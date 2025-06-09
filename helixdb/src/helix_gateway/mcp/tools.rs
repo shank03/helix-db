@@ -364,7 +364,6 @@ impl<'a> McpTools<'a> for McpBackend {
                     .clone()
                     .filter(move |item| {
                         properties.iter().all(|(key, value)| {
-                            println!("key: {:?}, value: {:?}", key, value);
                             item.check_property(key.as_str())
                                 .map_or(false, |v| *v == *value)
                         })
