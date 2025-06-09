@@ -43,6 +43,10 @@ pub enum ToolArgs {
     EFromType {
         edge_type: String,
     },
+    FilterItems {
+        properties: Option<Vec<(String, String)>>,
+        filter_traversals: Option<Vec<ToolArgs>>,
+    },
 }
 
 pub(crate) trait ToolCalls<'a> {
@@ -74,6 +78,7 @@ impl<'a> ToolCalls<'a> for McpBackend {
             ToolArgs::InEStep { edge_label } => self.in_e_step(connection, &edge_label, txn),
             ToolArgs::NFromType { node_type } => self.n_from_type(&node_type, txn),
             ToolArgs::EFromType { edge_type } => self.e_from_type(&edge_type, txn),
+            ToolArgs::FilterItems { properties, filter_traversals } => self.filter_items(connection, properties, filter_traversals, txn),
             _ => return Err(GraphError::New(format!("Tool {:?} not found", args))),
         }?;
 
@@ -127,10 +132,10 @@ trait McpTools<'a> {
     /// filters items based on properies and traversal existence
     fn filter_items(
         &'a self,
-        txn: &'a RoTxn,
         connection: &'a MCPConnection,
         properties: Option<Vec<(String, String)>>,
         filter_traversals: Option<Vec<ToolArgs>>,
+        txn: &'a RoTxn,
     ) -> Result<Vec<TraversalVal>, GraphError>;
 }
 
@@ -341,12 +346,16 @@ impl<'a> McpTools<'a> for McpBackend {
 
     fn filter_items(
         &'a self,
-        txn: &'a RoTxn,
         connection: &'a MCPConnection,
         properties: Option<Vec<(String, String)>>,
         filter_traversals: Option<Vec<ToolArgs>>,
+        txn: &'a RoTxn,
     ) -> Result<Vec<TraversalVal>, GraphError> {
         let db = Arc::clone(&self.db);
+
+        println!("properties: {:?}", properties);
+        println!("filter_traversals: {:?}", filter_traversals);
+        println!("connection: {:?}", connection.iter);
 
         let iter = match properties {
             Some(properties) => {
@@ -355,6 +364,7 @@ impl<'a> McpTools<'a> for McpBackend {
                     .clone()
                     .filter(move |item| {
                         properties.iter().all(|(key, value)| {
+                            println!("key: {:?}, value: {:?}", key, value);
                             item.check_property(key.as_str())
                                 .map_or(false, |v| *v == *value)
                         })
@@ -364,6 +374,8 @@ impl<'a> McpTools<'a> for McpBackend {
             }
             None => connection.iter.clone().collect::<Vec<_>>(),
         };
+
+        println!("iter: {:?}", iter);
 
         let result = iter
             .clone()
@@ -393,9 +405,11 @@ impl<'a> McpTools<'a> for McpBackend {
 
                     Some(item)
                 }
-                None => None,
+                None => Some(item),
             })
             .collect::<Vec<_>>();
+
+        println!("result: {:?}", result);
 
         Ok(result)
     }
