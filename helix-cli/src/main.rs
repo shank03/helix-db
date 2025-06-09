@@ -30,6 +30,136 @@ fn main() {
     let args = HelixCLI::parse();
 
     match args.command {
+        CommandType::Demo => {
+            println!("{}", "Demoing Helix".green().bold());
+
+            // run helix install
+            Command::new("helix").arg("install").output().unwrap();
+
+            // run helix init
+            Command::new("helix")
+                .arg("init")
+                .arg("--path")
+                .arg("demo")
+                .output()
+                .unwrap();
+
+            // write queries.hx
+            let queries_path = PathBuf::from("demo").join("queries.hx");
+            fs::write(
+                queries_path,
+                r#"
+QUERY CreateUser(name: String, age: U32, email: String) =>
+    user <- AddN<User>({name: name, age: age, email: email})
+    RETURN user
+
+
+QUERY CreateFollow(follower_id: ID, followed_id: ID) =>
+    follower <- N<User>(follower_id)
+    followed <- N<User>(followed_id)
+    AddE<Follows>::From(follower)::To(followed) // don't need to specify the `since` property because it has a default value
+    RETURN "success"
+
+
+QUERY CreatePost(user_id: ID, content: String) =>
+    user <- N<User>(user_id)
+    post <- AddN<Post>({content: content})
+    AddE<Created>::From(user)::To(post) // don't need to specify the `created_at` property because it has a default value
+    RETURN post
+
+
+QUERY GetUsers() =>
+    users <- N<User>
+    RETURN users
+
+QUERY GetPosts() =>
+    posts <- N<Post>
+    RETURN posts
+
+QUERY GetPostsByUser(user_id: ID) =>
+    posts <- N<User>(user_id)::Out<Created>
+    RETURN posts
+
+
+QUERY GetFollowedUsers(user_id: ID) =>
+    followed <- N<User>(user_id)::Out<Follows>
+    RETURN followed
+
+QUERY GetFollowedUsersPosts(user_id: ID) =>
+    followers <- N<User>(user_id)::Out<Follows>
+    posts <- followers::Out<Created>::RANGE(0, 40)
+    RETURN posts::{
+        post: _::{content},
+        creatorID: _::In<Created>::ID,
+    }
+            "#,
+            )
+            .unwrap();
+
+            // write schema.hx
+            let schema_path = PathBuf::from("demo").join("schema.hx");
+            fs::write(
+                schema_path,
+                r#"
+N::User {
+    name: String,
+    age: U32,
+    email: String,
+    created_at: Date DEFAULT NOW,
+    updated_at: Date DEFAULT NOW,
+}
+
+N::Post {
+    content: String,
+    created_at: Date DEFAULT NOW,
+    updated_at: Date DEFAULT NOW,
+}
+
+E::Follows {
+    From: User,
+    To: User,
+    Properties: {
+        since: Date DEFAULT NOW,
+    }
+}
+
+E::Created {
+    From: User,
+    To: Post,
+    Properties: {
+        created_at: Date DEFAULT NOW,
+    }
+}
+            "#,
+            )
+            .unwrap();
+
+            // write call.sh
+            let call_path = PathBuf::from("demo").join("call.sh");
+            fs::write(
+                call_path,
+                r#"
+curl -X POST http://localhost:6969/CreateUser -H "Content-Type: application/json" -d '{"name": "John Doe", "age": 25, "email": "john.doe@example.com"}'
+curl -X POST http://localhost:6969/CreateUser -H "Content-Type: application/json" -d '{"name": "Jane Doe", "age": 26, "email": "jane.doe@example.com"}'
+curl -X POST http://localhost:6969/CreateFollow -H "Content-Type: application/json" -d '{"follower_id": "1", "followed_id": "2"}'
+curl -X POST http://localhost:6969/CreatePost -H "Content-Type: application/json" -d '{"user_id": "1", "content": "Hello, world!"}'
+
+
+            "#,
+            )
+            .unwrap();
+
+            // run helix deploy
+            Command::new("helix")
+                .arg("deploy")
+                .arg("--path")
+                .arg("demo")
+                .output()
+                .unwrap();
+
+            // run call.sh
+            Command::new("sh").arg("call.sh").output().unwrap();
+        }
         CommandType::Deploy(command) => {
             match Command::new("cargo").output() {
                 Ok(_) => {}
