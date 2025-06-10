@@ -1,7 +1,6 @@
 use crate::{
     args::{CommandType, HelixCLI},
     instance_manager::InstanceManager,
-    styled_string::StyledString,
     types::*,
     utils::*,
 };
@@ -10,6 +9,7 @@ use clap::Parser;
 use helixdb::{
     helix_engine::graph_core::config::Config,
     ingestion_engine::{postgres_ingestion::PostgresIngestor, sql_ingestion::SqliteIngestor},
+    utils::styled_string::StyledString,
 };
 use spinners::{Spinner, Spinners};
 use std::{
@@ -22,7 +22,6 @@ use std::{
 
 pub mod args;
 mod instance_manager;
-mod styled_string;
 mod types;
 mod utils;
 
@@ -1021,14 +1020,14 @@ fn main() {
                 Err(e) => println!("{} {}", "Error while stopping instance".red().bold(), e),
             }
 
-            let mut del_prompt: bool = false;
+            let mut _del_prompt: bool = false;
             print!("Are you sure you want to delete the instance and its data? (y/n): ");
             std::io::stdout().flush().unwrap();
             let mut input = String::new();
             std::io::stdin().read_line(&mut input).unwrap();
-            del_prompt = input.trim().to_lowercase() == "y";
+            _del_prompt = input.trim().to_lowercase() == "y";
 
-            if del_prompt {
+            if _del_prompt {
                 match instance_manager.delete_instance(iid) {
                     Ok(_) => println!("{}", "Deleted Helix instance".green().bold()),
                     Err(e) => println!("{} {}", "Error while deleting instance".red().bold(), e),
@@ -1211,3 +1210,4 @@ fn main() {
         }
     }
 }
+

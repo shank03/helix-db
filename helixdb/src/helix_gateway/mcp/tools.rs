@@ -130,6 +130,7 @@ trait McpTools<'a> {
     ) -> Result<Vec<TraversalVal>, GraphError>;
 
     /// filters items based on properies and traversal existence
+    /// a node or edge needs to have been search first though
     fn filter_items(
         &'a self,
         connection: &'a MCPConnection,
@@ -413,3 +414,4 @@ impl<'a> McpTools<'a> for McpBackend {
         Ok(result)
     }
 }
+

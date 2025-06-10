@@ -9,31 +9,22 @@ use std::{
     vec::IntoIter,
 };
 
-use get_routes::{local_handler, mcp_handler};
-use heed3::{AnyTls, RoTxn};
+use get_routes::mcp_handler;
 use serde::Deserialize;
 
 use crate::{
     helix_engine::{
         graph_core::{
-            graph_core::HelixGraphEngine,
             ops::{
-                in_::{in_::InNodesIterator, in_e::InEdgesIterator},
-                out::{out::OutNodesIterator, out_e::OutEdgesIterator},
-                source::{add_e::EdgeType, n_from_type::NFromType},
-                tr_val::{Traversable, TraversalVal},
+                tr_val::TraversalVal,
             },
-            traversal_iter::RoTraversalIterator,
         },
         storage_core::storage_core::HelixGraphStorage,
         types::GraphError,
     },
-    helix_gateway::{
-        mcp::tools::{ToolArgs, ToolCalls},
-        router::router::HandlerInput,
-    },
+    helix_gateway::mcp::tools::{ToolArgs, ToolCalls},
     protocol::{
-        items::v6_uuid, label_hash::hash_label, request::Request, response::Response,
+        items::v6_uuid, request::Request, response::Response,
         return_values::ReturnValue,
     },
 };
@@ -89,26 +80,16 @@ impl McpBackend {
 
 pub struct MCPConnection {
     pub connection_id: String,
-    pub connection_addr: String,
-    pub connection_port: u16,
     pub iter: IntoIter<TraversalVal>,
 }
-
-// pub struct McpIter<I> {
-//     pub iter: I,
-// }
 
 impl MCPConnection {
     pub fn new(
         connection_id: String,
-        connection_addr: String,
-        connection_port: u16,
         iter: IntoIter<TraversalVal>,
     ) -> Self {
         Self {
             connection_id,
-            connection_addr,
-            connection_port,
             iter,
         }
     }
@@ -187,17 +168,10 @@ pub struct InitRequest {
 
 #[mcp_handler]
 pub fn init<'a>(input: &'a mut MCPToolInput, response: &mut Response) -> Result<(), GraphError> {
-    let data: InitRequest = match sonic_rs::from_slice(&input.request.body) {
-        Ok(data) => data,
-        Err(err) => return Err(GraphError::from(err)),
-    };
-
     let connection_id = uuid::Uuid::from_u128(v6_uuid()).to_string();
     let mut connections = input.mcp_connections.lock().unwrap();
     connections.add_connection(MCPConnection::new(
         connection_id.clone(),
-        data.connection_addr,
-        data.connection_port,
         vec![].into_iter(),
     ));
     drop(connections);
@@ -229,3 +203,4 @@ pub fn next<'a>(input: &'a mut MCPToolInput, response: &mut Response) -> Result<
     response.body = sonic_rs::to_vec(&ReturnValue::from(next)).unwrap();
     Ok(())
 }
+
