@@ -305,7 +305,7 @@ pub fn write_headers() -> String {
 
 use heed3::RoTxn;
 use get_routes::handler;
-use helixdb::{field_remapping, identifier_remapping, traversal_remapping, exclude_field};
+use helixdb::{field_remapping, identifier_remapping, traversal_remapping, exclude_field, value_remapping};
 use helixdb::helix_engine::vector_core::vector::HVector;
 use helixdb::{
     helix_engine::graph_core::ops::{

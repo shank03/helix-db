@@ -3,7 +3,10 @@ use std::sync::Arc;
 use heed3::{RoTxn, RwTxn, WithTls};
 
 use super::ops::tr_val::TraversalVal;
-use crate::helix_engine::{storage_core::storage_core::HelixGraphStorage, types::GraphError};
+use crate::{
+    helix_engine::{storage_core::storage_core::HelixGraphStorage, types::GraphError},
+    protocol::value::Value,
+};
 use itertools::Itertools;
 
 pub struct RoTraversalIterator<'a, I> {
@@ -45,6 +48,10 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> RoTraversalIterat
 
     pub fn collect_to_obj(self) -> Option<TraversalVal> {
         self.inner.filter_map(|item| item.ok()).take(1).next()
+    }
+
+    pub fn count_to_val(self) -> Value {
+        Value::from(self.inner.count())
     }
 }
 pub struct RwTraversalIterator<'scope, 'env, I> {

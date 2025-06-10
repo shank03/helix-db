@@ -165,17 +165,28 @@ impl PartialEq for FieldType {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (FieldType::String, FieldType::String) => true,
-            (FieldType::F32, FieldType::F32) => true,
-            (FieldType::F64, FieldType::F64) => true,
-            (FieldType::I8, FieldType::I8) => true,
-            (FieldType::I16, FieldType::I16) => true,
-            (FieldType::I32, FieldType::I32) => true,
-            (FieldType::I64, FieldType::I64) => true,
-            (FieldType::U8, FieldType::U8) => true,
-            (FieldType::U16, FieldType::U16) => true,
-            (FieldType::U32, FieldType::U32) => true,
-            (FieldType::U64, FieldType::U64) => true,
-            (FieldType::U128, FieldType::U128) => true,
+            (FieldType::F32 | FieldType::F64, FieldType::F32 | FieldType::F64) => true,
+            (
+                FieldType::I8
+                | FieldType::I16
+                | FieldType::I32
+                | FieldType::I64
+                | FieldType::U8
+                | FieldType::U16
+                | FieldType::U32
+                | FieldType::U64
+                | FieldType::U128,
+                FieldType::I8
+                | FieldType::I16
+                | FieldType::I32
+                | FieldType::I64
+                | FieldType::U8
+                | FieldType::U16
+                | FieldType::U32
+                | FieldType::U64
+                | FieldType::U128,
+            ) => true,
+
             (FieldType::Boolean, FieldType::Boolean) => true,
             (FieldType::Uuid, FieldType::Uuid) => true,
             (FieldType::Date, FieldType::Date) => true,

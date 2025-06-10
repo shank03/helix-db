@@ -1620,7 +1620,7 @@ impl<'a> Ctx<'a> {
                                         );
                                     }
                                 }
-                                GenRef::Std(format!("data.{}", i))
+                                GenRef::Std(format!("&data.{}", i))
                             }
                             IdType::Literal { value: s, loc } => GenRef::Std(s),
                             _ => unreachable!(),
@@ -1668,7 +1668,7 @@ impl<'a> Ctx<'a> {
             StartNode::Anonymous => {
                 let parent = parent_ty.unwrap();
                 gen_traversal.traversal_type =
-                    TraversalType::Nested(GenRef::Std("val".to_string())); // TODO: ensure this default is stable
+                    TraversalType::FromVar(GenRef::Std("val".to_string())); // TODO: ensure this default is stable
                 gen_traversal.source_step = Separator::Empty(SourceStep::Anonymous);
                 parent
             }
@@ -1729,10 +1729,11 @@ impl<'a> Ctx<'a> {
                     gen_traversal
                         .steps
                         .push(Separator::Period(GeneratedStep::Remapping(Remapping {
-                            variable_name: "".to_string(), // TODO: Change to start var
+                            variable_name: "item".to_string(), // TODO: Change to start var
                             is_inner: false,
                             should_spread: false,
                             remappings: vec![RemappingType::ExcludeField(ExcludeField {
+                                variable_name: "item".to_string(), // TODO: Change to start var
                                 fields_to_exclude: ex
                                     .fields
                                     .iter()
@@ -3111,11 +3112,35 @@ impl<'a> Ctx<'a> {
                             }
                         };
 
-                        RemappingType::TraversalRemapping(TraversalRemapping {
-                            variable_name: var_name.to_string(),
-                            new_field: key.clone(),
-                            new_value: inner_traversal,
-                        })
+                        match &traversal.steps.last() {
+                            Some(step) => {
+                                match step.step  {
+                                    StepType::Count | StepType::BooleanOperation(_) => {
+                                        return RemappingType::ValueRemapping(ValueRemapping {
+                                            variable_name: var_name.to_string(),
+                                            field_name: key.clone(),
+                                            value: GenRef::Std(inner_traversal.to_string()),
+                                        })
+                                    }
+                                    _ => {
+                                        RemappingType::TraversalRemapping(TraversalRemapping {
+                                            variable_name: var_name.to_string(),
+                                            new_field: key.clone(),
+                                            new_value: inner_traversal,
+                                        })
+                                    }
+                                }
+                            }
+                            None => {
+                                RemappingType::TraversalRemapping(TraversalRemapping {
+                                    variable_name: var_name.to_string(),
+                                    new_field: key.clone(),
+                                    new_value: inner_traversal,
+                                })
+                            }
+                        }
+
+                       
                     }
                     FieldValueType::Expression(expr) => {
                         match &expr.expr {
