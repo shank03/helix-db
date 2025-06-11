@@ -1,17 +1,14 @@
 use crate::{
-    args::{CommandType, HelixCLI},
+    args::{CommandType, HelixCLI, OutputLanguage},
     instance_manager::InstanceManager,
     types::*,
     utils::*,
 };
-use args::OutputLanguage;
-use clap::Parser;
 use helixdb::{
     helix_engine::graph_core::config::Config,
     ingestion_engine::{postgres_ingestion::PostgresIngestor, sql_ingestion::SqliteIngestor},
     utils::styled_string::StyledString,
 };
-use spinners::{Spinner, Spinners};
 use std::{
     fmt::Write,
     fs,
@@ -19,6 +16,8 @@ use std::{
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
+use clap::Parser;
+use spinners::{Spinner, Spinners};
 
 pub mod args;
 mod instance_manager;
