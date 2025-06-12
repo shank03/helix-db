@@ -251,7 +251,7 @@ impl Display for Query {
         }
         writeln!(
             f,
-            "let mut remapping_vals: RefCell<HashMap<u128, ResponseRemapping>> = RefCell::new(HashMap::new());"
+            "let mut remapping_vals = RemappingMap::new();"
         )?;
 
         writeln!(f, "let db = Arc::clone(&input.graph.storage);")?;

@@ -36,12 +36,11 @@ impl Node {
     pub fn decode_node(bytes: &[u8], id: u128) -> Result<Node, GraphError> {
         match bincode::deserialize::<Node>(bytes) {
             Ok(node) => {
-                let node = Node {
+                Ok(Node {
                     id,
                     label: node.label,
                     properties: node.properties,
-                };
-                Ok(node) // ERROR REACHING END OF FILE EARLs
+                })
             }
             Err(e) => Err(GraphError::ConversionError(format!(
                 "Error deserializing node: {}",
@@ -113,14 +112,13 @@ impl Edge {
     pub fn decode_edge(bytes: &[u8], id: u128) -> Result<Edge, GraphError> {
         match bincode::deserialize::<Edge>(bytes) {
             Ok(edge) => {
-                let edge = Edge {
+                Ok(Edge {
                     id,
                     label: edge.label,
                     from_node: edge.from_node,
                     to_node: edge.to_node,
                     properties: edge.properties,
-                };
-                Ok(edge)
+                })
             }
             Err(e) => Err(GraphError::ConversionError(format!(
                 "Error deserializing edge: {}",

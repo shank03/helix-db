@@ -2420,6 +2420,7 @@ impl<'a> Ctx<'a> {
                                 gen_traversal.steps.push(Separator::Period(
                                     GeneratedStep::PropertyFetch(GenRef::Literal(lit.clone())),
                                 ));
+                                gen_traversal.should_collect = ShouldCollect::ToVal;    
                             }
                             _ => unreachable!(),
                         }
@@ -2491,6 +2492,7 @@ impl<'a> Ctx<'a> {
                                 gen_traversal.steps.push(Separator::Period(
                                     GeneratedStep::PropertyFetch(GenRef::Literal(lit.clone())),
                                 ));
+                                gen_traversal.should_collect = ShouldCollect::ToVal;
                             }
                             _ => unreachable!(),
                         };
@@ -2534,16 +2536,86 @@ impl<'a> Ctx<'a> {
             }
             Type::Vector(Some(vector_ty)) => {
                 // Vectors only have 'id' and 'embedding' fields
-                if let Some(fields) = self.vector_fields.get(vector_ty.as_str()).cloned() {
-                    self.validate_object_fields(
-                        obj,
-                        &fields,
-                        &excluded,
-                        q,
-                        vector_ty,
-                        "vector",
-                        Some(tr.loc.clone()),
-                    );
+                // if let Some(fields) = self.vector_fields.get(vector_ty.as_str()).cloned() {
+                //     self.validate_object_fields(
+                //         obj,
+                //         &fields,
+                //         &excluded,
+                //         q,
+                //         vector_ty,
+                //         "vector",
+                //         Some(tr.loc.clone()),
+                //     );
+                // }
+
+                if let Some(field_set) = self.vector_fields.get(vector_ty.as_str()).cloned() {
+                    // if there is only one field then it is a property access
+                    if obj.fields.len() == 1
+                        && matches!(obj.fields[0].value.value, FieldValueType::Identifier(_))
+                    {
+                        match &obj.fields[0].value.value {
+                            FieldValueType::Identifier(lit) => {
+                                self.is_valid_identifier(
+                                    q,
+                                    obj.fields[0].value.loc.clone(),
+                                    lit.as_str(),
+                                );
+                                // gen_traversal.steps.push(Separator::Period(
+                                //     GeneratedStep::PropertyFetch(GenRef::Literal(lit.clone())),
+                                // ));
+                                gen_traversal.steps.push(Separator::Period(
+                                    GeneratedStep::PropertyFetch(GenRef::Literal(lit.clone())),
+                                ));
+                                gen_traversal.should_collect = ShouldCollect::ToVal;    
+                            }
+                            _ => unreachable!(),
+                        }
+                    } else if obj.fields.len() > 0 {
+                        // if there are multiple fields then it is a field remapping
+                        // push object remapping where
+                        let remapping = match var_name {
+                            Some(var_name) => self.parse_object_remapping(
+                                &obj.fields,
+                                q,
+                                false,
+                                scope,
+                                var_name,
+                                cur_ty.clone(),
+                            ),
+                            None => self.parse_object_remapping(
+                                &obj.fields,
+                                q,
+                                false,
+                                scope,
+                                "item",
+                                cur_ty.clone(),
+                            ),
+                        };
+                        // gen_traversal
+                        //     .steps
+                        //     .push(Separator::Period(GeneratedStep::Remapping(remapping)));
+                        gen_traversal
+                            .steps
+                            .push(Separator::Period(GeneratedStep::Remapping(remapping)));
+                    } else {
+                        // error
+                        self.push_query_err(
+                            q,
+                            obj.fields[0].value.loc.clone(),
+                            "vector object must have at least one field".to_string(),
+                            "vector object must have at least one field".to_string(),
+                        );
+                    }
+
+                    // self.validate_object_fields(
+                    //     obj,
+                    //     &field_set,
+                    //     &excluded,
+                    //     q,
+                    //     node_ty,
+                    //     "node",
+                    //     Some(tr.loc.clone()),
+                    // );
                 }
             }
             Type::Anonymous(ty) => {
@@ -3262,7 +3334,7 @@ impl<'a> Ctx<'a> {
                                                             GenRef::Literal(identifier.to_string()),
                                                         ),
                                                     )],
-                                                    should_collect: ShouldCollect::ToVec,
+                                                    should_collect: ShouldCollect::ToVal,
                                                 },
                                             })
                                         }

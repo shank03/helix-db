@@ -46,8 +46,11 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> RoTraversalIterat
             .collect::<B>()
     }
 
-    pub fn collect_to_obj(self) -> Option<TraversalVal> {
-        self.inner.filter_map(|item| item.ok()).take(1).next()
+    pub fn collect_to_obj(self) -> TraversalVal {
+        match self.inner.filter_map(|item| item.ok()).next() {
+            Some(val) => val,
+            None => TraversalVal::Empty,
+        }
     }
 
     pub fn count_to_val(self) -> Value {

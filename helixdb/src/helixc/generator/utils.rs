@@ -335,7 +335,7 @@ use helixdb::{
     helix_gateway::router::router::HandlerInput,
     node_matches, props,
     protocol::count::Count,
-    protocol::remapping::ResponseRemapping,
+    protocol::remapping::{RemappingMap, ResponseRemapping},
     protocol::response::Response,
     protocol::traversal_value::TraversalValue,
     protocol::{
