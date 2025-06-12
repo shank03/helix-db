@@ -1253,7 +1253,7 @@ fn test_drop_node() {
         .in_e("knows")
         .collect_to::<Vec<_>>();
 
-    assert_eq!(traversal, None);
+    assert_eq!(traversal, TraversalVal::Empty);
     assert_eq!(edges.len(), 0);
 }
 
@@ -1290,7 +1290,7 @@ fn test_drop_edge() {
     let traversal = G::new(Arc::clone(&storage), &txn)
         .e_from_id(&edge.id())
         .collect_to_obj();
-    assert_eq!(traversal, None);
+    assert_eq!(traversal, TraversalVal::Empty);
 
     let edges = G::new(Arc::clone(&storage), &txn)
         .n_from_id(&node1.id())

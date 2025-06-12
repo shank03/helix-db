@@ -143,7 +143,7 @@ pub mod macros {
             };
             let old_value_remapping =
                 Remapping::new(false, Some($new_name), Some(ReturnValue::from(old_value)));
-            $remapping_vals.borrow_mut().insert(
+            $remapping_vals.insert(
                 $var_name.id(),
                 ResponseRemapping::new(
                     HashMap::from([($old_name.to_string(), old_value_remapping)]),
@@ -158,13 +158,12 @@ pub mod macros {
     macro_rules! traversal_remapping {
         ($remapping_vals:expr, $var_name:expr, $new_name:expr => $traversal:expr) => {{
             // TODO: ref?
-            let traversal_result: Vec<TraversalVal> = $traversal;
             let new_remapping = Remapping::new(
                 false,
                 Some($new_name.to_string()),
-                Some(ReturnValue::from(traversal_result)),
+                Some(ReturnValue::from($traversal)),
             );
-            $remapping_vals.borrow_mut().insert(
+            $remapping_vals.insert(
                 $var_name.id(),
                 ResponseRemapping::new(
                     HashMap::from([($new_name.to_string(), new_remapping)]),
@@ -177,22 +176,23 @@ pub mod macros {
 
     #[macro_export]
     macro_rules! exclude_field {
-        ($remapping_vals:expr, $($field_to_exclude:expr),* $(,)?) => {{
+        ($remapping_vals:expr, $var_name:expr, $($field_to_exclude:expr),* $(,)?) => {{
 
                     $(
-                    let $field_to_exclude_remapping = Remapping::new(
+                    let field_to_exclude_remapping = Remapping::new(
                         true,
-                        Some($field_to_exclude),
+                        Some($field_to_exclude.to_string()),
                         None,
                     );
-                    $remapping_vals.borrow_mut().insert(
-                        item.id(),
+                    $remapping_vals.insert(
+                        $var_name.id(),
                         ResponseRemapping::new(
-                            HashMap::from([($field_to_exclude.to_string(), $field_to_exclude_remapping)]),
+                            HashMap::from([($field_to_exclude.to_string(), field_to_exclude_remapping)]),
                             false,
                         ),
                     );
                     )*
+                Ok::<TraversalVal, GraphError>($var_name)
         }};
     }
 
@@ -213,7 +213,7 @@ pub mod macros {
                 Some($identifier_value.to_string()),
                 Some(ReturnValue::from(value)),
             );
-            $remapping_vals.borrow_mut().insert(
+            $remapping_vals.insert(
                 $var_name.id(),
                 ResponseRemapping::new(
                     HashMap::from([($field_name.to_string(), value_remapping)]),
@@ -227,8 +227,8 @@ pub mod macros {
     #[macro_export]
     macro_rules! value_remapping {
         ($remapping_vals:expr, $var_name:expr, $field_name:expr =>  $value:expr) => {{
-            let old_value = match $var_name.check_property($field_name) {
-                Ok(val) => val,
+            let value = match $var_name.check_property($field_name) {
+                Ok(val) => val.clone(),
                 Err(e) => {
                     return Err(GraphError::ConversionError(format!(
                         "Error Decoding: {:?}",
@@ -237,15 +237,15 @@ pub mod macros {
                 }
             };
             let old_value_remapping =
-                Remapping::new(false, Some(value), Some(ReturnValue::from(old_value)));
-            $remapping_vals.borrow_mut().insert(
+                Remapping::new(false, Some($field_name.to_string()), Some(ReturnValue::from(value)));
+            $remapping_vals.insert(
                 $var_name.id(),
                 ResponseRemapping::new(
                     HashMap::from([($field_name.to_string(), old_value_remapping)]),
                     false,
                 ),
             );
-            Ok(()) // Return the Ok value
+            Ok::<TraversalVal, GraphError>($var_name) // Return the Ok value
         }};
     }
 }
