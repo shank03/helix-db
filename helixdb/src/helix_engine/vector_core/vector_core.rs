@@ -562,7 +562,7 @@ impl HNSW for VectorCore {
             Err(_) => {
                 self.set_entry_point(txn, &query)?;
                 query.set_distance(0.0);
-                return Ok(query);
+                query.clone()
             }
         };
 
