@@ -141,10 +141,10 @@ where
                 let data = item.vector_data();
                 let score = item.score();
 
-                let mut return_value = HashMap::with_capacity(2 + length);
-                return_value.insert("data".to_string(), ReturnValue::from(data));
-                return_value.insert("score".to_string(), ReturnValue::from(score));
-                return_value
+                let mut properties = HashMap::with_capacity(2 + length);
+                properties.insert("data".to_string(), ReturnValue::from(data));
+                properties.insert("score".to_string(), ReturnValue::from(score));
+                properties
             }
         };
         properties.insert("id".to_string(), ReturnValue::from(item.uuid()));
@@ -160,6 +160,7 @@ where
                     .map(|(k, v)| (k, ReturnValue::from(v))),
             );
         }
+
         ReturnValue::Object(properties)
     }
 }
@@ -246,7 +247,6 @@ impl ReturnValue {
                         );
                         ReturnValue::Object(properties)
                     }
-                    _ => unreachable!(),
                 })
                 .collect(),
         )
@@ -304,7 +304,6 @@ impl ReturnValue {
         match self {
             ReturnValue::Object(mut a) => {
                 remappings.into_iter().for_each(|(k, v)| {
-                    println!("k: {:?}, new_name: {:?}", k, v.new_name);
                     if v.exclude {
                         let _ = a.remove(k);
                     } else if let Some(new_name) = &v.new_name {

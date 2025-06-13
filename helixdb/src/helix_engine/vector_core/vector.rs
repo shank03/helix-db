@@ -190,7 +190,10 @@ impl Filterable for HVector {
     }
 
     fn properties(self) -> Option<HashMap<String, Value>> {
-        let mut properties = HashMap::new();
+        let mut properties = match self.properties {
+            Some(properties) => properties,
+            None => HashMap::new(),
+        };
         properties.insert(
             "data".to_string(),
             Value::Array(self.data.iter().map(|f| Value::F64(*f)).collect()),
