@@ -1,18 +1,14 @@
 use crate::{
     helix_engine::{
-        graph_core::{
-            ops::{
-                tr_val::TraversalVal,
-            },
-        },
+        graph_core::ops::tr_val::TraversalVal,
         storage_core::storage_core::HelixGraphStorage,
         types::GraphError,
     },
-    helix_gateway::mcp::tools::{ToolArgs, ToolCalls},
     protocol::{
         items::v6_uuid, request::Request, response::Response,
         return_values::ReturnValue,
     },
+    helix_gateway::mcp::tools::{ToolArgs, ToolCalls},
 };
 use get_routes::mcp_handler;
 use std::{
@@ -63,6 +59,12 @@ pub struct McpBackend {
 pub struct ToolCallRequest {
     pub connection_id: String,
     pub tool: ToolArgs,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct ResourceCallRequest {
+    pub connection_id: String,
 }
 
 impl McpBackend {
@@ -182,7 +184,7 @@ pub struct NextRequest {
 pub fn next<'a>(input: &'a mut MCPToolInput, response: &mut Response) -> Result<(), GraphError> {
     let data: NextRequest = match sonic_rs::from_slice(&input.request.body) {
         Ok(data) => data,
-        Err(err) => return Err(GraphError::from(err)),
+        Err(e) => return Err(GraphError::from(e)),
     };
 
     let mut connections = input.mcp_connections.lock().unwrap();
@@ -196,4 +198,21 @@ pub fn next<'a>(input: &'a mut MCPToolInput, response: &mut Response) -> Result<
     response.body = sonic_rs::to_vec(&ReturnValue::from(next)).unwrap();
     Ok(())
 }
+
+/*
+#[mcp_handler]
+pub fn schema_resource<'a>(input: &'a mut MCPToolInput, response: &mut Response) -> Result<(), GraphError> {
+    let data: ResourceCallRequest = match sonic_rs::from_slice(&input.request.body) {
+        Ok(data) => data,
+        Err(e) => return Err(GraphError::from(e)),
+    };
+
+    let mut connections = input.mcp_connections.lock().unwrap();
+    let connection = connections.get_connection_mut(&data.connection_id).unwrap();
+
+    response.body = sonic_rs::to_vec(&ReturnValue::from(schema)).unwrap();
+
+    Ok(())
+}
+*/
 

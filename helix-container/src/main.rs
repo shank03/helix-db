@@ -12,7 +12,6 @@ mod queries;
 
 #[tokio::main]
 async fn main() {
-    // read from config.hx.json
     let home = dirs::home_dir().expect("Could not retrieve home directory");
     let config_path = home.join(".helix/repo/helix-db/helix-container/src/config.hx.json");
     let schema_path = home.join(".helix/repo/helix-db/helix-container/src/schema.hx");
