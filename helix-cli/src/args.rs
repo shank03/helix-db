@@ -17,6 +17,9 @@ pub struct HelixCLI {
 
 #[derive(Debug, Subcommand)]
 pub enum CommandType {
+    /// Demo a Helix project
+    Demo,
+
     /// Deploy a Helix project
     Deploy(DeployCommand),
 

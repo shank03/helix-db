@@ -461,12 +461,22 @@ impl HNSW for VectorCore {
         with_data: bool,
     ) -> Result<HVector, VectorError> {
         let key = Self::vector_key(id, level);
-        let mut vector = match self.vectors_db.get(txn, key.as_ref())? {
+        let vector = match self.vectors_db.get(txn, key.as_ref())? {
             Some(bytes) => {
                 let vector = match with_data {
-                    true => HVector::from_bytes(id, level, &bytes),
-                    false => Ok(HVector::from_slice(level, vec![])),
-                }?;
+                    true => {
+                        let mut vector = HVector::from_bytes(id, level, &bytes)?;
+                        vector.properties = match self.vector_data_db.get(txn, &id.to_be_bytes())? {
+                            Some(bytes) => {
+                                Some(bincode::deserialize(&bytes).map_err(VectorError::from)?)
+                            }
+                            None => None,
+                        };
+                        println!("vector: {:?}", vector);
+                        vector
+                    }
+                    false => HVector::from_bytes(id, level, &bytes)?,
+                };
                 Ok(vector)
             }
             None if level > 0 => self.get_vector(txn, id, 0, with_data),
@@ -562,7 +572,7 @@ impl HNSW for VectorCore {
             Err(_) => {
                 self.set_entry_point(txn, &query)?;
                 query.set_distance(0.0);
-                return Ok(query);
+                query.clone()
             }
         };
 

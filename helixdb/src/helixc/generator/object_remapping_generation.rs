@@ -40,13 +40,15 @@ impl Display for FieldRemapping {
 /// This is used for excluding fields
 #[derive(Clone)]
 pub struct ExcludeField {
+    pub variable_name: String,
     pub fields_to_exclude: Vec<GenRef<String>>,
 }
 impl Display for ExcludeField {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "exclude_fields!(remapping_vals, {})",
+            "exclude_field!(remapping_vals, {}.clone(), {})",
+            self.variable_name,
             self.fields_to_exclude
                 .iter()
                 .map(|s| s.to_string())
