@@ -1,17 +1,3 @@
-// provides tool endpoints for mcp
-// init endpoint to get a user id and establish a connection to helix server
-
-// wraps iter in new tools
-
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-    vec::IntoIter,
-};
-
-use get_routes::mcp_handler;
-use serde::Deserialize;
-
 use crate::{
     helix_engine::{
         graph_core::{
@@ -28,6 +14,13 @@ use crate::{
         return_values::ReturnValue,
     },
 };
+use get_routes::mcp_handler;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+    vec::IntoIter,
+};
+use serde::Deserialize;
 
 pub struct McpConnections {
     pub connections: HashMap<String, MCPConnection>,

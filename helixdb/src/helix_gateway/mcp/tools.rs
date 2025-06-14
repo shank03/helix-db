@@ -1,22 +1,24 @@
-use crate::helix_engine::graph_core::ops::g::G;
-use crate::helix_engine::graph_core::ops::in_::in_::{InAdapter, InNodesIterator};
-use crate::helix_engine::graph_core::ops::in_::in_e::{InEdgesAdapter, InEdgesIterator};
-use crate::helix_engine::graph_core::ops::out::out::{OutAdapter, OutNodesIterator};
-use crate::helix_engine::graph_core::ops::out::out_e::{OutEdgesAdapter, OutEdgesIterator};
-use crate::helix_engine::graph_core::ops::source::add_e::EdgeType;
-use crate::helix_engine::graph_core::ops::source::e_from_type::{EFromType, EFromTypeAdapter};
-use crate::helix_engine::graph_core::ops::source::n_from_type::{NFromType, NFromTypeAdapter};
-use crate::helix_engine::graph_core::ops::tr_val::{Traversable, TraversalVal};
-use crate::helix_engine::storage_core::storage_core::HelixGraphStorage;
-use crate::helix_engine::types::GraphError;
-use crate::helix_gateway::mcp::mcp::{MCPConnection, McpBackend};
-use crate::helix_gateway::router::router::HandlerInput;
-use crate::protocol::label_hash::hash_label;
-use crate::protocol::response::Response;
-use get_routes::local_handler;
+use crate::{
+    helix_engine::{
+        graph_core::ops::{
+            in_::in_::{InAdapter, InNodesIterator},
+            in_::in_e::{InEdgesAdapter, InEdgesIterator},
+            out::out::{OutAdapter, OutNodesIterator},
+            out::out_e::{OutEdgesAdapter, OutEdgesIterator},
+            source::add_e::EdgeType,
+            source::e_from_type::EFromType,
+            source::n_from_type::NFromType,
+            tr_val::{Traversable, TraversalVal},
+            g::G,
+        },
+        storage_core::storage_core::HelixGraphStorage,
+        types::GraphError,
+    },
+    protocol::label_hash::hash_label,
+    helix_gateway::mcp::mcp::{MCPConnection, McpBackend},
+};
 use heed3::RoTxn;
-use serde::{Deserialize, Deserializer};
-use std::collections::HashMap;
+use serde::Deserialize;
 use std::sync::Arc;
 
 #[derive(Debug, Deserialize)]
@@ -79,7 +81,7 @@ impl<'a> ToolCalls<'a> for McpBackend {
             ToolArgs::NFromType { node_type } => self.n_from_type(&node_type, txn),
             ToolArgs::EFromType { edge_type } => self.e_from_type(&edge_type, txn),
             ToolArgs::FilterItems { properties, filter_traversals } => self.filter_items(connection, properties, filter_traversals, txn),
-            _ => return Err(GraphError::New(format!("Tool {:?} not found", args))),
+            //_ => return Err(GraphError::New(format!("Tool {:?} not found", args))),
         }?;
 
         Ok(result)
