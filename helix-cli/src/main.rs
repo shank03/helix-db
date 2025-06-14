@@ -129,6 +129,7 @@ fn main() {
 
             let file_path = PathBuf::from(&output).join("src/queries.rs");
             let mut generated_rust_code = String::new();
+
             match write!(&mut generated_rust_code, "{}", analyzed_source) {
                 Ok(_) => {
                     println!("{}", "Successfully transpiled queries".green().bold());
@@ -139,6 +140,7 @@ fn main() {
                     return;
                 }
             }
+
             match fs::write(file_path, generated_rust_code) {
                 Ok(_) => {
                     println!("{}", "Successfully wrote queries file".green().bold());
@@ -152,11 +154,11 @@ fn main() {
 
             let mut sp = Spinner::new(Spinners::Dots9, "Building Helix".into());
 
-            // copy config.hx.json to ~/.helix/repo/helix-db/helix-container/config.hx.json
             let config_path = PathBuf::from(&output).join("src/config.hx.json");
-            fs::copy(PathBuf::from(path + "/config.hx.json"), config_path).unwrap();
+            fs::copy(PathBuf::from(path.clone() + "/config.hx.json"), config_path).unwrap();
+            let schema_path = PathBuf::from(&output).join("src/schema.hx");
+            fs::copy(PathBuf::from(path.clone() + "/schema.hx"), schema_path).unwrap();
 
-            // check rust code
             let mut runner = Command::new("cargo");
             runner
                 .arg("check")
