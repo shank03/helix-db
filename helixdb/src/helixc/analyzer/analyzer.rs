@@ -4438,7 +4438,7 @@ impl<'a> Ctx<'a> {
 
     fn gen_identifier_or_param(&self, q: &Query, name: &str) -> GeneratedValue {
         if self.is_param(q, name) {
-            GeneratedValue::Parameter(GenRef::Std(format!("data.{}", name)))
+            GeneratedValue::Parameter(GenRef::Ref(format!("data.{}", name)))
         } else {
             GeneratedValue::Identifier(GenRef::Std(name.to_string()))
         }
