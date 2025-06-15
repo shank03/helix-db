@@ -75,7 +75,8 @@ impl Config {
             "graph_config": {
                 "secondary_indices": []
             },
-            "db_max_size_gb": 10
+            "db_max_size_gb": 10,
+            "mcp": true
         }
         "#
         .to_string()
