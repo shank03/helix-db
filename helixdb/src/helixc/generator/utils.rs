@@ -329,7 +329,7 @@ use helixdb::{
         },
         vectors::{insert::InsertVAdapter, search::SearchVAdapter, brute_force_search::BruteForceSearchVAdapter},
         bm25::search_bm25::SearchBM25Adapter,
-        
+
     },
     helix_engine::types::GraphError,
     helix_gateway::router::router::HandlerInput,
@@ -337,7 +337,6 @@ use helixdb::{
     protocol::count::Count,
     protocol::remapping::{RemappingMap, ResponseRemapping},
     protocol::response::Response,
-    protocol::traversal_value::TraversalValue,
     protocol::{
         filterable::Filterable, remapping::Remapping, return_values::ReturnValue, value::Value, id::ID,
     },

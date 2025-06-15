@@ -24,7 +24,7 @@ impl Display for BoolOp {
             BoolOp::Neq(neq) => format!("{}", neq),
             BoolOp::Contains(cont) => unimplemented!(),
         };
-        write!(f, "map_or(false, |v| *v{})", s)
+        write!(f, "map_value_or(false, |v| v{})?", s)
     }
 }
 #[derive(Clone)]
