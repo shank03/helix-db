@@ -1,17 +1,7 @@
-use crate::{
-    helix_engine::{
-        storage_core::storage_core::HelixGraphStorage,
-        types::GraphError,
-        graph_core::config::Config,
-    },
-    helix_gateway::mcp::mcp::{McpBackend, McpConnections},
-};
-use crate::protocol::{
-    items::{Edge, Node},
-    return_values::ReturnValue,
-    value::Value,
-};
-
+use crate::helix_engine::storage_core::storage_core::HelixGraphStorage;
+use crate::helix_engine::types::GraphError;
+use crate::helix_gateway::mcp::mcp::{McpBackend, McpConnections};
+use std::sync::{Arc, Mutex};
 use crate::helix_engine::graph_core::config::Config;
 
 #[derive(Debug)]
