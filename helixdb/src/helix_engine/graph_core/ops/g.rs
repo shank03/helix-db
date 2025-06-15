@@ -1,6 +1,9 @@
 use super::tr_val::TraversalVal;
 use crate::helix_engine::{
-    graph_core::traversal_iter::{RoTraversalIterator, RwTraversalIterator},
+    graph_core::{
+        ops::tr_val::IntoTraversalValues,
+        traversal_iter::{RoTraversalIterator, RwTraversalIterator},
+    },
     storage_core::storage_core::HelixGraphStorage,
     types::GraphError,
 };
@@ -54,13 +57,13 @@ impl G {
     /// let txn = storage.graph_env.read_txn().unwrap();
     /// let traversal = G::new_from(storage, &txn, vec![TraversalVal::Node(Node { id: 1, label: "Person".to_string(), properties: None })]);
     /// ```
-    pub fn new_from<'a>(
+    pub fn new_from<'a, T: IntoTraversalValues>(
         storage: Arc<HelixGraphStorage>,
         txn: &'a RoTxn<'a>,
-        items: Vec<TraversalVal>,
+        items: T,
     ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>> {
         RoTraversalIterator {
-            inner: items.into_iter().map(|val| Ok(val)),
+            inner: items.into().into_iter().map(|val| Ok(val)),
             storage,
             txn,
         }

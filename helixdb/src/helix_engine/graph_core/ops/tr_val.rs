@@ -131,3 +131,19 @@ impl Traversable for Vec<TraversalVal> {
         self[0].uuid()
     }
 }
+
+pub trait IntoTraversalValues {
+    fn into(self) -> Vec<TraversalVal>;
+}
+
+impl IntoTraversalValues for Vec<TraversalVal> {
+    fn into(self) -> Vec<TraversalVal> {
+        self
+    }
+}
+
+impl IntoTraversalValues for TraversalVal {
+    fn into(self) -> Vec<TraversalVal> {
+        vec![self]
+    }
+}
