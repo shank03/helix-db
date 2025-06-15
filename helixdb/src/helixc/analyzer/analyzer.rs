@@ -2413,7 +2413,7 @@ impl<'a> Ctx<'a> {
                                 gen_traversal.steps.push(Separator::Period(
                                     GeneratedStep::PropertyFetch(GenRef::Literal(lit.clone())),
                                 ));
-                                gen_traversal.should_collect = ShouldCollect::ToVal;    
+                                gen_traversal.should_collect = ShouldCollect::ToVal;
                             }
                             _ => unreachable!(),
                         }
@@ -2559,7 +2559,7 @@ impl<'a> Ctx<'a> {
                                 gen_traversal.steps.push(Separator::Period(
                                     GeneratedStep::PropertyFetch(GenRef::Literal(lit.clone())),
                                 ));
-                                gen_traversal.should_collect = ShouldCollect::ToVal;    
+                                gen_traversal.should_collect = ShouldCollect::ToVal;
                             }
                             _ => unreachable!(),
                         }
@@ -3204,8 +3204,6 @@ impl<'a> Ctx<'a> {
                                 })
                             }
                         }
-
-                       
                     }
                     FieldValueType::Expression(expr) => {
                         match &expr.expr {
@@ -4439,9 +4437,7 @@ impl<'a> Ctx<'a> {
     }
 
     fn gen_identifier_or_param(&self, q: &Query, name: &str) -> GeneratedValue {
-        println!("{:?}", name);
         if self.is_param(q, name) {
-            println!("{:?}", name);
             GeneratedValue::Parameter(GenRef::Std(format!("data.{}", name)))
         } else {
             GeneratedValue::Identifier(GenRef::Std(name.to_string()))

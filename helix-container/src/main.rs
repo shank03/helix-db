@@ -109,6 +109,6 @@ async fn main() {
     // start server
     println!("Starting server...");
     let a = gateway.connection_handler.accept_conns().await.unwrap();
-    let b = a.await.unwrap();
+    let _b = a.await.unwrap();
 }
 

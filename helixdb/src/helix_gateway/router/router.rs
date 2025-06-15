@@ -9,7 +9,7 @@
 
 use crate::{
     helix_engine::{graph_core::graph_core::HelixGraphEngine, types::GraphError},
-    helix_gateway::mcp::mcp::{MCPHandlerFn, MCPToolInput, McpConnections},
+    helix_gateway::mcp::mcp::{MCPHandlerFn, MCPToolInput},
 };
 use core::fmt;
 use std::{collections::HashMap, sync::Arc};
@@ -110,7 +110,7 @@ impl HelixRouter {
                 request,
                 mcp_backend: Arc::clone(&graph_access.mcp_backend.as_ref().unwrap()),
                 mcp_connections: Arc::clone(&graph_access.mcp_connections.as_ref().unwrap()),
-                schema: graph_access.storage.schema.clone(),
+                schema: Some(graph_access.storage.schema.clone()),
             };
             return mcp_handler(&mut mcp_input, response);
         };

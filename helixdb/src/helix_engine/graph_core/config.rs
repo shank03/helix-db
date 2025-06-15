@@ -23,7 +23,6 @@ pub struct Config {
     pub graph_config: GraphConfig,
     pub db_max_size_gb: Option<usize>, // database in GB
     pub mcp: bool,
-    // NOTE: just string for now, but should be stored in a structured manner
     pub schema: Option<String>,
 }
 

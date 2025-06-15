@@ -42,7 +42,7 @@ pub struct HelixGraphStorage {
     pub secondary_indices: HashMap<String, Database<Bytes, U128<BE>>>,
     pub vectors: VectorCore,
     pub bm25: HBM25Config,
-    pub schema: Option<String>,
+    pub schema: String,
 }
 
 impl HelixGraphStorage {
@@ -78,13 +78,11 @@ impl HelixGraphStorage {
         let out_edges_db: Database<Bytes, Bytes> = graph_env
             .database_options()
             .types::<Bytes, Bytes>()
-            .flags(DatabaseFlags::DUP_SORT | DatabaseFlags::DUP_FIXED) // TODO: remove as well?
             .name(DB_OUT_EDGES)
             .create(&mut wtxn)?;
         let in_edges_db: Database<Bytes, Bytes> = graph_env
             .database_options()
             .types::<Bytes, Bytes>()
-            .flags(DatabaseFlags::DUP_SORT | DatabaseFlags::DUP_FIXED) // TODO: remove as well?
             .name(DB_IN_EDGES)
             .create(&mut wtxn)?;
 
@@ -124,7 +122,7 @@ impl HelixGraphStorage {
             secondary_indices,
             vectors,
             bm25,
-            schema: config.schema,
+            schema: config.schema.unwrap_or("".to_string()),
         })
     }
 
