@@ -337,7 +337,6 @@ use helixdb::{
     protocol::count::Count,
     protocol::remapping::{RemappingMap, ResponseRemapping},
     protocol::response::Response,
-    protocol::traversal_value::TraversalValue,
     protocol::{
         filterable::Filterable, remapping::Remapping, return_values::ReturnValue, value::Value, id::ID,
     },

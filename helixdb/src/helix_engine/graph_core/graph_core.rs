@@ -6,7 +6,13 @@ use crate::{
     },
     helix_gateway::mcp::mcp::{McpBackend, McpConnections},
 };
-use std::sync::{Arc, Mutex};
+use crate::protocol::{
+    items::{Edge, Node},
+    return_values::ReturnValue,
+    value::Value,
+};
+
+use crate::helix_engine::graph_core::config::Config;
 
 #[derive(Debug)]
 pub enum QueryInput {

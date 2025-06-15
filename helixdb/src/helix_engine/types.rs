@@ -1,15 +1,8 @@
-use crate::{
-    helixc::parser::parser_methods::ParserError,
-    protocol::traversal_value::TraversalValueError,
-};
+use crate::helixc::parser::parser_methods::ParserError;
 use core::fmt;
 use heed3::Error as HeedError;
 use sonic_rs::Error as SonicError;
-use std::{
-    net::AddrParseError,
-    str::Utf8Error,
-    string::FromUtf8Error
-};
+use std::{net::AddrParseError, str::Utf8Error, string::FromUtf8Error};
 
 #[derive(Debug)]
 pub enum GraphError {
@@ -32,7 +25,7 @@ pub enum GraphError {
     InvalidNode,
     ConfigFileNotFound,
     SliceLengthError,
-    ShortestPathNotFound
+    ShortestPathNotFound,
 }
 
 impl fmt::Display for GraphError {
@@ -41,13 +34,13 @@ impl fmt::Display for GraphError {
             GraphError::Io(e) => write!(f, "IO error: {}", e),
             GraphError::StorageConnectionError(msg, e) => {
                 write!(f, "Error: {}", format!("{} {}", msg, e))
-            },
+            }
             GraphError::GraphConnectionError(msg, e) => {
                 write!(f, "Error: {}", format!("{} {}", msg, e))
-            },
+            }
             GraphError::TraversalError(msg) => write!(f, "Traversal error: {}", msg),
             GraphError::StorageError(msg) => write!(f, "Storage error: {}", msg),
-            GraphError::ConversionError(msg ) => write!(f, "Conversion error: {}", msg),
+            GraphError::ConversionError(msg) => write!(f, "Conversion error: {}", msg),
             GraphError::DecodeError(msg) => write!(f, "Decode error: {}", msg),
             GraphError::EdgeNotFound => write!(f, "Edge not found"),
             GraphError::NodeNotFound => write!(f, "Node not found"),
@@ -84,7 +77,6 @@ impl From<std::io::Error> for GraphError {
     }
 }
 
-
 impl From<AddrParseError> for GraphError {
     fn from(error: AddrParseError) -> Self {
         GraphError::ConversionError(format!("AddrParseError: {}", error.to_string()))
@@ -93,7 +85,7 @@ impl From<AddrParseError> for GraphError {
 
 impl From<SonicError> for GraphError {
     fn from(error: SonicError) -> Self {
-        GraphError::ConversionError(format!("sonic error: {}" , error.to_string()))
+        GraphError::ConversionError(format!("sonic error: {}", error.to_string()))
     }
 }
 
@@ -114,8 +106,6 @@ impl From<String> for GraphError {
         GraphError::New(error.to_string())
     }
 }
-
-
 
 impl From<bincode::Error> for GraphError {
     fn from(error: bincode::Error) -> Self {
@@ -138,13 +128,6 @@ impl From<Utf8Error> for GraphError {
 impl From<uuid::Error> for GraphError {
     fn from(error: uuid::Error) -> Self {
         GraphError::ConversionError(format!("uuid error: {}", error.to_string()))
-    }
-}
-
-
-impl From<TraversalValueError> for GraphError {
-    fn from(error: TraversalValueError) -> Self {
-        GraphError::ConversionError(format!("TraversalValueError: {}", error.to_string()))
     }
 }
 
