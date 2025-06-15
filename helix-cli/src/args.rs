@@ -54,6 +54,7 @@ pub enum CommandType {
     Start(StartCommand),
 
     /// Ingest data into Helix
+    #[cfg(feature = "ingestion")]
     Ingest(IngestCommand),
 
     /// Give an instance a short description
@@ -87,7 +88,10 @@ pub struct DeployCommand {
 pub struct UpdateCommand {}
 
 #[derive(Debug, Args)]
-#[clap(name = "version", about = "Get the installed verison of helix-cli and helix-db")]
+#[clap(
+    name = "version",
+    about = "Get the installed verison of helix-cli and helix-db"
+)]
 pub struct VersionCommand {}
 
 #[derive(Debug, Args)]
@@ -253,8 +257,7 @@ impl PartialEq for OutputLanguage {
         match (self, other) {
             (OutputLanguage::TypeScript, OutputLanguage::TypeScript) => true,
             (OutputLanguage::Rust, OutputLanguage::Rust) => true,
-            _ => false
+            _ => false,
         }
     }
 }
-
