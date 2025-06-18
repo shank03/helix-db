@@ -44,8 +44,8 @@ async fn main() -> Result<(), AdminError> {
                 tokio::spawn(async move {
                     // rename old binary
                     Command::new("mv")
-                        .arg("hbuild")
-                        .arg("hbuild_old")
+                        .arg("helix")
+                        .arg("helix_old")
                         .spawn()
                         .unwrap();
 
@@ -53,13 +53,13 @@ async fn main() -> Result<(), AdminError> {
                     let response = s3_client_clone
                         .get_object()
                         .bucket("helix-build")
-                        .key(format!("{}/hbuild/latest", user_id_clone))
+                        .key(format!("{}/helix/latest", user_id_clone))
                         .send()
                         .await
                         .unwrap();
 
                     // create binary file or overwrite if it exists
-                    let mut file = File::create("hbuild").unwrap();
+                    let mut file = File::create("helix").unwrap();
                     let body = match response.body.collect().await {
                         Ok(body) => body.to_vec(),
                         Err(e) => {
@@ -72,7 +72,7 @@ async fn main() -> Result<(), AdminError> {
                     // set permissions
                     Command::new("chmod")
                         .arg("+x")
-                        .arg("hbuild")
+                        .arg("helix")
                         .spawn()
                         .unwrap();
 
@@ -95,8 +95,8 @@ async fn main() -> Result<(), AdminError> {
                     // if not revert
                     if !output.status.success() {
                         Command::new("mv")
-                            .arg("hbuild_old")
-                            .arg("hbuild")
+                            .arg("helix_old")
+                            .arg("helix")
                             .spawn()
                             .unwrap();
 
@@ -110,7 +110,7 @@ async fn main() -> Result<(), AdminError> {
                         return;
                     } else {
                         // delete old binary
-                        Command::new("rm").arg("hbuild_old").spawn().unwrap();
+                        Command::new("rm").arg("helix_old").spawn().unwrap();
                     }
                 });
             }
