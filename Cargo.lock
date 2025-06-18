@@ -1861,10 +1861,7 @@ dependencies = [
  "anyhow",
  "aws-config",
  "aws-sdk-s3",
- "futures",
- "helixdb",
  "serde",
- "socket2",
  "sonic-rs",
  "tokio",
 ]
