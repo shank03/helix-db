@@ -2,13 +2,6 @@ use std::{sync::Arc, time::Instant};
 
 use crate::{
     helix_engine::graph_core::ops::{
-        source::{bulk_add_e::BulkAddEAdapter, e_from_type::EFromTypeAdapter},
-        util::drop::Drop,
-    },
-    props,
-};
-use crate::{
-    helix_engine::graph_core::ops::{
         source::{n_from_index::NFromIndexAdapter, n_from_type::NFromTypeAdapter},
         util::paths::ShortestPathAdapter,
     },
@@ -37,6 +30,18 @@ use crate::{
     },
     protocol::items::v6_uuid,
 };
+use crate::{
+    helix_engine::{
+        graph_core::ops::{
+            source::{bulk_add_e::BulkAddEAdapter, e_from_type::EFromTypeAdapter},
+            util::drop::Drop,
+            vectors::{insert::InsertVAdapter, search::SearchVAdapter},
+        },
+        vector_core::vector::HVector,
+    },
+    props,
+};
+use heed3::RoTxn;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use tempfile::TempDir;
@@ -1756,3 +1761,53 @@ fn test_add_n_parallel() {
 
 // 3 614 375 936
 // 3 411 509 248
+
+#[test]
+fn test_add_e_between_node_and_vector() {
+    let (storage, _temp_dir) = setup_test_db();
+    let mut txn = storage.graph_env.write_txn().unwrap();
+
+    let node = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_n("person", None, None)
+        .collect_to_val();
+
+    let vector   = G::new_mut(Arc::clone(&storage), &mut txn)
+        .insert_v::<fn(&HVector, &RoTxn) -> bool>(&vec![1.0, 2.0, 3.0], "vector", None)
+        .collect_to_val();
+
+    let edge = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_e("knows", None, node.id(), vector.id(), false, EdgeType::Vec)
+        .collect_to_val();
+
+    txn.commit().unwrap();
+
+    let txn = storage.graph_env.read_txn().unwrap();
+    let traversal = G::new(Arc::clone(&storage), &txn)
+        .n_from_id(&node.id())
+        .out("knows", &EdgeType::Vec)
+        .collect_to::<Vec<_>>();
+
+    println!("traversal: {:?}", traversal);
+
+    println!(
+        "edges: {:?}",
+        G::new(Arc::clone(&storage), &txn)
+            .e_from_type("knows")
+            .collect_to::<Vec<_>>()
+    );
+
+
+
+    println!(
+        "vectors: {:?}",
+        G::new(Arc::clone(&storage), &txn)
+            .search_v::<fn(&HVector, &RoTxn) -> bool>(&vec![1.0, 2.0, 3.0], 10, None)
+            .collect_to::<Vec<_>>()
+    );
+
+
+
+
+    assert_eq!(traversal.len(), 1);
+    assert_eq!(traversal[0].id(), vector.id());
+}
