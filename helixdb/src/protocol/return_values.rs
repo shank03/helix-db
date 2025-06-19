@@ -19,158 +19,6 @@ pub enum ReturnValue {
     Empty,
 }
 
-impl Serialize for ReturnValue {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::ser::Serializer,
-    {
-        match self {
-            ReturnValue::Value(value) => value.serialize(serializer),
-            ReturnValue::Object(object) => object.serialize(serializer),
-            ReturnValue::Array(array) => array.serialize(serializer),
-            ReturnValue::Empty => serializer.serialize_none(),
-        }
-    }
-}
-
-impl From<Value> for ReturnValue {
-    fn from(value: Value) -> Self {
-        ReturnValue::Value(value)
-    }
-}
-
-impl From<&Value> for ReturnValue {
-    fn from(value: &Value) -> Self {
-        ReturnValue::Value(value.clone())
-    }
-}
-
-impl From<Count> for ReturnValue {
-    fn from(count: Count) -> Self {
-        ReturnValue::Value(Value::I32(count.value() as i32))
-    }
-}
-
-impl From<String> for ReturnValue {
-    fn from(string: String) -> Self {
-        ReturnValue::Value(Value::String(string))
-    }
-}
-
-impl From<bool> for ReturnValue {
-    fn from(boolean: bool) -> Self {
-        ReturnValue::Value(Value::Boolean(boolean))
-    }
-}
-
-impl From<&str> for ReturnValue {
-    fn from(string: &str) -> Self {
-        ReturnValue::Value(Value::String(string.to_string()))
-    }
-}
-
-impl From<i32> for ReturnValue {
-    fn from(integer: i32) -> Self {
-        ReturnValue::Value(Value::I32(integer))
-    }
-}
-
-impl From<f64> for ReturnValue {
-    fn from(float: f64) -> Self {
-        ReturnValue::Value(Value::F64(float))
-    }
-}
-
-impl From<u128> for ReturnValue {
-    fn from(integer: u128) -> Self {
-        ReturnValue::Value(Value::U128(integer))
-    }
-}
-
-impl From<Vec<TraversalVal>> for ReturnValue {
-    fn from(array: Vec<TraversalVal>) -> Self {
-        ReturnValue::Array(array.into_iter().map(|val| val.into()).collect())
-    }
-}
-
-impl From<TraversalVal> for ReturnValue {
-    fn from(val: TraversalVal) -> Self {
-        match val {
-            TraversalVal::Node(node) => ReturnValue::from(node),
-            TraversalVal::Edge(edge) => ReturnValue::from(edge),
-            TraversalVal::Vector(vector) => ReturnValue::from(vector),
-            TraversalVal::Count(count) => ReturnValue::from(count),
-            TraversalVal::Value(value) => ReturnValue::from(value),
-            TraversalVal::Empty => ReturnValue::Empty,
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl From<&[f64]> for ReturnValue {
-    fn from(data: &[f64]) -> Self {
-        ReturnValue::Array(data.iter().map(|f| ReturnValue::from(*f)).collect())
-    }
-}
-
-impl<I> From<I> for ReturnValue
-where
-    I: Filterable + Clone,
-{
-    #[inline]
-    fn from(item: I) -> Self {
-        let length = match item.properties_ref() {
-            Some(properties) => properties.len(),
-            None => 0,
-        };
-        let mut properties = match item.type_name() {
-            FilterableType::Node => HashMap::with_capacity(Node::NUM_PROPERTIES + length),
-            FilterableType::Edge => {
-                let mut properties = HashMap::with_capacity(Edge::NUM_PROPERTIES + length);
-                properties.insert(
-                    "from_node".to_string(),
-                    ReturnValue::from(item.from_node_uuid()),
-                );
-                properties.insert(
-                    "to_node".to_string(),
-                    ReturnValue::from(item.to_node_uuid()),
-                );
-                properties
-            }
-            FilterableType::Vector => {
-                let data = item.vector_data();
-                let score = item.score();
-
-                let mut properties = HashMap::with_capacity(2 + length);
-                properties.insert("data".to_string(), ReturnValue::from(data));
-                properties.insert("score".to_string(), ReturnValue::from(score));
-                properties
-            }
-        };
-        properties.insert("id".to_string(), ReturnValue::from(item.uuid()));
-        properties.insert(
-            "label".to_string(),
-            ReturnValue::from(item.label().to_string()),
-        );
-        if item.properties_ref().is_some() {
-            properties.extend(
-                item.properties()
-                    .unwrap()
-                    .into_iter()
-                    .map(|(k, v)| (k, ReturnValue::from(v))),
-            );
-        }
-
-        ReturnValue::Object(properties)
-    }
-}
-
-impl Default for ReturnValue {
-    fn default() -> Self {
-        ReturnValue::Object(HashMap::new())
-    }
-}
-
 impl ReturnValue {
     #[inline]
     #[allow(unused_attributes)]
@@ -192,12 +40,11 @@ impl ReturnValue {
     where
         T: Filterable + Clone,
     {
-        let id = item.id();
-        if let Some(m) = mixin.get_mut(&id) {
+        if let Some(m) = mixin.remove(&item.id()) {
             if m.should_spread {
-                ReturnValue::from(item).mixin_remapping(&mut m.remappings)
+                ReturnValue::from(item).mixin_remapping(m.remappings)
             } else {
-                ReturnValue::default().mixin_remapping(&mut m.remappings)
+                ReturnValue::default().mixin_remapping(m.remappings)
             }
         } else {
             ReturnValue::from(item)
@@ -300,22 +147,22 @@ impl ReturnValue {
     /// );
     /// ```
     #[inline(always)]
-    pub fn mixin_remapping(self, remappings: &mut HashMap<String, Remapping>) -> Self {
+    pub fn mixin_remapping(self, remappings: HashMap<String, Remapping>) -> Self {
         match self {
             ReturnValue::Object(mut a) => {
                 remappings.into_iter().for_each(|(k, v)| {
                     if v.exclude {
-                        let _ = a.remove(k);
+                        let _ = a.remove(&k);
                     } else if let Some(new_name) = &v.new_name {
-                        if let Some(value) = a.remove(k) {
+                        if let Some(value) = a.remove(&k) {
                             a.insert(new_name.clone(), value);
                         } else {
                             println!("no value found for key: {:?}", k);
-                            a.insert(k.clone(), v.return_value.clone());
+                            a.insert(k, v.return_value);
                         }
                     } else {
                         println!("inserting value: {:?}", k);
-                        a.insert(k.clone(), v.return_value.clone()); // TODO/ remove clone
+                        a.insert(k, v.return_value);
                     }
                 });
                 ReturnValue::Object(a)
@@ -327,7 +174,7 @@ impl ReturnValue {
     #[inline(always)]
     #[allow(unused_attributes)]
     #[ignore = "No use for this function yet, however, I believe it may be useful in the future so I'm keeping it here"]
-    pub fn mixin_other<I>(&self, item: I, mut secondary_properties: ResponseRemapping) -> Self
+    pub fn mixin_other<I>(&self, item: I, secondary_properties: ResponseRemapping) -> Self
     where
         I: Filterable + Clone,
     {
@@ -345,8 +192,159 @@ impl ReturnValue {
                 }
             }
         }
-        return_val = return_val.mixin_remapping(&mut secondary_properties.remappings);
+        return_val = return_val.mixin_remapping(secondary_properties.remappings);
         return_val
     }
 }
 
+impl<I> From<I> for ReturnValue
+where
+    I: Filterable + Clone,
+{
+    #[inline]
+    fn from(item: I) -> Self {
+        let length = match item.properties_ref() {
+            Some(properties) => properties.len(),
+            None => 0,
+        };
+        let mut properties = match item.type_name() {
+            FilterableType::Node => HashMap::with_capacity(Node::NUM_PROPERTIES + length),
+            FilterableType::Edge => {
+                let mut properties = HashMap::with_capacity(Edge::NUM_PROPERTIES + length);
+                properties.insert(
+                    "from_node".to_string(),
+                    ReturnValue::from(item.from_node_uuid()),
+                );
+                properties.insert(
+                    "to_node".to_string(),
+                    ReturnValue::from(item.to_node_uuid()),
+                );
+                properties
+            }
+            FilterableType::Vector => {
+                let data = item.vector_data();
+                let score = item.score();
+
+                let mut properties = HashMap::with_capacity(2 + length);
+                properties.insert("data".to_string(), ReturnValue::from(data));
+                properties.insert("score".to_string(), ReturnValue::from(score));
+                properties
+            }
+        };
+        properties.insert("id".to_string(), ReturnValue::from(item.uuid()));
+        properties.insert(
+            "label".to_string(),
+            ReturnValue::from(item.label().to_string()),
+        );
+        if item.properties_ref().is_some() {
+            properties.extend(
+                item.properties()
+                    .unwrap()
+                    .into_iter()
+                    .map(|(k, v)| (k, ReturnValue::from(v))),
+            );
+        }
+
+        ReturnValue::Object(properties)
+    }
+}
+
+impl From<Value> for ReturnValue {
+    fn from(value: Value) -> Self {
+        ReturnValue::Value(value)
+    }
+}
+
+impl From<&Value> for ReturnValue {
+    fn from(value: &Value) -> Self {
+        ReturnValue::Value(value.clone())
+    }
+}
+
+impl From<Count> for ReturnValue {
+    fn from(count: Count) -> Self {
+        ReturnValue::Value(Value::I32(count.value() as i32))
+    }
+}
+
+impl From<String> for ReturnValue {
+    fn from(string: String) -> Self {
+        ReturnValue::Value(Value::String(string))
+    }
+}
+
+impl From<bool> for ReturnValue {
+    fn from(boolean: bool) -> Self {
+        ReturnValue::Value(Value::Boolean(boolean))
+    }
+}
+
+impl From<&str> for ReturnValue {
+    fn from(string: &str) -> Self {
+        ReturnValue::Value(Value::String(string.to_string()))
+    }
+}
+
+impl From<i32> for ReturnValue {
+    fn from(integer: i32) -> Self {
+        ReturnValue::Value(Value::I32(integer))
+    }
+}
+
+impl From<f64> for ReturnValue {
+    fn from(float: f64) -> Self {
+        ReturnValue::Value(Value::F64(float))
+    }
+}
+
+impl From<u128> for ReturnValue {
+    fn from(integer: u128) -> Self {
+        ReturnValue::Value(Value::U128(integer))
+    }
+}
+
+impl From<Vec<TraversalVal>> for ReturnValue {
+    fn from(array: Vec<TraversalVal>) -> Self {
+        ReturnValue::Array(array.into_iter().map(|val| val.into()).collect())
+    }
+}
+
+impl From<TraversalVal> for ReturnValue {
+    fn from(val: TraversalVal) -> Self {
+        match val {
+            TraversalVal::Node(node) => ReturnValue::from(node),
+            TraversalVal::Edge(edge) => ReturnValue::from(edge),
+            TraversalVal::Vector(vector) => ReturnValue::from(vector),
+            TraversalVal::Count(count) => ReturnValue::from(count),
+            TraversalVal::Value(value) => ReturnValue::from(value),
+            TraversalVal::Empty => ReturnValue::Empty,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl From<&[f64]> for ReturnValue {
+    fn from(data: &[f64]) -> Self {
+        ReturnValue::Array(data.iter().map(|f| ReturnValue::from(*f)).collect())
+    }
+}
+
+impl Serialize for ReturnValue {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        match self {
+            ReturnValue::Value(value) => value.serialize(serializer),
+            ReturnValue::Object(object) => object.serialize(serializer),
+            ReturnValue::Array(array) => array.serialize(serializer),
+            ReturnValue::Empty => serializer.serialize_none(),
+        }
+    }
+}
+
+impl Default for ReturnValue {
+    fn default() -> Self {
+        ReturnValue::Object(HashMap::new())
+    }
+}

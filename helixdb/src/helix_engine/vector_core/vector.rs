@@ -177,7 +177,13 @@ impl Filterable for HVector {
     }
 
     fn label(&self) -> &str {
-        "vector"
+        match &self.properties {
+            Some(properties) => match properties.get("label") {
+                Some(label) => label.as_str(),
+                None => "vector",
+            },
+            None => "vector",
+        }
     }
 
     fn from_node(&self) -> u128 {

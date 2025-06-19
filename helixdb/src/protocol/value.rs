@@ -53,6 +53,12 @@ impl Value {
             _ => panic!("Not primitive"),
         }
     }
+    pub fn as_str(&self) -> &str {
+        match self {
+            Value::String(s) => s.as_str(),
+            _ => panic!("Not a string"),
+        }
+    }
 }
 impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -712,8 +718,8 @@ impl From<Value> for GenRef<String> {
             Value::U32(u) => GenRef::Std(format!("{}", u)),
             Value::U64(u) => GenRef::Std(format!("{}", u)),
             Value::U128(u) => GenRef::Std(format!("{}", u)),
-            Value::Array(a) => unimplemented!(),
-            Value::Object(o) => unimplemented!(),
+            Value::Array(_a) => unimplemented!(),
+            Value::Object(_o) => unimplemented!(),
             Value::Empty => GenRef::Literal("".to_string()),
         }
     }

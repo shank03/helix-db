@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use heed3::{RoTxn, RwTxn, WithTls};
+use heed3::{RoTxn, RwTxn};
 
 use super::ops::tr_val::TraversalVal;
 use crate::{
@@ -57,7 +57,11 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> RoTraversalIterat
         Value::from(self.inner.count())
     }
 
-    pub fn map_value_or(mut self, default: bool, f: impl Fn(&Value) -> bool) -> Result<bool, GraphError> {
+    pub fn map_value_or(
+        mut self,
+        default: bool,
+        f: impl Fn(&Value) -> bool,
+    ) -> Result<bool, GraphError> {
         match &self.inner.next() {
             Some(Ok(TraversalVal::Value(val))) => Ok(f(val)),
             Some(Ok(_)) => Err(GraphError::ConversionError(

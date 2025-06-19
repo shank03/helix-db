@@ -621,9 +621,9 @@ pub enum IdType {
 impl Display for IdType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            IdType::Literal { value, loc } => write!(f, "{}", value),
-            IdType::Identifier { value, loc } => write!(f, "{}", value),
-            IdType::ByIndex { index, value, loc } => write!(f, "{}", index),
+            IdType::Literal { value, loc: _ } => write!(f, "{}", value),
+            IdType::Identifier { value, loc: _ } => write!(f, "{}", value),
+            IdType::ByIndex { index, value: _, loc: _ } => write!(f, "{}", index),
         }
     }
 }
@@ -684,12 +684,12 @@ impl From<Value> for ValueType {
 impl From<IdType> for String {
     fn from(id_type: IdType) -> String {
         match id_type {
-            IdType::Literal { mut value, loc } => {
+            IdType::Literal { mut value, loc: _ } => {
                 value.retain(|c| c != '"');
                 value
             }
-            IdType::Identifier { value, loc } => value,
-            IdType::ByIndex { index, value, loc } => String::from(*index),
+            IdType::Identifier { value, loc: _ } => value,
+            IdType::ByIndex { index, value: _, loc: _ } => String::from(*index),
         }
     }
 }
@@ -1824,7 +1824,7 @@ impl HelixParser {
                                                 value: id.as_str().to_string(),
                                                 loc: id.loc(),
                                             },
-                                            other => {
+                                            _ => {
                                                 panic!("Should be identifier or string literal")
                                             }
                                         }
@@ -1883,7 +1883,7 @@ impl HelixParser {
                                             ),
                                             loc: val.loc(),
                                         },
-                                        other => {
+                                        _ => {
                                             panic!("Should be identifier or string literal")
                                         }
                                     },

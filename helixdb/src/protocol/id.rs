@@ -1,16 +1,24 @@
+//! ID type for nodes and edges.
+//!
+//! This is a wrapper around a 128-bit UUID.
+//!
+//! It is used to deserialize a string UUID into a 128-bit integer so that 
+//! it can be serialized properly for use with LMDB. 
+//! 
+//! The ID type can be dereferenced to a 128-bit integer for use with other functions that expect a 128-bit integer.
+
 use core::fmt;
 use std::ops::Deref;
 
-use serde::{
-    de::{DeserializeSeed, VariantAccess, Visitor},
-    ser::Error,
-    Deserializer, Serializer,
-};
+use serde::{de::Visitor, Deserializer, Serializer};
 use sonic_rs::{Deserialize, Serialize};
-// pub type ID = String;
+
+/// A wrapper around a 128-bit UUID.
+///
+/// This is used to represent the ID of a node or edge.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(transparent)]
-// #[serde(transparent)]
+/// The inner ID.
 pub struct ID(u128);
 impl ID {
     pub fn inner(&self) -> u128 {
@@ -36,6 +44,7 @@ impl<'de> Visitor<'de> for IDVisitor {
         formatter.write_str("a valid UUID")
     }
 
+    /// Visits a string UUID and parses it into a 128-bit integer.
     fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
     where
         E: serde::de::Error,
@@ -46,6 +55,8 @@ impl<'de> Visitor<'de> for IDVisitor {
         }
     }
 }
+
+/// Deserializes a string UUID into a 128-bit integer.
 impl<'de> Deserialize<'de> for ID {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -55,6 +66,7 @@ impl<'de> Deserialize<'de> for ID {
     }
 }
 
+/// Dereferences the ID to a 128-bit integer.
 impl Deref for ID {
     type Target = u128;
     #[inline]
@@ -73,4 +85,13 @@ impl From<ID> for u128 {
     fn from(id: ID) -> Self {
         id.0
     }
+}
+
+/// Generates a new v6 UUID.
+/// 
+/// This is used to generate a new UUID for a node or edge.
+/// The UUID is generated using the current time and a random number.
+#[inline(always)]
+pub fn v6_uuid() -> u128 {
+    uuid::Uuid::now_v6(&[1, 2, 3, 4, 5, 6]).as_u128()
 }

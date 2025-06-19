@@ -1,19 +1,17 @@
+//! Date type for dates.
+//!
+//! This is a wrapper around a chrono DateTime<Utc>.
+//!
+//! It is used to deserialize a string date or numeric timestamp into a chrono DateTime<Utc>.
+
 use core::fmt;
-use std::{fmt::Display, ops::Deref};
+use std::ops::Deref;
 
 use chrono::{DateTime, NaiveDate, Utc};
-use serde::{
-    de::{DeserializeSeed, VariantAccess, Visitor},
-    ser::Error,
-    Deserializer, Serializer,
-};
-use sonic_rs::{Deserialize, Serialize};
+use serde::{de::Visitor, Deserializer};
+use sonic_rs::Deserialize;
 
 use super::value::Value;
-
-pub enum ValidDate {
-    Date(chrono::DateTime<chrono::Utc>),
-}
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(transparent)]
@@ -23,10 +21,12 @@ impl Date {
         &self.0
     }
 
+    /// Converts the Date to an RFC3339 string.
     pub fn to_rfc3339(&self) -> String {
         self.0.to_rfc3339()
     }
 
+    /// Creates a new Date from a Value.
     pub fn new(date: &Value) -> Result<Self, DateError> {
         match date {
             Value::String(date) => {
@@ -84,17 +84,31 @@ impl<'de> Visitor<'de> for DateVisitor {
         formatter.write_str("a valid Date")
     }
 
+    /// Visits a string and parses it into a chrono DateTime<Utc>.
+    ///
+    /// TODO: check if this is correct -> is the same as implementation above so should be fine. 
     fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
     where
         E: serde::de::Error,
     {
         let date = match v.parse::<DateTime<Utc>>() {
-            Ok(date) => date,
-            Err(e) => return Err(E::custom(e.to_string())),
+            Ok(date) => date.with_timezone(&Utc),
+            Err(e) => match v.parse::<NaiveDate>() {
+                Ok(date) => match date.and_hms_opt(0, 0, 0) {
+                    Some(date) => date.and_utc(),
+                    None => {
+                        return Err(E::custom(e.to_string()));
+                    }
+                },
+                Err(e) => {
+                    return Err(E::custom(e.to_string()));
+                }
+            },
         };
         Ok(Date(date))
     }
 
+    /// Visits a i64 and parses it into a chrono DateTime<Utc>.
     fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
     where
         E: serde::de::Error,
@@ -105,6 +119,7 @@ impl<'de> Visitor<'de> for DateVisitor {
         }))
     }
 
+    /// Visits a u64 and parses it into a chrono DateTime<Utc>.
     fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
     where
         E: serde::de::Error,

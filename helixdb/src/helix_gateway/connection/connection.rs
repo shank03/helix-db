@@ -40,6 +40,7 @@ impl ConnectionHandler {
         })
     }
 
+    /// accepts new connections and sends them to the thread pool
     pub async fn accept_conns(&self) -> Result<JoinHandle<()>, GraphError> {
         // Create a new TcpListener for each accept_conns call
         let listener = TcpListener::bind(&self.address).await.map_err(|e| {
@@ -51,7 +52,7 @@ impl ConnectionHandler {
 
         let active_connections = Arc::clone(&self.active_connections);
         let thread_pool_sender = self.thread_pool.sender.clone();
-        let address = self.address.clone();
+        let _address = self.address.clone();
 
 
         let handle = tokio::spawn(async move {

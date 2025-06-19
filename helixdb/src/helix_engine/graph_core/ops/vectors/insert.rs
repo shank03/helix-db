@@ -54,16 +54,22 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> InsertVAdapte
     where
         F: Fn(&HVector, &RoTxn) -> bool,
     {
-        let vector = self
-            .storage
-            .vectors
-            .insert::<F>(self.txn, &query, fields);
+        let fields = match fields {
+            Some(mut fields) => {
+                fields.push((String::from("label"), Value::String(label.to_string())));
+                Some(fields)
+            }
+            None => Some(vec![(
+                String::from("label"),
+                Value::String(label.to_string()),
+            )]),
+        };
+        let vector = self.storage.vectors.insert::<F>(self.txn, &query, fields);
 
         let result = match vector {
             Ok(vector) => Ok(TraversalVal::Vector(vector)),
             Err(e) => Err(GraphError::from(e)),
         };
-
 
         RwTraversalIterator {
             inner: std::iter::once(result),

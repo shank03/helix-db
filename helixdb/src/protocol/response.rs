@@ -68,11 +68,23 @@ impl Response {
         for (header, value) in &self.headers {
             writer
                 .write_all(format!("{}: {}\r\n", header, value).as_bytes())
-                .await.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("Error writing header: {}", e)))?;
+                .await
+                .map_err(|e| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        format!("Error writing header: {}", e),
+                    )
+                })?;
         }
 
         writer
-            .write_all(format!("Content-Length: {}\r\n\r\n", self.body.len()).as_bytes())
+            .write_all(
+                format!(
+                    "Content-Length: {}\r\n\r\n",
+                    self.body.len() + status_message.len()
+                )
+                .as_bytes(),
+            )
             .await?;
 
         // Write body

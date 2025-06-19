@@ -3,15 +3,12 @@ use crate::helixc::generator::utils::write_properties;
 use super::{
     bool_op::BoolOp,
     generator_types::BoExp,
-    object_remapping_generation::{ClosureFieldRemapping, ExcludeField, FieldRemapping, Remapping},
+    object_remapping_generation::Remapping,
     source_steps::SourceStep,
     utils::{GenRef, GeneratedValue, Order, Separator},
 };
 use core::fmt;
-use std::{
-    clone,
-    fmt::{Debug, Display},
-};
+use std::fmt::{Debug, Display};
 
 #[derive(Clone)]
 pub enum TraversalType {
@@ -217,17 +214,17 @@ impl Debug for Step {
             Step::ToN => write!(f, "ToN"),
             Step::PropertyFetch(property) => write!(f, "check_property({})", property),
 
-            Step::Out(out) => write!(f, "Out"),
-            Step::In(in_) => write!(f, "In"),
-            Step::OutE(out_e) => write!(f, "OutE"),
-            Step::InE(in_e) => write!(f, "InE"),
-            Step::Where(where_) => write!(f, "Where"),
-            Step::Range(range) => write!(f, "Range"),
-            Step::OrderBy(order_by) => write!(f, "OrderBy"),
-            Step::BoolOp(bool_op) => write!(f, "Bool"),
-            Step::Remapping(remapping) => write!(f, "Remapping"),
-            Step::ShortestPath(shortest_path) => write!(f, "ShortestPath"),
-            Step::SearchVector(search_vector) => write!(f, "SearchVector"),
+            Step::Out(_) => write!(f, "Out"),
+            Step::In(_) => write!(f, "In"),
+            Step::OutE(_) => write!(f, "OutE"),
+            Step::InE(_) => write!(f, "InE"),
+            Step::Where(_) => write!(f, "Where"),
+            Step::Range(_) => write!(f, "Range"),
+            Step::OrderBy(_) => write!(f, "OrderBy"),
+            Step::BoolOp(_) => write!(f, "Bool"),
+            Step::Remapping(_) => write!(f, "Remapping"),
+            Step::ShortestPath(_) => write!(f, "ShortestPath"),
+            Step::SearchVector(_) => write!(f, "SearchVector"),
         }
     }
 }
@@ -334,8 +331,8 @@ pub struct WhereMut {
     pub expr: BoExp,
 }
 impl Display for WhereMut {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        unimplemented!();
+    fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+        todo!()
     }
 }
 
@@ -392,10 +389,6 @@ pub struct SearchVectorStep {
 }
 impl Display for SearchVectorStep {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "brute_force_search_v({}, {})",
-            self.vec, self.k
-        )
+        write!(f, "brute_force_search_v({}, {})", self.vec, self.k)
     }
 }

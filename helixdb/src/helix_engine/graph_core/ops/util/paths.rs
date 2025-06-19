@@ -88,7 +88,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> Iterator
 
                     for result in iter {
                         let (_, value) = result.unwrap(); // TODO: handle error
-                        let (to_node, edge_id) =
+                        let (edge_id, to_node) =
                             HelixGraphStorage::unpack_adj_edge_data(value).unwrap(); // TODO: handle error
 
                         if !visited.contains(&to_node) {

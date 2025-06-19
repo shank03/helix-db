@@ -12,7 +12,7 @@ use crate::{
     },
     protocol::label_hash::hash_label,
 };
-use heed3::{types::Bytes, RoTxn, WithTls};
+use heed3::{types::Bytes, RoTxn};
 use std::sync::Arc;
 
 pub struct OutNodesIterator<'a, T> {
@@ -34,7 +34,7 @@ impl<'a> Iterator for OutNodesIterator<'a, RoTxn<'a>> {
         while let Some(Ok((_, data))) = self.iter.next() {
             match data.decode() {
                 Ok(data) => {
-                    let (item_id, _) = match HelixGraphStorage::unpack_adj_edge_data(&data) {
+                    let (_, item_id) = match HelixGraphStorage::unpack_adj_edge_data(&data) {
                         Ok(data) => data,
                         Err(e) => {
                             println!("Error unpacking edge data: {:?}", e);

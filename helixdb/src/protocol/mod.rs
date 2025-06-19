@@ -8,5 +8,4 @@ pub mod remapping;
 pub mod request;
 pub mod response;
 pub mod return_values;
-pub mod serdes;
 pub mod value;

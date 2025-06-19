@@ -6,11 +6,7 @@ use crate::{
         graph_core::traversal_iter::RwTraversalIterator,
         storage_core::storage_core::HelixGraphStorage, types::GraphError, vector_core::hnsw::HNSW,
     },
-    protocol::{
-        items::{v6_uuid, Edge},
-        label_hash::hash_label,
-        value::Value,
-    },
+    protocol::{id::v6_uuid, items::Edge, label_hash::hash_label, value::Value},
 };
 use heed3::PutFlags;
 use serde::{Deserialize, Serialize};
@@ -61,6 +57,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddEAdapter<'
     for RwTraversalIterator<'a, 'b, I>
 {
     #[inline(always)]
+    #[allow(unused_variables)]
     fn add_e(
         self,
         label: &'a str,
@@ -134,7 +131,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddEAdapter<'
             self.txn,
             PutFlags::APPEND_DUP,
             &HelixGraphStorage::out_edge_key(&from_node, &label_hash),
-            &HelixGraphStorage::pack_edge_data(&to_node, &edge.id),
+            &HelixGraphStorage::pack_edge_data(&edge.id, &to_node),
         ) {
             Ok(_) => {}
             Err(e) => {
@@ -147,7 +144,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddEAdapter<'
             self.txn,
             PutFlags::APPEND_DUP,
             &HelixGraphStorage::in_edge_key(&to_node, &label_hash),
-            &HelixGraphStorage::pack_edge_data(&from_node, &edge.id),
+            &HelixGraphStorage::pack_edge_data(&edge.id, &from_node),
         ) {
             Ok(_) => {}
             Err(e) => {
