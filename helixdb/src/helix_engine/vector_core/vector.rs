@@ -6,14 +6,15 @@ use crate::{
         value::Value,
     },
 };
+use core::fmt;
 use serde::{Deserialize, Serialize};
-use std::{cmp::Ordering, collections::HashMap};
+use std::{cmp::Ordering, collections::HashMap, fmt::Debug};
 
 // TODO: make this generic over the type of encoding (f32, f64, etc)
 // TODO: use const param to set dimension
 // TODO: set level as u8
 #[repr(C, align(16))]
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub struct HVector {
     pub id: u128,
     pub is_deleted: bool,
@@ -21,6 +22,12 @@ pub struct HVector {
     pub distance: Option<f64>,
     data: Vec<f64>,
     pub properties: Option<HashMap<String, Value>>,
+}
+
+impl Debug for HVector {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "HVector {{ id: {}, is_deleted: {}, level: {}, distance: {:?}, data: {:?}, properties: {:?} }}", uuid::Uuid::from_u128(self.id).to_string(), self.is_deleted, self.level, self.distance, self.data, self.properties)
+    }
 }
 
 impl Eq for HVector {}

@@ -4,11 +4,13 @@ use crate::{
     types::*,
     utils::*,
 };
-use helixdb::{
-    helix_engine::graph_core::config::Config,
-    ingestion_engine::{postgres_ingestion::PostgresIngestor, sql_ingestion::SqliteIngestor},
-    utils::styled_string::StyledString,
+use clap::Parser;
+#[cfg(feature = "ingestion")]
+use helixdb::ingestion_engine::{
+    postgres_ingestion::PostgresIngestor, sql_ingestion::SqliteIngestor,
 };
+use helixdb::{helix_engine::graph_core::config::Config, utils::styled_string::StyledString};
+use spinners::{Spinner, Spinners};
 use std::{
     fmt::Write,
     fs,
@@ -16,8 +18,6 @@ use std::{
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
-use clap::Parser;
-use spinners::{Spinner, Spinners};
 
 pub mod args;
 mod instance_manager;
@@ -1202,6 +1202,7 @@ fi
             }
         }
 
+        #[cfg(feature = "ingestion")]
         CommandType::Ingest(command) => {
             match command.db_type.as_str() {
                 "sqlite" => {
@@ -1358,4 +1359,3 @@ fi
         }
     }
 }
-

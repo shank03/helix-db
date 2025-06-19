@@ -1,9 +1,9 @@
 [package]
 name = "helixdb"
-version = "1.0.96"
+version = "1.0.97"
 edition = "2021"
 description = "HelixDB is a multi-model database built for performance and simplicity."
-license = "GPL-3.0"
+license = "AGPL-3.0"
 authors = ["HelixDB Team"]
 repository = "https://github.com/HelixDB/helix-db"
 
@@ -24,6 +24,7 @@ flume = "0.11.1"
 rayon = "1.8.0"
 itertools = "0.14.0"
 get_routes = { version = "0.1.0", path = "../get_routes" }
+tempfile = "3.20.0"
 
 # Compiler
 pest = { version = "2.7", optional = true }
@@ -44,7 +45,6 @@ tokio-postgres = { version = "0.7", features = [
     "with-chrono-0_4",
 ], optional = true }
 
-tempfile = { version = "3.2", optional = true }
 
 [dev-dependencies]
 rand = "0.9.0"
@@ -63,9 +63,9 @@ ingestion = [
     "reqwest",
     "native-tls",
     "rust_decimal",
-    "tempfile"
+
 ]
 build = ["compiler"]
+server = ["build", "compiler", "cosine"]
 full = ["build", "compiler", "ingestion", "cosine"]
-default = ["full"]
-
+default = ["server"]
