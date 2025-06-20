@@ -156,6 +156,8 @@ pub enum Step {
     InE(InE),
     FromN,
     ToN,
+    FromV,
+    ToV,
 
     // utils
     Count,
@@ -188,7 +190,9 @@ impl Display for Step {
             Step::Count => write!(f, "count()"),
             Step::Dedup => write!(f, "dedup()"),
             Step::FromN => write!(f, "from_n()"),
+            Step::FromV => write!(f, "from_v()"),
             Step::ToN => write!(f, "to_n()"),
+            Step::ToV => write!(f, "to_v()"),
             Step::PropertyFetch(property) => write!(f, "check_property({})", property),
 
             Step::Out(out) => write!(f, "{}", out),
@@ -213,7 +217,8 @@ impl Debug for Step {
             Step::FromN => write!(f, "FromN"),
             Step::ToN => write!(f, "ToN"),
             Step::PropertyFetch(property) => write!(f, "check_property({})", property),
-
+            Step::FromV => write!(f, "FromV"),
+            Step::ToV => write!(f, "ToV"),
             Step::Out(_) => write!(f, "Out"),
             Step::In(_) => write!(f, "In"),
             Step::OutE(_) => write!(f, "OutE"),

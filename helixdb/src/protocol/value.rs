@@ -170,6 +170,12 @@ impl PartialOrd<f64> for Value {
     }
 }
 
+impl<'a, K> PartialEq<&'a K> for Value {
+    fn eq(&self, other: &&'a K) -> bool {
+        self == other
+    }
+}
+
 /// Custom serialisation implementation for Value that removes enum variant names in JSON
 /// whilst preserving them for binary formats like bincode.
 impl Serialize for Value {

@@ -305,8 +305,8 @@ use helixdb::helix_engine::vector_core::vector::HVector;
 use helixdb::{
     helix_engine::graph_core::ops::{
         g::G,
-        in_::{in_::InAdapter, in_e::InEdgesAdapter, to_n::ToNAdapter},
-        out::{from_n::FromNAdapter, out::OutAdapter, out_e::OutEdgesAdapter},
+        in_::{in_::InAdapter, in_e::InEdgesAdapter, to_n::ToNAdapter, to_v::ToVAdapter},
+        out::{from_n::FromNAdapter, from_v::FromVAdapter, out::OutAdapter, out_e::OutEdgesAdapter},
         source::{
             add_e::{AddEAdapter, EdgeType},
             add_n::AddNAdapter,

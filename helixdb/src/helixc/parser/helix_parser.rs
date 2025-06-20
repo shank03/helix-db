@@ -480,6 +480,8 @@ pub enum GraphStepType {
 
     FromN,
     ToN,
+    FromV,
+    ToV,
 
     OutE(String),
     InE(String),
@@ -2084,6 +2086,14 @@ impl HelixParser {
             Rule::to_n => GraphStep {
                 loc: pair.loc(),
                 step: GraphStepType::ToN,
+            },
+            Rule::from_v => GraphStep {
+                loc: pair.loc(),
+                step: GraphStepType::FromV,
+            },
+            Rule::to_v => GraphStep {
+                loc: pair.loc(),
+                step: GraphStepType::ToV,
             },
             Rule::out => {
                 let types = types(&pair);

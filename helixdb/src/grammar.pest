@@ -128,6 +128,8 @@ graph_step = {
   | in_e
   | from_n
   | to_n
+  | from_v
+  | to_v
   | out
   | in_nodes
   | shortest_path
@@ -137,6 +139,8 @@ out_e ={  "OutE" ~ ("<" ~ type_args ~ ">")?}
 in_e ={ "InE" ~ ("<" ~ type_args ~ ">")?}
 from_n ={ "FromN"}
 to_n ={ "ToN"}
+from_v ={ "FromV"}
+to_v ={ "ToV"}
 out ={ "Out" ~ ("<" ~ type_args ~ ">")?}
 in_nodes ={ "In" ~ ("<" ~ type_args ~ ">")?}
 shortest_path ={ "ShortestPath" ~ ("<" ~ type_args ~ ">")? ~ to_from}

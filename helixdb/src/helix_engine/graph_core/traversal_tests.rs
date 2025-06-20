@@ -3,9 +3,12 @@ use std::{sync::Arc, time::Instant};
 use crate::helix_engine::{
     graph_core::ops::{
         g::G,
-        in_::{in_e::InEdgesAdapter, to_n::ToNAdapter},
-        out::{from_n::FromNAdapter, out::OutAdapter},
-        source::{add_n::AddNAdapter, e_from_id::EFromIdAdapter, n_from_id::NFromIdAdapter},
+        in_::{in_e::InEdgesAdapter, to_n::ToNAdapter, to_v::ToVAdapter},
+        out::{from_n::FromNAdapter, from_v::FromVAdapter, out::OutAdapter},
+        source::{
+            add_n::AddNAdapter, e_from_id::EFromIdAdapter, n_from_id::NFromIdAdapter,
+            n_from_index::NFromIndexAdapter,
+        },
         tr_val::{Traversable, TraversalVal},
         util::{dedup::DedupAdapter, range::RangeAdapter},
     },
@@ -1790,6 +1793,70 @@ fn test_add_e_between_node_and_vector() {
             .search_v::<fn(&HVector, &RoTxn) -> bool>(&vec![1.0, 2.0, 3.0], 10, None)
             .collect_to::<Vec<_>>()
     );
+
+    assert_eq!(traversal.len(), 1);
+    assert_eq!(traversal[0].id(), vector.id());
+}
+
+#[test]
+fn test_from_v() {
+    let (storage, _temp_dir) = setup_test_db();
+    let mut txn = storage.graph_env.write_txn().unwrap();
+
+    let node = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_n("person", None, None)
+        .collect_to_val();
+
+    let vector = G::new_mut(Arc::clone(&storage), &mut txn)
+        .insert_v::<fn(&HVector, &RoTxn) -> bool>(&vec![1.0, 2.0, 3.0], "vector", None)
+        .collect_to_val();
+
+    let _ = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_e("knows", None, vector.id(), node.id(), false, EdgeType::Vec)
+        .collect_to_val();
+
+    txn.commit().unwrap();
+
+    let txn = storage.graph_env.read_txn().unwrap();
+    let traversal = G::new(Arc::clone(&storage), &txn)
+        .n_from_id(&node.id())
+        .in_e("knows")
+        .from_v()
+        .collect_to::<Vec<_>>();
+
+    println!("traversal: {:?}", traversal);
+
+    assert_eq!(traversal.len(), 1);
+}
+
+#[test]
+fn test_to_v() {
+    let (storage, _temp_dir) = setup_test_db();
+    let mut txn = storage.graph_env.write_txn().unwrap();
+
+    let node = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_n("person", None, None)
+        .collect_to_val();
+
+    let vector = G::new_mut(Arc::clone(&storage), &mut txn)
+        .insert_v::<fn(&HVector, &RoTxn) -> bool>(&vec![1.0, 2.0, 3.0], "vector", None)
+        .collect_to_val();
+
+    let _ = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_e("knows", None, node.id(), vector.id(), false, EdgeType::Vec)
+        .collect_to_val();
+
+    txn.commit().unwrap();
+    println!("node: {:?}", node);
+
+    let txn = storage.graph_env.read_txn().unwrap();
+    let traversal = G::new(Arc::clone(&storage), &txn)
+        .n_from_id(&node.id())
+        .out_e("knows")
+        .to_v()
+        .collect_to::<Vec<_>>();
+
+    println!("traversal: {:?}", traversal);
 
     assert_eq!(traversal.len(), 1);
     assert_eq!(traversal[0].id(), vector.id());
