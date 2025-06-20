@@ -22,9 +22,9 @@ impl Display for BoolOp {
             BoolOp::Lte(lte) => format!("{}", lte),
             BoolOp::Eq(eq) => format!("{}", eq),
             BoolOp::Neq(neq) => format!("{}", neq),
-            BoolOp::Contains(cont) => unimplemented!(),
+            BoolOp::Contains(_) => unimplemented!(),
         };
-        write!(f, "map_value_or(false, |v| v{})?", s)
+        write!(f, "map_value_or(false, |v| *v{})?", s)
     }
 }
 #[derive(Clone)]

@@ -1,11 +1,6 @@
-use std::{
-    fmt::{self, Debug, Display},
-    io::{self, Write},
-};
+use std::fmt::{self, Debug, Display};
 
 use crate::helixc::parser::helix_parser::IdType;
-
-use super::tsdisplay::ToTypeScript;
 
 #[derive(Clone)]
 pub enum GenRef<T>
@@ -65,7 +60,7 @@ where
             GenRef::RefLiteral(t) => t,
             GenRef::Unknown => panic!("Cannot get inner of unknown"),
             GenRef::Std(t) => t,
-            GenRef::Id(t) => panic!("Cannot get inner of unknown"),
+            GenRef::Id(_) => panic!("Cannot get inner of unknown"),
         }
     }
 }
@@ -106,8 +101,8 @@ impl From<GenRef<String>> for String {
 impl From<IdType> for GenRef<String> {
     fn from(value: IdType) -> Self {
         match value {
-            IdType::Literal { value: s, loc } => GenRef::Literal(s),
-            IdType::Identifier { value: s, loc } => GenRef::Id(s),
+            IdType::Literal { value: s, .. } => GenRef::Literal(s),
+            IdType::Identifier { value: s, .. } => GenRef::Id(s),
             _ => panic!("Cannot convert to string: {:?}", value),
         }
     }
@@ -310,8 +305,8 @@ use helixdb::helix_engine::vector_core::vector::HVector;
 use helixdb::{
     helix_engine::graph_core::ops::{
         g::G,
-        in_::{in_::InAdapter, in_e::InEdgesAdapter, to_n::ToNAdapter},
-        out::{from_n::FromNAdapter, out::OutAdapter, out_e::OutEdgesAdapter},
+        in_::{in_::InAdapter, in_e::InEdgesAdapter, to_n::ToNAdapter, to_v::ToVAdapter},
+        out::{from_n::FromNAdapter, from_v::FromVAdapter, out::OutAdapter, out_e::OutEdgesAdapter},
         source::{
             add_e::{AddEAdapter, EdgeType},
             add_n::AddNAdapter,

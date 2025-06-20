@@ -45,6 +45,9 @@ impl Handler {
 
 inventory::collect!(HandlerSubmission);
 
+/// Router for handling requests and MCP requests
+///
+/// Standard Routes and MCP Routes are stored in a HashMap with the method and path as the key
 pub struct HelixRouter {
     /// Method+Path => Function
     pub routes: HashMap<(String, String), HandlerFn>,

@@ -12,12 +12,23 @@ extern crate tokio;
 
 use tokio::net::TcpStream;
 
+/// Worker for handling requests
+/// 
+/// A worker is a thread that handles requests
+/// 
+/// It receives a connection from the thread pool and handles the request
+/// 
+/// It sends the response back to the client
 pub struct Worker {
     pub id: usize,
     pub handle: JoinHandle<()>,
 }
 
 impl Worker {
+    /// Creates a new worker
+    /// 
+    /// It receives a connection from the thread pool and handles the request
+    /// It sends the response back to the client
     fn new(
         id: usize,
         graph_access: Arc<HelixGraphEngine>,
@@ -70,6 +81,7 @@ impl Worker {
     }
 }
 
+/// Thread pool for handling requests
 pub struct ThreadPool {
     pub sender: Sender<TcpStream>,
     pub num_unused_workers: Mutex<usize>,
@@ -89,7 +101,7 @@ impl ThreadPool {
             size
         );
 
-        let (tx, rx) = flume::bounded::<TcpStream>(1000);
+        let (tx, rx) = flume::bounded::<TcpStream>(1000); // TODO: make this configurable
         let mut workers = Vec::with_capacity(size);
         for id in 0..size {
             workers.push(Worker::new(id, Arc::clone(&graph), Arc::clone(&router), rx.clone()));

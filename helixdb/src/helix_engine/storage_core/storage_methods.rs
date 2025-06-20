@@ -1,8 +1,5 @@
 use crate::helix_engine::types::GraphError;
-use crate::protocol::{
-    items::{Edge, Node},
-    value::Value,
-};
+use crate::protocol::items::{Edge, Node};
 use heed3::{RoTxn, RwTxn};
 
 pub trait DBMethods {
@@ -29,6 +26,7 @@ pub trait BasicStorageMethods {
 pub trait StorageMethods {
     /// Checks whether an entry with a given id exists.
     /// Works for nodes or edges.
+    #[deprecated(note = "use get_node or get_edge instead")]
     fn check_exists(&self, txn: &RoTxn, id: &u128) -> Result<bool, GraphError>;
 
     /// Gets a node object for a given node id

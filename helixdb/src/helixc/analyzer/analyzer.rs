@@ -2849,7 +2849,24 @@ impl<'a> Ctx<'a> {
                         .to_string(),
                 )))
             }
-
+            (FromV, Type::Edges(_)) => {
+                traversal.steps.push(Separator::Period(GeneratedStep::FromV));
+                Some(Type::Vector(Some(
+                    gs.loc
+                        .span
+                        .trim_matches(|c: char| c == '"' || c.is_whitespace() || c == '\n')
+                        .to_string(),
+                )))
+            }
+            (ToV, Type::Edges(_)) => {
+                traversal.steps.push(Separator::Period(GeneratedStep::ToV));
+                Some(Type::Vector(Some(
+                    gs.loc
+                        .span
+                        .trim_matches(|c: char| c == '"' || c.is_whitespace() || c == '\n')
+                        .to_string(),
+                )))
+            }
             (ShortestPath(sp), Type::Nodes(_)) => {
                 let type_arg = match sp.type_arg.clone() {
                     Some(type_arg) => Some(GenRef::Literal(type_arg)),

@@ -1,10 +1,10 @@
 use heed3::{types::*, Database, Env, RoTxn, RwTxn};
 use serde::{Deserialize, Serialize};
-use std::{borrow::Cow, collections::HashMap, sync::Arc};
+use std::{borrow::Cow, collections::HashMap};
 
 use crate::{
     helix_engine::{
-        storage_core::{storage_core::HelixGraphStorage, storage_methods::StorageMethods},
+        storage_core::storage_core::HelixGraphStorage,
         types::GraphError,
         vector_core::{hnsw::HNSW, vector::HVector},
     },
@@ -308,8 +308,8 @@ impl BM25 for HBM25Config {
 
     fn calculate_bm25_score(
         &self,
-        term: &str,
-        doc_id: u128,
+        _term: &str,
+        _doc_id: u128,
         tf: u32,
         doc_length: u32,
         df: u32,

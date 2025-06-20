@@ -4,11 +4,11 @@ use crate::{
         storage_core::{storage_core::HelixGraphStorage, storage_methods::StorageMethods},
         types::GraphError,
     },
-    protocol::{items::Node, value::Value},
+    protocol::value::Value,
 };
-use heed3::{byteorder::BE, types::Bytes, RoTxn};
+use heed3::{byteorder::BE, RoTxn};
 use serde::Serialize;
-use std::{iter::Once, sync::Arc};
+use std::sync::Arc;
 
 pub struct NFromIndex<'a> {
     iter:
@@ -22,7 +22,7 @@ impl<'a> Iterator for NFromIndex<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(value) = self.iter.next() {
-            let (key_, value) = value.unwrap();
+            let (_, value) = value.unwrap();
             match value.decode() {
                 Ok(value) => match self.storage.get_node(self.txn, &value) {
                     Ok(node) => return Some(Ok(TraversalVal::Node(node))),

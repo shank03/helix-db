@@ -5,7 +5,7 @@ use crate::{
         types::GraphError,
     },
     protocol::{
-        items::v6_uuid, request::Request, response::Response,
+        id::v6_uuid, request::Request, response::Response,
         return_values::ReturnValue,
     },
     helix_gateway::mcp::tools::{ToolArgs, ToolCalls},

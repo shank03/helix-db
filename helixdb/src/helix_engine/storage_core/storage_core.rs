@@ -22,7 +22,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
-use super::storage_methods::{BasicStorageMethods, DBMethods};
+use super::storage_methods::DBMethods;
 
 // Database names for different stores
 const DB_NODES: &str = "nodes"; // For node data (n:)
@@ -30,7 +30,8 @@ const DB_EDGES: &str = "edges"; // For edge data (e:)
 const DB_OUT_EDGES: &str = "out_edges"; // For outgoing edge indices (o:)
 const DB_IN_EDGES: &str = "in_edges"; // For incoming edge indices (i:)
 
-// Key prefixes for different types of data
+pub type NodeId = u128;
+pub type EdgeId = u128;
 
 pub struct HelixGraphStorage {
     // TODO: maybe make not public?
@@ -57,30 +58,51 @@ impl HelixGraphStorage {
 
         let graph_env = unsafe {
             EnvOpenOptions::new()
-                .map_size(db_size * 1024 * 1024 * 1024) // GB
-                .max_dbs(20)
-                .max_readers(200)
+                .map_size(db_size * 1024 * 1024 * 1024) // Sets max size of the database in GB
+                .max_dbs(20) // Sets max number of databases
+                .max_readers(200) // Sets max number of readers
                 .open(Path::new(path))?
         };
 
         let mut wtxn = graph_env.write_txn()?;
 
+        // creates the lmdb databases (tables)
+        // Table: [key]->[value]
+        //        [size]->[size]
+
+        // Nodes: [node_id]->[bytes array of node data]
+        //        [16 bytes]->[dynamic]
         let nodes_db = graph_env
             .database_options()
             .types::<U128<BE>, Bytes>()
             .name(DB_NODES)
             .create(&mut wtxn)?;
+
+        // Edges: [edge_id]->[bytes array of edge data]
+        //        [16 bytes]->[dynamic]
         let edges_db = graph_env
             .database_options()
             .types::<U128<BE>, Bytes>()
             .name(DB_EDGES)
             .create(&mut wtxn)?;
+
+        // Out edges: [from_node_id + label]->[edge_id + to_node_id]  (edge first because value is ordered by byte size)
+        //                    [20 + 4 bytes]->[16 + 16 bytes]
+        //
+        // DUP_SORT used to store all values of duplicated keys under a single key. Saves on space and requires a single read to get all values.
+        // DUP_FIXED used to ensure all values are the same size meaning 8 byte length header is discarded.
         let out_edges_db: Database<Bytes, Bytes> = graph_env
             .database_options()
             .types::<Bytes, Bytes>()
             .flags(DatabaseFlags::DUP_SORT | DatabaseFlags::DUP_FIXED)
             .name(DB_OUT_EDGES)
             .create(&mut wtxn)?;
+
+        // In edges: [to_node_id + label]->[edge_id + from_node_id]  (edge first because value is ordered by byte size)
+        //                 [20 + 4 bytes]->[16 + 16 bytes]
+        //
+        // DUP_SORT used to store all values of duplicated keys under a single key. Saves on space and requires a single read to get all values.
+        // DUP_FIXED used to ensure all values are the same size meaning 8 byte length header is discarded.
         let in_edges_db: Database<Bytes, Bytes> = graph_env
             .database_options()
             .types::<Bytes, Bytes>()
@@ -88,6 +110,7 @@ impl HelixGraphStorage {
             .name(DB_IN_EDGES)
             .create(&mut wtxn)?;
 
+        // Creates the secondary indices databases if there are any
         let mut secondary_indices = HashMap::new();
         if let Some(indexes) = config.graph_config.secondary_indices {
             for index in indexes {
@@ -96,13 +119,14 @@ impl HelixGraphStorage {
                     graph_env
                         .database_options()
                         .types::<Bytes, U128<BE>>()
-                        .flags(DatabaseFlags::DUP_SORT)
+                        .flags(DatabaseFlags::DUP_SORT) // DUP_SORT used to store all duplicated node keys under a single key. Saves on space and requires a single read to get all values.
                         .name(&index)
                         .create(&mut wtxn)?,
                 );
             }
         }
 
+        // Creates the vector database
         let vectors = VectorCore::new(
             &graph_env,
             &mut wtxn,
@@ -128,59 +152,29 @@ impl HelixGraphStorage {
         })
     }
 
-    pub fn get_random_node(&self, txn: &RoTxn) -> Result<Node, GraphError> {
-        match self.nodes_db.first(&txn)? {
-            Some((_, data)) => Ok(bincode::deserialize(data)?),
-            None => Err(GraphError::NodeNotFound),
-        }
-    }
-
-    // todo look into using a shorter hash for space efficiency
-    // #[inline(always)]
-    // pub fn hash_label(label: &str) -> [u8; 4] {
-    //     let mut hash = twox_hash::XxHash32::with_seed(0);
-    //     hash.write(label.as_bytes());
-    //     hash.finish_32().to_le_bytes()
-    // }
-
-    // #[inline(always)]
-    // pub fn node_key(id: &u128) -> [u8; 16] {
-    //     id.to_be_bytes()
-    // }
-
-    // #[inline(always)]
-    // pub fn edge_key(id: &u128) -> [u8; 16] {
-    //     id.to_be_bytes()
-    // }
-
+    /// Used because in the case the key changes in the future.
+    /// Believed to not introduce any overhead being inline and using a reference.
+    #[must_use]
     #[inline(always)]
     pub fn node_key(id: &u128) -> &u128 {
         id
     }
 
+    /// Used because in the case the key changes in the future.
+    /// Believed to not introduce any overhead being inline and using a reference.
+    #[must_use]
     #[inline(always)]
     pub fn edge_key(id: &u128) -> &u128 {
         id
     }
 
-    #[inline(always)]
-    pub fn node_label_key(label: &[u8; 4], id: &u128) -> [u8; 20] {
-        let mut key = [0u8; 20];
-        key[0..4].copy_from_slice(label);
-        key[4..20].copy_from_slice(&id.to_be_bytes());
-        key
-    }
-
-    #[inline(always)]
-    pub fn edge_label_key(label: &[u8; 4], id: &u128) -> [u8; 20] {
-        let mut key = [0u8; 20];
-        key[0..4].copy_from_slice(label);
-        key[4..20].copy_from_slice(&id.to_be_bytes());
-        key
-    }
-
-    // key = from-node(16) | label-id(4)                 ← 20 B
-    // val = to-node(16)  | edge-id(16)                  ← 32 B (DUPFIXED)
+    /// Out edge key generator. Creates a 20 byte array and copies in the node id and 4 byte label.
+    ///
+    /// key = `from-node(16)` | `label-id(4)`                 ← 20 B
+    ///
+    /// The generated out edge key will remain the same for the same from_node_id and label.
+    /// To save space, the key is only stored once,
+    /// with the values being stored in a sorted sub-tree, with this key being the root.
     #[inline(always)]
     pub fn out_edge_key(from_node_id: &u128, label: &[u8; 4]) -> [u8; 20] {
         let mut key = [0u8; 20];
@@ -189,6 +183,13 @@ impl HelixGraphStorage {
         key
     }
 
+    /// In edge key generator. Creates a 20 byte array and copies in the node id and 4 byte label.
+    ///
+    /// key = `to-node(16)` | `label-id(4)`                 ← 20 B
+    ///
+    /// The generated in edge key will remain the same for the same to_node_id and label.
+    /// To save space, the key is only stored once,
+    /// with the values being stored in a sorted sub-tree, with this key being the root.
     #[inline(always)]
     pub fn in_edge_key(to_node_id: &u128, label: &[u8; 4]) -> [u8; 20] {
         let mut key = [0u8; 20];
@@ -197,17 +198,23 @@ impl HelixGraphStorage {
         key
     }
 
+    /// Packs the edge data into a 32 byte array.
+    ///
+    /// data = `edge-id(16)` | `node-id(16)`                 ← 32 B (DUPFIXED)
     #[inline(always)]
-    pub fn pack_edge_data(node_id: &u128, edge_id: &u128) -> [u8; 32] {
+    pub fn pack_edge_data(edge_id: &u128, node_id: &u128) -> [u8; 32] {
         let mut key = [0u8; 32];
         key[0..16].copy_from_slice(&edge_id.to_be_bytes());
         key[16..32].copy_from_slice(&node_id.to_be_bytes());
         key
     }
 
+    /// Unpacks the 32 byte array into an (edge_id, node_id) tuple of u128s.
+    ///
+    /// Returns (edge_id, node_id)
     #[inline(always)]
-    /// Returns (node_id, edge_id)
-    pub fn unpack_adj_edge_data(data: &[u8]) -> Result<(u128, u128), GraphError> {
+    // Uses Type Aliases for clarity
+    pub fn unpack_adj_edge_data(data: &[u8]) -> Result<(EdgeId, NodeId), GraphError> {
         let edge_id = u128::from_be_bytes(
             data[0..16]
                 .try_into()
@@ -218,39 +225,19 @@ impl HelixGraphStorage {
                 .try_into()
                 .map_err(|_| GraphError::SliceLengthError)?,
         );
-        Ok((node_id, edge_id))
+        Ok((edge_id, node_id))
     }
 
-    pub fn get_u128_from_bytes(bytes: &[u8]) -> Result<u128, GraphError> {
-        let mut arr = [0u8; 16];
-        arr.copy_from_slice(bytes);
-        let res = u128::from_be_bytes(arr);
-        Ok(res)
-    }
-
+    /// Gets a vector
     pub fn get_vector(&self, txn: &RoTxn, id: &u128) -> Result<HVector, GraphError> {
+        // uses level 0 because thats where all vectors are stored
         let vector = self.vectors.get_vector(txn, *id, 0, true)?;
         Ok(vector)
-    }
-
-    fn get_document_text(&self, txn: &RoTxn, doc_id: u128) -> Result<String, GraphError> {
-        let node = self.get_node(txn, &doc_id)?;
-        let mut text = node.label.clone();
-
-        if let Some(properties) = node.properties {
-            for (key, value) in properties {
-                text.push(' ');
-                text.push_str(&key);
-                text.push(' ');
-                text.push_str(&value.to_string());
-            }
-        }
-
-        Ok(text)
     }
 }
 
 impl DBMethods for HelixGraphStorage {
+    // Creates a secondary index lmdb db (table) for a given index name
     fn create_secondary_index(&mut self, name: &str) -> Result<(), GraphError> {
         let mut wtxn = self.graph_env.write_txn()?;
         let db = self.graph_env.create_database(&mut wtxn, Some(name))?;
@@ -259,6 +246,7 @@ impl DBMethods for HelixGraphStorage {
         Ok(())
     }
 
+    // Drops a secondary index lmdb db (table) for a given index name
     fn drop_secondary_index(&mut self, name: &str) -> Result<(), GraphError> {
         let mut wtxn = self.graph_env.write_txn()?;
         let db = self
@@ -275,28 +263,9 @@ impl DBMethods for HelixGraphStorage {
     }
 }
 
-impl BasicStorageMethods for HelixGraphStorage {
-    #[inline(always)]
-    fn get_temp_node<'a>(&self, txn: &'a RoTxn, id: &u128) -> Result<&'a [u8], GraphError> {
-        match self.nodes_db.get(&txn, Self::node_key(id))? {
-            Some(data) => Ok(data),
-            None => Err(GraphError::NodeNotFound),
-        }
-    }
-
-    #[inline(always)]
-    fn get_temp_edge<'a>(&self, txn: &'a RoTxn, id: &u128) -> Result<&'a [u8], GraphError> {
-        match self.edges_db.get(&txn, Self::edge_key(id))? {
-            Some(data) => Ok(data),
-            None => Err(GraphError::EdgeNotFound),
-        }
-    }
-}
-
 impl StorageMethods for HelixGraphStorage {
     #[inline(always)]
     fn check_exists(&self, txn: &RoTxn, id: &u128) -> Result<bool, GraphError> {
-        // let txn = txn.read_txn();
         let exists = self.nodes_db.get(txn, Self::node_key(id))?.is_some();
         Ok(exists)
     }
@@ -327,27 +296,6 @@ impl StorageMethods for HelixGraphStorage {
         Ok(edge)
     }
 
-    // LEAVE FOR NOW
-    // fn get_node_by_secondary_index(
-    //     &self,
-    //     txn: &RoTxn,
-    //     index: &str,
-    //     key: &Value,
-    // ) -> Result<Node, GraphError> {
-    //     let db = self
-    //         .secondary_indices
-    //         .get(index)
-    //         .ok_or(GraphError::New(format!(
-    //             "Secondary Index {} not found",
-    //             index
-    //         )))?;
-    //     let node_id = db
-    //         .get(txn, &bincode::serialize(key)?)?
-    //         .ok_or(GraphError::NodeNotFound)?;
-    //     let node_id = Self::get_u128_from_bytes(&node_id)?;
-    //     self.get_node(txn, &node_id)
-    // }
-
     fn drop_node(&self, txn: &mut RwTxn, id: &u128) -> Result<(), GraphError> {
         // Get node to get its label
         //let node = self.get_node(txn, id)?;
@@ -366,7 +314,7 @@ impl StorageMethods for HelixGraphStorage {
                 assert_eq!(key.len(), 20);
                 let mut label = [0u8; 4];
                 label.copy_from_slice(&key[16..20]);
-                let (_, edge_id) = Self::unpack_adj_edge_data(&value)?;
+                let (edge_id, _) = Self::unpack_adj_edge_data(&value)?;
                 out_edges.push((edge_id, label));
             }
             out_edges
@@ -387,7 +335,7 @@ impl StorageMethods for HelixGraphStorage {
                 assert_eq!(key.len(), 20);
                 let mut label = [0u8; 4];
                 label.copy_from_slice(&key[16..20]);
-                let (node_id, edge_id) = Self::unpack_adj_edge_data(&value)?;
+                let (edge_id, node_id) = Self::unpack_adj_edge_data(&value)?;
                 in_edges.push((edge_id, label, node_id));
             }
 
@@ -431,4 +379,3 @@ impl StorageMethods for HelixGraphStorage {
         Ok(())
     }
 }
-

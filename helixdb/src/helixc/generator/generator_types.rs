@@ -1,16 +1,12 @@
 use core::fmt;
-use std::{
-    collections::HashMap,
-    fmt::Display,
-    io::{self, Write},
-};
+use std::fmt::Display;
 
-use crate::{helixc::parser::helix_parser::FieldPrefix, protocol::value::Value};
+use crate::helixc::parser::helix_parser::FieldPrefix;
 
 use super::{
-    traversal_steps::{ShouldCollect, Traversal},
+    traversal_steps::Traversal,
     tsdisplay::ToTypeScript,
-    utils::{write_headers, write_properties, GenRef, GeneratedType, GeneratedValue},
+    utils::{write_headers, GenRef, GeneratedType, GeneratedValue},
 };
 
 pub struct Source {
@@ -249,10 +245,7 @@ impl Display for Query {
             writeln!(f, "    Err(err) => return Err(GraphError::from(err)),")?;
             writeln!(f, "}};\n")?;
         }
-        writeln!(
-            f,
-            "let mut remapping_vals = RemappingMap::new();"
-        )?;
+        writeln!(f, "let mut remapping_vals = RemappingMap::new();")?;
 
         writeln!(f, "let db = Arc::clone(&input.graph.storage);")?;
         // if mut then get write txn
@@ -280,7 +273,7 @@ impl Display for Query {
 
         // commit the transaction
         // if self.is_mut {
-            writeln!(f, "    txn.commit().unwrap();")?;
+        writeln!(f, "    txn.commit().unwrap();")?;
         // }/
         // closes the handler function
         write!(
@@ -367,7 +360,7 @@ pub struct ForEach {
 impl Display for ForEach {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.for_variables {
-            ForVariable::ObjectDestructure(variables) => {
+            ForVariable::ObjectDestructure(_) => {
                 write!(
                     f,
                     "for data in data.{}",
@@ -380,7 +373,7 @@ impl Display for ForEach {
                     self.in_variable
                 )?;
             }
-            ForVariable::Identifier(variable) => {
+            ForVariable::Identifier(_) => {
                 write!(f, "for data in {}", self.in_variable)?;
             }
             ForVariable::Empty => {

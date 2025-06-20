@@ -7,7 +7,7 @@ use crate::{
     },
     protocol::{
         filterable::Filterable,
-        items::{v6_uuid, Node},
+        id::v6_uuid, items::Node,
         value::Value,
     },
 };

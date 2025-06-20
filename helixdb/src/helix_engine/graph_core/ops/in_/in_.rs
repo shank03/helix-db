@@ -34,7 +34,7 @@ impl<'a> Iterator for InNodesIterator<'a, RoTxn<'a>> {
         while let Some(Ok((_, data))) = self.iter.next() {
             match data.decode() {
                 Ok(data) => {
-                    let (node_id, _) = match HelixGraphStorage::unpack_adj_edge_data(&data) {
+                    let (_, node_id) = match HelixGraphStorage::unpack_adj_edge_data(&data) {
                         Ok(data) => data,
                         Err(e) => {
                             println!("Error unpacking edge data: {:?}", e);

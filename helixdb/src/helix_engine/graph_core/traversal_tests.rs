@@ -1,39 +1,30 @@
 use std::{sync::Arc, time::Instant};
 
+use crate::helix_engine::{
+    graph_core::ops::{
+        g::G,
+        in_::{in_e::InEdgesAdapter, to_n::ToNAdapter, to_v::ToVAdapter},
+        out::{from_n::FromNAdapter, from_v::FromVAdapter, out::OutAdapter},
+        source::{
+            add_n::AddNAdapter, e_from_id::EFromIdAdapter, n_from_id::NFromIdAdapter,
+            n_from_index::NFromIndexAdapter,
+        },
+        tr_val::{Traversable, TraversalVal},
+        util::{dedup::DedupAdapter, range::RangeAdapter},
+    },
+    storage_core::storage_core::HelixGraphStorage,
+    types::GraphError,
+};
 use crate::{
     helix_engine::graph_core::ops::{
-        source::{n_from_index::NFromIndexAdapter, n_from_type::NFromTypeAdapter},
-        util::paths::ShortestPathAdapter,
+        source::n_from_type::NFromTypeAdapter, util::paths::ShortestPathAdapter,
     },
-    protocol::{
-        filterable::Filterable,
-        id::ID,
-        items::{Edge, Node},
-        value::Value,
-    },
+    protocol::{filterable::Filterable, id::ID, value::Value},
 };
 use crate::{
     helix_engine::{
         graph_core::ops::{
-            g::G,
-            in_::{in_e::InEdgesAdapter, to_n::ToNAdapter},
-            out::{from_n::FromNAdapter, out::OutAdapter},
-            source::{
-                add_n::AddNAdapter, bulk_add_n::BulkAddNAdapter, e_from_id::EFromIdAdapter,
-                n_from_id::NFromIdAdapter,
-            },
-            tr_val::{Traversable, TraversalVal},
-            util::{dedup::DedupAdapter, range::RangeAdapter},
-        },
-        storage_core::{storage_core::HelixGraphStorage, storage_methods::StorageMethods},
-        types::GraphError,
-    },
-    protocol::items::v6_uuid,
-};
-use crate::{
-    helix_engine::{
-        graph_core::ops::{
-            source::{bulk_add_e::BulkAddEAdapter, e_from_type::EFromTypeAdapter},
+            source::e_from_type::EFromTypeAdapter,
             util::drop::Drop,
             vectors::{insert::InsertVAdapter, search::SearchVAdapter},
         },
@@ -173,7 +164,7 @@ fn test_out() {
         .collect_to::<Vec<_>>();
 
     txn.commit().unwrap();
-    let mut txn = storage.graph_env.write_txn().unwrap();
+    let txn = storage.graph_env.write_txn().unwrap();
 
     // let nodes = VFromId::new(&storage, &txn, person1.id.as_str())
     //     .out("knows")
@@ -732,7 +723,7 @@ fn test_n_from_id_chain_operations() {
     let person2 = G::new_mut(Arc::clone(&storage), &mut txn)
         .add_n("person", Some(props!()), None)
         .collect_to::<Vec<_>>();
-    let person3 = G::new_mut(Arc::clone(&storage), &mut txn)
+    let _ = G::new_mut(Arc::clone(&storage), &mut txn)
         .add_n("person", Some(props!()), None)
         .collect_to::<Vec<_>>();
     let person3 = G::new_mut(Arc::clone(&storage), &mut txn)
@@ -1176,7 +1167,7 @@ fn test_edge_properties() {
         .add_n("person", Some(props!()), None)
         .collect_to_val();
     let props = Some(props! { "since" => 2020, "date" => 1744965900, "name" => "hello"});
-    let edge = G::new_mut(Arc::clone(&storage), &mut txn)
+    let _ = G::new_mut(Arc::clone(&storage), &mut txn)
         .add_e(
             "knows",
             props.clone(),
@@ -1229,7 +1220,7 @@ fn test_drop_node() {
     let node2 = G::new_mut(Arc::clone(&storage), &mut txn)
         .add_n("person", Some(props!("name" => "test2")), None)
         .collect_to_val();
-    let edge = G::new_mut(Arc::clone(&storage), &mut txn)
+    let _ = G::new_mut(Arc::clone(&storage), &mut txn)
         .add_e(
             "knows",
             Some(props!()),
@@ -1319,13 +1310,13 @@ fn test_update_node() {
     let node = G::new_mut(Arc::clone(&storage), &mut txn)
         .add_n("person", Some(props!("name" => "test")), None)
         .collect_to_val();
-    let node2 = G::new_mut(Arc::clone(&storage), &mut txn)
+    let _ = G::new_mut(Arc::clone(&storage), &mut txn)
         .add_n("person", Some(props!("name" => "test2")), None)
         .collect_to_val();
 
     txn.commit().unwrap();
     let mut txn = storage.graph_env.write_txn().unwrap();
-    let updatedUsers = {
+    let _ = {
         let update_tr = G::new(Arc::clone(&storage), &txn)
             .n_from_id(&node.id())
             .collect_to::<Vec<_>>();
@@ -1335,12 +1326,12 @@ fn test_update_node() {
     };
     txn.commit().unwrap();
     let txn = storage.graph_env.read_txn().unwrap();
-    let updatedUsers = G::new(Arc::clone(&storage), &txn)
+    let updated_users = G::new(Arc::clone(&storage), &txn)
         .n_from_id(&node.id())
         .collect_to::<Vec<_>>();
-    assert_eq!(updatedUsers.len(), 1);
+    assert_eq!(updated_users.len(), 1);
     assert_eq!(
-        updatedUsers[0].check_property("name").unwrap().to_string(),
+        updated_users[0].check_property("name").unwrap().to_string(),
         "john"
     );
 }
@@ -1490,9 +1481,9 @@ fn huge_traversal() {
     let (storage, _temp_dir) = setup_test_db();
     let mut txn = storage.graph_env.write_txn().unwrap();
 
-    let mut start = Instant::now();
+    let _start = Instant::now();
     let mut nodes = Vec::with_capacity(1000_000);
-    for i in 0..1000_000 {
+    for _ in 0..1000_000 {
         let id = G::new_mut(Arc::clone(&storage), &mut txn)
             .add_n("user", None, None)
             .collect_to_val();
@@ -1730,7 +1721,7 @@ fn test_add_n_parallel() {
     let (storage, _temp_dir) = setup_test_db();
     let n = 100_000_000;
     let chunks = n / 10000000;
-    let k = n / chunks;
+    let _ = n / chunks;
     let start = Instant::now();
 
     let mut txn = storage.graph_env.write_txn().unwrap();
@@ -1771,11 +1762,11 @@ fn test_add_e_between_node_and_vector() {
         .add_n("person", None, None)
         .collect_to_val();
 
-    let vector   = G::new_mut(Arc::clone(&storage), &mut txn)
+    let vector = G::new_mut(Arc::clone(&storage), &mut txn)
         .insert_v::<fn(&HVector, &RoTxn) -> bool>(&vec![1.0, 2.0, 3.0], "vector", None)
         .collect_to_val();
 
-    let edge = G::new_mut(Arc::clone(&storage), &mut txn)
+    let _ = G::new_mut(Arc::clone(&storage), &mut txn)
         .add_e("knows", None, node.id(), vector.id(), false, EdgeType::Vec)
         .collect_to_val();
 
@@ -1796,8 +1787,6 @@ fn test_add_e_between_node_and_vector() {
             .collect_to::<Vec<_>>()
     );
 
-
-
     println!(
         "vectors: {:?}",
         G::new(Arc::clone(&storage), &txn)
@@ -1805,8 +1794,69 @@ fn test_add_e_between_node_and_vector() {
             .collect_to::<Vec<_>>()
     );
 
+    assert_eq!(traversal.len(), 1);
+    assert_eq!(traversal[0].id(), vector.id());
+}
 
+#[test]
+fn test_from_v() {
+    let (storage, _temp_dir) = setup_test_db();
+    let mut txn = storage.graph_env.write_txn().unwrap();
 
+    let node = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_n("person", None, None)
+        .collect_to_val();
+
+    let vector = G::new_mut(Arc::clone(&storage), &mut txn)
+        .insert_v::<fn(&HVector, &RoTxn) -> bool>(&vec![1.0, 2.0, 3.0], "vector", None)
+        .collect_to_val();
+
+    let _ = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_e("knows", None, vector.id(), node.id(), false, EdgeType::Vec)
+        .collect_to_val();
+
+    txn.commit().unwrap();
+
+    let txn = storage.graph_env.read_txn().unwrap();
+    let traversal = G::new(Arc::clone(&storage), &txn)
+        .n_from_id(&node.id())
+        .in_e("knows")
+        .from_v()
+        .collect_to::<Vec<_>>();
+
+    println!("traversal: {:?}", traversal);
+
+    assert_eq!(traversal.len(), 1);
+}
+
+#[test]
+fn test_to_v() {
+    let (storage, _temp_dir) = setup_test_db();
+    let mut txn = storage.graph_env.write_txn().unwrap();
+
+    let node = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_n("person", None, None)
+        .collect_to_val();
+
+    let vector = G::new_mut(Arc::clone(&storage), &mut txn)
+        .insert_v::<fn(&HVector, &RoTxn) -> bool>(&vec![1.0, 2.0, 3.0], "vector", None)
+        .collect_to_val();
+
+    let _ = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_e("knows", None, node.id(), vector.id(), false, EdgeType::Vec)
+        .collect_to_val();
+
+    txn.commit().unwrap();
+    println!("node: {:?}", node);
+
+    let txn = storage.graph_env.read_txn().unwrap();
+    let traversal = G::new(Arc::clone(&storage), &txn)
+        .n_from_id(&node.id())
+        .out_e("knows")
+        .to_v()
+        .collect_to::<Vec<_>>();
+
+    println!("traversal: {:?}", traversal);
 
     assert_eq!(traversal.len(), 1);
     assert_eq!(traversal[0].id(), vector.id());

@@ -1,47 +1,50 @@
-use super::value::{properties_format, Value};
+//! Node and Edge types for the graph.
+//! 
+//! Nodes are the main entities in the graph and edges are the connections between them.
+//! 
+//! Nodes and edges are serialised without enum variant names in JSON format.
+
+use super::value::Value;
 use crate::helix_engine::types::GraphError;
-use bincode::Options;
 use sonic_rs::{Deserialize, Serialize};
 use std::{cmp::Ordering, collections::HashMap};
-use uuid::Uuid;
 
 /// A node in the graph containing an ID, label, and property map.
 /// Properties are serialised without enum variant names in JSON format.
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub struct Node {
+    /// The ID of the node.
+    ///
+    /// This is not serialized when stored as it is the key.
     #[serde(skip)]
     pub id: u128,
+    /// The label of the node.
     pub label: String,
+    /// The properties of the node.
+    ///
+    /// Properties are optional and can be None.
+    /// Properties are serialised without enum variant names in JSON format.
     #[serde(default)]
     pub properties: Option<HashMap<String, Value>>,
 }
 
-impl Eq for Node {}
-
-impl Ord for Node {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.id.cmp(&other.id)
-    }
-}
-
-impl PartialOrd for Node {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
 impl Node {
+    /// The number of properties in a node.
+    ///     
+    /// This is used as a constant in the return value mixin methods.
     pub const NUM_PROPERTIES: usize = 2;
 
+    /// Decodes a node from a byte slice.
+    ///
+    /// Takes ID as the ID is not serialized when stored as it is the key.
+    /// Uses the known ID (either from the query or the key in an LMDB iterator) to construct a new node.
     pub fn decode_node(bytes: &[u8], id: u128) -> Result<Node, GraphError> {
         match bincode::deserialize::<Node>(bytes) {
-            Ok(node) => {
-                Ok(Node {
-                    id,
-                    label: node.label,
-                    properties: node.properties,
-                })
-            }
+            Ok(node) => Ok(Node {
+                id,
+                label: node.label,
+                properties: node.properties,
+            }),
             Err(e) => Err(GraphError::ConversionError(format!(
                 "Error deserializing node: {}",
                 e
@@ -49,12 +52,16 @@ impl Node {
         }
     }
 
+    /// Encodes a node into a byte slice
+    ///
+    /// This skips the ID and if the properties are None, it skips the properties.
     pub fn encode_node(&self) -> Result<Vec<u8>, GraphError> {
         bincode::serialize(&self)
             .map_err(|e| GraphError::ConversionError(format!("Error serializing node: {}", e)))
     }
 }
 
+// Core trait implementations for Node
 impl std::fmt::Display for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -66,7 +73,6 @@ impl std::fmt::Display for Node {
         )
     }
 }
-
 impl std::fmt::Debug for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -78,48 +84,60 @@ impl std::fmt::Debug for Node {
         )
     }
 }
-
-/// An edge in the graph connecting two nodes with an ID, label, and property map.
-/// Properties are serialised without enum variant names in JSON format.
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
-pub struct Edge {
-    #[serde(skip)]
-    pub id: u128, // TODO: change to uuid::Uuid and implement SERDE manually
-    pub label: String,
-    pub from_node: u128,
-    pub to_node: u128,
-    #[serde(default)]
-    pub properties: Option<HashMap<String, Value>>,
-}
-
-impl Eq for Edge {}
-
-impl Ord for Edge {
+impl Eq for Node {}
+impl Ord for Node {
     fn cmp(&self, other: &Self) -> Ordering {
         self.id.cmp(&other.id)
     }
 }
-
-impl PartialOrd for Edge {
+impl PartialOrd for Node {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
+/// An edge in the graph connecting two nodes with an ID, label, and property map.
+/// Properties are serialised without enum variant names in JSON format.
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
+pub struct Edge {
+    /// The ID of the edge.
+    ///
+    /// This is not serialized when stored as it is the key.
+    #[serde(skip)]
+    pub id: u128,
+    /// The label of the edge.
+    pub label: String,
+    /// The ID of the from node.
+    pub from_node: u128,
+    /// The ID of the to node.
+    pub to_node: u128,
+    /// The properties of the edge.
+    ///
+    /// Properties are optional and can be None.
+    /// Properties are serialised without enum variant names in JSON format.
+    #[serde(default)]
+    pub properties: Option<HashMap<String, Value>>,
+}
+
 impl Edge {
+    /// The number of properties in an edge.
+    ///     
+    /// This is used as a constant in the return value mixin methods.
     pub const NUM_PROPERTIES: usize = 4;
 
+    /// Decodes an edge from a byte slice.
+    /// 
+    /// Takes ID as the ID is not serialized when stored as it is the key.
+    /// Uses the known ID (either from the query or the key in an LMDB iterator) to construct a new edge.
     pub fn decode_edge(bytes: &[u8], id: u128) -> Result<Edge, GraphError> {
         match bincode::deserialize::<Edge>(bytes) {
-            Ok(edge) => {
-                Ok(Edge {
-                    id,
-                    label: edge.label,
-                    from_node: edge.from_node,
-                    to_node: edge.to_node,
-                    properties: edge.properties,
-                })
-            }
+            Ok(edge) => Ok(Edge {
+                id,
+                label: edge.label,
+                from_node: edge.from_node,
+                to_node: edge.to_node,
+                properties: edge.properties,
+            }),
             Err(e) => Err(GraphError::ConversionError(format!(
                 "Error deserializing edge: {}",
                 e
@@ -127,12 +145,17 @@ impl Edge {
         }
     }
 
+    /// Encodes an edge into a byte slice
+    /// 
+    /// This skips the ID and if the properties are None, it skips the properties.
     pub fn encode_edge(&self) -> Result<Vec<u8>, GraphError> {
         bincode::serialize(self)
             .map_err(|e| GraphError::ConversionError(format!("Error serializing edge: {}", e)))
     }
 }
 
+
+// Core trait implementations for Edge
 impl std::fmt::Display for Edge {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -146,7 +169,6 @@ impl std::fmt::Display for Edge {
         )
     }
 }
-
 impl std::fmt::Debug for Edge {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -160,8 +182,16 @@ impl std::fmt::Debug for Edge {
         )
     }
 }
-
-#[inline(always)]
-pub fn v6_uuid() -> u128 {
-    Uuid::now_v6(&[1, 2, 3, 4, 5, 6]).as_u128()
+impl Eq for Edge {}
+impl Ord for Edge {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.id.cmp(&other.id)
+    }
 }
+impl PartialOrd for Edge {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+
