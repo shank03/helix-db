@@ -6,6 +6,7 @@ use crate::{
     },
     protocol::items::Edge,
 };
+use debug_trace::debug_trace;
 use heed3::RoTxn;
 use std::{iter::Once, sync::Arc};
 
@@ -20,6 +21,7 @@ impl<'a> Iterator for EFromId<'a, RoTxn<'a>> {
 
     type Item = Result<TraversalVal, GraphError>;
 
+    #[debug_trace("E_FROM_ID")]
     fn next(&mut self) -> Option<Self::Item> {
         self.iter.next().map(|_| {
             let edge: Edge = match self.storage.get_edge(self.txn, self.id) {

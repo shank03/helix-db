@@ -6,6 +6,7 @@ use crate::{
     },
     protocol::value::Value,
 };
+use debug_trace::debug_trace;
 use heed3::{byteorder::BE, RoTxn};
 use serde::Serialize;
 use std::sync::Arc;
@@ -20,6 +21,7 @@ pub struct NFromIndex<'a> {
 impl<'a> Iterator for NFromIndex<'a> {
     type Item = Result<TraversalVal, GraphError>;
 
+    #[debug_trace("N_FROM_INDEX")]
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(value) = self.iter.next() {
             let (_, value) = value.unwrap();

@@ -1,6 +1,14 @@
 [workspace]
-members = ["helixdb", "helix-container", "get_routes", "helix-cli", "hbuild", "hbuild_redploy"]
-resolver="2"
+members = [
+    "helixdb",
+    "helix-container",
+    "get_routes",
+    "debug_trace",
+    "helix-cli",
+    "hbuild",
+    "hbuild_redploy",
+]
+resolver = "2"
 
 [profile.release]
 strip = "debuginfo"
@@ -15,4 +23,4 @@ opt-level = 0
 codegen-units = 256
 incremental = true
 panic = "abort"
-debug = 1  # Reduce debug info for faster compilation
+debug = 1           

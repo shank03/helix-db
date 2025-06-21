@@ -9,6 +9,7 @@ use heed3::{
     byteorder::BE,
     types::{Bytes, U128},
 };
+use debug_trace::debug_trace;
 
 pub struct EFromType<'a> {
     pub iter: heed3::RoIter<'a, U128<BE>, heed3::types::LazyDecode<Bytes>>,
@@ -18,6 +19,7 @@ pub struct EFromType<'a> {
 impl<'a> Iterator for EFromType<'a> {
     type Item = Result<TraversalVal, GraphError>;
 
+    #[debug_trace("E_FROM_TYPE")]
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(value) = self.iter.next() {
             let (key, value) = value.unwrap();

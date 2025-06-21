@@ -26,7 +26,7 @@ pub struct HVector {
 
 impl Debug for HVector {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "HVector {{ id: {}, is_deleted: {}, level: {}, distance: {:?}, data: {:?}, properties: {:?} }}", uuid::Uuid::from_u128(self.id).to_string(), self.is_deleted, self.level, self.distance, self.data, self.properties)
+        write!(f, "{{ \nid: {},\nis_deleted: {},\nlevel: {},\ndistance: {:?},\ndata: {:?},\nproperties: {:#?} }}", uuid::Uuid::from_u128(self.id).to_string(), self.is_deleted, self.level, self.distance, self.data, self.properties)
     }
 }
 

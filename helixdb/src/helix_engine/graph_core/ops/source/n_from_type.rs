@@ -5,6 +5,7 @@ use crate::{
     },
     protocol::items::Node,
 };
+use debug_trace::debug_trace;
 use heed3::{
     byteorder::BE,
     types::{Bytes, U128},
@@ -18,6 +19,7 @@ pub struct NFromType<'a> {
 impl<'a> Iterator for NFromType<'a> {
     type Item = Result<TraversalVal, GraphError>;
 
+    #[debug_trace("N_FROM_TYPE")]
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(value) = self.iter.next() {
             let (key_, value) = value.unwrap();

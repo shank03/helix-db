@@ -9,6 +9,7 @@ use crate::{
     },
     protocol::label_hash::hash_label,
 };
+use debug_trace::debug_trace;
 use heed3::{types::Bytes, RoTxn};
 use std::sync::Arc;
 
@@ -26,6 +27,7 @@ pub struct OutEdgesIterator<'a, T> {
 impl<'a> Iterator for OutEdgesIterator<'a, RoTxn<'a>> {
     type Item = Result<TraversalVal, GraphError>;
 
+    #[debug_trace("OUT_E")]
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(Ok((_, data))) = self.iter.next() {
             match data.decode() {

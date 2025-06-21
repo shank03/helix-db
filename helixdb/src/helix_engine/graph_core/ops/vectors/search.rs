@@ -6,6 +6,7 @@ use crate::helix_engine::{
     types::{GraphError, VectorError},
     vector_core::{hnsw::HNSW, vector::HVector},
 };
+use debug_trace::debug_trace;
 use std::iter::once;
 
 pub struct SearchV<I: Iterator<Item = Result<TraversalVal, GraphError>>> {
@@ -16,6 +17,7 @@ pub struct SearchV<I: Iterator<Item = Result<TraversalVal, GraphError>>> {
 impl<I: Iterator<Item = Result<TraversalVal, GraphError>>> Iterator for SearchV<I> {
     type Item = Result<TraversalVal, GraphError>;
 
+    #[debug_trace("SEARCH_V")]
     fn next(&mut self) -> Option<Self::Item> {
         self.iter.next()
     }

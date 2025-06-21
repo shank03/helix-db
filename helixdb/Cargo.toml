@@ -25,6 +25,7 @@ rayon = "1.8.0"
 itertools = "0.14.0"
 get_routes = { version = "0.1.0", path = "../get_routes" }
 tempfile = "3.20.0"
+debug_trace = { version = "0.1.0", path = "../debug_trace" }
 
 # Compiler
 pest = { version = "2.7", optional = true }
@@ -53,6 +54,7 @@ polars = { version = "0.46.0", features = ["parquet", "lazy", "json"] }
 kdam = "0.3"
 
 [features]
+debug-output = ["debug_trace/debug-output"]
 compiler = ["pest", "pest_derive"]
 cosine = []
 ingestion = [
@@ -68,4 +70,5 @@ ingestion = [
 build = ["compiler"]
 server = ["build", "compiler", "cosine"]
 full = ["build", "compiler", "ingestion", "cosine"]
+dev = ["debug-output", "server"]
 default = ["server"]

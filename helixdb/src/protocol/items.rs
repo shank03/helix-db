@@ -77,7 +77,7 @@ impl std::fmt::Debug for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{{ id: {}, label: {}, properties: {:?} }}",
+            "{{ \nid:{},\nlabel:{},\nproperties:{:#?} }}",
             uuid::Uuid::from_u128(self.id).to_string(),
             self.label,
             self.properties
@@ -173,7 +173,7 @@ impl std::fmt::Debug for Edge {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{{ id: {}, label: {}, from_node: {}, to_node: {}, properties: {:?} }}",
+            "{{ \nid: {},\nlabel: {},\nfrom_node: {},\nto_node: {},\nproperties: {:#?} }}",
             uuid::Uuid::from_u128(self.id).to_string(),
             self.label,
             uuid::Uuid::from_u128(self.from_node).to_string(),
