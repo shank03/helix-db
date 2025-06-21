@@ -10,7 +10,7 @@ use crate::helix_engine::{
             n_from_index::NFromIndexAdapter,
         },
         tr_val::{Traversable, TraversalVal},
-        util::{dedup::DedupAdapter, range::RangeAdapter},
+        util::{dedup::DedupAdapter, range::RangeAdapter}, vectors::brute_force_search::BruteForceSearchVAdapter,
     },
     storage_core::storage_core::HelixGraphStorage,
     types::GraphError,
@@ -1860,4 +1860,47 @@ fn test_to_v() {
 
     assert_eq!(traversal.len(), 1);
     assert_eq!(traversal[0].id(), vector.id());
+}
+
+#[test]
+fn test_brute_force_vector_search() {
+    let (storage, _temp_dir) = setup_test_db();
+    let mut txn = storage.graph_env.write_txn().unwrap();
+
+    let node = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_n("person", None, None)
+        .collect_to_val();
+
+
+    let vectors = vec![
+        vec![1.0, 2.0, 3.0],
+        vec![4.0, 5.0, 6.0],
+        vec![7.0, 8.0, 9.0],
+    ];
+
+    let mut vector_ids = Vec::new();
+    for vector in vectors {
+        let vector_id = G::new_mut(Arc::clone(&storage), &mut txn)
+            .insert_v::<fn(&HVector, &RoTxn) -> bool>(&vector, "vector", None)
+            .collect_to_val().id();
+        let _ = G::new_mut(Arc::clone(&storage), &mut txn)   
+            .add_e("embedding", None, node.id(), vector_id, false, EdgeType::Vec)
+            .collect_to_val();
+        vector_ids.push(vector_id);
+    }
+
+    txn.commit().unwrap();
+
+    let txn = storage.graph_env.read_txn().unwrap();
+    let traversal = G::new(Arc::clone(&storage), &txn)
+        .n_from_id(&node.id())
+        .out_e("embedding")
+        .to_v()
+        .brute_force_search_v(&vec![1.0, 2.0, 3.0], 10)
+        .collect_to::<Vec<_>>();
+
+    println!("traversal: {:?}", traversal);
+
+    assert_eq!(traversal.len(), 1);
+    assert_eq!(traversal[0].id(), vector_ids[0]);
 }
