@@ -17,7 +17,13 @@ fi
 export PATH="$HOME/.cargo/bin:$PATH"
 
 # Continue with build process
-cargo build --release && cargo install --path . --root ~/.local
+
+# if dev profile, build with dev profile
+if [ "$1" = "dev" ]; then
+    cargo build --profile dev && cargo install --path . --root ~/.local
+else
+    cargo build --release && cargo install --path . --root ~/.local
+fi
 
 if ! echo "$PATH" | grep -q "$HOME/.local/bin"; then
     if ! grep -Fxq 'export PATH="$HOME/.local/bin:$PATH"' ~/.bashrc; then

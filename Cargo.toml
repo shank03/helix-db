@@ -8,3 +8,11 @@ lto = true
 opt-level = 3
 codegen-units = 1
 panic = "abort"
+
+[profile.dev]
+lto = false
+opt-level = 0
+codegen-units = 256
+incremental = true
+panic = "abort"
+debug = 1  # Reduce debug info for faster compilation
