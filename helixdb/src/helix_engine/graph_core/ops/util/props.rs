@@ -33,6 +33,7 @@ where
             Some(Ok(TraversalVal::Edge(edge))) => match edge.properties {
                 Some(prop) => {
                     let prop = prop.get(self.prop);
+                    println!("prop: {:?}", prop);
                     match prop {
                         Some(prop) => Some(Ok(TraversalVal::Value(prop.clone()))),
                         None => None,

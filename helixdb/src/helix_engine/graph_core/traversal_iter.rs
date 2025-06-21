@@ -62,14 +62,19 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> RoTraversalIterat
         default: bool,
         f: impl Fn(&Value) -> bool,
     ) -> Result<bool, GraphError> {
-        match &self.inner.next() {
-            Some(Ok(TraversalVal::Value(val))) => Ok(f(val)),
+        let val = match &self.inner.next() {
+            Some(Ok(TraversalVal::Value(val))) => {
+                println!("value : {:?}", val);
+                Ok(f(val))
+            }
             Some(Ok(_)) => Err(GraphError::ConversionError(
                 "Expected value, got something else".to_string(),
             )),
             Some(Err(err)) => Err(GraphError::from(err.to_string())),
             None => Ok(default),
-        }
+        };
+        println!("result: {:?}", val);
+        val
     }
 }
 pub struct RwTraversalIterator<'scope, 'env, I> {
