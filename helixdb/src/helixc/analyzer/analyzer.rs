@@ -3203,7 +3203,7 @@ impl<'a> Ctx<'a> {
                     .push(Separator::Period(GeneratedStep::SearchVector(
                         SearchVectorStep { vec, k },
                     )));
-                traversal.traversal_type = TraversalType::Ref;
+                // traversal.traversal_type = TraversalType::Ref;
                 traversal.should_collect = ShouldCollect::ToVec;
                 Some(Type::Vector(Some(vector_ty.clone())))
             }

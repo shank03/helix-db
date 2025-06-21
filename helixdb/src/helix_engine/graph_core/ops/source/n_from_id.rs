@@ -6,6 +6,7 @@ use crate::{
     },
     protocol::items::Node,
 };
+use debug_trace::debug_trace;
 use heed3::RoTxn;
 use std::{iter::Once, sync::Arc};
 
@@ -19,6 +20,7 @@ pub struct NFromId<'a, T> {
 impl<'a> Iterator for NFromId<'a, RoTxn<'a>> {
     type Item = Result<TraversalVal, GraphError>;
 
+    #[debug_trace("N_FROM_ID")]
     fn next(&mut self) -> Option<Self::Item> {
         self.iter.next().map(|_| {
             let node: Node = match self.storage.get_node(self.txn, &self.id) {

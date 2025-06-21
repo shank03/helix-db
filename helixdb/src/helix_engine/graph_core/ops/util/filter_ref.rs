@@ -2,6 +2,7 @@ use crate::helix_engine::{graph_core::traversal_iter::RoTraversalIterator, types
 
 use super::super::tr_val::TraversalVal;
 use heed3::RoTxn;
+use debug_trace::debug_trace;
 
 pub struct FilterRef<'a, I, F> {
     iter: I,
@@ -15,7 +16,7 @@ where
     F: Fn(&I::Item, &RoTxn) -> Result<bool, GraphError>,
 {
     type Item = I::Item;
-
+    #[debug_trace("FILTER_REF")]
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(item) = self.iter.next() {
             match (self.f)(&item, &self.txn) {

@@ -77,6 +77,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> RoTraversalIterat
         val
     }
 }
+
 pub struct RwTraversalIterator<'scope, 'env, I> {
     pub inner: I,
     pub storage: Arc<HelixGraphStorage>,

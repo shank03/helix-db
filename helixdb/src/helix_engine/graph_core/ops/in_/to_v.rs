@@ -5,6 +5,7 @@ use crate::helix_engine::{
 };
 use heed3::RoTxn;
 use std::sync::Arc;
+use debug_trace::debug_trace;
 
 pub struct ToVIterator<'a, I, T> {
     iter: I,
@@ -19,6 +20,7 @@ where
 {
     type Item = Result<TraversalVal, GraphError>;
 
+    #[debug_trace("TO_V")]
     fn next(&mut self) -> Option<Self::Item> {
         match self.iter.next() {
             Some(item) => match item {

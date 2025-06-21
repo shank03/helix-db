@@ -472,7 +472,7 @@ impl HNSW for VectorCore {
                             }
                             None => None,
                         };
-                        println!("vector: {:?}", vector);
+
                         vector
                     }
                     false => HVector::from_bytes(id, level, &bytes)?,

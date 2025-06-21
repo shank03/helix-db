@@ -3,6 +3,7 @@ use crate::helix_engine::{
     storage_core::{storage_core::HelixGraphStorage, storage_methods::StorageMethods},
     types::GraphError,
 };
+use debug_trace::debug_trace;
 use heed3::RoTxn;
 use std::sync::Arc;
 
@@ -19,6 +20,7 @@ where
 {
     type Item = Result<TraversalVal, GraphError>;
 
+    #[debug_trace("TO_N")]
     fn next(&mut self) -> Option<Self::Item> {
         match self.iter.next() {
             Some(item) => match item {
