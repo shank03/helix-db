@@ -1504,7 +1504,7 @@ impl<'a> Ctx<'a> {
                                             format!("data.{}", i)
                                         }
                                         ValueType::Literal { value, loc } => match value {
-                                            Value::String(s) => s,
+                                            Value::String(s) => format!("\"{}\"", s),
                                             Value::I8(i) => i.to_string(),
                                             Value::I16(i) => i.to_string(),
                                             Value::I32(i) => i.to_string(),
@@ -1922,7 +1922,7 @@ impl<'a> Ctx<'a> {
                                 }
                                 ExpressionType::Identifier(i) => {
                                     self.is_valid_identifier(q, expr.loc.clone(), i.as_str());
-                                    self.gen_identifier_or_param(q, i.as_str())
+                                    self.gen_identifier_or_param(q, i.as_str(), false)
                                 }
                                 _ => unreachable!("Cannot reach here"),
                             };
@@ -1938,7 +1938,7 @@ impl<'a> Ctx<'a> {
                                 }
                                 ExpressionType::Identifier(i) => {
                                     self.is_valid_identifier(q, expr.loc.clone(), i.as_str());
-                                    self.gen_identifier_or_param(q, i.as_str())
+                                    self.gen_identifier_or_param(q, i.as_str(), false)
                                 }
                                 _ => unreachable!("Cannot reach here"),
                             };
@@ -1954,7 +1954,7 @@ impl<'a> Ctx<'a> {
                                 }
                                 ExpressionType::Identifier(i) => {
                                     self.is_valid_identifier(q, expr.loc.clone(), i.as_str());
-                                    self.gen_identifier_or_param(q, i.as_str())
+                                    self.gen_identifier_or_param(q, i.as_str(), false)
                                 }
                                 _ => unreachable!("Cannot reach here"),
                             };
@@ -1970,7 +1970,7 @@ impl<'a> Ctx<'a> {
                                 }
                                 ExpressionType::Identifier(i) => {
                                     self.is_valid_identifier(q, expr.loc.clone(), i.as_str());
-                                    self.gen_identifier_or_param(q, i.as_str())
+                                    self.gen_identifier_or_param(q, i.as_str(), false)
                                 }
                                 _ => unreachable!("Cannot reach here"),
                             };
@@ -1992,7 +1992,7 @@ impl<'a> Ctx<'a> {
                                 }
                                 ExpressionType::Identifier(i) => {
                                     self.is_valid_identifier(q, expr.loc.clone(), i.as_str());
-                                    self.gen_identifier_or_param(q, i.as_str())
+                                    self.gen_identifier_or_param(q, i.as_str(), false)
                                 }
                                 _ => unreachable!("Cannot reach here"),
                             };
@@ -2014,7 +2014,7 @@ impl<'a> Ctx<'a> {
                                 }
                                 ExpressionType::Identifier(i) => {
                                     self.is_valid_identifier(q, expr.loc.clone(), i.as_str());
-                                    self.gen_identifier_or_param(q, i.as_str())
+                                    self.gen_identifier_or_param(q, i.as_str(), false)
                                 }
                                 _ => unreachable!("Cannot reach here"),
                             };
@@ -2145,7 +2145,7 @@ impl<'a> Ctx<'a> {
                                                 field.value.loc.clone(),
                                                 i.as_str(),
                                             );
-                                            self.gen_identifier_or_param(q, i.as_str())
+                                            self.gen_identifier_or_param(q, i.as_str(), true)
                                         }
                                         FieldValueType::Literal(l) => match l {
                                             Value::String(s) => {
@@ -2162,7 +2162,7 @@ impl<'a> Ctx<'a> {
                                                     e.loc.clone(),
                                                     i.as_str(),
                                                 );
-                                                self.gen_identifier_or_param(q, i.as_str())
+                                                self.gen_identifier_or_param(q, i.as_str(), true)
                                             }
                                             ExpressionType::StringLiteral(i) => {
                                                 GeneratedValue::Primitive(GenRef::Std(
@@ -4574,9 +4574,13 @@ impl<'a> Ctx<'a> {
         q.parameters.iter().find(|p| p.name.1 == *name).is_some()
     }
 
-    fn gen_identifier_or_param(&self, q: &Query, name: &str) -> GeneratedValue {
+    fn gen_identifier_or_param(&self, q: &Query, name: &str, should_ref: bool) -> GeneratedValue {
         if self.is_param(q, name) {
-            GeneratedValue::Parameter(GenRef::Ref(format!("data.{}", name)))
+            if should_ref {
+                GeneratedValue::Parameter(GenRef::Ref(format!("data.{}", name)))
+            } else {
+                GeneratedValue::Parameter(GenRef::Std(format!("data.{}", name)))
+            }
         } else {
             GeneratedValue::Identifier(GenRef::Std(name.to_string()))
         }
