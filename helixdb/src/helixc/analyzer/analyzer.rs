@@ -12,8 +12,8 @@ use crate::{
                 ReturnValueExpr, Source as GeneratedSource, Statement as GeneratedStatement,
             },
             object_remapping_generation::{
-                ExcludeField, IdentifierRemapping, ObjectRemapping, Remapping,
-                RemappingType, TraversalRemapping, ValueRemapping,
+                ExcludeField, IdentifierRemapping, ObjectRemapping, Remapping, RemappingType,
+                TraversalRemapping, ValueRemapping,
             },
             source_steps::{
                 AddE, AddN, AddV, EFromID, EFromType, NFromID, NFromIndex, NFromType, SearchBM25,
@@ -25,14 +25,9 @@ use crate::{
                 Step as GeneratedStep, Traversal as GeneratedTraversal, TraversalType, Where,
                 WhereExists, WhereRef,
             },
-            utils::{
-                GenRef, GeneratedValue, Separator,
-            },
+            utils::{GenRef, GeneratedValue, Separator},
         },
-        parser::{
-            helix_parser::*,
-            location::Loc,
-        },
+        parser::{helix_parser::*, location::Loc},
     },
     protocol::{date::Date, value::Value},
     utils::styled_string::StyledString,
@@ -562,22 +557,6 @@ impl<'a> Ctx<'a> {
                                     field_name.clone(),
                                     match value {
                                         ValueType::Literal { value, loc } => {
-                                            println!(
-                                                "value: {:?}, {}",
-                                                self.node_fields
-                                                    .get(ty.as_str())
-                                                    .unwrap()
-                                                    .get(field_name.as_str())
-                                                    .unwrap()
-                                                    .field_type,
-                                                self.node_fields
-                                                    .get(ty.as_str())
-                                                    .unwrap()
-                                                    .get(field_name.as_str())
-                                                    .unwrap()
-                                                    .field_type
-                                                    == FieldType::Date
-                                            );
                                             match self
                                                 .node_fields
                                                 .get(ty.as_str())
@@ -588,12 +567,9 @@ impl<'a> Ctx<'a> {
                                                 == FieldType::Date
                                             {
                                                 true => match Date::new(value) {
-                                                    Ok(date) => {
-                                                        println!("date: {}", date.to_rfc3339());
-                                                        GeneratedValue::Literal(GenRef::Literal(
-                                                            date.to_rfc3339(),
-                                                        ))
-                                                    }
+                                                    Ok(date) => GeneratedValue::Literal(
+                                                        GenRef::Literal(date.to_rfc3339()),
+                                                    ),
                                                     Err(e) => {
                                                         self.push_query_err(
                                                             q,
@@ -677,7 +653,7 @@ impl<'a> Ctx<'a> {
                         if let Some(gen_query) = gen_query {
                             gen_query.is_mut = true;
                         }
-                        return (Type::Nodes(Some(ty.to_string())), Some(stmt));
+                        return (Type::Node(Some(ty.to_string())), Some(stmt));
                     }
                 }
                 self.push_query_err(
@@ -686,7 +662,7 @@ impl<'a> Ctx<'a> {
                     "`AddN` must have a node type".to_string(),
                     "add a node type",
                 );
-                return (Type::Nodes(None), None);
+                return (Type::Node(None), None);
             }
             AddEdge(add) => {
                 if let Some(ref ty) = add.edge_type {
@@ -891,7 +867,7 @@ impl<'a> Ctx<'a> {
                     "`AddE` must have an edge type".to_string(),
                     "add an edge type",
                 );
-                (Type::Edges(None), None)
+                (Type::Edge(None), None)
             }
             AddVector(add) => {
                 if let Some(ref ty) = add.vector_type {
@@ -1235,7 +1211,7 @@ impl<'a> Ctx<'a> {
 
                 // Search returns nodes that contain the vectors
                 (
-                    Type::Vector(sv.vector_type.clone()),
+                    Type::Vectors(sv.vector_type.clone()),
                     Some(GeneratedStatement::Traversal(GeneratedTraversal {
                         traversal_type: TraversalType::Ref,
                         steps: vec![],
@@ -1424,7 +1400,7 @@ impl<'a> Ctx<'a> {
                     k,
                 };
                 (
-                    Type::Vector(bm25_search.type_arg.clone()),
+                    Type::Nodes(bm25_search.type_arg.clone()),
                     Some(GeneratedStatement::Traversal(GeneratedTraversal {
                         traversal_type: TraversalType::Ref,
                         steps: vec![],
@@ -1547,13 +1523,15 @@ impl<'a> Ctx<'a> {
                                     }),
                                 },
                             ));
+                            gen_traversal.traversal_type = TraversalType::Ref;
+                            Type::Node(Some(node_type.to_string()))
                         }
                         IdType::Identifier { value: i, loc } => {
                             if self.is_valid_identifier(q, loc.clone(), i.as_str()) {
                                 if !scope.contains_key(i.as_str()) {
                                     self.push_query_err(
                                         q,
-                                        loc,
+                                        loc.clone(),
                                         format!("variable named `{}` is not in scope", i),
                                         format!(
                                             "declare {} in the current scope or fix the typo",
@@ -1567,6 +1545,8 @@ impl<'a> Ctx<'a> {
                                     id: GenRef::Ref(format!("data.{}", i)),
                                     label: GenRef::Literal(node_type.clone()),
                                 }));
+                            gen_traversal.traversal_type = TraversalType::Ref;
+                            Type::Node(Some(node_type.to_string()))
                         }
                         IdType::Literal { value: s, loc } => {
                             gen_traversal.source_step =
@@ -1574,6 +1554,8 @@ impl<'a> Ctx<'a> {
                                     id: GenRef::Ref(s),
                                     label: GenRef::Literal(node_type.clone()),
                                 }));
+                            gen_traversal.traversal_type = TraversalType::Ref;
+                            Type::Node(Some(node_type.to_string()))
                         }
                     }
                 } else {
@@ -1581,10 +1563,9 @@ impl<'a> Ctx<'a> {
                         Separator::Period(SourceStep::NFromType(NFromType {
                             label: GenRef::Literal(node_type.clone()),
                         }));
+                    gen_traversal.traversal_type = TraversalType::Ref;
+                    Type::Nodes(Some(node_type.to_string()))
                 }
-
-                gen_traversal.traversal_type = TraversalType::Ref;
-                Type::Nodes(Some(node_type.to_string()))
             }
             StartNode::Edge { edge_type, ids } => {
                 if !self.edge_map.contains_key(edge_type.as_str()) {
@@ -1620,14 +1601,16 @@ impl<'a> Ctx<'a> {
                         },
                         label: GenRef::Literal(edge_type.clone()),
                     }));
+                    gen_traversal.traversal_type = TraversalType::Ref;
+                    Type::Edge(Some(edge_type.to_string()))
                 } else {
                     gen_traversal.source_step =
                         Separator::Period(SourceStep::EFromType(EFromType {
                             label: GenRef::Literal(edge_type.clone()),
                         }));
+                    gen_traversal.traversal_type = TraversalType::Ref;
+                    Type::Edges(Some(edge_type.to_string()))
                 }
-                gen_traversal.traversal_type = TraversalType::Ref;
-                Type::Edges(Some(edge_type.to_string()))
             }
 
             StartNode::Identifier(identifier) => {
@@ -1681,7 +1664,9 @@ impl<'a> Ctx<'a> {
             match step {
                 StepType::Node(gs) | StepType::Edge(gs) => {
                     match self.apply_graph_step(&gs, &cur_ty, q, gen_traversal, scope) {
-                        Some(new_ty) => cur_ty = new_ty,
+                        Some(new_ty) => {
+                            cur_ty = new_ty;
+                        }
                         None => { /* error already recorded */ }
                     }
                     excluded.clear(); // Traversal to a new element resets exclusions
@@ -1825,7 +1810,7 @@ impl<'a> Ctx<'a> {
                     if let Some(FieldValueType::Identifier(field_name)) = &field_name {
                         self.is_valid_identifier(q, b_op.loc.clone(), field_name.as_str());
                         match &cur_ty {
-                            Type::Nodes(Some(node_ty)) => {
+                            Type::Nodes(Some(node_ty)) | Type::Node(Some(node_ty)) => {
                                 let field_set = self.node_fields.get(node_ty.as_str()).cloned();
                                 if let Some(field_set) = field_set {
                                     match field_set.get(field_name.as_str()) {
@@ -1853,7 +1838,7 @@ impl<'a> Ctx<'a> {
                                     }
                                 }
                             }
-                            Type::Edges(Some(edge_ty)) => {
+                            Type::Edges(Some(edge_ty)) | Type::Edge(Some(edge_ty)) => {
                                 let field_set = self.edge_fields.get(edge_ty.as_str()).cloned();
                                 if let Some(field_set) = field_set {
                                     match field_set.get(field_name.as_str()) {
@@ -1881,7 +1866,7 @@ impl<'a> Ctx<'a> {
                                     }
                                 }
                             }
-                            Type::Vector(Some(sv)) => {
+                            Type::Vectors(Some(sv)) | Type::Vector(Some(sv)) => {
                                 let field_set = self.vector_fields.get(sv.as_str()).cloned();
                                 if let Some(field_set) = field_set {
                                     match field_set.get(field_name.as_str()) {
@@ -2009,10 +1994,7 @@ impl<'a> Ctx<'a> {
                                     self.is_valid_identifier(q, expr.loc.clone(), i.as_str());
                                     self.gen_identifier_or_param(q, i.as_str())
                                 }
-                                other => {
-                                    println!("ID {:?}", other);
-                                    panic!("expr be primitive or value")
-                                }
+                                _ => unreachable!("Cannot reach here"),
                             };
                             BoolOp::Eq(Eq { value: v })
                         }
@@ -2283,7 +2265,6 @@ impl<'a> Ctx<'a> {
             }
             _ => {}
         }
-
         cur_ty
     }
 
@@ -2326,7 +2307,7 @@ impl<'a> Ctx<'a> {
         q: &'a Query,
     ) {
         match &cur_ty {
-            Type::Nodes(Some(node_ty)) => {
+            Type::Nodes(Some(node_ty)) | Type::Node(Some(node_ty)) => {
                 if let Some(field_set) = self.node_fields.get(node_ty.as_str()).cloned() {
                     self.validate_exclude_fields(
                         ex,
@@ -2339,7 +2320,7 @@ impl<'a> Ctx<'a> {
                     );
                 }
             }
-            Type::Edges(Some(edge_ty)) => {
+            Type::Edges(Some(edge_ty)) | Type::Edge(Some(edge_ty)) => {
                 // for (key, val) in &obj.fields {
                 if let Some(field_set) = self.edge_fields.get(edge_ty.as_str()).cloned() {
                     self.validate_exclude_fields(
@@ -2353,7 +2334,7 @@ impl<'a> Ctx<'a> {
                     );
                 }
             }
-            Type::Vector(Some(vector_ty)) => {
+            Type::Vectors(Some(vector_ty)) | Type::Vector(Some(vector_ty)) => {
                 // Vectors only have 'id' and 'embedding' fields
                 if let Some(fields) = self.vector_fields.get(vector_ty.as_str()).cloned() {
                     self.validate_exclude_fields(
@@ -2394,7 +2375,7 @@ impl<'a> Ctx<'a> {
         var_name: Option<&str>,
     ) {
         match &cur_ty {
-            Type::Nodes(Some(node_ty)) => {
+            Type::Node(Some(node_ty)) => {
                 if let Some(field_set) = self.node_fields.get(node_ty.as_str()).cloned() {
                     // if there is only one field then it is a property access
                     if obj.fields.len() == 1
@@ -2407,9 +2388,6 @@ impl<'a> Ctx<'a> {
                                     obj.fields[0].value.loc.clone(),
                                     lit.as_str(),
                                 );
-                                // gen_traversal.steps.push(Separator::Period(
-                                //     GeneratedStep::PropertyFetch(GenRef::Literal(lit.clone())),
-                                // ));
                                 gen_traversal.steps.push(Separator::Period(
                                     GeneratedStep::PropertyFetch(GenRef::Literal(lit.clone())),
                                 ));
@@ -2438,9 +2416,7 @@ impl<'a> Ctx<'a> {
                                 cur_ty.clone(),
                             ),
                         };
-                        // gen_traversal
-                        //     .steps
-                        //     .push(Separator::Period(GeneratedStep::Remapping(remapping)));
+
                         gen_traversal
                             .steps
                             .push(Separator::Period(GeneratedStep::Remapping(remapping)));
@@ -2453,20 +2429,65 @@ impl<'a> Ctx<'a> {
                             "node object must have at least one field".to_string(),
                         );
                     }
-
-                    // self.validate_object_fields(
-                    //     obj,
-                    //     &field_set,
-                    //     &excluded,
-                    //     q,
-                    //     node_ty,
-                    //     "node",
-                    //     Some(tr.loc.clone()),
-                    // );
                 }
             }
-            Type::Edges(Some(edge_ty)) => {
-                // for (key, val) in &obj.fields {
+            Type::Nodes(Some(node_ty)) => {
+                if let Some(field_set) = self.node_fields.get(node_ty.as_str()).cloned() {
+                    // if there is only one field then it is a property access
+                    if obj.fields.len() == 1
+                        && matches!(obj.fields[0].value.value, FieldValueType::Identifier(_))
+                    {
+                        match &obj.fields[0].value.value {
+                            FieldValueType::Identifier(lit) => {
+                                self.is_valid_identifier(
+                                    q,
+                                    obj.fields[0].value.loc.clone(),
+                                    lit.as_str(),
+                                );
+                                gen_traversal.steps.push(Separator::Period(
+                                    GeneratedStep::PropertyFetch(GenRef::Literal(lit.clone())),
+                                ));
+                                gen_traversal.should_collect = ShouldCollect::ToVec;
+                            }
+                            _ => unreachable!(),
+                        }
+                    } else if obj.fields.len() > 0 {
+                        // if there are multiple fields then it is a field remapping
+                        // push object remapping where
+                        let remapping = match var_name {
+                            Some(var_name) => self.parse_object_remapping(
+                                &obj.fields,
+                                q,
+                                false,
+                                scope,
+                                var_name,
+                                cur_ty.clone(),
+                            ),
+                            None => self.parse_object_remapping(
+                                &obj.fields,
+                                q,
+                                false,
+                                scope,
+                                "item",
+                                cur_ty.clone(),
+                            ),
+                        };
+
+                        gen_traversal
+                            .steps
+                            .push(Separator::Period(GeneratedStep::Remapping(remapping)));
+                    } else {
+                        // error
+                        self.push_query_err(
+                            q,
+                            obj.fields[0].value.loc.clone(),
+                            "node object must have at least one field".to_string(),
+                            "node object must have at least one field".to_string(),
+                        );
+                    }
+                }
+            }
+            Type::Edge(Some(edge_ty)) => {
                 if let Some(field_set) = self.edge_fields.get(edge_ty.as_str()).cloned() {
                     // if there is only one field then it is a property access
                     if obj.fields.len() == 1
@@ -2479,9 +2500,6 @@ impl<'a> Ctx<'a> {
                                     obj.fields[0].value.loc.clone(),
                                     lit.as_str(),
                                 );
-                                // gen_traversal.steps.push(Separator::Period(
-                                //     GeneratedStep::PropertyFetch(GenRef::Literal(lit.clone())),
-                                // ));
                                 gen_traversal.steps.push(Separator::Period(
                                     GeneratedStep::PropertyFetch(GenRef::Literal(lit.clone())),
                                 ));
@@ -2500,9 +2518,6 @@ impl<'a> Ctx<'a> {
                             "item",
                             cur_ty.clone(),
                         );
-                        // gen_traversal
-                        //     .steps
-                        //     .push(Separator::Period(GeneratedStep::Remapping(remapping)));
                         gen_traversal
                             .steps
                             .push(Separator::Period(GeneratedStep::Remapping(remapping)));
@@ -2515,32 +2530,54 @@ impl<'a> Ctx<'a> {
                             "edge object must have at least one field".to_string(),
                         );
                     }
-
-                    // self.validate_object_fields(
-                    //     obj,
-                    //     &field_set,
-                    //     &excluded,
-                    //     q,
-                    //     node_ty,
-                    //     "node",
-                    //     Some(tr.loc.clone()),
-                    // );
+                }
+            }
+            Type::Edges(Some(edge_ty)) => {
+                if let Some(field_set) = self.edge_fields.get(edge_ty.as_str()).cloned() {
+                    // if there is only one field then it is a property access
+                    if obj.fields.len() == 1
+                        && matches!(obj.fields[0].value.value, FieldValueType::Identifier(_))
+                    {
+                        match &obj.fields[0].value.value {
+                            FieldValueType::Identifier(lit) => {
+                                self.is_valid_identifier(
+                                    q,
+                                    obj.fields[0].value.loc.clone(),
+                                    lit.as_str(),
+                                );
+                                gen_traversal.steps.push(Separator::Period(
+                                    GeneratedStep::PropertyFetch(GenRef::Literal(lit.clone())),
+                                ));
+                                gen_traversal.should_collect = ShouldCollect::ToVec;
+                            }
+                            _ => unreachable!(),
+                        };
+                    } else if obj.fields.len() > 0 {
+                        // if there are multiple fields then it is a field remapping
+                        // push object remapping where
+                        let remapping = self.parse_object_remapping(
+                            &obj.fields,
+                            q,
+                            false,
+                            scope,
+                            "item",
+                            cur_ty.clone(),
+                        );
+                        gen_traversal
+                            .steps
+                            .push(Separator::Period(GeneratedStep::Remapping(remapping)));
+                    } else {
+                        // error
+                        self.push_query_err(
+                            q,
+                            obj.fields[0].value.loc.clone(),
+                            "edge object must have at least one field".to_string(),
+                            "edge object must have at least one field".to_string(),
+                        );
+                    }
                 }
             }
             Type::Vector(Some(vector_ty)) => {
-                // Vectors only have 'id' and 'embedding' fields
-                // if let Some(fields) = self.vector_fields.get(vector_ty.as_str()).cloned() {
-                //     self.validate_object_fields(
-                //         obj,
-                //         &fields,
-                //         &excluded,
-                //         q,
-                //         vector_ty,
-                //         "vector",
-                //         Some(tr.loc.clone()),
-                //     );
-                // }
-
                 if let Some(field_set) = self.vector_fields.get(vector_ty.as_str()).cloned() {
                     // if there is only one field then it is a property access
                     if obj.fields.len() == 1
@@ -2553,9 +2590,6 @@ impl<'a> Ctx<'a> {
                                     obj.fields[0].value.loc.clone(),
                                     lit.as_str(),
                                 );
-                                // gen_traversal.steps.push(Separator::Period(
-                                //     GeneratedStep::PropertyFetch(GenRef::Literal(lit.clone())),
-                                // ));
                                 gen_traversal.steps.push(Separator::Period(
                                     GeneratedStep::PropertyFetch(GenRef::Literal(lit.clone())),
                                 ));
@@ -2584,9 +2618,6 @@ impl<'a> Ctx<'a> {
                                 cur_ty.clone(),
                             ),
                         };
-                        // gen_traversal
-                        //     .steps
-                        //     .push(Separator::Period(GeneratedStep::Remapping(remapping)));
                         gen_traversal
                             .steps
                             .push(Separator::Period(GeneratedStep::Remapping(remapping)));
@@ -2599,16 +2630,61 @@ impl<'a> Ctx<'a> {
                             "vector object must have at least one field".to_string(),
                         );
                     }
-
-                    // self.validate_object_fields(
-                    //     obj,
-                    //     &field_set,
-                    //     &excluded,
-                    //     q,
-                    //     node_ty,
-                    //     "node",
-                    //     Some(tr.loc.clone()),
-                    // );
+                }
+            }
+            Type::Vectors(Some(vector_ty)) => {
+                if let Some(field_set) = self.vector_fields.get(vector_ty.as_str()).cloned() {
+                    // if there is only one field then it is a property access
+                    if obj.fields.len() == 1
+                        && matches!(obj.fields[0].value.value, FieldValueType::Identifier(_))
+                    {
+                        match &obj.fields[0].value.value {
+                            FieldValueType::Identifier(lit) => {
+                                self.is_valid_identifier(
+                                    q,
+                                    obj.fields[0].value.loc.clone(),
+                                    lit.as_str(),
+                                );
+                                gen_traversal.steps.push(Separator::Period(
+                                    GeneratedStep::PropertyFetch(GenRef::Literal(lit.clone())),
+                                ));
+                                gen_traversal.should_collect = ShouldCollect::ToVec;
+                            }
+                            _ => unreachable!(),
+                        }
+                    } else if obj.fields.len() > 0 {
+                        // if there are multiple fields then it is a field remapping
+                        // push object remapping where
+                        let remapping = match var_name {
+                            Some(var_name) => self.parse_object_remapping(
+                                &obj.fields,
+                                q,
+                                false,
+                                scope,
+                                var_name,
+                                cur_ty.clone(),
+                            ),
+                            None => self.parse_object_remapping(
+                                &obj.fields,
+                                q,
+                                false,
+                                scope,
+                                "item",
+                                cur_ty.clone(),
+                            ),
+                        };
+                        gen_traversal
+                            .steps
+                            .push(Separator::Period(GeneratedStep::Remapping(remapping)));
+                    } else {
+                        // error
+                        self.push_query_err(
+                            q,
+                            obj.fields[0].value.loc.clone(),
+                            "vector object must have at least one field".to_string(),
+                            "vector object must have at least one field".to_string(),
+                        );
+                    }
                 }
             }
             Type::Anonymous(ty) => {
@@ -2648,7 +2724,13 @@ impl<'a> Ctx<'a> {
         use GraphStepType::*;
         match (&gs.step, cur_ty.base()) {
             // Node‑to‑Edge
-            (OutE(label), Type::Nodes(Some(node_label)) | Type::Vector(Some(node_label))) => {
+            (
+                OutE(label),
+                Type::Nodes(Some(node_label))
+                | Type::Node(Some(node_label))
+                | Type::Vectors(Some(node_label))
+                | Type::Vector(Some(node_label)),
+            ) => {
                 traversal
                     .steps
                     .push(Separator::Period(GeneratedStep::OutE(GeneratedOutE {
@@ -2680,7 +2762,13 @@ impl<'a> Ctx<'a> {
                     }
                 }
             }
-            (InE(label), Type::Nodes(Some(node_label)) | Type::Vector(Some(node_label))) => {
+            (
+                InE(label),
+                Type::Nodes(Some(node_label))
+                | Type::Node(Some(node_label))
+                | Type::Vectors(Some(node_label))
+                | Type::Vector(Some(node_label)),
+            ) => {
                 traversal
                     .steps
                     .push(Separator::Period(GeneratedStep::InE(GeneratedInE {
@@ -2712,7 +2800,13 @@ impl<'a> Ctx<'a> {
             }
 
             // Node‑to‑Node
-            (Out(label), Type::Nodes(Some(node_label)) | Type::Vector(Some(node_label))) => {
+            (
+                Out(label),
+                Type::Nodes(Some(node_label))
+                | Type::Node(Some(node_label))
+                | Type::Vectors(Some(node_label))
+                | Type::Vector(Some(node_label)),
+            ) => {
                 let edge_type = match self.edge_map.get(label.as_str()) {
                     Some(ref edge) => {
                         if self.node_set.contains(edge.to.1.as_str()) {
@@ -2769,7 +2863,13 @@ impl<'a> Ctx<'a> {
                 }
             }
 
-            (In(label), Type::Nodes(Some(node_label)) | Type::Vector(Some(node_label))) => {
+            (
+                In(label),
+                Type::Nodes(Some(node_label))
+                | Type::Node(Some(node_label))
+                | Type::Vectors(Some(node_label))
+                | Type::Vector(Some(node_label)),
+            ) => {
                 let edge_type = match self.edge_map.get(label.as_str()) {
                     Some(ref edge) => {
                         if self.node_set.contains(edge.from.1.as_str()) {
@@ -2829,45 +2929,113 @@ impl<'a> Ctx<'a> {
             }
 
             // Edge‑to‑Node
-            (FromN, Type::Edges(_)) => {
+            (FromN, Type::Edges(Some(edge_ty)) | Type::Edge(Some(edge_ty))) => {
+                let new_ty = if let Some(edge_schema) = self.edge_map.get(edge_ty.as_str()) {
+                    let node_type = &edge_schema.from.1;
+                    if !self.node_set.contains(node_type.as_str()) {
+                        self.push_query_err(
+                            q,
+                            gs.loc.clone(),
+                            format!(
+                                "edge type `{}` does not have a node type as its `From` source",
+                                edge_ty
+                            ),
+                            format!("set the `From` type of the edge to a node type"),
+                        );
+                    }
+                    match cur_ty {
+                        Type::Edges(_) => Some(Type::Nodes(Some(node_type.clone()))),
+                        Type::Edge(_) => Some(Type::Node(Some(node_type.clone()))),
+                        _ => None,
+                    }
+                } else {
+                    None
+                };
                 traversal
                     .steps
                     .push(Separator::Period(GeneratedStep::FromN));
-                Some(Type::Nodes(Some(
-                    gs.loc
-                        .span
-                        .trim_matches(|c: char| c == '"' || c.is_whitespace() || c == '\n')
-                        .to_string(),
-                )))
+                new_ty
             }
-            (ToN, Type::Edges(_)) => {
+            (ToN, Type::Edges(Some(edge_ty)) | Type::Edge(Some(edge_ty))) => {
+                let new_ty = if let Some(edge_schema) = self.edge_map.get(edge_ty.as_str()) {
+                    let node_type = &edge_schema.to.1;
+                    if !self.node_set.contains(node_type.as_str()) {
+                        self.push_query_err(
+                            q,
+                            gs.loc.clone(),
+                            format!(
+                                "edge type `{}` does not have a node type as its `To` target",
+                                edge_ty
+                            ),
+                            format!("set the `To` type of the edge to a node type"),
+                        );
+                    }
+                    match cur_ty {
+                        Type::Edges(_) => Some(Type::Nodes(Some(node_type.clone()))),
+                        Type::Edge(_) => Some(Type::Node(Some(node_type.clone()))),
+                        _ => None,
+                    }
+                } else {
+                    None
+                };
                 traversal.steps.push(Separator::Period(GeneratedStep::ToN));
-                Some(Type::Nodes(Some(
-                    gs.loc
-                        .span
-                        .trim_matches(|c: char| c == '"' || c.is_whitespace() || c == '\n')
-                        .to_string(),
-                )))
+                new_ty
             }
-            (FromV, Type::Edges(_)) => {
-                traversal.steps.push(Separator::Period(GeneratedStep::FromV));
-                Some(Type::Vector(Some(
-                    gs.loc
-                        .span
-                        .trim_matches(|c: char| c == '"' || c.is_whitespace() || c == '\n')
-                        .to_string(),
-                )))
+            (FromV, Type::Edges(Some(edge_ty)) | Type::Edge(Some(edge_ty))) => {
+                // Get the source vector type from the edge schema
+                let new_ty = if let Some(edge_schema) = self.edge_map.get(edge_ty.as_str()) {
+                    let source_type = &edge_schema.from.1;
+                    if !self.vector_set.contains(source_type.as_str()) {
+                        self.push_query_err(
+                            q,
+                            gs.loc.clone(),
+                            format!(
+                                "edge type `{}` does not have a vector type as its `From` source",
+                                edge_ty
+                            ),
+                            format!("set the `From` type of the edge to a vector type"),
+                        );
+                    }
+                    match cur_ty {
+                        Type::Edges(_) => Some(Type::Vectors(Some(source_type.clone()))),
+                        Type::Edge(_) => Some(Type::Vector(Some(source_type.clone()))),
+                        _ => None,
+                    }
+                } else {
+                    None
+                };
+                traversal
+                    .steps
+                    .push(Separator::Period(GeneratedStep::FromV));
+                new_ty
             }
-            (ToV, Type::Edges(_)) => {
+            (ToV, Type::Edges(Some(edge_ty)) | Type::Edge(Some(edge_ty))) => {
+                // Get the target vector type from the edge schema
+                let new_ty = if let Some(edge_schema) = self.edge_map.get(edge_ty.as_str()) {
+                    let target_type = &edge_schema.to.1;
+                    if !self.vector_set.contains(target_type.as_str()) {
+                        self.push_query_err(
+                            q,
+                            gs.loc.clone(),
+                            format!(
+                                "edge type `{}` does not have a vector type as its `To` target",
+                                edge_ty
+                            ),
+                            format!("set the `To` type of the edge to a vector type"),
+                        );
+                    }
+                    match cur_ty {
+                        Type::Edges(_) => Some(Type::Vectors(Some(target_type.clone()))),
+                        Type::Edge(_) => Some(Type::Vector(Some(target_type.clone()))),
+                        _ => None,
+                    }
+                } else {
+                    None
+                };
                 traversal.steps.push(Separator::Period(GeneratedStep::ToV));
-                Some(Type::Vector(Some(
-                    gs.loc
-                        .span
-                        .trim_matches(|c: char| c == '"' || c.is_whitespace() || c == '\n')
-                        .to_string(),
-                )))
+                new_ty
             }
-            (ShortestPath(sp), Type::Nodes(_)) => {
+            (ShortestPath(sp), Type::Nodes(_) | Type::Node(_)) => {
                 let type_arg = match sp.type_arg.clone() {
                     Some(type_arg) => Some(GenRef::Literal(type_arg)),
                     None => None,
@@ -2898,9 +3066,8 @@ impl<'a> Ctx<'a> {
                     )));
                 Some(Type::Unknown)
             }
-            (SearchVector(sv), Type::Vector(Some(vector_ty))) => {
-                println!("SV {:?}", sv);
-                if !matches!(cur_ty, Type::Vector(_)) {
+            (SearchVector(sv), Type::Vectors(Some(vector_ty)) | Type::Vector(Some(vector_ty))) => {
+                if !(matches!(cur_ty, Type::Vector(_)) || matches!(cur_ty, Type::Vectors(_))) {
                     self.push_query_err(
                             q,
                             sv.loc.clone(),
@@ -3066,7 +3233,10 @@ impl<'a> Ctx<'a> {
     fn get_traversal_step_hint(&self, current_step: &Type, next_step: &GraphStepType) -> String {
         match (current_step, next_step) {
             (
-                Type::Nodes(Some(span)) | Type::Vector(Some(span)),
+                Type::Nodes(Some(span))
+                | Type::Node(Some(span))
+                | Type::Vectors(Some(span))
+                | Type::Vector(Some(span)),
                 GraphStepType::ToN | GraphStepType::FromN,
             ) => {
                 format!(
@@ -3098,53 +3268,6 @@ impl<'a> Ctx<'a> {
         }
     }
 
-    fn validate_object_fields(
-        &mut self,
-        obj: &Object,
-        field_set: &HashMap<&str, &Field>,
-        excluded: &HashMap<&str, Loc>,
-        q: &'a Query,
-        type_name: &str,
-        type_kind: &str,
-        span: Option<Loc>,
-    ) {
-        for FieldAddition { key, value, .. } in &obj.fields {
-            if let Some(loc) = excluded.get(key.as_str()) {
-                // for the "::"
-                let mut loc = loc.clone();
-                loc.end.column += 2;
-                loc.span.push_str("::");
-                self.push_query_err_with_fix(
-                    q,
-                    value.loc.clone(),
-                    format!("field `{}` was previously excluded in this traversal", key),
-                    format!("remove the exclusion of `{}`", key),
-                    Fix::new(span.clone(), Some(loc.clone()), Some(String::new())),
-                );
-            } else {
-                match &value.value {
-                    FieldValueType::Identifier(identifier) => {
-                        if self.is_valid_identifier(q, value.loc.clone(), identifier.as_str()) {
-                            if !field_set.contains_key(identifier.as_str()) {
-                                self.push_query_err(
-                                    q,
-                                    value.loc.clone(),
-                                    format!(
-                                        "`{}` is not a field of {} `{}`",
-                                        key, type_kind, type_name
-                                    ),
-                                    "check the schema field names",
-                                );
-                            }
-                        }
-                    }
-
-                    _ => {}
-                }
-            }
-        }
-    }
-
     fn parse_object_remapping(
         &mut self,
         obj: &'a Vec<FieldAddition>,
@@ -3154,8 +3277,6 @@ impl<'a> Ctx<'a> {
         var_name: &str,
         parent_ty: Type,
     ) -> Remapping {
-        // for each field
-
         let remappings = obj
             .into_iter()
             .map(|FieldAddition { key, value, .. }| {
@@ -3308,17 +3429,17 @@ impl<'a> Ctx<'a> {
                                     );
                                 } else {
                                     let (is_valid_field, item_type) = match &parent_ty {
-                                        Type::Nodes(Some(ty)) => (self
+                                        Type::Nodes(Some(ty)) | Type::Node(Some(ty)) => (self
                                             .node_fields
                                             .get(ty.as_str())
                                             .unwrap()
                                             .contains_key(identifier.as_str()), ty.as_str()),
-                                        Type::Edges(Some(ty)) => (self
+                                        Type::Edges(Some(ty)) | Type::Edge(Some(ty)) => (self
                                             .edge_fields
                                             .get(ty.as_str())
                                             .unwrap()
                                             .contains_key(identifier.as_str()), ty.as_str()),
-                                        Type::Vector(Some(ty)) => (self
+                                        Type::Vectors(Some(ty)) | Type::Vector(Some(ty)) => (self
                                             .vector_fields
                                             .get(ty.as_str())
                                             .unwrap()
@@ -3390,19 +3511,19 @@ impl<'a> Ctx<'a> {
                             });
                         } else {
                             let (is_valid_field, item_type) = match &parent_ty {
-                                Type::Nodes(Some(ty)) => (self
+                                Type::Nodes(Some(ty)) | Type::Node(Some(ty)) => (self
                                         .node_fields
                                         .get(ty.as_str())
                                         .unwrap()
                                         .contains_key(identifier.as_str()),
                                     ty.as_str()),
-                                Type::Edges(Some(ty)) => (self
+                                Type::Edges(Some(ty)) | Type::Edge(Some(ty)) => (self
                                         .edge_fields
                                         .get(ty.as_str())
                                         .unwrap()
                                         .contains_key(identifier.as_str()),
                                     ty.as_str()),
-                                Type::Vector(Some(ty)) => (self
+                                Type::Vectors(Some(ty)) | Type::Vector(Some(ty)) => (self
                                         .vector_fields
                                         .get(ty.as_str())
                                         .unwrap()
@@ -4472,9 +4593,12 @@ impl<'a> Ctx<'a> {
 
 #[derive(Debug, Clone)]
 enum Type {
+    Node(Option<String>),
     Nodes(Option<String>),
+    Edge(Option<String>),
     Edges(Option<String>),
     Vector(Option<String>),
+    Vectors(Option<String>),
     Scalar(FieldType),
     Anonymous(Box<Type>),
     Boolean,
@@ -4484,9 +4608,12 @@ enum Type {
 impl Type {
     fn kind_str(&self) -> &'static str {
         match self {
+            Type::Node(_) => "node",
             Type::Nodes(_) => "nodes",
+            Type::Edge(_) => "edge",
             Type::Edges(_) => "edges",
-            Type::Vector(_) => "vectors",
+            Type::Vector(_) => "vector",
+            Type::Vectors(_) => "vectors",
             Type::Scalar(_) => "scalar",
             Type::Boolean => "boolean",
             Type::Unknown => "unknown",
@@ -4496,9 +4623,12 @@ impl Type {
 
     fn get_type_name(&self) -> String {
         match self {
+            Type::Node(Some(name)) => name.clone(),
             Type::Nodes(Some(name)) => name.clone(),
+            Type::Edge(Some(name)) => name.clone(),
             Type::Edges(Some(name)) => name.clone(),
             Type::Vector(Some(name)) => name.clone(),
+            Type::Vectors(Some(name)) => name.clone(),
             Type::Scalar(ft) => ft.to_string(),
             Type::Anonymous(ty) => ty.get_type_name(),
             Type::Boolean => "boolean".to_string(),
@@ -4516,7 +4646,8 @@ impl Type {
     }
 
     /// Same, but returns an owned clone for convenience.
-    fn cloned_base(&self) -> Type { // TODO: never used?
+    fn cloned_base(&self) -> Type {
+        // TODO: never used?
         match self {
             Type::Anonymous(inner) => inner.cloned_base(),
             _ => self.clone(),
@@ -4534,4 +4665,3 @@ impl<'a> From<&'a FieldType> for Type {
         }
     }
 }
-
