@@ -13,12 +13,11 @@ body:
       label: Task Type
       description: What type of task is this?
       options:
-        - Documentation
-        - Maintenance
-        - Testing
-        - CI/CD
+        - Docs
+        - Feature
+        - Bug
+        - Infrastructure
         - Refactoring
-        - Other
     validations:
       required: true
   - type: textarea
@@ -27,17 +26,6 @@ body:
       label: Task Description
       description: Describe what needs to be done
       placeholder: "A clear and concise description of the task..."
-    validations:
-      required: true
-  - type: textarea
-    id: acceptance
-    attributes:
-      label: Acceptance Criteria
-      description: What needs to be completed for this task to be considered done?
-      placeholder: |
-        - [ ] Criteria 1
-        - [ ] Criteria 2
-        - [ ] Criteria 3
     validations:
       required: true
   - type: dropdown
