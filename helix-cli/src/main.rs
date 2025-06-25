@@ -587,7 +587,7 @@ fi
 
                 // upload queries to centralremote db
                 // send request to https://api.helix.ai/helix/upload
-               
+
                 let payload = json!({
                     "user_id": user_id,
                     "queries": content.files,
@@ -1069,7 +1069,7 @@ fi
             ));
         }
 
-        CommandType::Install(_) => {
+        CommandType::Install(command) => {
             match Command::new("cargo").output() {
                 Ok(_) => {}
                 Err(_) => {
@@ -1088,12 +1088,15 @@ fi
 
             let repo_path = {
                 // check if helix repo exists
-                let home_dir = match dirs::home_dir() {
-                    Some(dir) => dir,
-                    None => {
-                        println!("{}", "Could not determine home directory".red().bold());
-                        return;
-                    }
+                let home_dir = match command.path {
+                    Some(path) => PathBuf::from(path),
+                    None => match dirs::home_dir() {
+                        Some(dir) => dir,
+                        None => {
+                            println!("{}", "Could not determine home directory".red().bold());
+                            return;
+                        }
+                    },
                 };
                 home_dir.join(".helix/repo")
             };
