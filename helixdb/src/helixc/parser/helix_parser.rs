@@ -9,6 +9,7 @@ use pest::{
     Parser as PestParser,
 };
 use pest_derive::Parser;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     fmt::{Debug, Display},
@@ -27,6 +28,7 @@ pub struct Content {
     pub files: Vec<HxFile>,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct HxFile {
     pub name: String,
     pub content: String,

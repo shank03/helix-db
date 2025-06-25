@@ -26,6 +26,7 @@ async fn main() -> Result<(), AdminError> {
     let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
     let s3_client = Client::new(&config);
     let user_id = std::env::var("USER_ID").unwrap_or("helix".to_string());
+    let cluster_id = std::env::var("CLUSTER_ID").unwrap_or("helix".to_string());
     // run server on specified port
     let port = std::env::var("PORT").unwrap_or("8080".to_string());
 
@@ -41,6 +42,7 @@ async fn main() -> Result<(), AdminError> {
                 println!("New connection from {}", addr);
                 let s3_client_clone = s3_client.clone();
                 let user_id_clone = user_id.clone();
+                let cluster_id_clone = cluster_id.clone();
                 tokio::spawn(async move {
                     // rename old binary
                     Command::new("mv")
@@ -53,7 +55,7 @@ async fn main() -> Result<(), AdminError> {
                     let response = s3_client_clone
                         .get_object()
                         .bucket("helix-build")
-                        .key(format!("{}/helix/latest", user_id_clone))
+                        .key(format!("{}/{}/helix/latest", user_id_clone, cluster_id_clone))
                         .send()
                         .await
                         .unwrap();
@@ -70,7 +72,8 @@ async fn main() -> Result<(), AdminError> {
                     file.write_all(&body).unwrap();
 
                     // set permissions
-                    Command::new("chmod")
+                    Command::new("sudo ")
+                        .arg("chmod")
                         .arg("+x")
                         .arg("helix")
                         .spawn()

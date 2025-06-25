@@ -221,7 +221,7 @@ pub fn to_snake_case(s: &str) -> String {
     result
 }
 
-fn generate_content(files: &Vec<DirEntry>) -> Result<Content, CliError> {
+pub fn generate_content(files: &Vec<DirEntry>) -> Result<Content, CliError> {
     let files = files
         .iter()
         .map(|file| {

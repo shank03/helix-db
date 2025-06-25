@@ -7,10 +7,11 @@ use crate::helix_engine::{
         out::{from_n::FromNAdapter, from_v::FromVAdapter, out::OutAdapter},
         source::{
             add_n::AddNAdapter, e_from_id::EFromIdAdapter, n_from_id::NFromIdAdapter,
-            n_from_index::NFromIndexAdapter,
+            n_from_index::NFromIndexAdapter, n_from_type,
         },
         tr_val::{Traversable, TraversalVal},
-        util::{dedup::DedupAdapter, range::RangeAdapter}, vectors::brute_force_search::BruteForceSearchVAdapter,
+        util::{dedup::DedupAdapter, range::RangeAdapter},
+        vectors::brute_force_search::BruteForceSearchVAdapter,
     },
     storage_core::storage_core::HelixGraphStorage,
     types::GraphError,
@@ -1234,7 +1235,7 @@ fn test_drop_node() {
     let mut txn = storage.graph_env.write_txn().unwrap();
     let traversal = G::new(Arc::clone(&storage), &txn)
         .n_from_id(&node.id())
-        .collect::<Vec<_>>();
+        .collect_to::<Vec<_>>();
 
     Drop::<Vec<_>>::drop_traversal(traversal, Arc::clone(&storage), &mut txn).unwrap();
     txn.commit().unwrap();
@@ -1278,7 +1279,7 @@ fn test_drop_edge() {
     let mut txn = storage.graph_env.write_txn().unwrap();
     let traversal = G::new(Arc::clone(&storage), &txn)
         .e_from_id(&edge.id())
-        .collect::<Vec<_>>();
+        .collect_to::<Vec<_>>();
     Drop::<Vec<_>>::drop_traversal(traversal, Arc::clone(&storage), &mut txn).unwrap();
     txn.commit().unwrap();
     let txn = storage.graph_env.read_txn().unwrap();
@@ -1871,7 +1872,6 @@ fn test_brute_force_vector_search() {
         .add_n("person", None, None)
         .collect_to_val();
 
-
     let vectors = vec![
         vec![1.0, 2.0, 3.0],
         vec![4.0, 5.0, 6.0],
@@ -1882,9 +1882,17 @@ fn test_brute_force_vector_search() {
     for vector in vectors {
         let vector_id = G::new_mut(Arc::clone(&storage), &mut txn)
             .insert_v::<fn(&HVector, &RoTxn) -> bool>(&vector, "vector", None)
-            .collect_to_val().id();
-        let _ = G::new_mut(Arc::clone(&storage), &mut txn)   
-            .add_e("embedding", None, node.id(), vector_id, false, EdgeType::Vec)
+            .collect_to_val()
+            .id();
+        let _ = G::new_mut(Arc::clone(&storage), &mut txn)
+            .add_e(
+                "embedding",
+                None,
+                node.id(),
+                vector_id,
+                false,
+                EdgeType::Vec,
+            )
             .collect_to_val();
         vector_ids.push(vector_id);
     }
@@ -1903,4 +1911,67 @@ fn test_brute_force_vector_search() {
 
     assert_eq!(traversal.len(), 1);
     assert_eq!(traversal[0].id(), vector_ids[0]);
+}
+
+#[test]
+fn test_drop_traversal() {
+    let (storage, _temp_dir) = setup_test_db();
+    let mut txn = storage.graph_env.write_txn().unwrap();
+
+    let node = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_n("person", None, None)
+        .collect_to_val();
+
+    for _ in 0..10 {
+        let new_node = G::new_mut(Arc::clone(&storage), &mut txn)
+            .add_n("person", None, None)
+            .collect_to_val();
+        let _ = G::new_mut(Arc::clone(&storage), &mut txn)
+            .add_e("knows", None, node.id(), new_node.id(), false, EdgeType::Node)
+            .collect_to_val();
+    }
+
+    txn.commit().unwrap();
+
+    let txn = storage.graph_env.read_txn().unwrap();
+    let traversal = G::new(Arc::clone(&storage), &txn)
+        .n_from_type("person")
+        .collect_to::<Vec<_>>();
+    txn.commit().unwrap();
+    println!("traversal: {:?}", traversal);
+
+    assert_eq!(traversal.len(), 11);
+
+    let mut txn = storage.graph_env.write_txn().unwrap();
+
+    Drop::drop_traversal(
+        G::new(Arc::clone(&storage), &txn)
+            .n_from_id(&node.id())
+            .out("knows", &EdgeType::Node)
+            .collect_to::<Vec<_>>(),
+        Arc::clone(&storage),
+        &mut txn,
+    )
+    .unwrap();
+
+    Drop::drop_traversal(
+        G::new(Arc::clone(&storage), &txn)
+            .n_from_id(&node.id())
+            .collect_to::<Vec<_>>(),
+        Arc::clone(&storage),
+        &mut txn,
+    )
+    .unwrap();
+
+    txn.commit().unwrap();
+
+    let txn = storage.graph_env.read_txn().unwrap();
+    let traversal = G::new(Arc::clone(&storage), &txn)
+        .n_from_type("person")
+        .collect_to::<Vec<_>>();
+    txn.commit().unwrap();
+    println!("traversal: {:?}", traversal);
+
+    assert_eq!(traversal.len(), 0);
+
 }
