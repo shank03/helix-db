@@ -15,14 +15,12 @@ use crate::{
         label_hash::hash_label,
     },
 };
-
+use super::storage_methods::DBMethods;
 use heed3::byteorder::BE;
 use heed3::{types::*, Database, DatabaseFlags, Env, EnvOpenOptions, RoTxn, RwTxn, WithTls};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-
-use super::storage_methods::DBMethods;
 
 // Database names for different stores
 const DB_NODES: &str = "nodes"; // For node data (n:)
@@ -44,6 +42,8 @@ pub struct HelixGraphStorage {
     pub vectors: VectorCore,
     pub bm25: HBM25Config,
     pub schema: String,
+    // if "": [F64] else: "openai" (or something else)
+    pub embedding_model: String,
 }
 
 impl HelixGraphStorage {
@@ -136,7 +136,10 @@ impl HelixGraphStorage {
                 config.vector_config.ef_search,
             ),
         )?;
+
         let bm25 = HBM25Config::new(&graph_env, &mut wtxn)?;
+        let schema = config.schema.unwrap_or("".to_string());
+        let embedding_model = config.embedding_model.unwrap_or("".to_string());
 
         wtxn.commit()?;
         Ok(Self {
@@ -148,7 +151,8 @@ impl HelixGraphStorage {
             secondary_indices,
             vectors,
             bm25,
-            schema: config.schema.unwrap_or("".to_string()),
+            schema,
+            embedding_model,
         })
     }
 
@@ -379,3 +383,10 @@ impl StorageMethods for HelixGraphStorage {
         Ok(())
     }
 }
+
+// if implemented in helix-container, HelixGraphStorage::embedding_vector is not None
+#[async_trait::async_trait]
+pub trait EmbeddingModel {
+    async fn fetch_embedding(&self, text: String) -> Vec<f64>;
+}
+

@@ -24,10 +24,18 @@ pub struct Config {
     pub db_max_size_gb: Option<usize>, // database in GB
     pub mcp: bool,
     pub schema: Option<String>,
+    pub embedding_model: Option<String>,
 }
 
 impl Config {
-    pub fn new(m: usize, ef_construction: usize, ef_search: usize, db_max_size_gb: usize, schema: Option<String>) -> Self {
+    pub fn new(
+        m: usize,
+        ef_construction: usize,
+        ef_search: usize,
+        db_max_size_gb: usize,
+        schema: Option<String>,
+        embedding_model: Option<String>,
+    ) -> Self {
         Self {
             vector_config: VectorConfig {
                 m: Some(m),
@@ -40,6 +48,7 @@ impl Config {
             db_max_size_gb: Some(db_max_size_gb),
             mcp: true,
             schema,
+            embedding_model,
         }
     }
 
@@ -65,21 +74,22 @@ impl Config {
     }
 
     pub fn init_config() -> String {
-        r#"
-        {
-            "vector_config": {
-                "m": 16,
-                "ef_construction": 128,
-                "ef_search": 768
-            },
-            "graph_config": {
-                "secondary_indices": []
-            },
-            "db_max_size_gb": 10,
-            "mcp": true
-        }
-        "#
-        .to_string()
+    r#"
+    {
+        "vector_config": {
+            "m": 16,
+            "ef_construction": 128,
+            "ef_search": 768
+        },
+        "graph_config": {
+            "secondary_indices": []
+        },
+        "db_max_size_gb": 10,
+        "mcp": true,
+        "embedding_model": true,
+    }
+    "#
+    .to_string()
     }
 }
 
@@ -97,6 +107,7 @@ impl Default for Config {
             db_max_size_gb: Some(10),
             mcp: true,
             schema: None,
+            embedding_model: None,
         }
     }
 }
@@ -109,7 +120,8 @@ impl fmt::Display for Config {
             Graph config => secondary_indicies: {:?}\n
             db_max_size_gb: {:?}\n
             mcp: {:?}\n
-            schema: {:?}",
+            schema: {:?}\n
+            embedding_model: {:?}",
             self.vector_config.m,
             self.vector_config.ef_construction,
             self.vector_config.ef_search,
@@ -117,6 +129,7 @@ impl fmt::Display for Config {
             self.db_max_size_gb,
             self.mcp,
             self.schema,
+            self.embedding_model,
         )
     }
 }

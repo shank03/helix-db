@@ -9,6 +9,7 @@ use inventory;
 use std::{collections::HashMap, sync::Arc};
 
 mod queries;
+mod embedding_providers;
 
 #[tokio::main]
 async fn main() {

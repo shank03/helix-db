@@ -1954,6 +1954,7 @@ dependencies = [
 name = "helix-container"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "chrono",
  "dirs 5.0.1",
  "get_routes",
@@ -1961,6 +1962,7 @@ dependencies = [
  "helixdb",
  "inventory",
  "rand 0.9.1",
+ "reqwest",
  "serde",
  "serde_json",
  "sonic-rs",
@@ -1972,6 +1974,7 @@ dependencies = [
 name = "helixdb"
 version = "1.0.102"
 dependencies = [
+ "async-trait",
  "bincode",
  "chrono",
  "debug_trace",
