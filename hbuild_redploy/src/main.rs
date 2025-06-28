@@ -55,7 +55,7 @@ async fn main() -> Result<(), AdminError> {
     let user_id = std::env::var("USER_ID").unwrap_or("helix".to_string());
     // run server on specified port
     let port = std::env::var("PORT").unwrap_or("8080".to_string());
-
+    let instance_id = std::env::var("INSTANCE_ID").unwrap_or("helix".to_string());
     let addr: SocketAddr = format!("0.0.0.0:{}", port).parse().unwrap();
     let listener = TcpListener::bind(&addr).await.map_err(|e| {
         eprintln!("Failed to bind to address {}: {}", addr, e);
@@ -70,8 +70,9 @@ async fn main() -> Result<(), AdminError> {
                 println!("New connection from {}", addr);
                 let s3_client_clone = s3_client.clone();
                 let user_id_clone = user_id.clone();
+                let instance_id_clone = instance_id.clone();
                 tokio::spawn(async move {
-                    let response = match handle_deploy_request(&s3_client_clone, &user_id_clone).await {
+                    let response = match handle_deploy_request(&s3_client_clone, &user_id_clone, &instance_id_clone).await {
                         Ok(msg) => {
                             println!("Deployment successful: {}", msg);
                             DeployResponse::success(msg)
@@ -112,7 +113,7 @@ async fn main() -> Result<(), AdminError> {
     }
 }
 
-async fn handle_deploy_request(s3_client: &Client, user_id: &str) -> Result<String, AdminError> {
+async fn handle_deploy_request(s3_client: &Client, user_id: &str, instance_id: &str) -> Result<String, AdminError> {
     // Step 1: Backup old binary
     println!("Step 1: Backing up old binary");
     let backup_result = Command::new("mv")
@@ -134,7 +135,7 @@ async fn handle_deploy_request(s3_client: &Client, user_id: &str) -> Result<Stri
     let response = s3_client
         .get_object()
         .bucket("helix-build")
-        .key(format!("{}/helix-container/latest", user_id))
+        .key(format!("{}/{}/helix-container/latest", user_id, instance_id))
         .send()
         .await
         .map_err(|e| AdminError::S3DownloadError("Failed to download from S3".to_string(), e))?;
