@@ -55,7 +55,7 @@ async fn main() -> Result<(), AdminError> {
     let user_id = std::env::var("USER_ID").unwrap_or("helix".to_string());
     // run server on specified port
     let port = std::env::var("PORT").unwrap_or("8080".to_string());
-    let instance_id = std::env::var("INSTANCE_ID").unwrap_or("helix".to_string());
+    let instance_id = std::env::var("EC2_INSTANCE_ID").unwrap_or("helix".to_string());
     let addr: SocketAddr = format!("0.0.0.0:{}", port).parse().unwrap();
     let listener = TcpListener::bind(&addr).await.map_err(|e| {
         eprintln!("Failed to bind to address {}: {}", addr, e);
