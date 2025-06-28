@@ -424,6 +424,8 @@ pub enum StepType {
     Exclude(Exclude),
     Closure(Closure),
     Range((Expression, Expression)),
+    OrderByAsc(Box<Expression>),
+    OrderByDesc(Box<Expression>),
     AddEdge(AddEdge),
 }
 impl PartialEq<StepType> for StepType {
@@ -439,6 +441,8 @@ impl PartialEq<StepType> for StepType {
             (&StepType::Exclude(_), &StepType::Exclude(_)) => true,
             (&StepType::Closure(_), &StepType::Closure(_)) => true,
             (&StepType::Range(_), &StepType::Range(_)) => true,
+            (&StepType::OrderByAsc(_), &StepType::OrderByAsc(_)) => true,
+            (&StepType::OrderByDesc(_), &StepType::OrderByDesc(_)) => true,
             (&StepType::AddEdge(_), &StepType::AddEdge(_)) => true,
             _ => false,
         }
@@ -2003,6 +2007,14 @@ impl HelixParser {
             Rule::AddE => Ok(Step {
                 loc: inner.loc(),
                 step: StepType::AddEdge(self.parse_add_edge(inner, true)?),
+            }),
+            Rule::order_by_asc => Ok(Step {
+                loc: inner.loc(),
+                step: StepType::OrderByAsc(Box::new(self.parse_expression(inner)?)),
+            }),
+            Rule::order_by_desc => Ok(Step {
+                loc: inner.loc(),
+                step: StepType::OrderByDesc(Box::new(self.parse_expression(inner)?)),
             }),
             _ => Err(ParserError::from(format!(
                 "Unexpected step type: {:?}",

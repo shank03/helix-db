@@ -20,12 +20,12 @@ use crate::{
                 SearchVector as GeneratedSearchVector, SourceStep,
             },
             traversal_steps::{
-                In as GeneratedIn, InE as GeneratedInE, Out as GeneratedOut, OutE as GeneratedOutE,
-                SearchVectorStep, ShortestPath as GeneratedShortestPath, ShouldCollect,
-                Step as GeneratedStep, Traversal as GeneratedTraversal, TraversalType, Where,
-                WhereExists, WhereRef,
+                In as GeneratedIn, InE as GeneratedInE, OrderBy, Out as GeneratedOut,
+                OutE as GeneratedOutE, Range, SearchVectorStep,
+                ShortestPath as GeneratedShortestPath, ShouldCollect, Step as GeneratedStep,
+                Traversal as GeneratedTraversal, TraversalType, Where, WhereExists, WhereRef,
             },
-            utils::{GenRef, GeneratedValue, Separator},
+            utils::{GenRef, GeneratedValue, Order, Separator},
         },
         parser::{helix_parser::*, location::Loc},
     },
@@ -2213,7 +2213,77 @@ impl<'a> Ctx<'a> {
                     excluded.clear();
                 }
 
-                StepType::Range(_) => { /* doesn't affect type */ }
+                StepType::Range((start, end)) => {
+                    let (start, end) = match (&start.expr, &end.expr) {
+                        (ExpressionType::Identifier(i), ExpressionType::Identifier(j)) => (
+                            self.gen_identifier_or_param(q, i.as_str(), false),
+                            self.gen_identifier_or_param(q, j.as_str(), false),
+                        ),
+                        (ExpressionType::IntegerLiteral(i), ExpressionType::IntegerLiteral(j)) => (
+                            GeneratedValue::Primitive(GenRef::Std(i.to_string())),
+                            GeneratedValue::Primitive(GenRef::Std(j.to_string())),
+                        ),
+                        _ => unreachable!("Cannot reach here"),
+                    };
+                    gen_traversal
+                        .steps
+                        .push(Separator::Period(GeneratedStep::Range(Range {
+                            start: start,
+                            end: end,
+                        })));
+                }
+                StepType::OrderByAsc(expr) => {
+                    // verify property access
+                    let (_, stmt) =
+                        self.infer_expr_type(expr, scope, q, Some(cur_ty.clone()), None);
+
+                    assert!(stmt.is_some());
+                    match stmt.unwrap() {
+                        GeneratedStatement::Traversal(traversal) => {
+                            let property = match &traversal.steps.last() {
+                                Some(step) => match &step.inner() {
+                                    GeneratedStep::PropertyFetch(property) => property.clone(),
+                                    _ => unreachable!("Cannot reach here"),
+                                },
+                                None => unreachable!("Cannot reach here"),
+                            };
+                            gen_traversal
+                                .steps
+                                .push(Separator::Period(GeneratedStep::OrderBy(OrderBy {
+                                    property,
+                                    order: Order::Asc,
+                                })));
+                            gen_traversal.should_collect = ShouldCollect::Try;
+                        }
+                        _ => unreachable!("Cannot reach here"),
+                    }
+                }
+                StepType::OrderByDesc(expr) => {
+                    // verify property access
+                    let (_, stmt) =
+                        self.infer_expr_type(expr, scope, q, Some(cur_ty.clone()), None);
+
+                    assert!(stmt.is_some());
+                    match stmt.unwrap() {
+                        GeneratedStatement::Traversal(traversal) => {
+                            let property = match &traversal.steps.last() {
+                                Some(step) => match &step.inner() {
+                                    GeneratedStep::PropertyFetch(property) => property.clone(),
+                                    _ => unreachable!("Cannot reach here"),
+                                },
+                                None => unreachable!("Cannot reach here"),
+                            };
+                            gen_traversal
+                                .steps
+                                .push(Separator::Period(GeneratedStep::OrderBy(OrderBy {
+                                    property,
+                                    order: Order::Desc,
+                                })));
+                            gen_traversal.should_collect = ShouldCollect::Try;
+                        }
+                        _ => unreachable!("Cannot reach here"),
+                    }
+                }
                 StepType::Closure(cl) => {
                     if i != number_of_steps {
                         self.push_query_err(
