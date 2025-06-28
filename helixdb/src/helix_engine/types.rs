@@ -26,6 +26,7 @@ pub enum GraphError {
     ConfigFileNotFound,
     SliceLengthError,
     ShortestPathNotFound,
+    EmbeddingError(String),
 }
 
 impl fmt::Display for GraphError {
@@ -55,15 +56,10 @@ impl fmt::Display for GraphError {
             GraphError::SliceLengthError => write!(f, "Slice length error"),
             GraphError::VectorError(msg) => write!(f, "Vector error: {}", msg),
             GraphError::ShortestPathNotFound => write!(f, "Shortest path not found"),
+            GraphError::EmbeddingError(msg) => write!(f, "Error while embedding text: {}", msg),
         }
     }
 }
-
-// impl From<rocksdb::Error> for GraphError {
-//     fn from(error: rocksdb::Error) -> Self {
-//         GraphError::New(error.into_string())
-//     }
-// }
 
 impl From<HeedError> for GraphError {
     fn from(error: HeedError) -> Self {
@@ -189,3 +185,4 @@ impl From<bincode::Error> for VectorError {
         VectorError::ConversionError(format!("bincode error: {}", error.to_string()))
     }
 }
+

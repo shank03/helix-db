@@ -387,6 +387,6 @@ impl StorageMethods for HelixGraphStorage {
 // if implemented in helix-container, HelixGraphStorage::embedding_vector is not None
 #[async_trait::async_trait]
 pub trait EmbeddingModel {
-    async fn fetch_embedding(&self, text: String) -> Vec<f64>;
+    async fn fetch_embedding(&self, text: &str) -> Result<Vec<f64>, GraphError>;
 }
 
