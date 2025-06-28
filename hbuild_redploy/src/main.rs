@@ -134,7 +134,7 @@ async fn handle_deploy_request(s3_client: &Client, user_id: &str, instance_id: &
     println!("Step 2: Downloading new binary from S3");
     let response = s3_client
         .get_object()
-        .bucket("helix-build")
+        .bucket("helix-user-builds")
         .key(format!("{}/{}/helix-container/latest", user_id, instance_id))
         .send()
         .await
