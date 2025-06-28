@@ -225,6 +225,16 @@ async fn handle_deploy_request(s3_client: &Client, user_id: &str, instance_id: &
     
     file.write_all(&data)
         .map_err(|e| AdminError::FileError("Failed to write new binary".to_string(), e))?;
+    
+    // Ensure data is flushed to disk before proceeding
+    file.flush()
+        .map_err(|e| AdminError::FileError("Failed to flush binary file".to_string(), e))?;
+    
+    file.sync_all()
+        .map_err(|e| AdminError::FileError("Failed to sync binary file to disk".to_string(), e))?;
+    
+    // Explicitly drop the file handle to ensure it's closed
+    drop(file);
 
     // Step 3: Set permissions
     println!("Step 3: Setting permissions");
@@ -241,6 +251,8 @@ async fn handle_deploy_request(s3_client: &Client, user_id: &str, instance_id: &
             error_msg
         )));
     }
+    // sleep for 1 second
+    tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
 
     // Step 4: Restart systemd service
     println!("Step 4: Restarting helix service");
