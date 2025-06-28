@@ -49,10 +49,21 @@ impl DeployResponse {
 #[tokio::main]
 async fn main() -> Result<(), AdminError> {
     println!("Starting helix build service");
-    // Initialize AWS SDK
-    let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
+    // Initialize AWS SDK with explicit region configuration
+    let bucket_region = std::env::var("S3_BUCKET_REGION").unwrap_or("us-west-1".to_string());
+    println!("Using S3 bucket region: {}", bucket_region);
+    
+    let config = aws_config::load_defaults(BehaviorVersion::latest())
+        .await
+        .to_builder()
+        .region(aws_config::Region::new(bucket_region.clone()))
+        .build();
     let s3_client = Client::new(&config);
+    
+    println!("AWS region configured: {:?}", config.region());
+    
     let user_id = std::env::var("USER_ID").unwrap_or("helix".to_string());
+    println!("User ID: {}", user_id);
     // run server on specified port
     let port = std::env::var("PORT").unwrap_or("8080".to_string());
     let instance_id = std::env::var("EC2_INSTANCE_ID").unwrap_or("helix".to_string());
@@ -114,6 +125,43 @@ async fn main() -> Result<(), AdminError> {
 }
 
 async fn handle_deploy_request(s3_client: &Client, user_id: &str, instance_id: &str) -> Result<String, AdminError> {
+    // Step 0: Debug AWS configuration and connectivity
+    println!("Step 0: Verifying AWS configuration and S3 connectivity");
+    println!("User ID: {}, Instance ID: {}", user_id, instance_id);
+    
+    // Try to list objects in the bucket to verify connectivity
+    let list_response = s3_client
+        .list_objects_v2()
+        .bucket("helix-user-builds")
+        .prefix(&format!("{}/{}/helix-container/", user_id, instance_id))
+        .send()
+        .await;
+    
+    match list_response {
+        Ok(list_result) => {
+            let contents = list_result.contents();
+            println!("Found {} objects with prefix {}/{}/helix-container/", contents.len(), user_id, instance_id);
+            for obj in contents {
+                if let Some(key) = obj.key() {
+                    println!("  - {}", key);
+                    if let Some(size) = obj.size() {
+                        println!("    Size: {} bytes", size);
+                    }
+                    if let Some(modified) = obj.last_modified() {
+                        println!("    Last modified: {:?}", modified);
+                    }
+                }
+            }
+            if contents.is_empty() {
+                println!("No objects found with prefix {}/{}/helix-container/", user_id, instance_id);
+            }
+        }
+        Err(e) => {
+            eprintln!("Failed to list objects in bucket: {:?}", e);
+            return Err(AdminError::InvalidParameter(format!("Failed to verify S3 connectivity: {:?}", e)));
+        }
+    }
+
     // Step 1: Backup old binary
     println!("Step 1: Backing up old binary");
     let backup_result = Command::new("mv")
@@ -132,13 +180,38 @@ async fn handle_deploy_request(s3_client: &Client, user_id: &str, instance_id: &
 
     // Step 2: Download new binary from S3
     println!("Step 2: Downloading new binary from S3 for user {} and instance {}", user_id, instance_id);
+    let s3_key = format!("{}/{}/helix-container/latest", user_id, instance_id);
+    println!("Attempting to download from bucket: helix-user-builds, key: {}", s3_key);
+    
     let response = s3_client
         .get_object()
         .bucket("helix-user-builds")
-        .key(format!("{}/{}/helix-container/latest", user_id, instance_id))
+        .key(&s3_key)
         .send()
         .await
-        .map_err(|e| AdminError::S3DownloadError("Failed to download from S3".to_string(), e))?;
+        .map_err(|e| {
+            eprintln!("S3 GetObject error details: {:?}", e);
+            // Print more specific error information
+            match &e {
+                aws_sdk_s3::error::SdkError::ServiceError(service_err) => {
+                    eprintln!("Service error: {:?}", service_err.err());
+                    eprintln!("HTTP status: {:?}", service_err.raw().status());
+                }
+                aws_sdk_s3::error::SdkError::ConstructionFailure(construction_err) => {
+                    eprintln!("Construction failure: {:?}", construction_err);
+                }
+                aws_sdk_s3::error::SdkError::TimeoutError(timeout_err) => {
+                    eprintln!("Timeout error: {:?}", timeout_err);
+                }
+                aws_sdk_s3::error::SdkError::DispatchFailure(dispatch_err) => {
+                    eprintln!("Dispatch failure: {:?}", dispatch_err);
+                }
+                _ => {
+                    eprintln!("Other S3 error: {:?}", e);
+                }
+            }
+            AdminError::S3DownloadError(format!("Failed to download from S3 (bucket: helix-user-builds, key: {})", s3_key), e)
+        })?;
 
     let data = response
         .body
