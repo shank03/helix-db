@@ -186,3 +186,15 @@ impl From<bincode::Error> for VectorError {
     }
 }
 
+#[cfg(all(feature = "embed_vectors", feature = "float_vectors"))]
+compile_error!("Features \"embed_vectors\" and \"float_vectors\" cannot be enabled at the same time.");
+
+#[cfg(feature = "embed_vectors")]
+type Vector = String;
+
+#[cfg(feature = "float_vectors")]
+type Vector = Vec<f64>;
+
+#[cfg(not(any(feature = "embed_vectors", feature = "float_vectors")))]
+compile_error!("Either feature \"embed_vectors\" or \"float_vectors\" must be enabled.");
+

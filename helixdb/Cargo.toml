@@ -59,6 +59,8 @@ kdam = "0.3"
 debug-output = ["debug_trace/debug-output"]
 compiler = ["pest", "pest_derive"]
 cosine = []
+float_vectors = []
+embed_vectors = []
 ingestion = [
     "rusqlite",
     "tokio-postgres",
@@ -70,7 +72,9 @@ ingestion = [
 
 ]
 build = ["compiler"]
-server = ["build", "compiler", "cosine"]
-full = ["build", "compiler", "ingestion", "cosine"]
+vectors = ["cosine", "float_vectors"]
+server = ["build", "compiler", "vectors"]
+full = ["build", "compiler", "ingestion", "vectors"]
 dev = ["debug-output", "server"]
 default = ["server"]
+

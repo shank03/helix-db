@@ -86,6 +86,10 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> InsertVAdapte
     where
         F: Fn(&HVector, &RoTxn) -> bool,
     {
+
+        // here either take in String or Vec<f64>
+        // if String, need to call embedding model in container
+
         let txn = self.txn;
         let storage = Arc::clone(&self.storage);
         let iter = vecs
@@ -106,3 +110,4 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> InsertVAdapte
         }
     }
 }
+
