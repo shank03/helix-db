@@ -2,7 +2,12 @@ use crate::helixc::parser::parser_methods::ParserError;
 use core::fmt;
 use heed3::Error as HeedError;
 use sonic_rs::Error as SonicError;
-use std::{net::AddrParseError, str::Utf8Error, string::FromUtf8Error};
+use std::{
+    net::AddrParseError,
+    str::Utf8Error,
+    string::FromUtf8Error,
+    env,
+};
 
 #[derive(Debug)]
 pub enum GraphError {
@@ -185,16 +190,4 @@ impl From<bincode::Error> for VectorError {
         VectorError::ConversionError(format!("bincode error: {}", error.to_string()))
     }
 }
-
-#[cfg(all(feature = "embed_vectors", feature = "float_vectors"))]
-compile_error!("Features \"embed_vectors\" and \"float_vectors\" cannot be enabled at the same time.");
-
-#[cfg(feature = "embed_vectors")]
-type Vector = String;
-
-#[cfg(feature = "float_vectors")]
-type Vector = Vec<f64>;
-
-#[cfg(not(any(feature = "embed_vectors", feature = "float_vectors")))]
-compile_error!("Either feature \"embed_vectors\" or \"float_vectors\" must be enabled.");
 

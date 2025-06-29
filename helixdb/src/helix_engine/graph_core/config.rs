@@ -24,7 +24,6 @@ pub struct Config {
     pub db_max_size_gb: Option<usize>, // database in GB
     pub mcp: bool,
     pub schema: Option<String>,
-    pub embedding_model: Option<String>,
 }
 
 impl Config {
@@ -48,7 +47,6 @@ impl Config {
             db_max_size_gb: Some(db_max_size_gb),
             mcp: true,
             schema,
-            embedding_model,
         }
     }
 
@@ -85,8 +83,7 @@ impl Config {
             "secondary_indices": []
         },
         "db_max_size_gb": 10,
-        "mcp": true,
-        "embedding_model": true,
+        "mcp": true
     }
     "#
     .to_string()
@@ -106,8 +103,7 @@ impl Default for Config {
             },
             db_max_size_gb: Some(10),
             mcp: true,
-            schema: None,
-            embedding_model: None,
+            schema: None
         }
     }
 }
@@ -120,8 +116,7 @@ impl fmt::Display for Config {
             Graph config => secondary_indicies: {:?}\n
             db_max_size_gb: {:?}\n
             mcp: {:?}\n
-            schema: {:?}\n
-            embedding_model: {:?}",
+            schema: {:?}",
             self.vector_config.m,
             self.vector_config.ef_construction,
             self.vector_config.ef_search,
@@ -129,7 +124,6 @@ impl fmt::Display for Config {
             self.db_max_size_gb,
             self.mcp,
             self.schema,
-            self.embedding_model,
         )
     }
 }

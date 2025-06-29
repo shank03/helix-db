@@ -42,8 +42,6 @@ pub struct HelixGraphStorage {
     pub vectors: VectorCore,
     pub bm25: HBM25Config,
     pub schema: String,
-    // if "": [F64] else: "openai" (or something else)
-    pub embedding_model: String,
 }
 
 impl HelixGraphStorage {
@@ -139,7 +137,6 @@ impl HelixGraphStorage {
 
         let bm25 = HBM25Config::new(&graph_env, &mut wtxn)?;
         let schema = config.schema.unwrap_or("".to_string());
-        let embedding_model = config.embedding_model.unwrap_or("".to_string());
 
         wtxn.commit()?;
         Ok(Self {
@@ -152,7 +149,6 @@ impl HelixGraphStorage {
             vectors,
             bm25,
             schema,
-            embedding_model,
         })
     }
 
@@ -382,11 +378,5 @@ impl StorageMethods for HelixGraphStorage {
 
         Ok(())
     }
-}
-
-// if implemented in helix-container, HelixGraphStorage::embedding_vector is not None
-#[async_trait::async_trait]
-pub trait EmbeddingModel {
-    fn fetch_embedding(&self, text: &str) -> Result<Vec<f64>, GraphError>;
 }
 
