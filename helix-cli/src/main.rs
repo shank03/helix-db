@@ -529,14 +529,20 @@ fi
                 let path = match get_cfg_deploy_path(command.path) {
                     Ok(path) => path,
                     Err(e) => {
-                        sp.stop_with_message(format!("{}", "Error getting config path".red().bold()));
+                        sp.stop_with_message(format!(
+                            "{}",
+                            "Error getting config path".red().bold()
+                        ));
                         return;
                     }
                 };
                 let files = match check_and_read_files(&path) {
                     Ok(files) if !files.is_empty() => files,
                     Ok(_) => {
-                        sp.stop_with_message(format!("{}", "No queries found, nothing to compile".yellow().bold()));
+                        sp.stop_with_message(format!(
+                            "{}",
+                            "No queries found, nothing to compile".yellow().bold()
+                        ));
                         return;
                     }
                     Err(e) => {
@@ -548,7 +554,10 @@ fi
                 let content = match generate_content(&files) {
                     Ok(content) => content,
                     Err(e) => {
-                        sp.stop_with_message(format!("{}", "Error generating content".red().bold()));
+                        sp.stop_with_message(format!(
+                            "{}",
+                            "Error generating content".red().bold()
+                        ));
                         println!("└── {}", e);
                         return;
                     }
@@ -589,11 +598,24 @@ fi
                 // upload queries to centralremote db
                 // send request to https://api.helix.ai/helix/upload
 
+                // read config.hx.json
+                let config = match Config::from_files(
+                    PathBuf::from(path.clone()).join("config.hx.json"),
+                    PathBuf::from(path.clone()).join("schema.hx"),
+                ) {
+                    Ok(config) => config,
+                    Err(e) => {
+                        sp.stop_with_message(format!("{}", "Error loading config".red().bold()));
+                        return;
+                    }
+                };
+
                 let payload = json!({
                     "user_id": user_id,
                     "queries": content.files,
                     "instance_id": command.instance,
-                    "version": "0.1.0"
+                    "version": "0.1.0",
+                    "config": config
                 });
                 let client = reqwest::Client::new();
                 match client
