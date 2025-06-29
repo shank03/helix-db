@@ -524,22 +524,23 @@ fi
             }
 
             if command.remote {
-                println!("{}", "Uploading queries to remote db".green().bold());
+                let mut sp = Spinner::new(Spinners::Dots9, "Uploading queries to remote db".into());
+
                 let path = match get_cfg_deploy_path(command.path) {
                     Ok(path) => path,
                     Err(e) => {
-                        println!("{} {}", "Error getting config path:".red().bold(), e);
+                        sp.stop_with_message(format!("{}", "Error getting config path".red().bold()));
                         return;
                     }
                 };
                 let files = match check_and_read_files(&path) {
                     Ok(files) if !files.is_empty() => files,
                     Ok(_) => {
-                        println!("{}", "No queries found, nothing to compile".red().bold());
+                        sp.stop_with_message(format!("{}", "No queries found, nothing to compile".yellow().bold()));
                         return;
                     }
                     Err(e) => {
-                        println!("{} {}", "Error getting files:".red().bold(), e);
+                        sp.stop_with_message(format!("{}", "Error getting files".red().bold()));
                         return;
                     }
                 };
@@ -547,7 +548,7 @@ fi
                 let content = match generate_content(&files) {
                     Ok(content) => content,
                     Err(e) => {
-                        println!("{}", "Error generating content".red().bold());
+                        sp.stop_with_message(format!("{}", "Error generating content".red().bold()));
                         println!("└── {}", e);
                         return;
                     }
@@ -559,7 +560,7 @@ fi
                 let config_path = Path::new(config_path);
                 let config_path = config_path.join("credentials");
                 if !config_path.exists() {
-                    println!("{}", "No credentials found".red().bold());
+                    sp.stop_with_message(format!("{}", "No credentials found".yellow().bold()));
                     println!(
                         "{}",
                         "Please run `helix config` to set your credentials"
@@ -605,15 +606,15 @@ fi
                 {
                     Ok(response) => {
                         if response.status().is_success() {
-                            println!("{}", "Queries uploaded to remote db".green().bold());
+                            sp.stop_with_message(format!("{}", "Queries uploaded to remote db".green().bold()));
                         } else {
-                            println!("{}", "Error uploading queries to remote db".red().bold());
+                            sp.stop_with_message(format!("{}", "Error uploading queries to remote db".red().bold()));
                             println!("└── {}", response.text().await.unwrap());
                             return;
                         }
                     }
                     Err(e) => {
-                        println!("{}", "Error uploading queries to remote db".red().bold());
+                        sp.stop_with_message(format!("{}", "Error uploading queries to remote db".red().bold()));
                         println!("└── {}", e);
                         return;
                     }
