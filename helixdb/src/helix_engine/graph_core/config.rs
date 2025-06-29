@@ -81,6 +81,10 @@ impl Config {
         "#
         .to_string()
     }
+
+    pub fn to_json(&self) -> String {
+        sonic_rs::to_string(self).unwrap()
+    }
 }
 
 impl Default for Config {

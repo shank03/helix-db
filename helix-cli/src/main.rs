@@ -615,7 +615,7 @@ fi
                     "queries": content.files,
                     "instance_id": command.instance,
                     "version": "0.1.0",
-                    "config": config
+                    "config": config.to_json()
                 });
                 let client = reqwest::Client::new();
                 match client
