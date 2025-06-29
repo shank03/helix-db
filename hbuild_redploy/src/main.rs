@@ -162,22 +162,6 @@ async fn handle_deploy_request(s3_client: &Client, user_id: &str, instance_id: &
         }
     }
 
-    // Step 1: Backup old binary
-    println!("Step 1: Backing up old binary");
-    let backup_result = Command::new("mv")
-        .arg("/root/.helix/bin/helix-container")
-        .arg("/root/.helix/bin/helix-container_old")
-        .output()
-        .map_err(|e| AdminError::CommandError("Failed to backup old binary".to_string(), e))?;
-
-    if !backup_result.status.success() {
-        let error_msg = String::from_utf8_lossy(&backup_result.stderr);
-        return Err(AdminError::InvalidParameter(format!(
-            "Failed to backup old binary: {}",
-            error_msg
-        )));
-    }
-
     // Step 2: Download new binary from S3
     println!("Step 2: Downloading new binary from S3 for user {} and instance {}", user_id, instance_id);
     let s3_key = format!("{}/{}/helix-container/latest", user_id, instance_id);
@@ -220,7 +204,7 @@ async fn handle_deploy_request(s3_client: &Client, user_id: &str, instance_id: &
         .map_err(|e| AdminError::InvalidParameter(format!("Failed to read S3 response body {:?}", e)))?
         .into_bytes();
 
-    let mut file = File::create("/root/.helix/bin/helix-container")
+    let mut file = File::create("/root/.helix/bin/helix-container.new")
         .map_err(|e| AdminError::FileError("Failed to create new binary file".to_string(), e))?;
     
     file.write_all(&data)
@@ -240,7 +224,7 @@ async fn handle_deploy_request(s3_client: &Client, user_id: &str, instance_id: &
     println!("Step 3: Setting permissions");
     let chmod_result = Command::new("chmod")
         .arg("+x")
-        .arg("/root/.helix/bin/helix-container")
+        .arg("/root/.helix/bin/helix-container.new")
         .output()
         .map_err(|e| AdminError::CommandError("Failed to set permissions".to_string(), e))?;
 
@@ -251,20 +235,33 @@ async fn handle_deploy_request(s3_client: &Client, user_id: &str, instance_id: &
             error_msg
         )));
     }
-    // sleep for 1 second
-    tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
 
-    // Step 4: Restart systemd service
-    println!("Step 4: Restarting helix service");
-    let restart_result = Command::new("sudo")
+    // rename the new binary to the old binary
+    let rename_result = Command::new("mv")
+        .arg("/root/.helix/bin/helix-container.new")
+        .arg("/root/.helix/bin/helix-container")
+        .output()
+        .map_err(|e| AdminError::CommandError("Failed to rename binary".to_string(), e))?;
+
+    if !rename_result.status.success() {
+        let error_msg = String::from_utf8_lossy(&rename_result.stderr);
+        return Err(AdminError::InvalidParameter(format!(
+            "Failed to rename binary: {}",
+            error_msg
+        )));
+    }
+
+    // Step 4: restart systemd service
+    println!("Step 4: Starting helix service");
+    let start_result = Command::new("sudo")
         .arg("systemctl")
         .arg("restart")
         .arg("helix")
         .output()
-        .map_err(|e| AdminError::CommandError("Failed to restart service".to_string(), e))?;
+        .map_err(|e| AdminError::CommandError("Failed to start service".to_string(), e))?;
 
-    if !restart_result.status.success() {
-        let error_msg = String::from_utf8_lossy(&restart_result.stderr);
+    if !start_result.status.success() {
+        let error_msg = String::from_utf8_lossy(&start_result.stderr);
         return Err(AdminError::InvalidParameter(format!(
             "Failed to restart service: {}",
             error_msg
