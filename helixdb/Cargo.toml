@@ -27,7 +27,6 @@ get_routes = { version = "0.1.0", path = "../get_routes" }
 tempfile = "3.20.0"
 debug_trace = { version = "0.1.0", path = "../debug_trace" }
 reqwest = { version = "0.12.15", features = [ "json", "blocking"] }
-
 async-trait = "0.1"
 
 # Compiler
@@ -45,7 +44,6 @@ tokio-postgres = { version = "0.7", features = [
     "with-chrono-0_4",
 ], optional = true }
 
-
 [dev-dependencies]
 rand = "0.9.0"
 lazy_static = "1.4.0"
@@ -58,10 +56,10 @@ compiler = ["pest", "pest_derive"]
 
 # vector features
 cosine = []
-local = []
-openai = []
 float_vectors = []
 embed_vectors = []
+local = []
+openai = []
 
 ingestion = [
     "rusqlite",
@@ -77,3 +75,4 @@ server = ["build", "compiler", "vectors"]
 full = ["build", "compiler", "ingestion", "vectors"]
 dev = ["debug-output", "server"]
 default = ["server"]
+
