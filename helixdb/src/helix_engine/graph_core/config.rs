@@ -59,7 +59,7 @@ impl Config {
             config.schema = None;
         }
 
-        println!("config: {:?}", config);
+
 
         Ok(config)
     }
@@ -83,7 +83,7 @@ impl Config {
     }
 
     pub fn to_json(&self) -> String {
-        sonic_rs::to_string(self).unwrap()
+        sonic_rs::to_string_pretty(self).unwrap()
     }
 }
 
