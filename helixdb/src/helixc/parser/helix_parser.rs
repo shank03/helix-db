@@ -28,7 +28,7 @@ pub struct Content {
     pub files: Vec<HxFile>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct HxFile {
     pub name: String,
     pub content: String,

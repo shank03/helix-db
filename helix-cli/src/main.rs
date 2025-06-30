@@ -522,6 +522,7 @@ fi
                 }
             }
 
+            // if remote flag `--remote` is provided, upload queries to remote db
             if command.remote {
                 let mut sp = Spinner::new(Spinners::Dots9, "Uploading queries to remote db".into());
 
@@ -578,6 +579,8 @@ fi
                     return;
                 }
 
+                // TODO: probable could make this more secure
+                // reads credentials from ~/.helix/credentials
                 let config = fs::read_to_string(config_path).unwrap();
                 let user_id = config
                     .split("helix_user_id=")
@@ -594,9 +597,6 @@ fi
                     .nth(0)
                     .unwrap();
 
-                // upload queries to centralremote db
-                // send request to https://api.helix.ai/helix/upload
-
                 // read config.hx.json
                 let config = match Config::from_files(
                     PathBuf::from(path.clone()).join("config.hx.json"),
@@ -610,6 +610,7 @@ fi
                     }
                 };
 
+                // upload queries to central server
                 let payload = json!({
                     "user_id": user_id,
                     "queries": content.files,
@@ -618,11 +619,10 @@ fi
                     "helix_config": config.to_json()
                 });
                 let client = reqwest::Client::new();
-
                 match client
                     .post("https://api.helix-db.com/helix/api/deploy-queries")
-                    .header("X-Api-Key", user_key)
-                    .header("X-Instance-Id", &command.instance)
+                    .header("X-Api-Key", user_key) // used to verify user
+                    .header("X-Instance-Id", &command.instance) // used to verify instance with user
                     .header("Content-Type", "application/json")
                     .body(sonic_rs::to_string(&payload).unwrap())
                     .send()
