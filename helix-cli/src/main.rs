@@ -19,7 +19,6 @@ use std::{
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
-
 pub mod args;
 mod instance_manager;
 mod types;
@@ -619,10 +618,13 @@ fi
                     "helix_config": config.to_json()
                 });
                 let client = reqwest::Client::new();
+                
+                // API Gateway typically expects x-api-key for API key authentication
+                // The error suggests it's trying to parse Bearer token as AWS SigV4
                 match client
-                    .post("https://api.helix-db.com/api/deploy-queries")
-                    .header("Authorization", format!("Bearer {}", user_key))
-                    .header("x-instance-id", command.instance)
+                    .post("https://api.helix-db.com/helix/api/deploy-queries")
+                    .header("X-Api-Key", user_key)  // Use API key format instead of Bearer
+                    .header("X-Instance-Id", &command.instance)
                     .header("Content-Type", "application/json")
                     .body(sonic_rs::to_string(&payload).unwrap())
                     .send()
