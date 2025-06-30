@@ -620,7 +620,7 @@ fi
                 });
                 let client = reqwest::Client::new();
                 match client
-                    .post("http://ec2-184-72-27-116.us-west-1.compute.amazonaws.com:3000/api/deploy-queries")
+                    .post("https://api.helix-db.com/api/deploy-queries")
                     .header("Authorization", format!("Bearer {}", user_key))
                     .header("x-instance-id", command.instance)
                     .header("Content-Type", "application/json")
