@@ -605,6 +605,7 @@ fi
                 ) {
                     Ok(config) => config,
                     Err(e) => {
+                        println!("Error loading config: {}", e);
                         sp.stop_with_message(format!("{}", "Error loading config".red().bold()));
                         return;
                     }
@@ -615,12 +616,13 @@ fi
                     "queries": content.files,
                     "instance_id": command.instance,
                     "version": "0.1.0",
-                    "config": config.to_json()
+                    "helix_config": config.to_json()
                 });
                 let client = reqwest::Client::new();
                 match client
                     .post("http://ec2-184-72-27-116.us-west-1.compute.amazonaws.com:3000/api/deploy-queries")
                     .header("Authorization", format!("Bearer {}", user_key))
+                    .header("x-instance-id", command.instance)
                     .header("Content-Type", "application/json")
                     .body(sonic_rs::to_string(&payload).unwrap())
                     .send()
