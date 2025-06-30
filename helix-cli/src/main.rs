@@ -618,12 +618,10 @@ fi
                     "helix_config": config.to_json()
                 });
                 let client = reqwest::Client::new();
-                
-                // API Gateway typically expects x-api-key for API key authentication
-                // The error suggests it's trying to parse Bearer token as AWS SigV4
+
                 match client
                     .post("https://api.helix-db.com/helix/api/deploy-queries")
-                    .header("X-Api-Key", user_key)  // Use API key format instead of Bearer
+                    .header("X-Api-Key", user_key)
                     .header("X-Instance-Id", &command.instance)
                     .header("Content-Type", "application/json")
                     .body(sonic_rs::to_string(&payload).unwrap())
@@ -632,15 +630,24 @@ fi
                 {
                     Ok(response) => {
                         if response.status().is_success() {
-                            sp.stop_with_message(format!("{}", "Queries uploaded to remote db".green().bold()));
+                            sp.stop_with_message(format!(
+                                "{}",
+                                "Queries uploaded to remote db".green().bold()
+                            ));
                         } else {
-                            sp.stop_with_message(format!("{}", "Error uploading queries to remote db".red().bold()));
+                            sp.stop_with_message(format!(
+                                "{}",
+                                "Error uploading queries to remote db".red().bold()
+                            ));
                             println!("└── {}", response.text().await.unwrap());
                             return;
                         }
                     }
                     Err(e) => {
-                        sp.stop_with_message(format!("{}", "Error uploading queries to remote db".red().bold()));
+                        sp.stop_with_message(format!(
+                            "{}",
+                            "Error uploading queries to remote db".red().bold()
+                        ));
                         println!("└── {}", e);
                         return;
                     }
