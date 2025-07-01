@@ -1,4 +1,5 @@
 use crate::{helix_engine::types::GraphError, helixc::generator::utils::GenRef};
+use chrono::Utc;
 use serde::{
     de::{DeserializeSeed, VariantAccess, Visitor},
     Deserializer, Serializer,
@@ -802,6 +803,13 @@ where
     #[inline]
     fn from(k: &'a K) -> Self {
         Value::from(k.clone().into())
+    }
+}
+
+impl From<chrono::DateTime<Utc>> for Value {
+    #[inline]
+    fn from(dt: chrono::DateTime<Utc>) -> Self {
+        Value::String(dt.to_rfc3339())
     }
 }
 
