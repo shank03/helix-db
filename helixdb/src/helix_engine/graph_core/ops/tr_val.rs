@@ -11,13 +11,19 @@ use std::hash::Hash;
 
 #[derive(Clone, Debug)]
 pub enum TraversalVal {
+    /// A node in the graph
     Node(Node),
+    /// An edge in the graph
     Edge(Edge),
+    /// A vector in the graph
     Vector(HVector),
+    /// A count of the number of items
     Count(Count),
+    /// A path between two nodes in the graph
     Path((Vec<Node>, Vec<Edge>)),
+    /// A value in the graph
     Value(Value),
-    // Lazy(Lazy<'a, Bytes>),
+    /// An empty traversal value
     Empty,
 }
 
@@ -48,6 +54,9 @@ impl PartialEq for TraversalVal {
     }
 }
 
+/// A trait for all traversable values in the graph
+/// 
+/// This trait is used to define the common methods for all traversable values in the graph so we don't need to write match statements to access id's and properties every time. 
 pub trait Traversable {
     fn id(&self) -> u128;
     fn label(&self) -> String;
