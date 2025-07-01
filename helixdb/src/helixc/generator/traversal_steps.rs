@@ -52,12 +52,14 @@ pub enum ShouldCollect {
     ToVec,
     ToVal,
     No,
+    Try,
 }
 impl Display for ShouldCollect {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ShouldCollect::ToVec => write!(f, ".collect_to::<Vec<_>>()"),
             ShouldCollect::ToVal => write!(f, ".collect_to_obj()"),
+            ShouldCollect::Try => write!(f, "?"),
             ShouldCollect::No => write!(f, ""),
         }
     }
@@ -343,8 +345,8 @@ impl Display for WhereMut {
 
 #[derive(Clone)]
 pub struct Range {
-    pub start: GenRef<String>,
-    pub end: GenRef<String>,
+    pub start: GeneratedValue,
+    pub end: GeneratedValue,
 }
 impl Display for Range {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -354,12 +356,15 @@ impl Display for Range {
 
 #[derive(Clone)]
 pub struct OrderBy {
-    pub property: String,
+    pub property: GenRef<String>,
     pub order: Order,
 }
 impl Display for OrderBy {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "order_by({}, HelixOrder::{})", self.property, self.order)
+        match self.order {
+            Order::Asc => write!(f, "order_by_asc({})", self.property),
+            Order::Desc => write!(f, "order_by_desc({})", self.property),
+        }
     }
 }
 

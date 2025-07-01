@@ -10,7 +10,8 @@ use crate::helix_engine::{
             n_from_index::NFromIndexAdapter,
         },
         tr_val::{Traversable, TraversalVal},
-        util::{dedup::DedupAdapter, range::RangeAdapter}, vectors::brute_force_search::BruteForceSearchVAdapter,
+        util::{dedup::DedupAdapter, range::RangeAdapter},
+        vectors::brute_force_search::BruteForceSearchVAdapter,
     },
     storage_core::storage_core::HelixGraphStorage,
     types::GraphError,
@@ -1871,7 +1872,6 @@ fn test_brute_force_vector_search() {
         .add_n("person", None, None)
         .collect_to_val();
 
-
     let vectors = vec![
         vec![1.0, 2.0, 3.0],
         vec![4.0, 5.0, 6.0],
@@ -1882,9 +1882,17 @@ fn test_brute_force_vector_search() {
     for vector in vectors {
         let vector_id = G::new_mut(Arc::clone(&storage), &mut txn)
             .insert_v::<fn(&HVector, &RoTxn) -> bool>(&vector, "vector", None)
-            .collect_to_val().id();
-        let _ = G::new_mut(Arc::clone(&storage), &mut txn)   
-            .add_e("embedding", None, node.id(), vector_id, false, EdgeType::Vec)
+            .collect_to_val()
+            .id();
+        let _ = G::new_mut(Arc::clone(&storage), &mut txn)
+            .add_e(
+                "embedding",
+                None,
+                node.id(),
+                vector_id,
+                false,
+                EdgeType::Vec,
+            )
             .collect_to_val();
         vector_ids.push(vector_id);
     }
@@ -1901,6 +1909,136 @@ fn test_brute_force_vector_search() {
 
     println!("traversal: {:?}", traversal);
 
-    assert_eq!(traversal.len(), 1);
+    assert_eq!(traversal.len(), 3);
     assert_eq!(traversal[0].id(), vector_ids[0]);
+    assert_eq!(traversal[1].id(), vector_ids[1]);
+    assert_eq!(traversal[2].id(), vector_ids[2]);
+}
+
+#[test]
+fn test_order_by_desc() {
+    let (storage, _temp_dir) = setup_test_db();
+    let mut txn = storage.graph_env.write_txn().unwrap();
+
+    let node = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_n("person", Some(props! { "age" => 10 }), None)
+        .collect_to_val();
+
+    let node2 = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_n("person", Some(props! { "age" => 20 }), None)
+        .collect_to_val();
+
+    let node3 = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_n("person", Some(props! { "age" => 30 }), None)
+        .collect_to_val();
+
+    txn.commit().unwrap();
+
+    let txn = storage.graph_env.read_txn().unwrap();
+    let traversal = G::new(Arc::clone(&storage), &txn)
+        .n_from_type("person")
+        .order_by_desc("age")
+        .unwrap();
+
+    assert_eq!(traversal.len(), 3);
+    assert_eq!(traversal[0].id(), node3.id());
+    assert_eq!(traversal[1].id(), node2.id());
+    assert_eq!(traversal[2].id(), node.id());
+}
+
+#[test]
+fn test_order_by_asc() {
+    let (storage, _temp_dir) = setup_test_db();
+    let mut txn = storage.graph_env.write_txn().unwrap();
+
+    let node = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_n("person", Some(props! { "age" => 30 }), None)
+        .collect_to_val();
+
+    let node2 = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_n("person", Some(props! { "age" => 20 }), None)
+        .collect_to_val();
+
+    let node3 = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_n("person", Some(props! { "age" => 10 }), None)
+        .collect_to_val();
+
+    txn.commit().unwrap();
+
+    let txn = storage.graph_env.read_txn().unwrap();
+    let traversal = G::new(Arc::clone(&storage), &txn)
+        .n_from_type("person")
+        .order_by_asc("age")
+        .unwrap();
+
+    assert_eq!(traversal.len(), 3);
+    assert_eq!(traversal[0].id(), node3.id());
+    assert_eq!(traversal[1].id(), node2.id());
+    assert_eq!(traversal[2].id(), node.id());
+}
+
+#[test]
+fn test_vector_search() {
+    let (storage, _temp_dir) = setup_test_db();
+    let mut txn = storage.graph_env.write_txn().unwrap();
+
+    let mut i = 0;
+    let mut inserted_vectors = Vec::with_capacity(10000);
+    
+
+    let mut rng = rand::rng();
+    for _ in 10..2000 {
+        // between 0 and 1
+        let random_vector = vec![
+            rng.random::<f64>(),
+            rng.random::<f64>(),
+            rng.random::<f64>(),
+            rng.random::<f64>(),
+            rng.random::<f64>(),
+            rng.random::<f64>(),
+        ];
+        let node = G::new_mut(Arc::clone(&storage), &mut txn)
+            .insert_v::<fn(&HVector, &RoTxn) -> bool>(&random_vector, "vector", None)
+            .collect_to_val();
+        println!("inserted vector: {:?}", i);
+        i += 1;
+    }
+
+    let vectors = vec![
+        vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+        vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+        vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+        vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+        vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+        vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+        vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+        vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+        vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+        vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+    ];
+
+    for vector in vectors {
+        let node = G::new_mut(Arc::clone(&storage), &mut txn)
+            .insert_v::<fn(&HVector, &RoTxn) -> bool>(&vector, "vector", None)
+            .collect_to_val();
+        inserted_vectors.push(node.id());
+        println!("inserted vector: {:?}", i);
+        i += 1;
+    }
+
+    txn.commit().unwrap();
+
+    let txn = storage.graph_env.read_txn().unwrap();
+    let mut traversal = G::new(Arc::clone(&storage), &txn)
+        .search_v::<fn(&HVector, &RoTxn) -> bool>(&vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 2000, None)
+        .collect_to::<Vec<_>>();
+    // traversal.reverse();
+
+
+    for vec in &traversal[0..10] { 
+        if let TraversalVal::Vector(vec) = vec {
+            println!("vec {:?} {}", vec.get_data(), vec.get_distance());
+            assert!(vec.get_distance() < 0.1);
+        }
+    }
 }

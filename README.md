@@ -15,7 +15,9 @@
 
 [![GitHub Repo stars](https://img.shields.io/github/stars/HelixDB/helix-db)](https://github.com/HelixDB/helix-db/stargazers)
 [![Discord](https://img.shields.io/discord/1354148209005559819)](https://discord.gg/2stgMPr5BD)
+[![LOC](https://img.shields.io/endpoint?url=https://ghloc.vercel.app/api/HelixDB/helix-db/badge?filter=.rs$,.sh$&style=flat&logoColor=white&label=Lines%20of%20Code)](https://github.com/HelixDB/helix-db)
 
+<a href="https://www.ycombinator.com/launches/Naz-helixdb-the-database-for-rag-ai" target="_blank"><img src="https://www.ycombinator.com/launches/Naz-helixdb-the-database-for-rag-ai/upvote_embed.svg" alt="Launch YC: HelixDB - The Database for Intelligence" style="margin-left: 12px;"/></a>
 </div>
 
 <hr>
@@ -120,6 +122,17 @@ Our current focus areas include:
 Long term projects:
 - In-house graph-vector storage engine (to replace LMDB)
 - In-house network protocol & serdes libraries (similar to protobufs/gRPC)
+
+## Our Software DNA 🧬
+
+- All code should be well-documented so no additional documentation is needed.
+- All code should be well-tested (DST coming soon).
+- If you can build it yourself, do it. Reduce dependencies.
+- If it doesn't need to exist, don't build it.
+- Don't lose users' data.
+- Use asserts in production: make an effort towards putting asserts anywhere you see fit even if the assert should always obviously be true.
+- If there is a more functional way to write a piece of code, do so. ie. pattern matching over if statements, iterators+combinators over loops, closures over small 1-2 line functions, etc.
+- When optimizing pieces of software, first write an eval/benchmark so that you can measure an exact metric for performance change
 
 ## License
 HelixDB is licensed under the The AGPL (Affero General Public License).

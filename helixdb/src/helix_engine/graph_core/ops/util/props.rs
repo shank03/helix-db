@@ -56,6 +56,9 @@ where
     }
 }
 pub trait PropsAdapter<'a, I>: Iterator<Item = Result<TraversalVal, GraphError>> {
+    /// Returns a new iterator which yeilds the value of the property if it exists
+    /// 
+    /// Given the type checking of the schema there should be no need to return an empty traversal.
     fn check_property(
         self,
         prop: &'a str,

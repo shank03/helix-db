@@ -1,11 +1,12 @@
-use std::sync::Arc;
+use std::{cmp::Ordering, sync::Arc};
 
 use heed3::{RoTxn, RwTxn};
 
 use super::ops::tr_val::TraversalVal;
 use crate::{
     helix_engine::{storage_core::storage_core::HelixGraphStorage, types::GraphError},
-    protocol::value::Value,
+    helixc::generator::utils::Order,
+    protocol::{filterable::Filterable, value::Value},
 };
 use itertools::Itertools;
 
@@ -55,6 +56,82 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> RoTraversalIterat
 
     pub fn count_to_val(self) -> Value {
         Value::from(self.inner.count())
+    }
+
+    pub fn order_by_asc(self, property: &str) -> Result<Vec<TraversalVal>, GraphError> {
+        let result = self
+            .inner
+            .filter_map(|item| item.ok())
+            .sorted_by(|a, b| match (a, b) {
+                (TraversalVal::Node(a), TraversalVal::Node(b)) => {
+                    match (a.check_property(property), b.check_property(property)) {
+                        (Ok(val_a), Ok(val_b)) => val_a.cmp(val_b),
+                        (Ok(_), Err(_)) => Ordering::Less,
+                        (Err(_), Ok(_)) => Ordering::Greater,
+                        (Err(_), Err(_)) => Ordering::Equal,
+                    }
+                }
+                (TraversalVal::Edge(a), TraversalVal::Edge(b)) => {
+                    match (a.check_property(property), b.check_property(property)) {
+                        (Ok(val_a), Ok(val_b)) => val_a.cmp(val_b),
+                        (Ok(_), Err(_)) => Ordering::Less,
+                        (Err(_), Ok(_)) => Ordering::Greater,
+                        (Err(_), Err(_)) => Ordering::Equal,
+                    }
+                }
+                (TraversalVal::Vector(a), TraversalVal::Vector(b)) => {
+                    match (a.check_property(property), b.check_property(property)) {
+                        (Ok(val_a), Ok(val_b)) => val_a.cmp(val_b),
+                        (Ok(_), Err(_)) => Ordering::Less,
+                        (Err(_), Ok(_)) => Ordering::Greater,
+                        (Err(_), Err(_)) => Ordering::Equal,
+                    }
+                }
+                (TraversalVal::Count(val_a), TraversalVal::Count(val_b)) => val_a.cmp(val_b),
+                (TraversalVal::Value(val_a), TraversalVal::Value(val_b)) => val_a.cmp(val_b),
+                _ => Ordering::Equal,
+            })
+            .collect::<Vec<_>>();
+
+        Ok(result)
+    }
+
+    pub fn order_by_desc(self, property: &str) -> Result<Vec<TraversalVal>, GraphError> {
+        let result = self
+            .inner
+            .filter_map(|item| item.ok())
+            .sorted_by(|a, b| match (a, b) {
+                (TraversalVal::Node(a), TraversalVal::Node(b)) => {
+                    match (a.check_property(property), b.check_property(property)) {
+                        (Ok(val_a), Ok(val_b)) => val_b.cmp(val_a),
+                        (Ok(_), Err(_)) => Ordering::Greater,
+                        (Err(_), Ok(_)) => Ordering::Less,
+                        (Err(_), Err(_)) => Ordering::Equal,
+                    }
+                }
+                (TraversalVal::Edge(a), TraversalVal::Edge(b)) => {
+                    match (a.check_property(property), b.check_property(property)) {
+                        (Ok(val_a), Ok(val_b)) => val_b.cmp(val_a),
+                        (Ok(_), Err(_)) => Ordering::Greater,
+                        (Err(_), Ok(_)) => Ordering::Less,
+                        (Err(_), Err(_)) => Ordering::Equal,
+                    }
+                }
+                (TraversalVal::Vector(a), TraversalVal::Vector(b)) => {
+                    match (a.check_property(property), b.check_property(property)) {
+                        (Ok(val_a), Ok(val_b)) => val_b.cmp(val_a),
+                        (Ok(_), Err(_)) => Ordering::Greater,
+                        (Err(_), Ok(_)) => Ordering::Less,
+                        (Err(_), Err(_)) => Ordering::Equal,
+                    }
+                }
+                (TraversalVal::Count(val_a), TraversalVal::Count(val_b)) => val_b.cmp(val_a),
+                (TraversalVal::Value(val_a), TraversalVal::Value(val_b)) => val_b.cmp(val_a),
+                _ => Ordering::Equal,
+            })
+            .collect::<Vec<_>>();
+
+        Ok(result)
     }
 
     pub fn map_value_or(

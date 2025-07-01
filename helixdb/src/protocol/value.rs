@@ -83,6 +83,45 @@ impl Display for Value {
         }
     }
 }
+impl Ord for Value {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            (Value::String(s), Value::String(o)) => s.cmp(o),
+            (Value::F32(s), Value::F32(o)) => match s.partial_cmp(o) {
+                Some(o) => o,
+                None => Ordering::Equal,
+            },
+            (Value::F64(s), Value::F64(o)) => match s.partial_cmp(o) {
+                Some(o) => o,
+                None => Ordering::Equal,
+            },
+            (Value::I8(s), Value::I8(o)) => s.cmp(o),
+            (Value::I16(s), Value::I16(o)) => s.cmp(o),
+            (Value::I32(s), Value::I32(o)) => s.cmp(o),
+            (Value::I64(s), Value::I64(o)) => s.cmp(o),
+            (Value::U8(s), Value::U8(o)) => s.cmp(o),
+            (Value::U16(s), Value::U16(o)) => s.cmp(o),
+            (Value::U32(s), Value::U32(o)) => s.cmp(o),
+            (Value::U64(s), Value::U64(o)) => s.cmp(o),
+            (Value::U128(s), Value::U128(o)) => s.cmp(o),
+            (Value::Boolean(s), Value::Boolean(o)) => s.cmp(o),
+            (Value::Array(s), Value::Array(o)) => s.cmp(o),
+            (Value::Empty, Value::Empty) => Ordering::Equal,
+            (Value::Empty, _) => Ordering::Less,
+            (_, Value::Empty) => Ordering::Greater,
+            (_, _) => Ordering::Equal,
+        }
+    }
+}
+
+impl PartialOrd for Value {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Eq for Value {}
+
 impl PartialEq<i32> for Value {
     fn eq(&self, other: &i32) -> bool {
         match self {
@@ -612,6 +651,97 @@ impl From<Vec<Value>> for Value {
     #[inline]
     fn from(v: Vec<Value>) -> Self {
         Value::Array(v)
+    }
+}
+
+impl From<Vec<bool>> for Value {
+    #[inline(always)]
+    fn from(v: Vec<bool>) -> Self {
+        Value::Array(v.into_iter().map(|v| v.into()).collect())
+    }
+}
+
+impl From<Vec<String>> for Value {
+    #[inline(always)]
+    fn from(v: Vec<String>) -> Self {
+        Value::Array(v.into_iter().map(|v| v.into()).collect())
+    }
+}
+
+impl From<Vec<i64>> for Value {
+    #[inline(always)]
+    fn from(v: Vec<i64>) -> Self {
+        Value::Array(v.into_iter().map(|v| v.into()).collect())
+    }
+}
+
+impl From<Vec<i32>> for Value {
+    #[inline(always)]
+    fn from(v: Vec<i32>) -> Self {
+        Value::Array(v.into_iter().map(|v| v.into()).collect())
+    }
+}
+
+impl From<Vec<i16>> for Value {
+    #[inline(always)]
+    fn from(v: Vec<i16>) -> Self {
+        Value::Array(v.into_iter().map(|v| v.into()).collect())
+    }
+}
+
+impl From<Vec<i8>> for Value {
+    #[inline(always)]
+    fn from(v: Vec<i8>) -> Self {
+        Value::Array(v.into_iter().map(|v| v.into()).collect())
+    }
+}
+
+impl From<Vec<u128>> for Value {
+    #[inline(always)]
+    fn from(v: Vec<u128>) -> Self {
+        Value::Array(v.into_iter().map(|v| v.into()).collect())
+    }
+}
+
+impl From<Vec<u64>> for Value {
+    #[inline(always)]
+    fn from(v: Vec<u64>) -> Self {
+        Value::Array(v.into_iter().map(|v| v.into()).collect())
+    }
+}
+
+impl From<Vec<u32>> for Value {
+    #[inline(always)]
+    fn from(v: Vec<u32>) -> Self {
+        Value::Array(v.into_iter().map(|v| v.into()).collect())
+    }
+}
+
+impl From<Vec<u16>> for Value {
+    #[inline(always)]
+    fn from(v: Vec<u16>) -> Self {
+        Value::Array(v.into_iter().map(|v| v.into()).collect())
+    }
+}
+
+impl From<Vec<u8>> for Value {
+    #[inline(always)]
+    fn from(v: Vec<u8>) -> Self {
+        Value::Array(v.into_iter().map(|v| v.into()).collect())
+    }
+}
+
+impl From<Vec<f64>> for Value {
+    #[inline(always)]
+    fn from(v: Vec<f64>) -> Self {
+        Value::Array(v.into_iter().map(|v| v.into()).collect())
+    }
+}
+
+impl From<Vec<f32>> for Value {
+    #[inline(always)]
+    fn from(v: Vec<f32>) -> Self {
+        Value::Array(v.into_iter().map(|v| v.into()).collect())
     }
 }
 
