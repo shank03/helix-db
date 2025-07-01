@@ -653,6 +653,20 @@ impl From<Vec<Value>> for Value {
     }
 }
 
+impl From<Vec<bool>> for Value {
+    #[inline(always)]
+    fn from(v: Vec<bool>) -> Self {
+        Value::Array(v.into_iter().map(|v| v.into()).collect())
+    }
+}
+
+impl From<Vec<String>> for Value {
+    #[inline(always)]
+    fn from(v: Vec<String>) -> Self {
+        Value::Array(v.into_iter().map(|v| v.into()).collect())
+    }
+}
+
 impl From<Vec<i64>> for Value {
     #[inline(always)]
     fn from(v: Vec<i64>) -> Self {
