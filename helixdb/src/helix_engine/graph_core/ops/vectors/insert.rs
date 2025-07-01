@@ -8,10 +8,6 @@ use crate::{
         vector_core::{hnsw::HNSW, vector::HVector},
     },
     protocol::value::Value,
-    providers::{
-        types::Vector,
-        embedding_providers::get_embedding_model,
-    },
 };
 use std::sync::Arc;
 
@@ -30,7 +26,7 @@ impl Iterator for InsertVIterator {
 pub trait InsertVAdapter<'a, 'b>: Iterator<Item = Result<TraversalVal, GraphError>> {
     fn insert_v<F>(
         self,
-        query: &Vector,
+        query: &Vec<f64>,
         label: &str,
         fields: Option<Vec<(String, Value)>>,
     ) -> RwTraversalIterator<'a, 'b, impl Iterator<Item = Result<TraversalVal, GraphError>>>
@@ -39,7 +35,7 @@ pub trait InsertVAdapter<'a, 'b>: Iterator<Item = Result<TraversalVal, GraphErro
 
     fn insert_vs<F>(
         self,
-        queries: &Vec<Vector>,
+        queries: &Vec<Vec<f64>>,
         fields: Option<Vec<(String, Value)>>,
     ) -> RwTraversalIterator<'a, 'b, impl Iterator<Item = Result<TraversalVal, GraphError>>>
     where
@@ -51,21 +47,13 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> InsertVAdapte
 {
     fn insert_v<F>(
         self,
-        query: &Vector,
+        query: &Vec<f64>,
         label: &str,
         fields: Option<Vec<(String, Value)>>,
     ) -> RwTraversalIterator<'a, 'b, impl Iterator<Item = Result<TraversalVal, GraphError>>>
     where
         F: Fn(&HVector, &RoTxn) -> bool,
     {
-        #[cfg(feature = "embed_vectors")]
-        let query = {
-            let embedding_model = get_embedding_model(None, None, None);
-            embedding_model
-                .fetch_embedding(query)
-                .expect("Failed to fetch embedding")
-        };
-
         let fields = match fields {
             Some(mut fields) => {
                 fields.push((String::from("label"), Value::String(label.to_string())));
@@ -92,7 +80,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> InsertVAdapte
 
     fn insert_vs<F>(
         self,
-        queries: &Vec<Vector>,
+        queries: &Vec<Vec<f64>>,
         fields: Option<Vec<(String, Value)>>,
     ) -> RwTraversalIterator<'a, 'b, impl Iterator<Item = Result<TraversalVal, GraphError>>>
     where
@@ -103,14 +91,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> InsertVAdapte
         let iter = queries
             .iter()
             .map(|vec| {
-                #[cfg(feature = "embed_vectors")]
-                let vector = {
-                    let embedding_model = get_embedding_model(None, None, None);
-                    embedding_model
-                        .fetch_embedding(vec)
-                        .expect("Failed to fetch embedding")
-                };
-                let vector = storage.vectors.insert::<F>(txn, &vector, fields.clone()); // TODO: remove clone
+                let vector = storage.vectors.insert::<F>(txn, &vec, fields.clone()); // TODO: remove clone
                 match vector {
                     Ok(vector) => Ok(TraversalVal::Vector(vector)),
                     Err(e) => Err(GraphError::from(e)),

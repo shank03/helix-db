@@ -3,28 +3,20 @@
 use crate::helix_engine::types::GraphError;
 use reqwest::blocking::Client;
 use serde_json::json;
-use async_trait;
 use std::env;
 
-#[async_trait::async_trait]
 pub trait EmbeddingModel {
     fn fetch_embedding(&self, text: &str) -> Result<Vec<f64>, GraphError>;
 }
 
-#[cfg(feature = "openai")]
+#[cfg(feature = "embed_openai")]
 struct EmbeddingModelImpl {
     api_key: String,
     client: Client,
     model: String,
 }
 
-#[cfg(feature = "local")]
-struct EmbeddingModelImpl {
-    url: String,
-    client: Client,
-}
-
-#[cfg(feature = "openai")]
+#[cfg(feature = "embed_openai")]
 impl EmbeddingModelImpl {
     fn new(api_key: Option<&str>, model: Option<&str>) -> Self {
         let key = api_key
@@ -38,18 +30,7 @@ impl EmbeddingModelImpl {
     }
 }
 
-#[cfg(feature = "local")]
-impl EmbeddingModelImpl {
-    fn new(url: Option<&str>) -> Self {
-        EmbeddingModelImpl {
-            url: url.map(String::from).unwrap_or("http://localhost:8699/embed".into()),
-            client: Client::new(),
-        }
-    }
-}
-
-#[cfg(feature = "openai")]
-#[async_trait::async_trait]
+#[cfg(feature = "embed_openai")]
 impl EmbeddingModel for EmbeddingModelImpl {
     fn fetch_embedding(&self, text: &str) -> Result<Vec<f64>, GraphError> {
         let response = self
@@ -76,8 +57,23 @@ impl EmbeddingModel for EmbeddingModelImpl {
     }
 }
 
-#[cfg(feature = "local")]
-#[async_trait::async_trait]
+#[cfg(feature = "embed_local")]
+struct EmbeddingModelImpl {
+    url: String,
+    client: Client,
+}
+
+#[cfg(feature = "embed_local")]
+impl EmbeddingModelImpl {
+    fn new(url: Option<&str>) -> Self {
+        EmbeddingModelImpl {
+            url: url.map(String::from).unwrap_or("http://localhost:8699/embed".into()),
+            client: Client::new(),
+        }
+    }
+}
+
+#[cfg(feature = "embed_local")]
 impl EmbeddingModel for EmbeddingModelImpl {
     fn fetch_embedding(&self, text: &str) -> Result<Vec<f64>, GraphError> {
         let response = self
@@ -105,13 +101,23 @@ impl EmbeddingModel for EmbeddingModelImpl {
 }
 
 pub fn get_embedding_model(api_key: Option<&str>, model: Option<&str>, url: Option<&str>) -> Box<dyn EmbeddingModel> {
-    #[cfg(feature = "openai")]
+    #[cfg(feature = "embed_openai")]
     return Box::new(EmbeddingModelImpl::new(api_key, model));
 
-    #[cfg(feature = "local")]
+    #[cfg(feature = "embed_local")]
     return Box::new(EmbeddingModelImpl::new(url));
 
     #[cfg(not(any(feature = "openai", feature = "local")))]
     panic!("No embedding model feature enabled. Enable either 'openai' or 'local'.");
 }
+
+
+/* basically do this:
+    let query = {
+        let embedding_model = get_embedding_model(None, None, None);
+        embedding_model
+            .fetch_embedding(query)
+            .expect("Failed to fetch embedding")
+    };
+*/
 

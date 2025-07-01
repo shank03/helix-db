@@ -7,10 +7,6 @@ use crate::{
         types::{GraphError, VectorError},
         vector_core::{hnsw::HNSW, vector::HVector},
     },
-    providers::{
-        types::Vector,
-        embedding_providers::get_embedding_model,
-    },
 };
 use debug_trace::debug_trace;
 use std::iter::once;
@@ -32,7 +28,7 @@ impl<I: Iterator<Item = Result<TraversalVal, GraphError>>> Iterator for SearchV<
 pub trait SearchVAdapter<'a>: Iterator<Item = Result<TraversalVal, GraphError>> {
     fn search_v<F>(
         self,
-        query: &Vector,
+        query: &Vec<f64>,
         k: usize,
         filter: Option<&[F]>,
     ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>
@@ -45,21 +41,13 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> SearchVAdapt
 {
     fn search_v<F>(
         self,
-        query: &Vector,
+        query: &Vec<f64>,
         k: usize,
         filter: Option<&[F]>,
     ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>
     where
         F: Fn(&HVector, &RoTxn) -> bool,
     {
-        #[cfg(feature = "embed_vectors")]
-        let query = {
-            let embedding_model = get_embedding_model(None, None, None);
-            embedding_model
-                .fetch_embedding(query)
-                .expect("Failed to fetch embedding")
-        };
-
         let vectors = self
             .storage
             .vectors

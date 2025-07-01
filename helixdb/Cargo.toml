@@ -27,7 +27,6 @@ get_routes = { version = "0.1.0", path = "../get_routes" }
 tempfile = "3.20.0"
 debug_trace = { version = "0.1.0", path = "../debug_trace" }
 reqwest = { version = "0.12.15", features = [ "json", "blocking"] }
-async-trait = "0.1"
 
 # Compiler
 pest = { version = "2.7", optional = true }
@@ -56,10 +55,8 @@ compiler = ["pest", "pest_derive"]
 
 # vector features
 cosine = []
-float_vectors = []
-embed_vectors = []
-local = []
-openai = []
+embed_local = []
+embed_openai = []
 
 ingestion = [
     "rusqlite",
@@ -70,7 +67,7 @@ ingestion = [
     "rust_decimal",
 ]
 build = ["compiler"]
-vectors = ["cosine", "embed_vectors", "local"]
+vectors = ["cosine", "embed_local"]
 server = ["build", "compiler", "vectors"]
 full = ["build", "compiler", "ingestion", "vectors"]
 dev = ["debug-output", "server"]

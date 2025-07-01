@@ -44,43 +44,13 @@ use std::sync::Arc;
 use std::time::Instant;
 use std::cell::RefCell;
 use chrono::{DateTime, Utc};
-
+    
 
 
 pub struct Embedding {
     pub vec: Vec<f64>,
 }
 
-pub struct Text {
-    pub text: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct hnswinserttextInput {
-
-pub text_in: String
-}
-#[handler]
-pub fn hnswinserttext (input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
-let data: hnswinserttextInput = match sonic_rs::from_slice(&input.request.body) {
-    Ok(data) => data,
-    Err(err) => return Err(GraphError::from(err)),
-};
-
-let mut remapping_vals = RemappingMap::new();
-let db = Arc::clone(&input.graph.storage);
-let mut txn = db.graph_env.write_txn().unwrap();
-    G::new_mut(Arc::clone(&db), &mut txn)
-.insert_v::<fn(&HVector, &RoTxn) -> bool>(&data.text_in, "Text", None).collect_to::<Vec<_>>();
-let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
-        return_vals.insert("Success".to_string(), ReturnValue::from(Value::from("Success")));
-
-    txn.commit().unwrap();
-    response.body = sonic_rs::to_vec(&return_vals).unwrap();
-    Ok(())
-}
-
-/*
 #[derive(Serialize, Deserialize)]
 pub struct hnswinsertInput {
 
@@ -105,5 +75,29 @@ let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
     response.body = sonic_rs::to_vec(&return_vals).unwrap();
     Ok(())
 }
-*/
 
+#[derive(Serialize, Deserialize)]
+pub struct hnswsearchInput {
+
+pub query: Vec<f64>,
+pub k: i32
+}
+#[handler]
+pub fn hnswsearch (input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
+let data: hnswsearchInput = match sonic_rs::from_slice(&input.request.body) {
+    Ok(data) => data,
+    Err(err) => return Err(GraphError::from(err)),
+};
+
+let mut remapping_vals = RemappingMap::new();
+let db = Arc::clone(&input.graph.storage);
+let txn = db.graph_env.read_txn().unwrap();
+    let res = G::new(Arc::clone(&db), &txn)
+.search_v::<fn(&HVector, &RoTxn) -> bool>(&data.query, data.k as usize, None).collect_to::<Vec<_>>();
+let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
+        return_vals.insert("res".to_string(), ReturnValue::from_traversal_value_array_with_mixin(res.clone(), remapping_vals.borrow_mut()));
+
+    txn.commit().unwrap();
+    response.body = sonic_rs::to_vec(&return_vals).unwrap();
+    Ok(())
+}

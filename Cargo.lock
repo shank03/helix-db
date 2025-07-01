@@ -1973,7 +1973,6 @@ dependencies = [
 name = "helixdb"
 version = "1.0.102"
 dependencies = [
- "async-trait",
  "bincode",
  "chrono",
  "debug_trace",
