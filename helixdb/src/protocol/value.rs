@@ -653,6 +653,83 @@ impl From<Vec<Value>> for Value {
     }
 }
 
+impl From<Vec<i64>> for Value {
+    #[inline(always)]
+    fn from(v: Vec<i64>) -> Self {
+        Value::Array(v.into_iter().map(|v| v.into()).collect())
+    }
+}
+
+impl From<Vec<i32>> for Value {
+    #[inline(always)]
+    fn from(v: Vec<i32>) -> Self {
+        Value::Array(v.into_iter().map(|v| v.into()).collect())
+    }
+}
+
+impl From<Vec<i16>> for Value {
+    #[inline(always)]
+    fn from(v: Vec<i16>) -> Self {
+        Value::Array(v.into_iter().map(|v| v.into()).collect())
+    }
+}
+
+impl From<Vec<i8>> for Value {
+    #[inline(always)]
+    fn from(v: Vec<i8>) -> Self {
+        Value::Array(v.into_iter().map(|v| v.into()).collect())
+    }
+}
+
+impl From<Vec<u128>> for Value {
+    #[inline(always)]
+    fn from(v: Vec<u128>) -> Self {
+        Value::Array(v.into_iter().map(|v| v.into()).collect())
+    }
+}
+
+impl From<Vec<u64>> for Value {
+    #[inline(always)]
+    fn from(v: Vec<u64>) -> Self {
+        Value::Array(v.into_iter().map(|v| v.into()).collect())
+    }
+}
+
+impl From<Vec<u32>> for Value {
+    #[inline(always)]
+    fn from(v: Vec<u32>) -> Self {
+        Value::Array(v.into_iter().map(|v| v.into()).collect())
+    }
+}
+
+impl From<Vec<u16>> for Value {
+    #[inline(always)]
+    fn from(v: Vec<u16>) -> Self {
+        Value::Array(v.into_iter().map(|v| v.into()).collect())
+    }
+}
+
+impl From<Vec<u8>> for Value {
+    #[inline(always)]
+    fn from(v: Vec<u8>) -> Self {
+        Value::Array(v.into_iter().map(|v| v.into()).collect())
+    }
+}
+
+impl From<Vec<f64>> for Value {
+    #[inline(always)]
+    fn from(v: Vec<f64>) -> Self {
+        Value::Array(v.into_iter().map(|v| v.into()).collect())
+    }
+}
+
+impl From<Vec<f32>> for Value {
+    #[inline(always)]
+    fn from(v: Vec<f32>) -> Self {
+        Value::Array(v.into_iter().map(|v| v.into()).collect())
+    }
+}
+
 impl From<usize> for Value {
     #[inline]
     fn from(v: usize) -> Self {
