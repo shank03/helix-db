@@ -13,16 +13,25 @@ use crate::{
     protocol::{
         items::{Edge, Node},
         label_hash::hash_label,
-    },
+    }
 };
-
-use heed3::byteorder::BE;
-use heed3::{types::*, Database, DatabaseFlags, Env, EnvOpenOptions, RoTxn, RwTxn, WithTls};
-use std::collections::HashMap;
-use std::fs;
-use std::path::Path;
-
 use super::storage_methods::DBMethods;
+use heed3::byteorder::BE;
+use heed3::{
+    types::*,
+    Database,
+    DatabaseFlags,
+    Env,
+    EnvOpenOptions,
+    RoTxn,
+    RwTxn,
+    WithTls};
+use std::{
+    collections::HashMap,
+    fs,
+    path::Path,
+};
+use serde_json::{json, Value};
 
 // Database names for different stores
 const DB_NODES: &str = "nodes"; // For node data (n:)
@@ -190,6 +199,7 @@ impl HelixGraphStorage {
     /// The generated in edge key will remain the same for the same to_node_id and label.
     /// To save space, the key is only stored once,
     /// with the values being stored in a sorted sub-tree, with this key being the root.
+
     #[inline(always)]
     pub fn in_edge_key(to_node_id: &u128, label: &[u8; 4]) -> [u8; 20] {
         let mut key = [0u8; 20];
@@ -233,6 +243,36 @@ impl HelixGraphStorage {
         // uses level 0 because thats where all vectors are stored
         let vector = self.vectors.get_vector(txn, *id, 0, true)?;
         Ok(vector)
+    }
+
+    /// Returns edges and nodes as json to export into a graphviz app like pyviz
+    pub fn get_nodes_edges_json(&self, txn: &RoTxn) -> Result<String, GraphError> {
+        let mut nodes = vec![];
+        //let mut edges = vec![];
+
+        for node in self.nodes_db.iter(txn)? {
+            let (node_id, node_data) = node?;
+            let node = Node::decode_node(node_data, node_id)?;
+            println!("node: {:?}", node);
+            nodes.push(json!({"id": node_id.to_string(), "data": node}));
+        }
+
+        //for edge in self.edges_db.iter(txn)? {
+        //    let (edge_id, edge_data) = edge?;
+        //    let edge = Edge::decode_edge(edge_data, edge_id)?;
+        //    println!("edge: {:?}", edge);
+        //    edges.push(json!({"id": edge_id.to_string(), "data": edge}));
+        //}
+
+        let result = json!({
+            "nodes": nodes,
+            //"edges": edges,
+        });
+
+        println!("result: {:?}", result);
+
+        serde_json::to_string(&result)
+            .map_err(|e| GraphError::New(e.to_string()))
     }
 }
 
