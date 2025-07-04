@@ -72,10 +72,7 @@ impl Traversable for TraversalVal {
 
             TraversalVal::Vector(vector) => vector.id,
             TraversalVal::Value(_) => unreachable!(),
-            TraversalVal::Empty => {
-                println!("reting zero! line 76");
-                0
-            }
+            TraversalVal::Empty => 0,
             t => {
                 println!("invalid traversal value {:?}", t);
                 panic!("Invalid traversal value")
