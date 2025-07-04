@@ -77,14 +77,10 @@ pub fn insert_relationship (input: &HandlerInput, response: &mut Response) -> Re
     let mut remapping_vals = RemappingMap::new();
     let db = Arc::clone(&input.graph.storage);
     let mut txn = db.graph_env.write_txn().unwrap();
-    println!("data.from_entity_label: {:?}, data.to_entity_label: {:?}",
-        &data.from_entity_label, &data.to_entity_label);
     let from_entity = G::new(Arc::clone(&db), &txn)
         .n_from_index("entity_name", &data.from_entity_label).collect_to::<Vec<_>>();
-    println!("insert_relationship queries from_entity: {:?}", from_entity);
     let to_entity = G::new(Arc::clone(&db), &txn)
         .n_from_index("entity_name", &data.to_entity_label).collect_to::<Vec<_>>();
-    println!("insert_relationship queries to_entity: {:?}", from_entity);
     let e = G::new_mut(Arc::clone(&db), &mut txn)
         .add_e("Relationship", Some(props! { "edge_name" => data.edge_name_in.clone() }), from_entity.id(), to_entity.id(), true, EdgeType::Node).collect_to::<Vec<_>>();
     let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
@@ -112,7 +108,8 @@ pub fn insert_entity (input: &HandlerInput, response: &mut Response) -> Result<(
     let mut txn = db.graph_env.write_txn().unwrap();
     let node = G::new_mut(Arc::clone(&db), &mut txn)
         .add_n("Entity", Some(props! { "entity_name" => data.entity_name_in.clone() }), Some(&["entity_name"])).collect_to::<Vec<_>>();
-    println!("insert_entity queries node: {:?}", node);
+    let node = G::new(Arc::clone(&db), &txn)
+        .n_from_index("entity_name", &data.entity_name_in).collect_to::<Vec<_>>();
     let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
     return_vals.insert("node".to_string(), ReturnValue::from_traversal_value_array_with_mixin(node.clone(), remapping_vals.borrow_mut()));
 
@@ -136,10 +133,8 @@ pub fn get_entity (input: &HandlerInput, response: &mut Response) -> Result<(), 
     let mut remapping_vals = RemappingMap::new();
     let db = Arc::clone(&input.graph.storage);
     let txn = db.graph_env.read_txn().unwrap();
-    println!("data.entity_name_in: {:?}", &data.entity_name_in);
     let node = G::new(Arc::clone(&db), &txn)
         .n_from_index("entity_name", &data.entity_name_in).collect_to::<Vec<_>>();
-    println!("get_entity queries node: {:?}", node);
     let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
     return_vals.insert("node".to_string(), ReturnValue::from_traversal_value_array_with_mixin(node.clone(), remapping_vals.borrow_mut()));
 

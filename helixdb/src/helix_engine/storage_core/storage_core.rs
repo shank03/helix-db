@@ -249,14 +249,14 @@ impl HelixGraphStorage {
     // TODO: do this on an lmdb snapshot of the tables rather than just looping through them
     pub fn get_nodes_edges_json(&self, txn: &RoTxn) -> Result<String, GraphError> {
         let mut nodes = vec![];
-        //let mut edges = vec![];
+        let mut edges = vec![];
 
         for node in self.nodes_db.iter(txn)? {
             let (node_id, node_data) = node?;
             let node = Node::decode_node(node_data, node_id)?;
             let props = node.properties.clone().unwrap();
             let json_node = json!({"id": node_id.to_string(), "label": props["entity_name"]});
-            println!("{:?}", json_node);
+            //println!("{:?}", json_node);
             nodes.push(json_node);
         }
 
@@ -269,13 +269,13 @@ impl HelixGraphStorage {
                 "to": edge.to_node.to_string(),
                 "label": props["edge_name"],
             });
-            println!("{:?}", json_edge);
-            //edges.push(json_edge);
+            //println!("{:?}", json_edge);
+            edges.push(json_edge);
         }
 
         let result = json!({
             "nodes": nodes,
-            //"edges": edges,
+            "edges": edges,
         });
 
         serde_json::to_string(&result)
