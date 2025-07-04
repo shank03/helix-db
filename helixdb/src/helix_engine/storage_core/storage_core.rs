@@ -31,7 +31,7 @@ use std::{
     fs,
     path::Path,
 };
-use serde_json::{json, Value};
+use serde_json::json;
 
 // Database names for different stores
 const DB_NODES: &str = "nodes"; // For node data (n:)
@@ -246,6 +246,7 @@ impl HelixGraphStorage {
     }
 
     /// Returns edges and nodes as json to export into a graphviz app like pyviz
+    // TODO: do this on an lmdb snapshot of the tables rather than just looping through them
     pub fn get_nodes_edges_json(&self, txn: &RoTxn) -> Result<String, GraphError> {
         let mut nodes = vec![];
         //let mut edges = vec![];
@@ -253,23 +254,29 @@ impl HelixGraphStorage {
         for node in self.nodes_db.iter(txn)? {
             let (node_id, node_data) = node?;
             let node = Node::decode_node(node_data, node_id)?;
-            println!("node: {:?}", node);
-            nodes.push(json!({"id": node_id.to_string(), "data": node}));
+            let props = node.properties.clone().unwrap();
+            let json_node = json!({"id": node_id.to_string(), "label": props["entity_name"]});
+            println!("{:?}", json_node);
+            nodes.push(json_node);
         }
 
-        //for edge in self.edges_db.iter(txn)? {
-        //    let (edge_id, edge_data) = edge?;
-        //    let edge = Edge::decode_edge(edge_data, edge_id)?;
-        //    println!("edge: {:?}", edge);
-        //    edges.push(json!({"id": edge_id.to_string(), "data": edge}));
-        //}
+        for edge in self.edges_db.iter(txn)? {
+            let (edge_id, edge_data) = edge?;
+            let edge = Edge::decode_edge(edge_data, edge_id)?;
+            let props = edge.properties.clone().unwrap();
+            let json_edge = json!({
+                "from": edge.from_node.to_string(),
+                "to": edge.to_node.to_string(),
+                "label": props["edge_name"],
+            });
+            println!("{:?}", json_edge);
+            //edges.push(json_edge);
+        }
 
         let result = json!({
             "nodes": nodes,
             //"edges": edges,
         });
-
-        println!("result: {:?}", result);
 
         serde_json::to_string(&result)
             .map_err(|e| GraphError::New(e.to_string()))
