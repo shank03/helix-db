@@ -78,6 +78,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddEAdapter<'
 
         let mut result: Result<TraversalVal, GraphError> = Ok(TraversalVal::Empty);
 
+        /*
         if should_check {
             match edge_types {
                 (EdgeType::Node, EdgeType::Node) => {
@@ -110,6 +111,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddEAdapter<'
                 }
             }
         }
+        */
 
         match edge.encode_edge() {
             Ok(bytes) => {

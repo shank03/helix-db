@@ -9,6 +9,7 @@ use inventory;
 use std::{collections::HashMap, sync::Arc};
 
 mod queries;
+mod graphvis;
 
 #[tokio::main]
 async fn main() {
@@ -47,6 +48,7 @@ async fn main() {
         path: path_str.to_string(),
         config,
     };
+
     let graph = Arc::new(HelixGraphEngine::new(opts).unwrap());
 
     // generates routes from handler proc macro
@@ -54,6 +56,45 @@ async fn main() {
     let submissions: Vec<_> = inventory::iter::<HandlerSubmission>.into_iter().collect();
     println!("Found {} submissions", submissions.len());
 
+    let post_routes: HashMap<(String, String), HandlerFn> = inventory::iter::<HandlerSubmission>
+        .into_iter()
+        .map(|submission| {
+            println!("Processing POST submission for handler: {}", submission.0.name);
+            let handler = &submission.0;
+            let func: HandlerFn = Arc::new(move |input, response| (handler.func)(input, response));
+            (
+                (
+                    "POST".to_string(),
+                    format!("/{}", handler.name.to_string()),
+                ),
+                func,
+            )
+        })
+    .collect();
+
+    // Collect GET routes
+    let get_routes: HashMap<(String, String), HandlerFn> = inventory::iter::<HandlerSubmission>
+        .into_iter()
+        .map(|submission| {
+            println!("Processing GET submission for handler: {}", submission.0.name);
+            let handler = &submission.0;
+            let func: HandlerFn = Arc::new(move |input, response| (handler.func)(input, response));
+            (
+                (
+                    "GET".to_string(),
+                    format!("/{}", handler.name.to_string()),
+                ),
+                func,
+            )
+        })
+    .collect();
+
+    // Combine POST and GET routes immutably
+    let routes: HashMap<(String, String), HandlerFn> = post_routes.into_iter()
+        .chain(get_routes)
+        .collect();
+
+    /*
     let routes = HashMap::from_iter(
         submissions
             .into_iter()
@@ -72,6 +113,7 @@ async fn main() {
             })
             .collect::<Vec<((String, String), HandlerFn)>>(),
     );
+    */
 
     let mcp_submissions: Vec<_> = inventory::iter::<MCPHandlerSubmission>
         .into_iter()
@@ -96,7 +138,6 @@ async fn main() {
     );
 
     println!("Routes: {:?}", routes.keys());
-    // create gateway
     let gateway = HelixGateway::new(
         &format!("0.0.0.0:{}", port),
         graph,
@@ -106,7 +147,6 @@ async fn main() {
     )
     .await;
 
-    // start server
     println!("Starting server...");
     let a = gateway.connection_handler.accept_conns().await.unwrap();
     let _b = a.await.unwrap();

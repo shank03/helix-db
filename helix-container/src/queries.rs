@@ -1,4 +1,3 @@
-
 use heed3::RoTxn;
 use get_routes::handler;
 use helixdb::{field_remapping, identifier_remapping, traversal_remapping, exclude_field, value_remapping};
@@ -139,18 +138,6 @@ pub fn get_entity (input: &HandlerInput, response: &mut Response) -> Result<(), 
 
     txn.commit().unwrap();
     response.body = sonic_rs::to_vec(&return_vals).unwrap();
-    Ok(())
-}
-
-#[handler]
-pub fn get_ne (input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
-    let db = Arc::clone(&input.graph.storage);
-    let txn = db.graph_env.read_txn().unwrap();
-
-    let ret = db.get_nodes_edges_json(&txn).unwrap();
-
-    txn.commit().unwrap();
-    response.body = sonic_rs::to_vec(&ret).unwrap();
     Ok(())
 }
 

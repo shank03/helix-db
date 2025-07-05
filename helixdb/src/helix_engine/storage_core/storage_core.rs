@@ -1,4 +1,6 @@
+use super::storage_methods::DBMethods;
 use crate::{
+    debug_println,
     helix_engine::{
         bm25::bm25::HBM25Config,
         graph_core::config::Config,
@@ -13,25 +15,12 @@ use crate::{
     protocol::{
         items::{Edge, Node},
         label_hash::hash_label,
-    }
+    },
 };
-use super::storage_methods::DBMethods;
 use heed3::byteorder::BE;
-use heed3::{
-    types::*,
-    Database,
-    DatabaseFlags,
-    Env,
-    EnvOpenOptions,
-    RoTxn,
-    RwTxn,
-    WithTls};
-use std::{
-    collections::HashMap,
-    fs,
-    path::Path,
-};
-use serde_json::json;
+use heed3::{types::*, Database, DatabaseFlags, Env, EnvOpenOptions, RoTxn, RwTxn, WithTls};
+use serde_json::{json, Value};
+use std::{collections::HashMap, fs, path::Path};
 
 // Database names for different stores
 const DB_NODES: &str = "nodes"; // For node data (n:)
@@ -245,31 +234,63 @@ impl HelixGraphStorage {
         Ok(vector)
     }
 
-    /// Returns edges and nodes as json to export into a graphviz app like pyviz
-    // TODO: do this on an lmdb snapshot of the tables rather than just looping through them
-    pub fn get_nodes_edges_json(&self, txn: &RoTxn) -> Result<String, GraphError> {
-        let mut nodes = vec![];
-        let mut edges = vec![];
+    /// Returns edges and nodes in a specific json format such that it can be visualized
+    ///     strictly in this format (write you're own parser if you want it in a diff
+    ///     format):
+    /// {
+    ///     "nodes": [ { "id": 1, "label": "Node 1" } ],
+    ///     "edges": [ { "from": 1, "to": 2, "label "Edge from 1 to 2" } ]
+    /// }
+    pub fn get_ne_json(&self) -> Result<String, GraphError> {
+        let txn = self.graph_env.read_txn().unwrap();
+        if self.nodes_db.is_empty(&txn)? || self.edges_db.is_empty(&txn)? {
+            return Err(GraphError::New("edges or nodes db is empty!".to_string()));
+        }
 
-        for node in self.nodes_db.iter(txn)? {
+        let (mut missing_nodes, mut missing_edges, mut nodes, mut edges): (
+            usize,
+            usize,
+            Vec<Value>,
+            Vec<Value>,
+        ) = (0, 0, vec![], vec![]);
+
+        for node in self.nodes_db.iter(&txn)? {
             let (node_id, node_data) = node?;
             let node = Node::decode_node(node_data, node_id)?;
-            let props = node.properties.clone().unwrap();
+
+            let props = match node.properties.clone() {
+                Some(p) => p,
+                None => {
+                    println!("failed to get properties for node {}", node_id);
+                    missing_nodes += 1;
+                    continue;
+                }
+            };
+
             let json_node = json!({"id": node_id.to_string(), "label": props["entity_name"]});
-            //println!("{:?}", json_node);
+            debug_println!("{:?}", json_node);
             nodes.push(json_node);
         }
 
-        for edge in self.edges_db.iter(txn)? {
+        for edge in self.edges_db.iter(&txn)? {
             let (edge_id, edge_data) = edge?;
             let edge = Edge::decode_edge(edge_data, edge_id)?;
-            let props = edge.properties.clone().unwrap();
+
+            let props = match edge.properties.clone() {
+                Some(p) => p,
+                None => {
+                    println!("failed to get properties for edge {}", edge_id);
+                    missing_edges += 1;
+                    continue;
+                }
+            };
+
             let json_edge = json!({
                 "from": edge.from_node.to_string(),
                 "to": edge.to_node.to_string(),
                 "label": props["edge_name"],
             });
-            //println!("{:?}", json_edge);
+            debug_println!("{:?}", json_edge);
             edges.push(json_edge);
         }
 
@@ -278,9 +299,20 @@ impl HelixGraphStorage {
             "edges": edges,
         });
 
-        serde_json::to_string(&result)
-            .map_err(|e| GraphError::New(e.to_string()))
+        if missing_edges != 0 || missing_nodes != 0 {
+            println!(
+                "failed to get {} nodes and {} edges",
+                missing_nodes, missing_edges
+            );
+        }
+
+        serde_json::to_string(&result).map_err(|e| GraphError::New(e.to_string()))
     }
+
+    // TODO: to list in the html as well
+    //pub fn get_db_stats_json(&self) -> Result<String, GraphError> {
+    //   db.stats or something from heed docs
+    //}
 }
 
 impl DBMethods for HelixGraphStorage {
