@@ -52,9 +52,8 @@ async fn main() {
     let graph = Arc::new(HelixGraphEngine::new(opts).unwrap());
 
     // generates routes from handler proc macro
-    println!("Starting route collection...");
     let submissions: Vec<_> = inventory::iter::<HandlerSubmission>.into_iter().collect();
-    println!("Found {} submissions", submissions.len());
+    println!("Found {} route submissions", submissions.len());
 
     let post_routes: HashMap<(String, String), HandlerFn> = inventory::iter::<HandlerSubmission>
         .into_iter()
@@ -72,7 +71,7 @@ async fn main() {
         })
     .collect();
 
-    // Collect GET routes
+    // collect GET routes
     let get_routes: HashMap<(String, String), HandlerFn> = inventory::iter::<HandlerSubmission>
         .into_iter()
         .map(|submission| {
@@ -89,31 +88,9 @@ async fn main() {
         })
     .collect();
 
-    // Combine POST and GET routes immutably
     let routes: HashMap<(String, String), HandlerFn> = post_routes.into_iter()
         .chain(get_routes)
         .collect();
-
-    /*
-    let routes = HashMap::from_iter(
-        submissions
-            .into_iter()
-            .map(|submission| {
-                println!("Processing submission for handler: {}", submission.0.name);
-                let handler = &submission.0;
-                let func: HandlerFn =
-                    Arc::new(move |input, response| (handler.func)(input, response));
-                (
-                    (
-                        "post".to_ascii_uppercase().to_string(),
-                        format!("/{}", handler.name.to_string()),
-                    ),
-                    func,
-                )
-            })
-            .collect::<Vec<((String, String), HandlerFn)>>(),
-    );
-    */
 
     let mcp_submissions: Vec<_> = inventory::iter::<MCPHandlerSubmission>
         .into_iter()

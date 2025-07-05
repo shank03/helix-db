@@ -1,38 +1,51 @@
 use helixdb::{
-    helix_engine::{
-        storage_core::storage_core::HelixGraphStorage,
-        types::GraphError,
-    },
-    protocol::{
-        id::v6_uuid, request::Request, response::Response,
-        return_values::ReturnValue,
-    },
-    helix_gateway::router::router::{HandlerInput, Handler},
+    helix_engine::types::GraphError,
+    protocol::response::Response,
+    helix_gateway::router::router::HandlerInput,
 };
-use get_routes::{get_handler, handler};
-use serde_json::json;
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-    vec::IntoIter,
-};
+use get_routes::get_handler;
+use serde_json::Value;
+use std::sync::Arc;
 
 #[get_handler]
 pub fn graphvis(input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
     let db = Arc::clone(&input.graph.storage);
-    //let json_ne: String = db.get_ne_json().unwrap();
-    // TODO: (func) need a preprocessing step here to add colors, arrows, shape etc.
-
-    let nodes = json!([{"color": "#97c2fc", "id": "41234901881305623165119301202951275782", "label": "Marie Curie", "shape": "dot"}, {"color": "#97c2fc", "id": "41234901881312936930209927040952698118", "label": "physicist", "shape": "dot"}, {"color": "#97c2fc", "id": "41234901881325033567103984291497116934", "label": "chemist", "shape": "dot"}, {"color": "#97c2fc", "id": "41234901881332271516076467183241397510", "label": "radioactivity", "shape": "dot"}, {"color": "#97c2fc", "id": "41234901881343122997745549039051736326", "label": "Nobel Prize", "shape": "dot"}, {"color": "#97c2fc", "id": "41234901881392692535019506509751256326", "label": "Pierre Curie", "shape": "dot"}, {"color": "#97c2fc", "id": "41234901881401157745875213297964549382", "label": "Nobel Prize", "shape": "dot"}, {"color": "#97c2fc", "id": "41234901881409656714272574974657299718", "label": "Curie family", "shape": "dot"}, {"color": "#97c2fc", "id": "41234901881416848361917432855427024134", "label": "University of Paris", "shape": "dot"}, {"color": "#97c2fc", "id": "41234901881421742467587910211542975750", "label": "Robin Williams", "shape": "dot"}]);
-    let edges = json!([{"arrows": "to", "from": "41234901881305623165119301202951275782", "title": "conducted research on", "to": "41234901881332271516076467183241397510"}, {"arrows": "to", "from": "41234901881305623165119301202951275782", "title": "was", "to": "41234901881312936930209927040952698118"}, {"arrows": "to", "from": "41234901881305623165119301202951275782", "title": "was", "to": "41234901881325033567103984291497116934"}, {"arrows": "to", "from": "41234901881305623165119301202951275782", "title": "won", "to": "41234901881343122997745549039051736326"}, {"arrows": "to", "from": "41234901881392692535019506509751256326", "title": "co-winner", "to": "41234901881343122997745549039051736326"}, {"arrows": "to", "from": "41234901881409656714272574974657299718", "title": "legacy", "to": "41234901881343122997745549039051736326"}]);
+    let json_ne: String = db.get_ne_json().unwrap();
+    let json_ne_m = modify_graph_json(&json_ne).unwrap();
 
     let html_template = include_str!("graphvis.html");
     let html_content = html_template
-        .replace("{NODES_JSON_DATA}", &serde_json::to_string(&nodes).unwrap())
-        .replace("{EDGES_JSON_DATA}", &serde_json::to_string(&edges).unwrap());
+        .replace("{NODES_JSON_DATA}", &serde_json::to_string(&json_ne_m[&"nodes"]).unwrap())
+        .replace("{EDGES_JSON_DATA}", &serde_json::to_string(&json_ne_m["edges"]).unwrap());
 
     response.headers.insert("Content-Type".to_string(), "text/html".to_string());
     response.body = html_content.as_bytes().to_vec();
     Ok(())
+}
+
+fn modify_graph_json(input: &str) -> Result<Value, serde_json::Error> {
+    let mut json: Value = serde_json::from_str(input)?;
+
+    if let Some(nodes) = json.get_mut("nodes").and_then(|n| n.as_array_mut()) {
+        for node in nodes {
+            if let Some(obj) = node.as_object_mut() {
+                obj.insert("color".to_string(), Value::String("#97c2fc".to_string()));
+                obj.insert("shape".to_string(), Value::String("dot".to_string()));
+            }
+        }
+    }
+
+    if let Some(edges) = json.get_mut("edges").and_then(|e| e.as_array_mut()) {
+        for edge in edges {
+            if let Some(obj) = edge.as_object_mut() {
+                if let Some(label) = obj.remove("label") {
+                    obj.insert("title".to_string(), label);
+                }
+                obj.insert("arrows".to_string(), Value::String("to".to_string()));
+            }
+        }
+    }
+
+    Ok(json)
 }
 

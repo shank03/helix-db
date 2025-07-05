@@ -239,7 +239,7 @@ impl HelixGraphStorage {
     ///     format):
     /// {
     ///     "nodes": [ { "id": 1, "label": "Node 1" } ],
-    ///     "edges": [ { "from": 1, "to": 2, "label "Edge from 1 to 2" } ]
+    ///     "edges": [ { "from": 1, "to": 2, "label": Edge from 1 to 2" } ]
     /// }
     pub fn get_ne_json(&self) -> Result<String, GraphError> {
         let txn = self.graph_env.read_txn().unwrap();
@@ -308,6 +308,9 @@ impl HelixGraphStorage {
 
         serde_json::to_string(&result).map_err(|e| GraphError::New(e.to_string()))
     }
+
+    // TODO: a more genearl one as well for non kg stuff
+    //pub fn get_ne_json(&self) -> Result<String, GraphError> {}
 
     // TODO: to list in the html as well
     //pub fn get_db_stats_json(&self) -> Result<String, GraphError> {
