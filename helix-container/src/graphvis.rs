@@ -44,9 +44,6 @@ fn modify_graph_json(input: &str) -> Result<Value, serde_json::Error> {
     if let Some(edges) = json.get_mut("edges").and_then(|e| e.as_array_mut()) {
         for edge in edges {
             if let Some(obj) = edge.as_object_mut() {
-                if let Some(label) = obj.remove("label") {
-                    obj.insert("title".to_string(), label);
-                }
                 obj.insert("arrows".to_string(), Value::String("to".to_string()));
             }
         }
