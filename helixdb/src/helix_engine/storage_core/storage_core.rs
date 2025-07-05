@@ -312,10 +312,19 @@ impl HelixGraphStorage {
     // TODO: a more genearl one as well for non kg stuff
     //pub fn get_ne_json(&self) -> Result<String, GraphError> {}
 
-    // TODO: to list in the html as well
-    //pub fn get_db_stats_json(&self) -> Result<String, GraphError> {
-    //   db.stats or something from heed docs
-    //}
+    /// Get number of nodes, edges, and vectors from lmdb
+    pub fn get_db_stats_json(&self) -> Result<String, GraphError> {
+        let txn = self.graph_env.read_txn().unwrap();
+
+        let result = json!({
+            "num_nodes":   self.nodes_db.len(&txn).unwrap_or(0),
+            "num_edges":   self.edges_db.len(&txn).unwrap_or(0),
+            "num_vectors": self.vectors.vectors_db.len(&txn).unwrap_or(0),
+        });
+        debug_println!("db stats json: {:?}", result);
+
+        serde_json::to_string(&result).map_err(|e| GraphError::New(e.to_string()))
+    }
 }
 
 impl DBMethods for HelixGraphStorage {
