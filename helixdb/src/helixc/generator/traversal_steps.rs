@@ -1,4 +1,4 @@
-use crate::helixc::generator::utils::write_properties;
+use crate::helixc::generator::utils::{write_properties, VecData};
 
 use super::{
     bool_op::BoolOp,
@@ -389,7 +389,7 @@ impl Display for ShortestPath {
 
 #[derive(Clone)]
 pub struct SearchVectorStep {
-    pub vec: GeneratedValue,
+    pub vec: VecData,
     pub k: GeneratedValue,
 }
 impl Display for SearchVectorStep {

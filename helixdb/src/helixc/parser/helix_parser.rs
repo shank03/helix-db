@@ -534,6 +534,19 @@ pub enum BooleanOpType {
 pub enum VectorData {
     Vector(Vec<f64>),
     Identifier(String),
+    Embed(Embed),
+}
+
+#[derive(Debug, Clone)]
+pub struct Embed {
+    pub loc: Loc,
+    pub value: EvaluatesToString,
+}
+
+#[derive(Debug, Clone)]
+pub enum EvaluatesToString {
+    Identifier(String),
+    StringLiteral(String),
 }
 
 #[derive(Debug, Clone)]
@@ -627,7 +640,11 @@ impl Display for IdType {
         match self {
             IdType::Literal { value, loc: _ } => write!(f, "{}", value),
             IdType::Identifier { value, loc: _ } => write!(f, "{}", value),
-            IdType::ByIndex { index, value: _, loc: _ } => write!(f, "{}", index),
+            IdType::ByIndex {
+                index,
+                value: _,
+                loc: _,
+            } => write!(f, "{}", index),
         }
     }
 }
@@ -693,7 +710,11 @@ impl From<IdType> for String {
                 value
             }
             IdType::Identifier { value, loc: _ } => value,
-            IdType::ByIndex { index, value: _, loc: _ } => String::from(*index),
+            IdType::ByIndex {
+                index,
+                value: _,
+                loc: _,
+            } => String::from(*index),
         }
     }
 }
@@ -1318,6 +1339,29 @@ impl HelixParser {
                     }
                     Rule::vec_literal => {
                         data = Some(VectorData::Vector(self.parse_vec_literal(p)?));
+                    }
+                    Rule::embed_method => {
+                        data = Some(VectorData::Embed(Embed {
+                            loc: p.loc(),
+                            value: match p.clone().into_inner().next() {
+                                Some(p) => match p.as_rule() {
+                                    Rule::identifier => {
+                                        EvaluatesToString::Identifier(p.as_str().to_string())
+                                    }
+                                    Rule::string_literal => {
+                                        EvaluatesToString::StringLiteral(p.as_str().to_string())
+                                    }
+                                    _ => unreachable!(),
+                                },
+                                None => {
+                                    return Err(ParserError::from(format!(
+                                        "Unexpected rule in AddV: {:?} => {:?}",
+                                        p.as_rule(),
+                                        p,
+                                    )))
+                                }
+                            },
+                        }));
                     }
                     _ => unreachable!(),
                 },
@@ -2457,4 +2501,3 @@ pub fn write_to_temp_file(content: Vec<&str>) -> Content {
         source: Source::default(),
     }
 }
-

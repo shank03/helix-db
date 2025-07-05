@@ -109,6 +109,23 @@ impl From<IdType> for GenRef<String> {
 }
 
 #[derive(Clone)]
+pub enum VecData {
+    Standard(GeneratedValue),
+    Embed(GeneratedValue),
+    Unknown,
+}
+
+impl Display for VecData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            VecData::Standard(v) => write!(f, "{}", v),
+            VecData::Embed(v) => write!(f, "embed({})", v),
+            VecData::Unknown => panic!("Cannot convert to string, VecData is unknown"),
+        }
+    }
+}
+
+#[derive(Clone)]
 pub enum Order {
     Asc,
     Desc,
