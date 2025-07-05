@@ -10,7 +10,13 @@ use std::sync::Arc;
 #[get_handler]
 pub fn graphvis(input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
     let db = Arc::clone(&input.graph.storage);
-    let json_ne: String = db.get_ne_json().unwrap();
+    let json_ne: String = match db.get_ne_json() {
+        Ok(value) => value,
+        Err(e) => {
+            println!("error with json: {}", e);
+            return Ok(());
+        }
+    };
     let json_ne_m = modify_graph_json(&json_ne).unwrap();
 
     let html_template = include_str!("graphvis.html");
