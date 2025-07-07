@@ -1895,16 +1895,6 @@ fn test_brute_force_vector_search() {
             )
             .collect_to_val()
             .id();
-        let _ = G::new_mut(Arc::clone(&storage), &mut txn)
-            .add_e(
-                "embedding",
-                None,
-                node.id(),
-                vector_id,
-                false,
-                EdgeType::Vec,
-            )
-            .collect_to_val();
         vector_ids.push(vector_id);
     }
 
