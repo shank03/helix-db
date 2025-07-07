@@ -20,8 +20,8 @@ pub enum CommandType {
     /// Demo a Helix project
     Demo,
 
-    /// Open graph vis in default browser
-    Visualize,
+    // Open graph vis in default browser
+    //Visualize,
 
     /// Deploy a Helix project
     Deploy(DeployCommand),

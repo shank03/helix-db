@@ -15,7 +15,7 @@ use std::{
     fmt::Write,
     fs,
     io::Write as iWrite,
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::{Command, Stdio},
 };
 

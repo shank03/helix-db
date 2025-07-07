@@ -1,3 +1,5 @@
+
+
 use heed3::RoTxn;
 use get_routes::handler;
 use helixdb::{field_remapping, identifier_remapping, traversal_remapping, exclude_field, value_remapping};
@@ -42,47 +44,45 @@ use std::sync::Arc;
 use std::time::Instant;
 use std::cell::RefCell;
 use chrono::{DateTime, Utc};
-
-pub struct Entity {
-    pub entity_name: String,
+    
+pub struct User {
+    pub user_num: u64,
+    pub age: u32,
+    pub gender: String,
+    pub r_status: String,
+    pub numoffriends: u64,
 }
 
-pub struct Relationship {
-    pub from: Entity,
-    pub to: Entity,
-    pub edge_name: String,
+pub struct Friends {
+    pub from: User,
+    pub to: User,
 }
 
-pub struct Embedding {
-    pub vector_name: String,
-    pub vec: Vec<f64>,
-}
 
 #[derive(Serialize, Deserialize)]
-pub struct insert_relationshipInput {
+pub struct insertFriendRelationshipInput {
 
-    pub from_entity_label: String,
-    pub to_entity_label: String,
-    pub edge_name_in: String
+pub from: u64,
+pub to: u64
 }
 #[handler]
-pub fn insert_relationship (input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
-    let data: insert_relationshipInput = match sonic_rs::from_slice(&input.request.body) {
-        Ok(data) => data,
-        Err(err) => return Err(GraphError::from(err)),
-    };
+pub fn insertFriendRelationship (input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
+let data: insertFriendRelationshipInput = match sonic_rs::from_slice(&input.request.body) {
+    Ok(data) => data,
+    Err(err) => return Err(GraphError::from(err)),
+};
 
-    let mut remapping_vals = RemappingMap::new();
-    let db = Arc::clone(&input.graph.storage);
-    let mut txn = db.graph_env.write_txn().unwrap();
-    let from_entity = G::new(Arc::clone(&db), &txn)
-        .n_from_index("entity_name", &data.from_entity_label).collect_to::<Vec<_>>();
-    let to_entity = G::new(Arc::clone(&db), &txn)
-        .n_from_index("entity_name", &data.to_entity_label).collect_to::<Vec<_>>();
+let mut remapping_vals = RemappingMap::new();
+let db = Arc::clone(&input.graph.storage);
+let mut txn = db.graph_env.write_txn().unwrap();
+    let from_user = G::new(Arc::clone(&db), &txn)
+.n_from_index("user_num", &data.from).collect_to::<Vec<_>>();
+    let to_user = G::new(Arc::clone(&db), &txn)
+.n_from_index("user_num", &data.to).collect_to::<Vec<_>>();
     let e = G::new_mut(Arc::clone(&db), &mut txn)
-        .add_e("Relationship", Some(props! { "edge_name" => data.edge_name_in.clone() }), from_entity.id(), to_entity.id(), true, EdgeType::Node).collect_to::<Vec<_>>();
-    let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
-    return_vals.insert("e".to_string(), ReturnValue::from_traversal_value_array_with_mixin(e.clone(), remapping_vals.borrow_mut()));
+.add_e("Friends", None, from_user.id(), to_user.id(), true, EdgeType::Node).collect_to::<Vec<_>>();
+let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
+        return_vals.insert("e".to_string(), ReturnValue::from_traversal_value_array_with_mixin(e.clone(), remapping_vals.borrow_mut()));
 
     txn.commit().unwrap();
     response.body = sonic_rs::to_vec(&return_vals).unwrap();
@@ -90,54 +90,30 @@ pub fn insert_relationship (input: &HandlerInput, response: &mut Response) -> Re
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct insert_entityInput {
+pub struct inesrtUserInput {
 
-    pub entity_name_in: String
+pub in_user_num: u64,
+pub in_age: u32,
+pub in_gender: String,
+pub in_r_status: String,
+pub in_numoffriends: u64
 }
 #[handler]
-pub fn insert_entity (input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
-    let data: insert_entityInput = match sonic_rs::from_slice(&input.request.body) {
-        Ok(data) => data,
-        Err(err) => return Err(GraphError::from(err)),
-    };
+pub fn inesrtUser (input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
+let data: inesrtUserInput = match sonic_rs::from_slice(&input.request.body) {
+    Ok(data) => data,
+    Err(err) => return Err(GraphError::from(err)),
+};
 
-    let mut remapping_vals = RemappingMap::new();
-    let db = Arc::clone(&input.graph.storage);
-    let mut txn = db.graph_env.write_txn().unwrap();
-    let node = G::new_mut(Arc::clone(&db), &mut txn)
-        .add_n("Entity", Some(props! { "entity_name" => data.entity_name_in.clone() }), Some(&["entity_name"])).collect_to::<Vec<_>>();
-    let node = G::new(Arc::clone(&db), &txn)
-        .n_from_index("entity_name", &data.entity_name_in).collect_to::<Vec<_>>();
-    let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
-    return_vals.insert("node".to_string(), ReturnValue::from_traversal_value_array_with_mixin(node.clone(), remapping_vals.borrow_mut()));
+let mut remapping_vals = RemappingMap::new();
+let db = Arc::clone(&input.graph.storage);
+let mut txn = db.graph_env.write_txn().unwrap();
+    let n = G::new_mut(Arc::clone(&db), &mut txn)
+.add_n("User", Some(props! { "user_num" => data.in_user_num.clone(), "gender" => data.in_gender.clone(), "r_status" => data.in_r_status.clone(), "age" => data.in_age.clone(), "numoffriends" => data.in_numoffriends.clone() }), Some(&["user_num"])).collect_to::<Vec<_>>();
+let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
+        return_vals.insert("n".to_string(), ReturnValue::from_traversal_value_array_with_mixin(n.clone(), remapping_vals.borrow_mut()));
 
     txn.commit().unwrap();
     response.body = sonic_rs::to_vec(&return_vals).unwrap();
     Ok(())
 }
-
-#[derive(Serialize, Deserialize)]
-pub struct get_entityInput {
-
-    pub entity_name_in: String
-}
-#[handler]
-pub fn get_entity (input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
-    let data: get_entityInput = match sonic_rs::from_slice(&input.request.body) {
-        Ok(data) => data,
-        Err(err) => return Err(GraphError::from(err)),
-    };
-
-    let mut remapping_vals = RemappingMap::new();
-    let db = Arc::clone(&input.graph.storage);
-    let txn = db.graph_env.read_txn().unwrap();
-    let node = G::new(Arc::clone(&db), &txn)
-        .n_from_index("entity_name", &data.entity_name_in).collect_to::<Vec<_>>();
-    let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
-    return_vals.insert("node".to_string(), ReturnValue::from_traversal_value_array_with_mixin(node.clone(), remapping_vals.borrow_mut()));
-
-    txn.commit().unwrap();
-    response.body = sonic_rs::to_vec(&return_vals).unwrap();
-    Ok(())
-}
-
