@@ -1,17 +1,33 @@
-use helixdb::{
-    helix_engine::types::GraphError,
-    protocol::response::Response,
-    helix_gateway::router::router::HandlerInput,
-    debug_println,
-};
 use get_routes::get_handler;
+use helixdb::{
+    helix_engine::types::GraphError, helix_gateway::router::router::HandlerInput,
+    protocol::response::Response,
+};
 use serde_json::Value;
 use std::sync::Arc;
 
+/*
+use serde::{Serialize, Deserialize};
+#[derive(Serialize, Deserialize)]
+pub struct GraphLabels {
+    pub node_label: String,
+}
+*/
+
 #[get_handler]
 pub fn graphvis(input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
+    /*
+    let data: GraphLabels = match sonic_rs::from_slice(&input.request.body) {
+        Ok(data) => data,
+        Err(err) => return Err(GraphError::from(err)),
+    };
+    */
+
     let db = Arc::clone(&input.graph.storage);
-    let json_ne: String = match db.get_ne_json() {
+    let json_ne: String = match db.get_ne_json(
+        Some("entity_name".to_string()),
+        Some("edge_name".to_string()),
+    ) {
         Ok(value) => value,
         Err(e) => {
             println!("error with json: {}", e);
@@ -37,13 +53,30 @@ pub fn graphvis(input: &HandlerInput, response: &mut Response) -> Result<(), Gra
 
     let html_template = include_str!("graphvis.html");
     let html_content = html_template
-        .replace("{NODES_JSON_DATA}", &serde_json::to_string(&json_ne_m["nodes"]).unwrap())
-        .replace("{EDGES_JSON_DATA}", &serde_json::to_string(&json_ne_m["edges"]).unwrap())
-        .replace("{NUM_NODES}", &serde_json::to_string(&db_counts_m["num_nodes"]).unwrap())
-        .replace("{NUM_EDGES}", &serde_json::to_string(&db_counts_m["num_edges"]).unwrap())
-        .replace("{NUM_VECTORS}", &serde_json::to_string(&db_counts_m["num_vectors"]).unwrap());
+        .replace(
+            "{NODES_JSON_DATA}",
+            &serde_json::to_string(&json_ne_m["nodes"]).unwrap(),
+        )
+        .replace(
+            "{EDGES_JSON_DATA}",
+            &serde_json::to_string(&json_ne_m["edges"]).unwrap(),
+        )
+        .replace(
+            "{NUM_NODES}",
+            &serde_json::to_string(&db_counts_m["num_nodes"]).unwrap(),
+        )
+        .replace(
+            "{NUM_EDGES}",
+            &serde_json::to_string(&db_counts_m["num_edges"]).unwrap(),
+        )
+        .replace(
+            "{NUM_VECTORS}",
+            &serde_json::to_string(&db_counts_m["num_vectors"]).unwrap(),
+        );
 
-    response.headers.insert("Content-Type".to_string(), "text/html".to_string());
+    response
+        .headers
+        .insert("Content-Type".to_string(), "text/html".to_string());
     response.body = html_content.as_bytes().to_vec();
     Ok(())
 }
@@ -70,4 +103,3 @@ fn modify_graph_json(input: &str) -> Result<Value, serde_json::Error> {
 
     Ok(json)
 }
-
