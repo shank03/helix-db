@@ -1,3 +1,5 @@
+use crate::helix_engine::vector_core::vector_distance::{MAX_DISTANCE, MIN_DISTANCE, ORTHOGONAL};
+
 use super::vector::HVector;
 
 #[test]
@@ -15,27 +17,27 @@ fn test_hvector_from_slice() {
 }
 
 #[test]
-fn test_hvector_distance() {
+fn test_hvector_distance_orthogonal() {
     let v1 = HVector::new(vec![1.0, 0.0]);
     let v2 = HVector::new(vec![0.0, 1.0]);
     let distance = v1.distance_to(&v2).unwrap();
-    assert!((distance - 2.0_f64.sqrt()).abs() < 1e-10);
+    assert!(distance == ORTHOGONAL);
 }
 
 #[test]
-fn test_hvector_distance_zero() {
+fn test_hvector_distance_min() {
     let v1 = HVector::new(vec![1.0, 2.0, 3.0]);
     let v2 = HVector::new(vec![1.0, 2.0, 3.0]);
     let distance = v2.distance_to(&v1).unwrap();
-    assert!(distance.abs() < 1e-10);
+    assert!(distance.abs() == MIN_DISTANCE);
 }
 
 #[test]
-fn test_hvector_distance_to() {
+fn test_hvector_distance_max() {
     let v1 = HVector::new(vec![0.0, 0.0]);
     let v2 = HVector::new(vec![3.0, 4.0]);
     let distance = v1.distance_to(&v2).unwrap();
-    assert!((distance - 5.0).abs() < 1e-10);
+    assert!(distance == MAX_DISTANCE);
 }
 
 #[test]
@@ -63,10 +65,12 @@ fn test_hvector_is_empty() {
 }
 
 #[test]
+#[should_panic]
 fn test_hvector_distance_different_dimensions() {
     let v1 = HVector::new(vec![1.0, 2.0, 3.0]);
     let v2 = HVector::new(vec![1.0, 2.0, 3.0, 4.0]);
     let distance = v1.distance_to(&v2).unwrap();
+    println!("distance: {}", distance);
     assert!(distance.is_finite());
 }
 
@@ -91,6 +95,5 @@ fn test_hvector_cosine_similarity() {
     let v1 = HVector::new(vec![1.0, 2.0, 3.0]);
     let v2 = HVector::new(vec![4.0, 5.0, 6.0]);
     let similarity = v1.distance_to(&v2).unwrap();
-    assert!((similarity - 0.9746318461970762).abs() < 1e-10);
+    assert!(similarity == 1.0 - 0.9746318461970762);
 }
-
