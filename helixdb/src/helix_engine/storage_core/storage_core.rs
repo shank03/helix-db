@@ -241,7 +241,11 @@ impl HelixGraphStorage {
     ///     "nodes": [ { "id": 1, "label": "Node 1" } ],
     ///     "edges": [ { "from": 1, "to": 2, "label": Edge from 1 to 2" } ]
     /// }
-    pub fn get_ne_json(&self) -> Result<String, GraphError> {
+    pub fn get_ne_json(
+        &self,
+        show_node_properties: Option<String>,
+        show_edge_properties: Option<String>,
+    ) -> Result<String, GraphError> {
         let txn = self.graph_env.read_txn().unwrap();
         if self.nodes_db.is_empty(&txn)? || self.edges_db.is_empty(&txn)? {
             return Err(GraphError::New("edges or nodes db is empty!".to_string()));
@@ -257,17 +261,32 @@ impl HelixGraphStorage {
         for node in self.nodes_db.iter(&txn)? {
             let (node_id, node_data) = node?;
             let node = Node::decode_node(node_data, node_id)?;
+            let mut json_node = json!({"id": node_id.to_string()});
 
-            let props = match node.properties.clone() {
-                Some(p) => p,
-                None => {
-                    println!("failed to get properties for node {}", node_id);
-                    missing_nodes += 1;
-                    continue;
+            match show_node_properties {
+                Some(snp) => {
+                    match node.properties.as_ref() {
+                        Some(node_props) => {
+                            if node_props.contains_key(&snp) {
+                                let value = node_props.get(&snp).unwrap_or();
+                                json_node.insert(snp.to_string(), json!(value.to_string()));
+                            } else {
+                                println!("failed to get properties for node {}", node_id);
+                                missing_nodes += 1;
+                                continue;
+                            }
+                        }
+                        None => {
+                            println!("failed to get properties for node {}", node_id);
+                            missing_nodes += 1;
+                            continue;
+                        }
+                    }
                 }
-            };
+                None => { }
+            }
 
-            let json_node = json!({"id": node_id.to_string(), "label": props["entity_name"]});
+            //let json_node = json!({"id": node_id.to_string(), "label": props["entity_name"]});
             debug_println!("{:?}", json_node);
             nodes.push(json_node);
         }
