@@ -1,5 +1,8 @@
 use crate::{
-    helix_engine::types::{GraphError, VectorError},
+    helix_engine::{
+        types::{GraphError, VectorError},
+        vector_core::vector_distance::DistanceCalc,
+    },
     protocol::{
         filterable::{Filterable, FilterableType},
         return_values::ReturnValue,
@@ -13,46 +16,40 @@ use std::{cmp::Ordering, collections::HashMap, fmt::Debug};
 // TODO: make this generic over the type of encoding (f32, f64, etc)
 // TODO: use const param to set dimension
 // TODO: set level as u8
-#[repr(C, align(16))]
+
+
+#[repr(C, align(16))] // TODO: see performance impact of repr(C) and align(16)
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub struct HVector {
+    /// The id of the HVector
     pub id: u128,
+    /// Whether the HVector is deleted (will be used for soft deletes)
     pub is_deleted: bool,
+    /// The level of the HVector
     pub level: usize,
+    /// The distance of the HVector
     pub distance: Option<f64>,
-    data: Vec<f64>,
+    /// The actual vector
+    pub data: Vec<f64>,
+    /// The properties of the HVector
     pub properties: Option<HashMap<String, Value>>,
 }
 
-impl Debug for HVector {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{{ \nid: {},\nis_deleted: {},\nlevel: {},\ndistance: {:?},\ndata: {:?},\nproperties: {:#?} }}", uuid::Uuid::from_u128(self.id).to_string(), self.is_deleted, self.level, self.distance, self.data, self.properties)
-    }
-}
-
 impl Eq for HVector {}
-
 impl PartialOrd for HVector {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         other.distance.partial_cmp(&self.distance)
     }
 }
-
 impl Ord for HVector {
     fn cmp(&self, other: &Self) -> Ordering {
         self.partial_cmp(other).unwrap_or(Ordering::Equal)
     }
 }
 
-pub trait DistanceCalc {
-    fn distance(from: &HVector, to: &HVector) -> Result<f64, VectorError>;
-}
-
-impl DistanceCalc for HVector {
-    #[inline(always)]
-    #[cfg(feature = "cosine")]
-    fn distance(from: &HVector, to: &HVector) -> Result<f64, VectorError> {
-        cosine_similarity(&from.data, &to.data)
+impl Debug for HVector {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{{ \nid: {},\nis_deleted: {},\nlevel: {},\ndistance: {:?},\ndata: {:?},\nproperties: {:#?} }}", uuid::Uuid::from_u128(self.id).to_string(), self.is_deleted, self.level, self.distance, self.data, self.properties)
     }
 }
 
@@ -83,16 +80,19 @@ impl HVector {
         }
     }
 
+    /// Returns the data of the HVector
     #[inline(always)]
     pub fn get_data(&self) -> &[f64] {
         &self.data
     }
 
+    /// Returns the id of the HVector
     #[inline(always)]
     pub fn get_id(&self) -> u128 {
         self.id
     }
 
+    /// Returns the level of the HVector
     #[inline(always)]
     pub fn get_level(&self) -> usize {
         self.level
@@ -158,11 +158,19 @@ impl HVector {
     pub fn get_distance(&self) -> f64 {
         match self.distance {
             Some(distance) => distance,
-            None => 0.0,
+            // changed from 0.0 to 2.0 to match the distance calculation
+            // if the distance is not set, make it the furthest distance
+            None => 2.0,
         }
     }
 }
 
+
+/// Filterable implementation for HVector
+/// 
+/// see helixdb/src/protocol/filterable.rs
+/// 
+/// NOTE: This could be moved to the protocol module with the node and edges in `helixdb/protocol/items.rs``
 impl Filterable for HVector {
     fn type_name(&self) -> FilterableType {
         FilterableType::Vector
@@ -230,7 +238,6 @@ impl Filterable for HVector {
         &self.properties
     }
 
-    // TODO: Implement this
     fn check_property(&self, key: &str) -> Result<&Value, GraphError> {
         match &self.properties {
             Some(properties) => properties
@@ -254,134 +261,4 @@ impl Filterable for HVector {
     ) -> Option<&ReturnValue> {
         unreachable!()
     }
-}
-
-#[inline(always)]
-#[cfg(feature = "cosine")]
-pub fn cosine_similarity(from: &[f64], to: &[f64]) -> Result<f64, VectorError> {
-    let len = from.len();
-    let other_len = to.len();
-
-    if len != other_len {
-        println!("mis-match in vector dimensions!\n{} != {}", len, other_len);
-        return Err(VectorError::InvalidVectorLength);
-    }
-    //debug_assert_eq!(len, other.data.len(), "Vectors must have the same length");
-
-    #[cfg(target_feature = "avx2")]
-    {
-        return cosine_similarity_avx2(from, to);
-    }
-
-    let mut dot_product = 0.0;
-    let mut magnitude_a = 0.0;
-    let mut magnitude_b = 0.0;
-
-    const CHUNK_SIZE: usize = 8;
-    let chunks = len / CHUNK_SIZE;
-    let remainder = len % CHUNK_SIZE;
-
-    for i in 0..chunks {
-        let offset = i * CHUNK_SIZE;
-        let a_chunk = &from[offset..offset + CHUNK_SIZE];
-        let b_chunk = &to[offset..offset + CHUNK_SIZE];
-
-        let mut local_dot = 0.0;
-        let mut local_mag_a = 0.0;
-        let mut local_mag_b = 0.0;
-
-        for j in 0..CHUNK_SIZE {
-            let a_val = a_chunk[j];
-            let b_val = b_chunk[j];
-            local_dot += a_val * b_val;
-            local_mag_a += a_val * a_val;
-            local_mag_b += b_val * b_val;
-        }
-
-        dot_product += local_dot;
-        magnitude_a += local_mag_a;
-        magnitude_b += local_mag_b;
-    }
-
-    let remainder_offset = chunks * CHUNK_SIZE;
-    for i in 0..remainder {
-        let a_val = from[remainder_offset + i];
-        let b_val = to[remainder_offset + i];
-        dot_product += a_val * b_val;
-        magnitude_a += a_val * a_val;
-        magnitude_b += b_val * b_val;
-    }
-
-    Ok(dot_product / (magnitude_a.sqrt() * magnitude_b.sqrt()))
-}
-
-// SIMD implementation using AVX2 (256-bit vectors)
-#[cfg(target_feature = "avx2")]
-#[inline(always)]
-pub fn cosine_similarity_avx2(a: &[f64], b: &[f64]) -> f64 {
-    use std::arch::x86_64::*;
-
-    let len = a.len();
-    let chunks = len / 4; // AVX2 processes 4 f64 values at once
-
-    unsafe {
-        let mut dot_product = _mm256_setzero_pd();
-        let mut magnitude_a = _mm256_setzero_pd();
-        let mut magnitude_b = _mm256_setzero_pd();
-
-        for i in 0..chunks {
-            let offset = i * 4;
-
-            // Load data - handle unaligned data
-            let a_chunk = _mm256_loadu_pd(&a[offset]);
-            let b_chunk = _mm256_loadu_pd(&b[offset]);
-
-            // Calculate dot product and magnitudes in parallel
-            dot_product = _mm256_add_pd(dot_product, _mm256_mul_pd(a_chunk, b_chunk));
-            magnitude_a = _mm256_add_pd(magnitude_a, _mm256_mul_pd(a_chunk, a_chunk));
-            magnitude_b = _mm256_add_pd(magnitude_b, _mm256_mul_pd(b_chunk, b_chunk));
-        }
-
-        // Horizontal sum of 4 doubles in each vector
-        let dot_sum = horizontal_sum_pd(dot_product);
-        let mag_a_sum = horizontal_sum_pd(magnitude_a);
-        let mag_b_sum = horizontal_sum_pd(magnitude_b);
-
-        // Handle remainder elements
-        let mut dot_remainder = 0.0;
-        let mut mag_a_remainder = 0.0;
-        let mut mag_b_remainder = 0.0;
-
-        let remainder_offset = chunks * 4;
-        for i in remainder_offset..len {
-            let a_val = a[i];
-            let b_val = b[i];
-            dot_remainder += a_val * b_val;
-            mag_a_remainder += a_val * a_val;
-            mag_b_remainder += b_val * b_val;
-        }
-
-        // Combine SIMD and scalar results
-        let dot_product_total = dot_sum + dot_remainder;
-        let magnitude_a_total = (mag_a_sum + mag_a_remainder).sqrt();
-        let magnitude_b_total = (mag_b_sum + mag_b_remainder).sqrt();
-
-        dot_product_total / (magnitude_a_total * magnitude_b_total)
-    }
-}
-
-// Helper function to sum the 4 doubles in an AVX2 vector
-#[cfg(target_feature = "avx2")]
-#[inline(always)]
-unsafe fn horizontal_sum_pd(__v: __m256d) -> f64 {
-    use std::arch::x86_64::*;
-
-    // Extract the high 128 bits and add to the low 128 bits
-    let sum_hi_lo = _mm_add_pd(_mm256_castpd256_pd128(__v), _mm256_extractf128_pd(__v, 1));
-
-    // Add the high 64 bits to the low 64 bits
-    let sum = _mm_add_sd(sum_hi_lo, _mm_unpackhi_pd(sum_hi_lo, sum_hi_lo));
-
-    // Extract the low 64 bits as a scalar
-    _mm_cvtsd_f64(sum)
 }

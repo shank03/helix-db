@@ -1,7 +1,7 @@
 use super::super::tr_val::TraversalVal;
 use crate::helix_engine::{
     graph_core::traversal_iter::RoTraversalIterator, types::GraphError,
-    vector_core::vector::cosine_similarity,
+    vector_core::vector_distance::cosine_similarity,
 };
 use debug_trace::debug_trace;
 

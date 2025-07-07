@@ -64,6 +64,20 @@ impl std::cmp::PartialOrd<usize> for Count {
     }
 }
 
+impl PartialOrd for Count {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.value.partial_cmp(&other.value)
+    }
+}
+
+impl Ord for Count {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.value.cmp(&other.value)
+    }
+}
+
+impl Eq for Count {}
+
 impl From<Count> for usize {
     fn from(value: Count) -> Self {
         value.value
