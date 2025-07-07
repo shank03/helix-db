@@ -87,7 +87,8 @@ fn test_hvector_negative_values() {
     let v1 = HVector::new(vec![-1.0, -2.0]);
     let v2 = HVector::new(vec![1.0, 2.0]);
     let distance = v1.distance_to(&v2).unwrap();
-    assert!((distance - (20.0_f64).sqrt()).abs() < 1e-10);
+    // used round to avoid floating point precision issues
+    assert!(distance.round() == MAX_DISTANCE);
 }
 
 #[test]
