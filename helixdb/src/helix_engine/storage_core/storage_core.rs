@@ -309,6 +309,8 @@ impl HelixGraphStorage {
         serde_json::to_string(&result).map_err(|e| GraphError::New(e.to_string()))
     }
 
+    // TODO: write a parser that includes vectors then as well!
+
     // TODO: a more genearl one as well for non kg stuff
     //pub fn get_ne_json(&self) -> Result<String, GraphError> {}
 

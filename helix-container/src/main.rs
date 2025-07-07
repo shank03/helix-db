@@ -81,7 +81,7 @@ async fn main() {
             (
                 (
                     "GET".to_string(),
-                    format!("/{}", handler.name.to_string()),
+                    format!("/get/{}", handler.name.to_string()),
                 ),
                 func,
             )
