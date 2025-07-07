@@ -25,7 +25,9 @@ impl EmbeddingModelImpl {
         EmbeddingModelImpl {
             api_key: key,
             client: Client::new(),
-            model: model.map(String::from).unwrap_or("text-embedding-ada-002".into()),
+            model: model
+                .map(String::from)
+                .unwrap_or("text-embedding-ada-002".into()),
         }
     }
 }
@@ -41,7 +43,7 @@ impl EmbeddingModel for EmbeddingModelImpl {
                 "input": text,
                 "model": &self.model,
             }))
-        .send()
+            .send()
             .map_err(|e| GraphError::from(format!("Failed to send request: {}", e)))?
             .json::<serde_json::Value>()
             .map_err(|e| GraphError::from(format!("Failed to parse response: {}", e)))?;
@@ -50,7 +52,10 @@ impl EmbeddingModel for EmbeddingModelImpl {
             .as_array()
             .ok_or_else(|| GraphError::from("Invalid embedding format"))?
             .iter()
-            .map(|v| v.as_f64().ok_or_else(|| GraphError::from("Invalid float value")))
+            .map(|v| {
+                v.as_f64()
+                    .ok_or_else(|| GraphError::from("Invalid float value"))
+            })
             .collect::<Result<Vec<f64>, GraphError>>()?;
 
         Ok(embedding)
@@ -67,7 +72,9 @@ struct EmbeddingModelImpl {
 impl EmbeddingModelImpl {
     fn new(url: Option<&str>) -> Self {
         EmbeddingModelImpl {
-            url: url.map(String::from).unwrap_or("http://localhost:8699/embed".into()),
+            url: url
+                .map(String::from)
+                .unwrap_or("http://localhost:8699/embed".into()),
             client: Client::new(),
         }
     }
@@ -84,7 +91,7 @@ impl EmbeddingModel for EmbeddingModelImpl {
                 "chunk_style": "recursive",
                 "chunk_size": 100
             }))
-        .send()
+            .send()
             .map_err(|e| GraphError::from(format!("Request failed: {}", e)))?
             .json::<serde_json::Value>()
             .map_err(|e| GraphError::from(format!("Failed to parse response: {}", e)))?;
@@ -93,14 +100,21 @@ impl EmbeddingModel for EmbeddingModelImpl {
             .as_array()
             .ok_or_else(|| GraphError::from("Invalid embedding format"))?
             .iter()
-            .map(|v| v.as_f64().ok_or_else(|| GraphError::from("Invalid float value")))
+            .map(|v| {
+                v.as_f64()
+                    .ok_or_else(|| GraphError::from("Invalid float value"))
+            })
             .collect::<Result<Vec<f64>, GraphError>>()?;
 
         Ok(embedding)
     }
 }
 
-pub fn get_embedding_model(api_key: Option<&str>, model: Option<&str>, url: Option<&str>) -> Box<dyn EmbeddingModel> {
+pub fn get_embedding_model(
+    api_key: Option<&str>,
+    model: Option<&str>,
+    url: Option<&str>,
+) -> Box<dyn EmbeddingModel> {
     #[cfg(feature = "embed_openai")]
     return Box::new(EmbeddingModelImpl::new(api_key, model));
 
@@ -111,13 +125,26 @@ pub fn get_embedding_model(api_key: Option<&str>, model: Option<&str>, url: Opti
     panic!("No embedding model feature enabled. Enable either 'openai' or 'local'.");
 }
 
-
-/* basically do this:
-    let query = {
+#[macro_export]
+/// Fetches an embedding from the embedding model.
+///
+/// If no model or url is provided, it will use the default model and url.
+///
+/// ## Example Use
+/// ```rust
+/// let query = fetch_embedding!("Hello, world!");
+/// ```
+macro_rules! embed {
+    ($query:expr) => {{
         let embedding_model = get_embedding_model(None, None, None);
-        embedding_model
-            .fetch_embedding(query)
-            .expect("Failed to fetch embedding")
-    };
-*/
-
+        embedding_model.fetch_embedding($query)?
+    }};
+    ($query:expr, $model:expr) => {{
+        let embedding_model = get_embedding_model(None, Some($model), None);
+        embedding_model.fetch_embedding($query)?
+    }};
+    ($query:expr, $model:expr, $url:expr) => {{
+        let embedding_model = get_embedding_model(None, Some($model), Some($url));
+        embedding_model.fetch_embedding($query)?
+    }};
+}

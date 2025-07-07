@@ -1337,37 +1337,58 @@ impl HelixParser {
                 Rule::identifier_upper => {
                     vector_type = Some(p.as_str().to_string());
                 }
-                Rule::vector_data => match p.clone().into_inner().next().unwrap().as_rule() {
-                    Rule::identifier => {
-                        data = Some(VectorData::Identifier(p.as_str().to_string()));
-                    }
-                    Rule::vec_literal => {
-                        data = Some(VectorData::Vector(self.parse_vec_literal(p)?));
-                    }
-                    Rule::embed_method => {
-                        data = Some(VectorData::Embed(Embed {
-                            loc: p.loc(),
-                            value: match p.clone().into_inner().next() {
-                                Some(p) => match p.as_rule() {
-                                    Rule::identifier => {
-                                        EvaluatesToString::Identifier(p.as_str().to_string())
+                Rule::vector_data => match p.clone().into_inner().next() {
+                    Some(vector_data) => match vector_data.as_rule() {
+                        Rule::identifier => {
+                            data = Some(VectorData::Identifier(p.as_str().to_string()));
+                        }
+                        Rule::vec_literal => {
+                            data = Some(VectorData::Vector(self.parse_vec_literal(p)?));
+                        }
+                        Rule::embed_method => {
+                            data = Some(VectorData::Embed(Embed {
+                                loc: vector_data.loc(),
+                                value: match vector_data.clone().into_inner().next() {
+                                    Some(inner) => match inner.as_rule() {
+                                        Rule::identifier => EvaluatesToString::Identifier(
+                                            inner.as_str().to_string(),
+                                        ),
+                                        Rule::string_literal => EvaluatesToString::StringLiteral(
+                                            inner.as_str().to_string(),
+                                        ),
+                                        _ => {
+                                            return Err(ParserError::from(format!(
+                                                "Unexpected rule in AddV: {:?} => {:?}",
+                                                inner.as_rule(),
+                                                inner,
+                                            )))
+                                        }
+                                    },
+                                    None => {
+                                        return Err(ParserError::from(format!(
+                                            "Unexpected rule in AddV: {:?} => {:?}",
+                                            p.as_rule(),
+                                            p,
+                                        )))
                                     }
-                                    Rule::string_literal => {
-                                        EvaluatesToString::StringLiteral(p.as_str().to_string())
-                                    }
-                                    _ => unreachable!(),
                                 },
-                                None => {
-                                    return Err(ParserError::from(format!(
-                                        "Unexpected rule in AddV: {:?} => {:?}",
-                                        p.as_rule(),
-                                        p,
-                                    )))
-                                }
-                            },
-                        }));
+                            }));
+                        }
+                        _ => {
+                            return Err(ParserError::from(format!(
+                                "Unexpected rule in AddV: {:?} => {:?}",
+                                vector_data.as_rule(),
+                                vector_data,
+                            )))
+                        }
+                    },
+                    None => {
+                        return Err(ParserError::from(format!(
+                            "Unexpected rule in AddV: {:?} => {:?}",
+                            p.as_rule(),
+                            p,
+                        )))
                     }
-                    _ => unreachable!(),
                 },
                 Rule::create_field => {
                     fields = Some(self.parse_property_assignments(p)?);

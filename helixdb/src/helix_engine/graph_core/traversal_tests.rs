@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Instant};
 
-use crate::helix_engine::{
+use crate::{embed, helix_engine::{
     graph_core::ops::{
         g::G,
         in_::{in_e::InEdgesAdapter, to_n::ToNAdapter, to_v::ToVAdapter},
@@ -15,7 +15,7 @@ use crate::helix_engine::{
     },
     storage_core::storage_core::HelixGraphStorage,
     types::GraphError,
-};
+}, providers::embedding_providers::get_embedding_model};
 use crate::{
     helix_engine::graph_core::ops::{
         source::n_from_type::NFromTypeAdapter, util::paths::ShortestPathAdapter,

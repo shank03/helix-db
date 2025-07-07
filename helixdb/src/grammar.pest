@@ -102,13 +102,13 @@ return_stmt = { "RETURN" ~ evaluates_to_anything ~ ("," ~ evaluates_to_anything)
 // ---------------------------------------------------------------------
 // Creation steps
 // ---------------------------------------------------------------------
-create_field  = { "{" ~ new_field ~ ("," ~ new_field)* ~ "}" }
+create_field  = { "{" ~ new_field ~ ("," ~ new_field)* ~ ","? ~ "}" }
 new_field     = { identifier ~ ":" ~ (anonymous_traversal | evaluates_to_anything | create_field) }
 to_from       = { to ~ from? | from ~ to? }
 to            = { "::" ~ "To" ~ "(" ~ id_arg ~ ")" }
 from          = { "::" ~ "From" ~ "(" ~ id_arg ~ ")" }
 vec_literal   = { "[" ~ (float) ~ ("," ~ (float))* ~ "]" }
-vector_data = { (identifier | vec_literal | embed_method) }
+vector_data = { vec_literal | embed_method | identifier }
 AddN          = { "AddN" ~ ("<" ~ identifier_upper ~ ">") ~ ("(" ~ create_field? ~ ")")? }
 AddE          = { "AddE" ~ ("<" ~ identifier_upper ~ ">") ~ ("(" ~ create_field? ~ ")")? ~ to_from }
 AddV          = { "AddV" ~ ("<" ~ identifier_upper ~ ">") ~ ("(" ~ vector_data ~ ("," ~ create_field)* ~ ")") }
