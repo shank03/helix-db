@@ -1,7 +1,5 @@
-use crate::{
-    instance_manager::InstanceInfo,
-    types::*,
-};
+use crate::{instance_manager::InstanceInfo, types::*};
+use futures_util::StreamExt;
 use helixdb::{
     helixc::{
         analyzer::analyzer::analyze,
@@ -10,17 +8,19 @@ use helixdb::{
     },
     utils::styled_string::StyledString,
 };
+use reqwest::blocking::Client;
+use serde::Deserialize;
+use serde_json::Value as JsonValue;
 use std::{
     error::Error,
     fs::{self, DirEntry, File},
     io::{ErrorKind, Write},
     net::{SocketAddr, TcpListener},
     path::{Path, PathBuf},
-    process::{Stdio, Command},
+    process::{Command, Stdio},
 };
+use tokio_tungstenite::{connect_async, tungstenite::Message};
 use toml::Value;
-use reqwest::blocking::Client;
-use serde_json::Value as JsonValue;
 
 pub const DB_DIR: &str = "helixdb-cfg/";
 
@@ -225,9 +225,9 @@ pub fn to_snake_case(s: &str) -> String {
 
 /// Generates a Content object from a vector of DirEntry objects
 /// Returns a Content object with the files and source
-/// 
+///
 /// This essentially makes a full string of all of the files while having a separate vector of the individual files
-/// 
+///
 /// This could be changed in the future but keeps the option open for being able to access the files separately or all at once
 pub fn generate_content(files: &Vec<DirEntry>) -> Result<Content, CliError> {
     let files: Vec<HxFile> = files
@@ -239,15 +239,19 @@ pub fn generate_content(files: &Vec<DirEntry>) -> Result<Content, CliError> {
         })
         .collect();
 
-    let content = files.clone().iter().map(|file| file.content.clone()).collect::<Vec<String>>().join("\n");
+    let content = files
+        .clone()
+        .iter()
+        .map(|file| file.content.clone())
+        .collect::<Vec<String>>()
+        .join("\n");
 
     Ok(Content {
         content,
         files,
-        source: Source::default()
+        source: Source::default(),
     })
 }
-
 
 /// Uses the helix parser to parse the content into a Source object
 fn parse_content(content: &Content) -> Result<Source, CliError> {
@@ -278,9 +282,9 @@ fn analyze_source(source: Source) -> Result<GeneratedSource, CliError> {
 
 /// Generates a Content and GeneratedSource object from a vector of DirEntry objects
 /// Returns a tuple of the Content and GeneratedSource objects
-/// 
+///
 /// This function is the main entry point for generating the Content and GeneratedSource objects
-/// 
+///
 /// It first generates the content from the files, then parses the content into a Source object, and then analyzes the source to catch errors and generate diagnostics if any.
 pub fn generate(files: &Vec<DirEntry>) -> Result<(Content, GeneratedSource), CliError> {
     let mut content = generate_content(&files)?;
@@ -388,9 +392,12 @@ pub fn get_n_helix_cli() -> Result<(), Box<dyn Error>> {
             "PATH",
             format!(
                 "{}:{}",
-                std::env::var("HOME").map(|h| format!("{}/.cargo/bin", h)).unwrap_or_default(),
+                std::env::var("HOME")
+                    .map(|h| format!("{}/.cargo/bin", h))
+                    .unwrap_or_default(),
                 std::env::var("PATH").unwrap_or_default()
-            ))
+            ),
+        )
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .status()?;
@@ -407,3 +414,42 @@ pub fn get_n_helix_cli() -> Result<(), Box<dyn Error>> {
 // Spinner::stop_with_message
 // Dots9 style
 
+pub async fn github_login() -> Result<String, Box<dyn Error>> {
+    // TODO: get control server
+    let url = "ws://127.0.0.1:3000/login";
+    let (mut ws_stream, _) = connect_async(url).await?;
+
+    let init_msg: UserCodeMsg = match ws_stream.next().await {
+        Some(Ok(Message::Text(payload))) => sonic_rs::from_str(&payload)?,
+        Some(Ok(m)) => return Err(format!("Unexpected message: {m:?}").into()),
+        Some(Err(e)) => return Err(e.into()),
+        None => return Err("Connection Closed Unexpectedly".into()),
+    };
+
+    println!(
+        "To Login please go \x1b]8;;{}\x1b\\here\x1b]8;;\x1b\\({}),\n and enter the code: {}",
+        init_msg.verification_uri,
+        init_msg.verification_uri,
+        init_msg.user_code.bold()
+    );
+
+    let msg: ApiKeyMsg = match ws_stream.next().await {
+        Some(Ok(Message::Text(payload))) => sonic_rs::from_str(&payload)?,
+        Some(Ok(m)) => return Err(format!("Unexpected message: {m:?}").into()),
+        Some(Err(e)) => return Err(e.into()),
+        None => return Err("Connection Closed Unexpectedly".into()),
+    };
+
+    Ok(msg.key)
+}
+
+#[derive(Deserialize)]
+struct UserCodeMsg {
+    user_code: String,
+    verification_uri: String,
+}
+
+#[derive(Deserialize)]
+struct ApiKeyMsg {
+    key: String,
+}

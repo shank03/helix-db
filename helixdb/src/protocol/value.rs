@@ -34,6 +34,7 @@ pub enum Value {
     Object(HashMap<String, Value>),
     Empty,
 }
+
 impl Value {
     pub fn to_string(&self) -> String {
         match self {
@@ -53,6 +54,7 @@ impl Value {
             _ => panic!("Not primitive"),
         }
     }
+
     pub fn as_str(&self) -> &str {
         match self {
             Value::String(s) => s.as_str(),
@@ -169,7 +171,6 @@ impl PartialOrd<f64> for Value {
         }
     }
 }
-
 
 /// Custom serialisation implementation for Value that removes enum variant names in JSON
 /// whilst preserving them for binary formats like bincode.

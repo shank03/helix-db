@@ -74,6 +74,12 @@ pub enum CommandType {
 
     /// Get the current version of the cli and db
     Version(VersionCommand),
+
+    /// Check login credentials or login with github
+    Login,
+
+    /// Remove login credentials
+    Logout,
 }
 
 #[derive(Debug, Args)]

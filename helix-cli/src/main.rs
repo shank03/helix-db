@@ -1344,37 +1344,49 @@ fi
             }
         }
 
-        // CommandType::Login(_) => {
-        //     println!("{}", "Logging in to helix".green().bold());
+        CommandType::Login => {
+            println!("{}", "Logging in to helix".green().bold());
 
-        //     // read config from  ~/.helix/credentials
-        //     // in the format:
-        //     // helix_user_id=<user_id>
-        //     // helis_user_key=<user_key>
+            // read config from  ~/.helix/credentials
+            // in the format:
+            // helix_user_id=<user_id>
+            // helis_user_key=<user_key>
 
-        //     let config_path = Path::new("~/.helix/credentials");
-        //     if !config_path.exists() {
-        //         println!("{}", "No credentials found".red().bold());
-        //         return;
-        //     }
+            let config_path = Path::new("~/.helix/credentials");
+            if !config_path.exists() {
+                println!("{}", "No credentials found".red().bold());
+                return;
+            }
 
-        //     let config = match fs::read_to_string(config_path) {
-        //         Ok(config) => config,
-        //         Err(e) => {
-        //             println!("{}", "No credentials found".yellow().bold());
-        //             println!("{}", "Logging in with GitHub".yellow().bold());
-        //             return;
-        //         }
-        //     };
-        //     let user_id = config.split("helix_user_id=").nth(1).unwrap().split("\n").nth(0).unwrap();
-        //     let user_key = config.split("helis_user_key=").nth(1).unwrap().split("\n").nth(0).unwrap();
+            let config = match fs::read_to_string(config_path) {
+                Ok(config) => config,
+                Err(e) => {
+                    println!("{}", "No credentials found".yellow().bold());
+                    println!("{}", "Logging in with GitHub".yellow().bold());
+                    return;
+                }
+            };
+            let user_id = config
+                .split("helix_user_id=")
+                .nth(1)
+                .unwrap()
+                .split("\n")
+                .nth(0)
+                .unwrap();
+            let user_key = config
+                .split("helis_user_key=")
+                .nth(1)
+                .unwrap()
+                .split("\n")
+                .nth(0)
+                .unwrap();
 
-        //     println!("{}", "User ID:".green().bold());
-        //     println!("{}", user_id.green().bold());
-        //     println!("{}", "User Key:".green().bold());
-        //     println!("{}", user_key.green().bold());
-
-        // }
+            println!("{}", "User ID:".green().bold());
+            println!("{}", user_id.green().bold());
+            println!("{}", "User Key:".green().bold());
+            println!("{}", user_key.green().bold());
+        }
+        CommandType::Logout => {}
         CommandType::Config(_) => {
             println!("{}", "Please enter your Helix user ID:".green().bold());
             let mut input = String::new();
