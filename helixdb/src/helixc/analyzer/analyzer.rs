@@ -296,20 +296,23 @@ impl<'a> Ctx<'a> {
 
             assert!(stmt.is_some(), "RETURN value should be a valid expression");
             match stmt.unwrap() {
-                GeneratedStatement::Traversal(traversal) => match &traversal.source_step.inner() {
-                    SourceStep::Identifier(v) => {
-                        self.is_valid_identifier(q, ret.loc.clone(), v.inner().as_str());
-                        query.return_values.push(ReturnValue::new_named(
-                            v.clone(),
-                            ReturnValueExpr::Traversal(traversal.clone()),
-                        ));
+                GeneratedStatement::Traversal(mut traversal) => {
+                    traversal.should_collect = ShouldCollect::ToVec;
+                    match &traversal.source_step.inner() {
+                        SourceStep::Identifier(v) => {
+                            self.is_valid_identifier(q, ret.loc.clone(), v.inner().as_str());
+                            query.return_values.push(ReturnValue::new_named(
+                                v.clone(),
+                                ReturnValueExpr::Traversal(traversal.clone()),
+                            ));
+                        }
+                        _ => {
+                            query.return_values.push(ReturnValue::new_unnamed(
+                                ReturnValueExpr::Traversal(traversal.clone()),
+                            ));
+                        }
                     }
-                    _ => {
-                        query.return_values.push(ReturnValue::new_unnamed(
-                            ReturnValueExpr::Traversal(traversal.clone()),
-                        ));
-                    }
-                },
+                }
                 GeneratedStatement::Identifier(id) => {
                     self.is_valid_identifier(q, ret.loc.clone(), id.inner().as_str());
                     let identifier_end_type = match scope.get(id.inner().as_str()) {
