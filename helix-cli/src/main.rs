@@ -618,11 +618,14 @@ fi
                     "version": "0.1.0",
                     "helix_config": config.to_json()
                 });
+                println!("{:#?}", payload);
                 let client = reqwest::Client::new();
+                println!("{}", user_key);
+                println!("{}", &command.instance);
                 match client
-                    .post("https://api.helix-db.com/helix/api/deploy-queries")
-                    .header("X-Api-Key", user_key) // used to verify user
-                    .header("X-Instance-Id", &command.instance) // used to verify instance with user
+                    .post("http://ec2-184-72-27-116.us-west-1.compute.amazonaws.com:3000/clusters/deploy-queries")
+                    .header("x-api-key", user_key) // used to verify user
+                    .header("x-instance-id", &command.instance) // used to verify instance with user
                     .header("Content-Type", "application/json")
                     .body(sonic_rs::to_string(&payload).unwrap())
                     .send()
