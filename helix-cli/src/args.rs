@@ -35,6 +35,9 @@ pub enum CommandType {
     /// Compile a Helix project
     Compile(CompileCommand),
 
+    /// Configure Helix Credentials
+    Config(ConfigCommand),
+
     /// Lint a Helix project
     Check(LintCommand),
 
@@ -62,6 +65,9 @@ pub enum CommandType {
 
     /// Give an instance a short description
     Label(LabelCommand),
+
+    /// Login to helix
+    // Login(LoginCommand),
 
     /// Save an instnaces data.mdb file
     Save(SaveCommand),
@@ -108,6 +114,9 @@ pub struct RedeployCommand {
 
     #[clap(short, long, help = "The path to the project")]
     pub path: Option<String>,
+
+    #[clap(short, long, help = "Remote cluster ID")]
+    pub remote: bool,
 }
 
 #[derive(Debug, Args)]
@@ -140,6 +149,8 @@ pub struct LintCommand {
 pub struct InstallCommand {
     #[clap(help = "Install HelixDb on the development(considered unstable) branch")]
     pub dev: bool,
+    #[clap(short, long, help = "The path to the project")]
+    pub path: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -248,6 +259,14 @@ pub struct DeleteCommand {
     #[clap(help = "Instance ID to delete")]
     pub instance: String,
 }
+
+// #[derive(Debug, Args)]
+// #[clap(name = "login", about = "Login to helix")]
+// pub struct LoginCommand {}
+
+#[derive(Debug, Args)]
+#[clap(name = "config", about = "Configure Helix Credentials")]
+pub struct ConfigCommand {}
 
 #[derive(Debug, Subcommand, Clone, ValueEnum)]
 #[clap(name = "output")]

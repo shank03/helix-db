@@ -25,7 +25,7 @@ use crate::{
                 ShortestPath as GeneratedShortestPath, ShouldCollect, Step as GeneratedStep,
                 Traversal as GeneratedTraversal, TraversalType, Where, WhereExists, WhereRef,
             },
-            utils::{GenRef, GeneratedValue, Order, Separator},
+            utils::{GenRef, GeneratedValue, Order, Separator, VecData},
         },
         parser::{helix_parser::*, location::Loc},
     },
@@ -1002,18 +1002,31 @@ impl<'a> Ctx<'a> {
                     };
                     if let Some(vec_data) = &add.data {
                         let vec = match vec_data {
-                            VectorData::Vector(v) => GeneratedValue::Literal(GenRef::Ref(format!(
-                                "[{}]",
-                                v.iter()
-                                    .map(|f| f.to_string())
-                                    .collect::<Vec<String>>()
-                                    .join(",")
-                            ))),
+                            VectorData::Vector(v) => {
+                                VecData::Standard(GeneratedValue::Literal(GenRef::Ref(format!(
+                                    "[{}]",
+                                    v.iter()
+                                        .map(|f| f.to_string())
+                                        .collect::<Vec<String>>()
+                                        .join(",")
+                                ))))
+                            }
                             VectorData::Identifier(i) => {
                                 self.is_valid_identifier(q, add.loc.clone(), i.as_str());
                                 // TODO: if in params then do data.i else i
-                                GeneratedValue::Identifier(GenRef::Ref(format!("data.{}", i)))
+                                VecData::Standard(GeneratedValue::Identifier(GenRef::Ref(format!(
+                                    "data.{}",
+                                    i
+                                ))))
                             }
+                            VectorData::Embed(e) => match &e.value {
+                                EvaluatesToString::Identifier(i) => VecData::Embed(
+                                    GeneratedValue::Identifier(GenRef::Ref(format!("data.{}", i))),
+                                ),
+                                EvaluatesToString::StringLiteral(s) => {
+                                    VecData::Embed(GeneratedValue::Literal(GenRef::Ref(s.clone())))
+                                }
+                            },
                         };
                         let add_v = AddV {
                             vec,
@@ -3176,23 +3189,27 @@ impl<'a> Ctx<'a> {
                     }
                 }
                 let vec = match &sv.data {
-                    Some(VectorData::Vector(v)) => GeneratedValue::Literal(GenRef::Ref(format!(
-                        "[{}]",
-                        v.iter()
-                            .map(|f| f.to_string())
-                            .collect::<Vec<String>>()
-                            .join(",")
-                    ))),
+                    Some(VectorData::Vector(v)) => {
+                        VecData::Standard(GeneratedValue::Literal(GenRef::Ref(format!(
+                            "[{}]",
+                            v.iter()
+                                .map(|f| f.to_string())
+                                .collect::<Vec<String>>()
+                                .join(",")
+                        ))))
+                    }
                     Some(VectorData::Identifier(i)) => {
                         self.is_valid_identifier(q, sv.loc.clone(), i.as_str());
                         // if is in params then use data.
                         if let Some(_) = q.parameters.iter().find(|p| p.name.1 == *i) {
-                            GeneratedValue::Identifier(GenRef::Ref(format!(
+                            VecData::Standard(GeneratedValue::Identifier(GenRef::Ref(format!(
                                 "data.{}",
                                 i.to_string()
-                            )))
+                            ))))
                         } else if let Some(_) = scope.get(i.as_str()) {
-                            GeneratedValue::Identifier(GenRef::Ref(i.to_string()))
+                            VecData::Standard(GeneratedValue::Identifier(GenRef::Ref(
+                                i.to_string(),
+                            )))
                         } else {
                             self.push_query_err(
                                 q,
@@ -3200,9 +3217,17 @@ impl<'a> Ctx<'a> {
                                 format!("variable named `{}` is not in scope", i),
                                 "declare {} in the current scope or fix the typo",
                             );
-                            GeneratedValue::Unknown
+                            VecData::Standard(GeneratedValue::Unknown)
                         }
                     }
+                    Some(VectorData::Embed(e)) => match &e.value {
+                        EvaluatesToString::Identifier(i) => {
+                            VecData::Embed(self.gen_identifier_or_param(q, &i, true))
+                        }
+                        EvaluatesToString::StringLiteral(s) => {
+                            VecData::Embed(GeneratedValue::Literal(GenRef::Ref(s.clone())))
+                        }
+                    },
                     _ => {
                         self.push_query_err(
                             q,
@@ -3210,7 +3235,7 @@ impl<'a> Ctx<'a> {
                             "`SearchVector` must have a vector data".to_string(),
                             "add a vector data",
                         );
-                        GeneratedValue::Unknown
+                        VecData::Standard(GeneratedValue::Unknown)
                     }
                 };
                 let k = match &sv.k {
@@ -4243,18 +4268,26 @@ impl<'a> Ctx<'a> {
                     };
                     if let Some(vec_data) = &add.data {
                         let vec = match vec_data {
-                            VectorData::Vector(v) => GeneratedValue::Literal(GenRef::Ref(format!(
-                                "[{}]",
-                                v.iter()
-                                    .map(|f| f.to_string())
-                                    .collect::<Vec<String>>()
-                                    .join(",")
-                            ))),
-                            VectorData::Identifier(i) => {
-                                self.is_valid_identifier(q, add.loc.clone(), i.as_str());
-                                // TODO: if in params then do data.i else i
-                                GeneratedValue::Identifier(GenRef::Ref(format!("data.{}", i)))
+                            VectorData::Vector(v) => {
+                                VecData::Standard(GeneratedValue::Literal(GenRef::Ref(format!(
+                                    "[{}]",
+                                    v.iter()
+                                        .map(|f| f.to_string())
+                                        .collect::<Vec<String>>()
+                                        .join(",")
+                                ))))
                             }
+                            VectorData::Identifier(i) => {
+                                VecData::Standard(self.gen_identifier_or_param(q, &i, true))
+                            }
+                            VectorData::Embed(e) => match &e.value {
+                                EvaluatesToString::Identifier(i) => {
+                                    VecData::Embed(self.gen_identifier_or_param(q, &i, true))
+                                }
+                                EvaluatesToString::StringLiteral(s) => {
+                                    VecData::Embed(GeneratedValue::Literal(GenRef::Ref(s.clone())))
+                                }
+                            },
                         };
                         let add_v = AddV {
                             vec,

@@ -109,6 +109,23 @@ impl From<IdType> for GenRef<String> {
 }
 
 #[derive(Clone)]
+pub enum VecData {
+    Standard(GeneratedValue),
+    Embed(GeneratedValue),
+    Unknown,
+}
+
+impl Display for VecData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            VecData::Standard(v) => write!(f, "{}", v),
+            VecData::Embed(v) => write!(f, "&embed!({})", v),
+            VecData::Unknown => panic!("Cannot convert to string, VecData is unknown"),
+        }
+    }
+}
+
+#[derive(Clone)]
 pub enum Order {
     Asc,
     Desc,
@@ -300,7 +317,7 @@ pub fn write_headers() -> String {
 
 use heed3::RoTxn;
 use get_routes::handler;
-use helixdb::{field_remapping, identifier_remapping, traversal_remapping, exclude_field, value_remapping};
+use helixdb::{field_remapping, identifier_remapping, traversal_remapping, exclude_field, value_remapping, embed};
 use helixdb::helix_engine::vector_core::vector::HVector;
 use helixdb::{
     helix_engine::graph_core::ops::{
@@ -335,6 +352,7 @@ use helixdb::{
     protocol::{
         filterable::Filterable, remapping::Remapping, return_values::ReturnValue, value::Value, id::ID,
     },
+    providers::embedding_providers::get_embedding_model,
 };
 use sonic_rs::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};

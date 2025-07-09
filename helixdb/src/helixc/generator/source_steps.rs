@@ -1,7 +1,7 @@
 use core::fmt;
 use std::fmt::Display;
 
-use crate::helixc::generator::utils::{write_properties, write_secondary_indices};
+use crate::helixc::generator::utils::{write_properties, write_secondary_indices, VecData};
 
 use super::{
     generator_types::BoExp,
@@ -66,7 +66,7 @@ impl Display for AddE {
 }
 #[derive(Clone)]
 pub struct AddV {
-    pub vec: GeneratedValue,
+    pub vec: VecData,
     pub label: GenRef<String>,
     pub properties: Option<Vec<(String, GeneratedValue)>>,
 }
@@ -85,7 +85,7 @@ impl Display for AddV {
 /// where F: Fn(&HVector) -> bool;
 #[derive(Clone)]
 pub struct SearchV {
-    pub vec: GeneratedValue,
+    pub vec: VecData,
     pub properties: Option<Vec<(String, GeneratedValue)>>,
     pub f: Vec<BoExp>,
 }

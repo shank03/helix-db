@@ -1,5 +1,9 @@
 use crate::helix_engine::{types::VectorError, vector_core::vector::HVector};
 
+pub const MAX_DISTANCE: f64 = 2.0;
+pub const ORTHOGONAL: f64 = 1.0;
+pub const MIN_DISTANCE: f64 = 0.0;
+
 pub trait DistanceCalc {
     fn distance(from: &HVector, to: &HVector) -> Result<f64, VectorError>;
 }
@@ -73,6 +77,10 @@ pub fn cosine_similarity(from: &[f64], to: &[f64]) -> Result<f64, VectorError> {
         dot_product += a_val * b_val;
         magnitude_a += a_val * a_val;
         magnitude_b += b_val * b_val;
+    }
+
+    if magnitude_a.abs() == 0.0 || magnitude_b.abs() == 0.0 {
+        return Ok(-1.0);
     }
 
     Ok(dot_product / (magnitude_a.sqrt() * magnitude_b.sqrt()))

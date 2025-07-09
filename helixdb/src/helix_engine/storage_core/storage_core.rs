@@ -134,7 +134,9 @@ impl HelixGraphStorage {
                 config.vector_config.ef_search,
             ),
         )?;
+
         let bm25 = HBM25Config::new(&graph_env, &mut wtxn)?;
+        let schema = config.schema.unwrap_or("".to_string());
 
         wtxn.commit()?;
         Ok(Self {
@@ -146,7 +148,7 @@ impl HelixGraphStorage {
             secondary_indices,
             vectors,
             bm25,
-            schema: config.schema.unwrap_or("".to_string()),
+            schema,
         })
     }
 
@@ -513,4 +515,6 @@ impl StorageMethods for HelixGraphStorage {
 
         Ok(())
     }
+
 }
+
