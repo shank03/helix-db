@@ -26,6 +26,7 @@ itertools = "0.14.0"
 proc_macros = { version = "0.1.0", path = "../proc_macros" }
 tempfile = "3.20.0"
 reqwest = { version = "0.12.15", features = [ "json", "blocking"] }
+url = "2.5"
 
 # Compiler
 pest = { version = "2.7", optional = true }
