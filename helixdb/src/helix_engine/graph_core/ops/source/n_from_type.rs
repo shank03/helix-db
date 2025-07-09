@@ -5,7 +5,7 @@ use crate::{
     },
     protocol::items::Node,
 };
-use debug_trace::debug_trace;
+use proc_macros::debug_trace;
 use heed3::{
     byteorder::BE,
     types::{Bytes, U128},
@@ -51,7 +51,7 @@ pub trait NFromTypeAdapter<'a>: Iterator<Item = Result<TraversalVal, GraphError>
 }
 impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> NFromTypeAdapter<'a>
     for RoTraversalIterator<'a, I>
-{   
+{
     #[inline]
     fn n_from_type(
         self,

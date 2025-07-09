@@ -1,9 +1,10 @@
-// TODO: do this all in a seperate crate?
-
 use crate::helix_engine::types::GraphError;
 use reqwest::blocking::Client;
 use serde_json::json;
 use std::env;
+
+// TODO: add support for rust native embedding model libs as well so it runs fully built in
+//      in case we have a gpu or something on the server we're running it on
 
 pub trait EmbeddingModel {
     fn fetch_embedding(&self, text: &str) -> Result<Vec<f64>, GraphError>;

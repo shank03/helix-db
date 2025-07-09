@@ -1269,15 +1269,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "debug_trace"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.104",
-]
-
-[[package]]
 name = "der"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1701,15 +1692,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "get_routes"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.104",
-]
-
-[[package]]
 name = "getrandom"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1957,10 +1939,10 @@ dependencies = [
  "async-trait",
  "chrono",
  "dirs 5.0.1",
- "get_routes",
  "heed3",
  "helixdb",
  "inventory",
+ "proc_macros",
  "rand 0.9.1",
  "serde",
  "serde_json",
@@ -1975,10 +1957,8 @@ version = "1.0.105"
 dependencies = [
  "bincode",
  "chrono",
- "debug_trace",
  "dirs 6.0.0",
  "flume",
- "get_routes",
  "heed3",
  "inventory",
  "itertools 0.14.0",
@@ -1990,6 +1970,7 @@ dependencies = [
  "pgvector",
  "polars",
  "postgres-native-tls",
+ "proc_macros",
  "rand 0.9.1",
  "rayon",
  "reqwest",
@@ -3732,6 +3713,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "02b3e5e68a3a1a02aad3ec490a98007cbc13c37cbe84a3cd7b8e406d76e7f778"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "proc_macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.104",
 ]
 
 [[package]]

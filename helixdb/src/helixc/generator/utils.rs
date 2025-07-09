@@ -316,7 +316,7 @@ pub fn write_headers() -> String {
     r#"
 
 use heed3::RoTxn;
-use get_routes::handler;
+use proc_macros::handler;
 use helixdb::{field_remapping, identifier_remapping, traversal_remapping, exclude_field, value_remapping, embed};
 use helixdb::helix_engine::vector_core::vector::HVector;
 use helixdb::{

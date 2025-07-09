@@ -237,6 +237,7 @@ impl HelixGraphStorage {
     }
 
     // TODO: limit to 300 nodes
+    // TODO: use .into_iter()
 
     /// Returns edges and nodes in a specific json format such that it can be visualized
     ///     strictly in this format (write you're own parser if you want it in a diff
@@ -255,46 +256,27 @@ impl HelixGraphStorage {
             return Err(GraphError::New("edges or nodes db is empty!".to_string()));
         }
 
-        let (mut missing_nodes, mut missing_edges, mut nodes, mut edges): (
-            usize,
-            usize,
-            Vec<Value>,
-            Vec<Value>,
-        ) = (0, 0, vec![], vec![]);
+        let mut nodes = vec![];
+        let mut edges = vec![];
 
         for node in self.nodes_db.iter(&txn)? {
             let (node_id, node_data) = node?;
             let node = Node::decode_node(node_data, node_id)?;
             let mut json_node = json!({"id": node_id.to_string()});
 
-            match show_node_properties {
-                Some(ref snp) => {
-                    match node.properties.as_ref() {
-                        Some(node_props) => {
-                            if node_props.contains_key(snp) {
-                                if let Some(obj) = json_node.as_object_mut() {
-                                    // TODO: no unwrap here to avoid fatal crash
-                                    let value = node_props.get(snp).unwrap();
-                                    obj.insert("label".to_string(), json!(value.to_string()));
-                                } else {
-                                    println!("failed to get properties for node {}", node_id);
-                                    missing_nodes += 1;
-                                    continue;
-                                }
-                            } else {
-                                println!("failed to get properties for node {}", node_id);
-                                missing_nodes += 1;
-                                continue;
-                            }
-                        }
-                        None => {
-                            println!("failed to get properties for node {}", node_id);
-                            missing_nodes += 1;
-                            continue;
-                        }
-                    }
-                }
-                None => {}
+            if let Some(snp) = &show_node_properties {
+                let props = node.properties.as_ref().ok_or_else(|| {
+                    debug_println!("No properties for node {}", node_id);
+                    GraphError::New(format!("No properties for node {}", node_id))
+                })?;
+                let value = props.get(snp).ok_or_else(|| {
+                    debug_println!("Property {} not found for node {}", snp, node_id);
+                    GraphError::New(format!("Property {} not found for node {}", snp, node_id))
+                })?;
+                json_node
+                    .as_object_mut()
+                    .ok_or_else(|| GraphError::New("Invalid JSON object".to_string()))?
+                    .insert("label".to_string(), json!(value.to_string()));
             }
 
             debug_println!("{:?}", json_node);
@@ -309,34 +291,19 @@ impl HelixGraphStorage {
                 "to": edge.to_node.to_string(),
             });
 
-            match show_edge_properties {
-                Some(ref sep) => {
-                    match edge.properties.as_ref() {
-                        Some(edge_props) => {
-                            if edge_props.contains_key(sep) {
-                                if let Some(obj) = json_edge.as_object_mut() {
-                                    // TODO: no unwrap here to avoid fatal crash
-                                    let value = edge_props.get(sep).unwrap();
-                                    obj.insert("label".to_string(), json!(value.to_string()));
-                                } else {
-                                    println!("failed to get properties for edge {}", edge_id);
-                                    missing_edges += 1;
-                                    continue;
-                                }
-                            } else {
-                                println!("failed to get properties for edge {}", edge_id);
-                                missing_edges += 1;
-                                continue;
-                            }
-                        }
-                        None => {
-                            println!("failed to get properties for edge {}", edge_id);
-                            missing_edges += 1;
-                            continue;
-                        }
-                    }
-                }
-                None => {}
+            if let Some(sep) = &show_edge_properties {
+                let props = edge.properties.as_ref().ok_or_else(|| {
+                    debug_println!("No properties for edge {}", edge_id);
+                    GraphError::New(format!("No properties for edge {}", edge_id))
+                })?;
+                let value = props.get(sep).ok_or_else(|| {
+                    debug_println!("Property {} not found for edge {}", sep, edge_id);
+                    GraphError::New(format!("Property {} not found for edge {}", sep, edge_id))
+                })?;
+                json_edge
+                    .as_object_mut()
+                    .ok_or_else(|| GraphError::New("Invalid JSON object".to_string()))?
+                    .insert("label".to_string(), json!(value.to_string()));
             }
 
             debug_println!("{:?}", json_edge);
@@ -347,13 +314,6 @@ impl HelixGraphStorage {
             "nodes": nodes,
             "edges": edges,
         });
-
-        if missing_edges != 0 || missing_nodes != 0 {
-            println!(
-                "failed to get {} nodes and {} edges",
-                missing_nodes, missing_edges
-            );
-        }
 
         serde_json::to_string(&result).map_err(|e| GraphError::New(e.to_string()))
     }

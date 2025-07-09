@@ -23,9 +23,8 @@ chrono = "0.4.39"
 flume = "0.11.1"
 rayon = "1.8.0"
 itertools = "0.14.0"
-get_routes = { version = "0.1.0", path = "../get_routes" }
+proc_macros = { version = "0.1.0", path = "../proc_macros" }
 tempfile = "3.20.0"
-debug_trace = { version = "0.1.0", path = "../debug_trace" }
 reqwest = { version = "0.12.15", features = [ "json", "blocking"] }
 
 # Compiler
@@ -50,7 +49,7 @@ polars = { version = "0.46.0", features = ["parquet", "lazy", "json"] }
 kdam = "0.3"
 
 [features]
-debug-output = ["debug_trace/debug-output"]
+debug-output = ["proc_macros/debug-output"]
 compiler = ["pest", "pest_derive"]
 
 # vector features
@@ -67,7 +66,7 @@ ingestion = [
     "rust_decimal",
 ]
 build = ["compiler"]
-vectors = ["cosine", "embed_local"]
+vectors = ["cosine", "embed_openai"]
 server = ["build", "compiler", "vectors"]
 full = ["build", "compiler", "ingestion", "vectors"]
 dev = ["debug-output", "server"]

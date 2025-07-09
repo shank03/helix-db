@@ -1,4 +1,4 @@
-use get_routes::get_handler;
+use proc_macros::get_handler;
 use helixdb::{
     helix_engine::types::GraphError, helix_gateway::router::router::HandlerInput,
     protocol::response::Response,
