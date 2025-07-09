@@ -7,6 +7,7 @@ members = [
     "helix-cli",
     "hbuild",
     "hbuild_redploy",
+    "query-container",
 ]
 resolver = "2"
 
@@ -23,4 +24,4 @@ opt-level = 0
 codegen-units = 256
 incremental = true
 panic = "abort"
-debug = 1           
+debug = 1

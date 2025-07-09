@@ -60,8 +60,7 @@ async fn main() {
             .map(|submission| {
                 println!("Processing submission for handler: {}", submission.0.name);
                 let handler = &submission.0;
-                let func: HandlerFn =
-                    Arc::new(move |input, response| (handler.func)(input, response));
+                let func: HandlerFn = Arc::new(handler.func);
                 (
                     (
                         "post".to_ascii_uppercase().to_string(),
@@ -111,4 +110,3 @@ async fn main() {
     let a = gateway.connection_handler.accept_conns().await.unwrap();
     let _b = a.await.unwrap();
 }
-

@@ -835,9 +835,9 @@ dependencies = [
 
 [[package]]
 name = "bumpalo"
-version = "3.17.0"
+version = "3.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1628fb46dfa0b37568d12e5edd512553eccf6a22a78e8bde00bb4aed84d5bdbf"
+checksum = "46c5e41b57b8bba42a04676d81cb89e9ee8e859a1a66f80a5a72e1cb76b34d43"
 
 [[package]]
 name = "bytecheck"
@@ -1983,6 +1983,7 @@ dependencies = [
  "itertools 0.14.0",
  "kdam",
  "lazy_static",
+ "libloading",
  "native-tls",
  "pest",
  "pest_derive",
@@ -2536,12 +2537,12 @@ checksum = "d750af042f7ef4f724306de029d18836c26c1765a54a6a3f094cbd23a7267ffa"
 
 [[package]]
 name = "libloading"
-version = "0.8.6"
+version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc2f4eb4bc735547cfed7c0a4922cbd04a4655978c09b54f1f7b228750664c34"
+checksum = "07033963ba89ebaf1584d767badaa2e8fcec21aedea6b8c0346d487d49c28667"
 dependencies = [
  "cfg-if",
- "windows-targets 0.52.6",
+ "windows-targets 0.53.0",
 ]
 
 [[package]]
@@ -3783,6 +3784,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "query-container"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "dirs 5.0.1",
+ "get_routes",
+ "heed3",
+ "helixdb",
+ "inventory",
+ "rand 0.9.1",
+ "serde",
+ "serde_json",
+ "sonic-rs",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "quote"
 version = "1.0.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4622,9 +4641,9 @@ dependencies = [
 
 [[package]]
 name = "sonic-rs"
-version = "0.5.1"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93070f7e7c0d7ec7d08406b1b407234af30420320fd854f304029e3c6db4a899"
+checksum = "7be54789747a46a8b1eb7b2c9cb0879cd7559a5f71bfff950868369f6868b9ad"
 dependencies = [
  "ahash 0.8.11",
  "bumpalo",

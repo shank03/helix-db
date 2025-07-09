@@ -9,7 +9,10 @@
 
 use crate::{
     helix_engine::{graph_core::graph_core::HelixGraphEngine, types::GraphError},
-    helix_gateway::mcp::mcp::{MCPHandlerFn, MCPToolInput},
+    helix_gateway::{
+        mcp::mcp::{MCPHandlerFn, MCPToolInput},
+        router::QueryHandler,
+    },
 };
 use core::fmt;
 use std::{collections::HashMap, sync::Arc};
@@ -25,8 +28,7 @@ pub struct HandlerInput {
 pub type BasicHandlerFn = fn(&HandlerInput, &mut Response) -> Result<(), GraphError>;
 
 // thread safe type for multi threaded use
-pub type HandlerFn =
-    Arc<dyn Fn(&HandlerInput, &mut Response) -> Result<(), GraphError> + Send + Sync>;
+pub type HandlerFn = Arc<dyn QueryHandler + Send + Sync>;
 
 #[derive(Clone, Debug)]
 pub struct HandlerSubmission(pub Handler);
@@ -75,9 +77,9 @@ impl HelixRouter {
     }
 
     /// Add a route to the router
-    pub fn add_route(&mut self, method: &str, path: &str, handler: BasicHandlerFn) {
+    pub fn add_route(&mut self, method: &str, path: &str, handler: HandlerFn) {
         self.routes
-            .insert((method.to_uppercase(), path.to_string()), Arc::new(handler));
+            .insert((method.to_uppercase(), path.to_string()), handler);
     }
 
     /// Handle a request by finding the appropriate handler and executing it
@@ -105,7 +107,7 @@ impl HelixRouter {
                 request,
                 graph: Arc::clone(&graph_access),
             };
-            return handler(&input, response);
+            return handler.handle(&input, response);
         }
 
         if let Some(mcp_handler) = self.mcp_routes.get(&route_key) {

@@ -1,0 +1,62 @@
+use libloading::{self, Library, Symbol};
+use std::{error::Error, ops::Deref, path::PathBuf, sync::Arc};
+
+use crate::{
+    helix_engine::types::GraphError,
+    helix_gateway::router::{
+        router::{HandlerInput, HelixRouter},
+        QueryHandler,
+    },
+    protocol::response::Response,
+};
+
+#[derive(Clone)]
+pub struct DynHandler {
+    // holding this guarentees that the Symbol is still valid
+    _source: Arc<Library>,
+    func: extern "Rust" fn(&HandlerInput, &mut Response) -> Result<(), GraphError>,
+}
+
+impl QueryHandler for DynHandler {
+    fn handle(&self, input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
+        (self.func)(input, response)
+    }
+}
+
+// impl QueryHandler for DynHandler {
+//     fn handle(&self, input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
+//         self.func.
+//     }
+// }
+
+type DynQueryFn = extern "Rust" fn(&HandlerInput, &mut Response) -> Result<(), GraphError>;
+type GetQueryFn = extern "Rust" fn() -> Vec<(String, DynQueryFn)>;
+
+struct Plugin {
+    lib: Arc<Library>,
+}
+
+impl Plugin {
+    /// SAFETY: This must be called with a path to Helix query dynamic library, compiled with the same version of Rust as the main database
+    unsafe fn open(lib_path: PathBuf) -> Result<Self, Box<dyn Error>> {
+        let lib = Library::new(lib_path)?;
+        Ok(Plugin { lib: Arc::new(lib) })
+    }
+
+    fn add_queries(&self, router: &mut HelixRouter) -> Result<(), Box<dyn Error>> {
+        // SAFETY: If a valid file was opened it will have a get_queries function of this type
+        let get_fn: Symbol<GetQueryFn> = unsafe { self.lib.get(b"get_queries")? };
+
+        let queries = get_fn();
+
+        for (name, func) in queries {
+            let handler = DynHandler {
+                _source: self.lib.clone(),
+                func,
+            };
+            router.add_route("post", &format!("/{name}"), Arc::new(handler));
+        }
+
+        todo!()
+    }
+}

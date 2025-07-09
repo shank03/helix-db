@@ -288,6 +288,8 @@ fi
                 }
             }
 
+            println!("\n\n{generated_rust_code}\n\n");
+
             match fs::write(file_path, generated_rust_code) {
                 Ok(_) => {
                     println!("{}", "Successfully wrote queries file".green().bold());
