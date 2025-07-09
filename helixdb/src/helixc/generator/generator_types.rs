@@ -456,7 +456,7 @@ impl Display for BoExp {
                     .collect::<Vec<_>>();
                 write!(f, "{}", tr.join(" || "))
             }
-            BoExp::Exists(traversal) => write!(f, "{}", traversal),
+            BoExp::Exists(traversal) => write!(f, "Exist::exists(&mut {})", traversal),
             BoExp::Expr(traversal) => write!(f, "{}", traversal),
         }
     }

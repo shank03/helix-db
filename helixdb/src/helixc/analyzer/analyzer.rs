@@ -1275,7 +1275,16 @@ impl<'a> Ctx<'a> {
                         );
 
                         match stmt.unwrap() {
-                            GeneratedStatement::BoExp(expr) => expr,
+                            GeneratedStatement::BoExp(expr) => {
+                                match expr {
+                                    BoExp::Exists(mut tr) => {
+                                        // keep as iterator 
+                                        tr.should_collect = ShouldCollect::No;
+                                        BoExp::Exists(tr)
+                                    }
+                                    _ => expr,
+                                }
+                            }
                             GeneratedStatement::Traversal(tr) => BoExp::Expr(tr),
                             _ => unreachable!(),
                         }
@@ -1297,7 +1306,15 @@ impl<'a> Ctx<'a> {
                             "incorrect stmt should've been caught by `infer_expr_type`"
                         );
                         match stmt.unwrap() {
-                            GeneratedStatement::BoExp(expr) => expr,
+                            GeneratedStatement::BoExp(expr) => {
+                                match expr {
+                                    BoExp::Exists(mut tr) => {
+                                        tr.should_collect = ShouldCollect::No;
+                                        BoExp::Exists(tr)
+                                    }
+                                    _ => expr,
+                                }
+                            }
                             GeneratedStatement::Traversal(tr) => BoExp::Expr(tr),
                             _ => unreachable!(),
                         }
@@ -1795,6 +1812,7 @@ impl<'a> Ctx<'a> {
                     let stmt = stmt.unwrap();
                     match stmt {
                         GeneratedStatement::Traversal(tr) => {
+                            println!("TRAVERSAL");
                             gen_traversal
                                 .steps
                                 .push(Separator::Period(GeneratedStep::Where(Where::Ref(
@@ -1804,6 +1822,7 @@ impl<'a> Ctx<'a> {
                                 ))));
                         }
                         GeneratedStatement::BoExp(expr) => {
+                            println!("BOEXP");
                             gen_traversal
                                 .steps
                                 .push(Separator::Period(GeneratedStep::Where(match expr {
@@ -2934,6 +2953,7 @@ impl<'a> Ctx<'a> {
                         }
                     }
                     None => {
+                        // TODO: throw error
                         unreachable!() // throw error
                     }
                 };
@@ -4502,7 +4522,10 @@ impl<'a> Ctx<'a> {
                                 gen_traversal
                                     .steps
                                     .push(Separator::Period(GeneratedStep::Where(match expr {
-                                        BoExp::Exists(tr) => Where::Exists(WhereExists { tr }),
+                                        BoExp::Exists(mut tr) => {
+                                            tr.should_collect = ShouldCollect::No;
+                                            Where::Exists(WhereExists { tr })
+                                        }
                                         _ => Where::Ref(WhereRef { expr }),
                                     })));
                             }
