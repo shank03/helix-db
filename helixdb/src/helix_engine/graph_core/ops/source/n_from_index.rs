@@ -79,7 +79,6 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>, K: Into<Value> + 
                 index
             )))
             .unwrap();
-        println!("DB: {:?}", self.storage.secondary_indices);
         let res = db
             .lazily_decode_data()
             .prefix_iter(self.txn, &bincode::serialize(&Value::from(key)).unwrap())
