@@ -351,7 +351,7 @@ impl<'a> Ctx<'a> {
                                 value,
                             ));
                         }
-                        Type::Node(_) | Type::Vector(_) | Type::Edges(_) => {
+                        Type::Node(_) | Type::Vector(_) | Type::Edge(_) => {
                             query.return_values.push(ReturnValue::new_single_named(
                                 GeneratedValue::Literal(GenRef::Literal(id.inner().clone())),
                                 ReturnValueExpr::Identifier(value),
@@ -676,7 +676,7 @@ impl<'a> Ctx<'a> {
                             source_step: Separator::Period(SourceStep::AddN(add_n)),
                             steps: vec![],
                             traversal_type: TraversalType::Mut,
-                            should_collect: ShouldCollect::ToVec,
+                            should_collect: ShouldCollect::ToVal,
                         });
                         if let Some(gen_query) = gen_query {
                             gen_query.is_mut = true;
@@ -882,12 +882,12 @@ impl<'a> Ctx<'a> {
                         source_step: Separator::Period(SourceStep::AddE(add_e)),
                         steps: vec![],
                         traversal_type: TraversalType::Mut,
-                        should_collect: ShouldCollect::ToVec,
+                        should_collect: ShouldCollect::ToVal,
                     });
                     if let Some(gen_query) = gen_query {
                         gen_query.is_mut = true;
                     }
-                    return (Type::Edges(Some(ty.to_string())), Some(stmt));
+                    return (Type::Edge(Some(ty.to_string())), Some(stmt));
                 }
                 self.push_query_err(
                     q,
@@ -1065,7 +1065,7 @@ impl<'a> Ctx<'a> {
                             source_step: Separator::Period(SourceStep::AddV(add_v)),
                             steps: vec![],
                             traversal_type: TraversalType::Mut,
-                            should_collect: ShouldCollect::ToVec,
+                            should_collect: ShouldCollect::ToVal,
                         });
                         if let Some(gen_query) = gen_query {
                             gen_query.is_mut = true;
@@ -3952,7 +3952,7 @@ impl<'a> Ctx<'a> {
                             source_step: Separator::Period(SourceStep::AddN(add_n)),
                             steps: vec![],
                             traversal_type: TraversalType::Mut,
-                            should_collect: ShouldCollect::ToVec,
+                            should_collect: ShouldCollect::ToVal,
                         });
                         query.is_mut = true;
 
@@ -4156,7 +4156,7 @@ impl<'a> Ctx<'a> {
                         source_step: Separator::Period(SourceStep::AddE(add_e)),
                         steps: vec![],
                         traversal_type: TraversalType::Mut,
-                        should_collect: ShouldCollect::ToVec,
+                        should_collect: ShouldCollect::ToVal,
                     });
                     query.is_mut = true;
                     // query.statements.push(stmt.clone());
@@ -4334,7 +4334,7 @@ impl<'a> Ctx<'a> {
                             source_step: Separator::Period(SourceStep::AddV(add_v)),
                             steps: vec![],
                             traversal_type: TraversalType::Mut,
-                            should_collect: ShouldCollect::ToVec,
+                            should_collect: ShouldCollect::ToVal,
                         });
                         query.is_mut = true;
                         return Some(stmt);
