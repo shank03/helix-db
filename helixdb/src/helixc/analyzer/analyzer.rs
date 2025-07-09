@@ -2526,7 +2526,17 @@ impl<'a> Ctx<'a> {
                                 gen_traversal.steps.push(Separator::Period(
                                     GeneratedStep::PropertyFetch(GenRef::Literal(lit.clone())),
                                 ));
-                                gen_traversal.should_collect = ShouldCollect::ToVal;
+                                match cur_ty {
+                                    Type::Nodes(_) | Type::Edges(_) | Type::Vectors(_) => {
+                                        gen_traversal.should_collect = ShouldCollect::ToVec;
+                                    }
+                                    Type::Node(_) | Type::Edge(_) | Type::Vector(_) => {
+                                        gen_traversal.should_collect = ShouldCollect::ToVal;
+                                    }
+                                    _ => {
+                                        unreachable!()
+                                    }   
+                                }
                             }
                             _ => unreachable!(),
                         }
@@ -2979,7 +2989,7 @@ impl<'a> Ctx<'a> {
                         if EdgeType::Node == edge_type {
                             Some(Type::Nodes(Some(edge.unwrap().to.1.clone())))
                         } else if EdgeType::Vec == edge_type {
-                            Some(Type::Vector(Some(edge.unwrap().to.1.clone())))
+                            Some(Type::Vectors(Some(edge.unwrap().to.1.clone())))
                         } else {
                             None
                         }
@@ -3044,7 +3054,7 @@ impl<'a> Ctx<'a> {
                         if EdgeType::Node == edge_type {
                             Some(Type::Nodes(Some(edge.unwrap().to.1.clone())))
                         } else if EdgeType::Vec == edge_type {
-                            Some(Type::Vector(Some(edge.unwrap().to.1.clone())))
+                            Some(Type::Vectors(Some(edge.unwrap().to.1.clone())))
                         } else {
                             None
                         }
