@@ -262,7 +262,7 @@ impl<'a> Ctx<'a> {
         // -------------------------------------------------
         let mut scope: HashMap<&str, Type> = HashMap::new();
         for param in &q.parameters {
-            scope.insert(param.name.1.as_str(), Type::from(&param.param_type.1));
+            scope.insert(param.name.1.as_str(), Type::from(param.param_type.1.clone()));
         }
         for stmt in &q.statements {
             let statement = self.walk_statements(&mut scope, q, &mut query, stmt);
@@ -591,11 +591,7 @@ impl<'a> Ctx<'a> {
                                                 loc.clone(),
                                                 value.as_str(),
                                             );
-                                            // when doing object field access would need to include object here
-                                            GeneratedValue::Identifier(GenRef::Std(format!(
-                                                "data.{}.clone()",
-                                                value.clone()
-                                            )))
+                                            self.gen_identifier_or_param(q, value, true)
                                         }
                                         v => {
                                             self.push_query_err(
@@ -3738,6 +3734,7 @@ impl<'a> Ctx<'a> {
                             format!("`AddN<{}>` refers to unknown node type", ty),
                             "declare the node schema first",
                         );
+                        return None;
                     }
                     let label = GenRef::Literal(ty.clone());
 
@@ -3842,11 +3839,7 @@ impl<'a> Ctx<'a> {
                                                 loc.clone(),
                                                 value.as_str(),
                                             );
-                                            // when doing object field access would need to include object here
-                                            GeneratedValue::Identifier(GenRef::Std(format!(
-                                                "data.{}.clone()",
-                                                value.clone()
-                                            )))
+                                            self.gen_identifier_or_param(q, value, true)
                                         }
                                         v => {
                                             self.push_query_err(
@@ -4508,34 +4501,39 @@ impl<'a> Ctx<'a> {
                 // find param from fl.in_variable
                 let param = q.parameters.iter().find(|p| p.name.1 == fl.in_variable.1);
 
-                if param.is_none() {
-                    match scope.contains_key(fl.in_variable.1.as_str()) {
-                        true => {
+                let fl_in_var_ty = match param {
+                    Some(param) => {
+                        for_loop_in_variable =
+                            ForLoopInVariable::Parameter(GenRef::Std(fl.in_variable.1.clone()));
+                        Type::from(param.param_type.1.clone())
+                    }
+                    None => match scope.get(fl.in_variable.1.as_str()) {
+                        Some(fl_in_var_ty) => {
                             self.is_valid_identifier(q, fl.loc.clone(), fl.in_variable.1.as_str());
+
                             for_loop_in_variable = ForLoopInVariable::Identifier(GenRef::Std(
                                 fl.in_variable.1.clone(),
                             ));
+                            fl_in_var_ty.clone()
                         }
-                        false => {
+                        None => {
                             self.push_query_err(
                                 q,
                                 fl.loc.clone(),
                                 format!("`{}` is not a parameter", fl.in_variable.1),
                                 "add a parameter to the query",
                             );
+                            Type::Unknown
                         }
-                    }
-                } else {
-                    for_loop_in_variable =
-                        ForLoopInVariable::Parameter(GenRef::Std(fl.in_variable.1.clone()));
-                }
+                    },
+                };
                 let mut for_variable: ForVariable = ForVariable::Empty;
 
                 match &fl.variable {
                     ForLoopVars::Identifier { name, loc: _ } => {
                         self.is_valid_identifier(q, fl.loc.clone(), name.as_str());
-                        // body_scope.insert(name.as_str(), Type::Unknown);
-                        // scope.insert(name.as_str(), Type::Unknown);
+                        body_scope.insert(name.as_str(), Type::Unknown);
+                        scope.insert(name.as_str(), Type::Unknown);
                         for_variable = ForVariable::Identifier(GenRef::Std(name.clone()));
                     }
                     ForLoopVars::ObjectAccess {
@@ -4682,10 +4680,10 @@ impl<'a> Ctx<'a> {
             if should_ref {
                 GeneratedValue::Parameter(GenRef::Ref(format!("data.{}", name)))
             } else {
-                GeneratedValue::Parameter(GenRef::Std(format!("data.{}", name)))
+                GeneratedValue::Parameter(GenRef::Std(format!("data.{}.clone()", name)))
             }
         } else {
-            GeneratedValue::Identifier(GenRef::Std(name.to_string()))
+            GeneratedValue::Identifier(GenRef::Std(format!("{}.clone()", name.to_string())))
         }
     }
 
@@ -4762,13 +4760,14 @@ impl Type {
     }
 }
 
-impl<'a> From<&'a FieldType> for Type {
-    fn from(ft: &'a FieldType) -> Self {
+impl From<FieldType> for Type {
+    fn from(ft: FieldType) -> Self {
         use FieldType::*;
         match ft {
             String | Boolean | F32 | F64 | I8 | I16 | I32 | I64 | U8 | U16 | U32 | U64 | U128
             | Uuid | Date => Type::Scalar(ft.clone()),
-            Array(_) | Object(_) | Identifier(_) => Type::Unknown,
+            Array(inner_ft) => Type::from(*inner_ft),
+            _ => Type::Unknown,
         }
     }
 }

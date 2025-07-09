@@ -373,8 +373,8 @@ impl Display for ForEach {
                     self.in_variable
                 )?;
             }
-            ForVariable::Identifier(_) => {
-                write!(f, "for data in {}", self.in_variable)?;
+            ForVariable::Identifier(identifier) => {
+                write!(f, "for {} in {}", identifier, self.in_variable)?;
             }
             ForVariable::Empty => {
                 assert!(false, "For variable is empty");
@@ -404,7 +404,7 @@ impl Display for ForLoopInVariable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ForLoopInVariable::Identifier(identifier) => write!(f, "{}", identifier),
-            ForLoopInVariable::Parameter(parameter) => write!(f, "{}", parameter),
+            ForLoopInVariable::Parameter(parameter) => write!(f, "data.{}", parameter),
             ForLoopInVariable::Empty => {
                 assert!(false, "For loop in variable is empty");
                 write!(f, "_")
