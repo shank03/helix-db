@@ -70,6 +70,45 @@ pub struct ResearchAreaAndDescriptionEmbedding {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct get_professor_research_areas_with_descriptions_v1Input {
+    pub professor_id: ID,
+}
+#[handler]
+pub fn get_professor_research_areas_with_descriptions_v1(
+    input: &HandlerInput,
+    response: &mut Response,
+) -> Result<(), GraphError> {
+    let data: get_professor_research_areas_with_descriptions_v1Input =
+        match sonic_rs::from_slice(&input.request.body) {
+            Ok(data) => data,
+            Err(err) => return Err(GraphError::from(err)),
+        };
+
+    let mut remapping_vals = RemappingMap::new();
+    let db = Arc::clone(&input.graph.storage);
+    let txn = db.graph_env.read_txn().unwrap();
+    let research_areas = G::new(Arc::clone(&db), &txn)
+        .n_from_id(&data.professor_id)
+        .out("HasResearchAreaAndDescriptionEmbedding", &EdgeType::Vec)
+        .collect_to::<Vec<_>>();
+    let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
+    return_vals.insert(
+        "research_areas".to_string(),
+        ReturnValue::from_traversal_value_with_mixin(
+            G::new_from(Arc::clone(&db), &txn, research_areas.clone())
+                .check_property("areas_and_descriptions")
+                .collect_to_obj()
+                .clone(),
+            remapping_vals.borrow_mut(),
+        ),
+    );
+
+    txn.commit().unwrap();
+    response.body = sonic_rs::to_vec(&return_vals).unwrap();
+    Ok(())
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct get_professor_research_areas_with_descriptions_v2Input {
     pub professor_id: ID,
 }
@@ -106,15 +145,15 @@ pub fn get_professor_research_areas_with_descriptions_v2(
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct get_professor_research_areas_with_descriptions_v1Input {
+pub struct get_professor_research_areas_with_descriptionsInput {
     pub professor_id: ID,
 }
 #[handler]
-pub fn get_professor_research_areas_with_descriptions_v1(
+pub fn get_professor_research_areas_with_descriptions(
     input: &HandlerInput,
     response: &mut Response,
 ) -> Result<(), GraphError> {
-    let data: get_professor_research_areas_with_descriptions_v1Input =
+    let data: get_professor_research_areas_with_descriptionsInput =
         match sonic_rs::from_slice(&input.request.body) {
             Ok(data) => data,
             Err(err) => return Err(GraphError::from(err)),
@@ -126,15 +165,13 @@ pub fn get_professor_research_areas_with_descriptions_v1(
     let research_areas = G::new(Arc::clone(&db), &txn)
         .n_from_id(&data.professor_id)
         .out("HasResearchAreaAndDescriptionEmbedding", &EdgeType::Vec)
-        .collect_to::<Vec<_>>();
+        .check_property("areas_and_descriptions")
+        .collect_to_obj();
     let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
     return_vals.insert(
         "research_areas".to_string(),
-        ReturnValue::from_traversal_value_array_with_mixin(
-            G::new_from(Arc::clone(&db), &txn, research_areas.clone())
-                .check_property("areas_and_descriptions")
-                .collect_to::<Vec<_>>()
-                .clone(),
+        ReturnValue::from_traversal_value_with_mixin(
+            research_areas.clone(),
             remapping_vals.borrow_mut(),
         ),
     );
