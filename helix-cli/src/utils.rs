@@ -19,7 +19,13 @@ use std::{
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
-use tokio_tungstenite::{connect_async, tungstenite::Message};
+use tokio_tungstenite::{
+    connect_async,
+    tungstenite::{
+        Message,
+        protocol::{CloseFrame, frame::coding::CloseCode},
+    },
+};
 use toml::Value;
 
 pub const DB_DIR: &str = "helixdb-cfg/";
@@ -427,7 +433,7 @@ pub async fn github_login() -> Result<String, Box<dyn Error>> {
     };
 
     println!(
-        "To Login please go \x1b]8;;{}\x1b\\here\x1b]8;;\x1b\\({}),\n and enter the code: {}",
+        "To Login please go \x1b]8;;{}\x1b\\here\x1b]8;;\x1b\\({}),\nand enter the code: {}",
         init_msg.verification_uri,
         init_msg.verification_uri,
         init_msg.user_code.bold()
@@ -435,6 +441,10 @@ pub async fn github_login() -> Result<String, Box<dyn Error>> {
 
     let msg: ApiKeyMsg = match ws_stream.next().await {
         Some(Ok(Message::Text(payload))) => sonic_rs::from_str(&payload)?,
+        Some(Ok(Message::Close(Some(CloseFrame {
+            code: CloseCode::Error,
+            reason,
+        })))) => return Err(format!("Error: {reason}").into()),
         Some(Ok(m)) => return Err(format!("Unexpected message: {m:?}").into()),
         Some(Err(e)) => return Err(e.into()),
         None => return Err("Connection Closed Unexpectedly".into()),
@@ -452,4 +462,16 @@ struct UserCodeMsg {
 #[derive(Deserialize)]
 struct ApiKeyMsg {
     key: String,
+}
+
+/// tries to parse a credential file, returning the key, if any
+pub fn parse_credentials(creds: &String) -> Option<&str> {
+    for line in creds.lines() {
+        if let Some((key, value)) = line.split_once("=")
+            && key.to_lowercase() == "helix_user_key"
+        {
+            return Some(value);
+        }
+    }
+    None
 }

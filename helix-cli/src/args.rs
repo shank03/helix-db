@@ -32,9 +32,8 @@ pub enum CommandType {
     /// Compile a Helix project
     Compile(CompileCommand),
 
-    /// Configure Helix Credentials
-    Config(ConfigCommand),
-
+    // /// Configure Helix Credentials
+    // Config(ConfigCommand),
     /// Lint a Helix project
     Check(LintCommand),
 
@@ -132,7 +131,7 @@ pub struct CompileCommand {
     pub output: Option<String>,
 
     #[clap(short, long, help = "The target language")]
-    pub gen: OutputLanguage,
+    pub r#gen: OutputLanguage,
     // #[clap(short, long, help = "The target platform")]
     // pub target: Option<String>,
 
