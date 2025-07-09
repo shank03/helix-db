@@ -234,7 +234,6 @@ impl HelixGraphStorage {
         Ok(vector)
     }
 
-    // TODO: update comments
     // TODO: limit to 300 nodes
 
     /// Returns edges and nodes in a specific json format such that it can be visualized
