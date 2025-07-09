@@ -137,7 +137,10 @@ pub struct LintCommand {
 
 #[derive(Debug, Args)]
 #[clap(name = "install", about = "Install the Helix repo")]
-pub struct InstallCommand {}
+pub struct InstallCommand {
+    #[clap(help = "Install HelixDb on the development(considered unstable) branch")]
+    pub dev: bool,
+}
 
 #[derive(Debug, Args)]
 #[clap(name = "init", about = "Initialise a new Helix project")]
@@ -166,7 +169,7 @@ pub struct StopCommand {
     #[clap(long, help = "Stop all running instances")]
     pub all: bool,
 
-    #[clap(help = "Instance ID to stop")]
+    #[clap(short, long, help = "Instance ID to stop")]
     pub instance: Option<String>,
 }
 

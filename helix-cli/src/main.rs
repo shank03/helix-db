@@ -965,7 +965,7 @@ fi
             ));
         }
 
-        CommandType::Install(_) => {
+        CommandType::Install(command) => {
             match Command::new("cargo").output() {
                 Ok(_) => {}
                 Err(_) => {
@@ -1028,6 +1028,10 @@ fi
             let mut runner = Command::new("git");
             runner.arg("clone");
             runner.arg("https://github.com/HelixDB/helix-db.git");
+            if command.dev {
+                runner.arg("--branch");
+                runner.arg("dev");
+            }
             runner.current_dir(&repo_path);
 
             match runner.output() {

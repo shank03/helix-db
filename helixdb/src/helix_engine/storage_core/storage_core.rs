@@ -357,8 +357,6 @@ impl HelixGraphStorage {
         serde_json::to_string(&result).map_err(|e| GraphError::New(e.to_string()))
     }
 
-    // TODO: write a parser that includes vectors then as well!
-
     /// Get number of nodes, edges, and vectors from lmdb
     pub fn get_db_stats_json(&self) -> Result<String, GraphError> {
         let txn = self.graph_env.read_txn().unwrap();
