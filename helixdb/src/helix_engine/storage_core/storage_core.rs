@@ -249,63 +249,55 @@ impl HelixGraphStorage {
     ///     "nodes": [ { "id": 1, "label": "Node 1" } ],
     ///     "edges": [ { "from": 1, "to": 2, "label": Edge from 1 to 2" } ]
     /// }
+    ///
+    /// does not show nodes with no edges
     pub fn get_ne_json(
         &self,
         k: Option<usize>,
         show_node_properties: Option<String>,
         show_edge_properties: Option<String>,
     ) -> Result<String, GraphError> {
-        let txn = self.graph_env.read_txn()?;
+        let txn = self.graph_env.write_txn()?;
         if self.nodes_db.is_empty(&txn)? || self.edges_db.is_empty(&txn)? {
             return Err(GraphError::New("edges or nodes db is empty!".to_string()));
         }
 
-        let mut edge_counts: HashMap<u128, u32> = HashMap::new();
-        for result in self.out_edges_db.iter(&txn)? {
-            let (key, _) = result?;
-            let node_id = u128::from_be_bytes(key[0..16].try_into().map_err(|_| GraphError::SliceLengthError)?);
-            *edge_counts.entry(node_id).or_insert(0) += 1;
-        }
-
         let k = k.unwrap_or(200);
-        let mut top_nodes: Vec<(u128, u32)> = edge_counts.into_iter().collect();
-        top_nodes.sort_by(|a, b| b.1.cmp(&a.1)); // Sort descending by count
-        let top_node_ids: HashSet<u128> = top_nodes.into_iter()
-            .take(k)
-            .map(|(id, _)| id)
-            .collect();
+        let top_node_ids = self.nodes_by_highest_card(&txn, k)?;
 
         let mut nodes = vec![];
         let mut edges = vec![];
 
-        for node in self.nodes_db.iter(&txn)? {
-            let (node_id, node_data) = node?;
-            if !top_node_ids.contains(&node_id) {
-                continue;
-            }
-            let node = Node::decode_node(node_data, node_id)?;
-            let mut json_node = json!({"id": node_id.to_string()});
+        for node_id in &top_node_ids {
+            let mut node = self.nodes_db.lazily_decode_data()
+                .prefix_iter(&txn, &node_id)?;
+            if let Some((_, node_data)) = node.next().transpose()? {
+                let node = Node::decode_node(node_data.decode().unwrap(), *node_id)?;
+                let mut json_node = json!({"id": node_id.to_string()});
 
-            if let Some(snp) = &show_node_properties {
-                let props = node.properties.as_ref().ok_or_else(|| {
-                    debug_println!("No properties for node {}", node_id);
-                    GraphError::New(format!("No properties for node {}", node_id))
-                })?;
-                let value = props.get(snp).ok_or_else(|| {
-                    debug_println!("Property {} not found for node {}", snp, node_id);
-                    GraphError::New(format!("Property {} not found for node {}", snp, node_id))
-                })?;
-                json_node
-                    .as_object_mut()
-                    .ok_or_else(|| GraphError::New("Invalid JSON object".to_string()))?
-                    .insert("label".to_string(), json!(value.to_string()));
+                if let Some(snp) = &show_node_properties {
+                    let props = node.properties.as_ref().ok_or_else(|| {
+                        debug_println!("No properties for node {}", node_id);
+                        GraphError::New(format!("No properties for node {}", node_id))
+                    })?;
+                    let value = props.get(snp).ok_or_else(|| {
+                        debug_println!("Property {} not found for node {}", snp, node_id);
+                        GraphError::New(format!("Property {} not found for node {}", snp, node_id))
+                    })?;
+                    json_node
+                        .as_object_mut()
+                        .ok_or_else(|| GraphError::New("Invalid JSON object".to_string()))?
+                        .insert("label".to_string(), json!(value.to_string()));
+                }
+                nodes.push(json_node);
+            } else {
+                return Err(GraphError::New(format!("no node for for id {:?}", node_id)));
             }
-            nodes.push(json_node);
         }
 
-        for edge in self.edges_db.iter(&txn)? {
+        for edge in self.edges_db.lazily_decode_data().iter(&txn)? {
             let (edge_id, edge_data) = edge?;
-            let edge = Edge::decode_edge(edge_data, edge_id)?;
+            let edge = Edge::decode_edge(edge_data.decode().unwrap(), edge_id)?;
             if top_node_ids.contains(&edge.from_node) || top_node_ids.contains(&edge.to_node) {
                 let mut json_edge = json!({
                     "from": edge.from_node.to_string(),
@@ -336,6 +328,28 @@ impl HelixGraphStorage {
         });
 
         serde_json::to_string(&result).map_err(|e| GraphError::New(e.to_string()))
+    }
+
+    /// Get the top k nodes with the highest cardinalities
+    fn nodes_by_highest_card(
+        &self,
+        txn: &RwTxn,
+        k: usize
+    ) -> Result<HashSet<u128>, GraphError> {
+        let mut edge_counts: HashMap<u128, u32> = HashMap::new();
+        for edge in self.edges_db.iter(&txn)? {
+            let (edge_id, edge_data) = edge?;
+            let edge = Edge::decode_edge(edge_data, edge_id)?;
+            *edge_counts.entry(edge.from_node).or_insert(0) += 1;
+            *edge_counts.entry(edge.to_node).or_insert(0) += 1;
+        }
+
+        let mut top_nodes: Vec<(u128, u32)> = edge_counts.into_iter().collect();
+        top_nodes.sort_by(|a, b| b.1.cmp(&a.1));
+        Ok(top_nodes.into_iter()
+            .take(k)
+            .map(|(id, _)| id)
+            .collect())
     }
 
     /// Get number of nodes, edges, and vectors from lmdb

@@ -14,6 +14,7 @@ pub struct GraphLabels {
 }
 */
 
+// TODO: important is that errors are returned in the http response!
 #[get_handler]
 pub fn graphvis(input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
     /*
@@ -27,8 +28,8 @@ pub fn graphvis(input: &HandlerInput, response: &mut Response) -> Result<(), Gra
     let db = Arc::clone(&input.graph.storage);
     let json_ne: String = match db.get_ne_json(
         Some(300),
-        Some("user_num".to_string()),
-        None,
+        Some("entity_name".to_string()),
+        Some("edge_name".to_string()),
     ) {
         Ok(value) => value,
         Err(e) => {
@@ -52,6 +53,7 @@ pub fn graphvis(input: &HandlerInput, response: &mut Response) -> Result<(), Gra
             return Ok(());
         }
     };
+    let num_nodes = json_ne_m["nodes"].as_array().map(|arr| arr.len()).unwrap_or(0);
 
     let html_template = include_str!("graphvis.html");
     let html_content = html_template
@@ -74,6 +76,10 @@ pub fn graphvis(input: &HandlerInput, response: &mut Response) -> Result<(), Gra
         .replace(
             "{NUM_VECTORS}",
             &serde_json::to_string(&db_counts_m["num_vectors"]).unwrap(),
+        )
+        .replace(
+            "{NUM_NODES_SHOWING}",
+            &num_nodes.to_string(),
         );
 
     response
