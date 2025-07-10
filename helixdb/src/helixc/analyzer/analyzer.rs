@@ -32,7 +32,10 @@ use crate::{
     protocol::{date::Date, value::Value},
     utils::styled_string::StyledString,
 };
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    convert::Infallible,
+};
 
 /// A single diagnostic to be surfaced to the editor.
 #[derive(Debug, Clone)]
@@ -299,10 +302,26 @@ impl<'a> Ctx<'a> {
                 GeneratedStatement::Traversal(traversal) => match &traversal.source_step.inner() {
                     SourceStep::Identifier(v) => {
                         self.is_valid_identifier(q, ret.loc.clone(), v.inner().as_str());
-                        query.return_values.push(ReturnValue::new_named(
-                            v.clone(),
-                            ReturnValueExpr::Traversal(traversal.clone()),
-                        ));
+
+                        // if is single object, need to handle it as a single object
+                        // if is array, need to handle it as an array
+                        match traversal.should_collect {
+                            ShouldCollect::ToVec => {
+                                query.return_values.push(ReturnValue::new_named(
+                                    GeneratedValue::Literal(GenRef::Literal(v.inner().clone())),
+                                    ReturnValueExpr::Traversal(traversal.clone()),
+                                ));
+                            }
+                            ShouldCollect::ToVal => {
+                                query.return_values.push(ReturnValue::new_single_named(
+                                    GeneratedValue::Literal(GenRef::Literal(v.inner().clone())),
+                                    ReturnValueExpr::Traversal(traversal.clone()),
+                                ));
+                            }
+                            _ => {
+                                unreachable!()
+                            }
+                        }
                     }
                     _ => {
                         query.return_values.push(ReturnValue::new_unnamed(
@@ -324,24 +343,33 @@ impl<'a> Ctx<'a> {
                             Type::Unknown
                         }
                     };
+                    let value = self.gen_identifier_or_param(q, id.inner().as_str(), false, true);
                     match identifier_end_type {
                         Type::Scalar(_) => {
-                            query
-                                .return_values
-                                .push(ReturnValue::new_named_literal(id.clone(), id.clone()));
+                            query.return_values.push(ReturnValue::new_named_literal(
+                                GeneratedValue::Literal(GenRef::Literal(id.inner().clone())),
+                                value,
+                            ));
+                        }
+                        Type::Node(_) | Type::Vector(_) | Type::Edge(_) => {
+                            query.return_values.push(ReturnValue::new_single_named(
+                                GeneratedValue::Literal(GenRef::Literal(id.inner().clone())),
+                                ReturnValueExpr::Identifier(value),
+                            ));
                         }
                         _ => {
                             query.return_values.push(ReturnValue::new_named(
-                                id.clone(),
-                                ReturnValueExpr::Identifier(id.clone()),
+                                GeneratedValue::Literal(GenRef::Literal(id.inner().clone())),
+                                ReturnValueExpr::Identifier(value),
                             ));
                         }
                     }
                 }
                 GeneratedStatement::Literal(l) => {
-                    query
-                        .return_values
-                        .push(ReturnValue::new_literal(l.clone(), l.clone()));
+                    query.return_values.push(ReturnValue::new_literal(
+                        GeneratedValue::Literal(l.clone()),
+                        GeneratedValue::Literal(l.clone()),
+                    ));
                 }
                 GeneratedStatement::Empty => query.return_values = vec![],
                 _ => {
@@ -644,7 +672,7 @@ impl<'a> Ctx<'a> {
                             source_step: Separator::Period(SourceStep::AddN(add_n)),
                             steps: vec![],
                             traversal_type: TraversalType::Mut,
-                            should_collect: ShouldCollect::ToVec,
+                            should_collect: ShouldCollect::ToVal,
                         });
                         if let Some(gen_query) = gen_query {
                             gen_query.is_mut = true;
@@ -850,12 +878,12 @@ impl<'a> Ctx<'a> {
                         source_step: Separator::Period(SourceStep::AddE(add_e)),
                         steps: vec![],
                         traversal_type: TraversalType::Mut,
-                        should_collect: ShouldCollect::ToVec,
+                        should_collect: ShouldCollect::ToVal,
                     });
                     if let Some(gen_query) = gen_query {
                         gen_query.is_mut = true;
                     }
-                    return (Type::Edges(Some(ty.to_string())), Some(stmt));
+                    return (Type::Edge(Some(ty.to_string())), Some(stmt));
                 }
                 self.push_query_err(
                     q,
@@ -1033,7 +1061,7 @@ impl<'a> Ctx<'a> {
                             source_step: Separator::Period(SourceStep::AddV(add_v)),
                             steps: vec![],
                             traversal_type: TraversalType::Mut,
-                            should_collect: ShouldCollect::ToVec,
+                            should_collect: ShouldCollect::ToVal,
                         });
                         if let Some(gen_query) = gen_query {
                             gen_query.is_mut = true;
@@ -1243,7 +1271,16 @@ impl<'a> Ctx<'a> {
                         );
 
                         match stmt.unwrap() {
-                            GeneratedStatement::BoExp(expr) => expr,
+                            GeneratedStatement::BoExp(expr) => {
+                                match expr {
+                                    BoExp::Exists(mut tr) => {
+                                        // keep as iterator 
+                                        tr.should_collect = ShouldCollect::No;
+                                        BoExp::Exists(tr)
+                                    }
+                                    _ => expr,
+                                }
+                            }
                             GeneratedStatement::Traversal(tr) => BoExp::Expr(tr),
                             _ => unreachable!(),
                         }
@@ -1265,7 +1302,15 @@ impl<'a> Ctx<'a> {
                             "incorrect stmt should've been caught by `infer_expr_type`"
                         );
                         match stmt.unwrap() {
-                            GeneratedStatement::BoExp(expr) => expr,
+                            GeneratedStatement::BoExp(expr) => {
+                                match expr {
+                                    BoExp::Exists(mut tr) => {
+                                        tr.should_collect = ShouldCollect::No;
+                                        BoExp::Exists(tr)
+                                    }
+                                    _ => expr,
+                                }
+                            }
                             GeneratedStatement::Traversal(tr) => BoExp::Expr(tr),
                             _ => unreachable!(),
                         }
@@ -1763,6 +1808,7 @@ impl<'a> Ctx<'a> {
                     let stmt = stmt.unwrap();
                     match stmt {
                         GeneratedStatement::Traversal(tr) => {
+                            println!("TRAVERSAL");
                             gen_traversal
                                 .steps
                                 .push(Separator::Period(GeneratedStep::Where(Where::Ref(
@@ -1772,6 +1818,7 @@ impl<'a> Ctx<'a> {
                                 ))));
                         }
                         GeneratedStatement::BoExp(expr) => {
+                            println!("BOEXP");
                             gen_traversal
                                 .steps
                                 .push(Separator::Period(GeneratedStep::Where(match expr {
@@ -1931,7 +1978,7 @@ impl<'a> Ctx<'a> {
                                 }
                                 ExpressionType::Identifier(i) => {
                                     self.is_valid_identifier(q, expr.loc.clone(), i.as_str());
-                                    self.gen_identifier_or_param(q, i.as_str(), false)
+                                    self.gen_identifier_or_param(q, i.as_str(), false, true)
                                 }
                                 _ => unreachable!("Cannot reach here"),
                             };
@@ -1947,7 +1994,7 @@ impl<'a> Ctx<'a> {
                                 }
                                 ExpressionType::Identifier(i) => {
                                     self.is_valid_identifier(q, expr.loc.clone(), i.as_str());
-                                    self.gen_identifier_or_param(q, i.as_str(), false)
+                                    self.gen_identifier_or_param(q, i.as_str(), false, true)
                                 }
                                 _ => unreachable!("Cannot reach here"),
                             };
@@ -1963,7 +2010,7 @@ impl<'a> Ctx<'a> {
                                 }
                                 ExpressionType::Identifier(i) => {
                                     self.is_valid_identifier(q, expr.loc.clone(), i.as_str());
-                                    self.gen_identifier_or_param(q, i.as_str(), false)
+                                    self.gen_identifier_or_param(q, i.as_str(), false, true)
                                 }
                                 _ => unreachable!("Cannot reach here"),
                             };
@@ -1979,7 +2026,7 @@ impl<'a> Ctx<'a> {
                                 }
                                 ExpressionType::Identifier(i) => {
                                     self.is_valid_identifier(q, expr.loc.clone(), i.as_str());
-                                    self.gen_identifier_or_param(q, i.as_str(), false)
+                                    self.gen_identifier_or_param(q, i.as_str(), false, true)
                                 }
                                 _ => unreachable!("Cannot reach here"),
                             };
@@ -2001,7 +2048,7 @@ impl<'a> Ctx<'a> {
                                 }
                                 ExpressionType::Identifier(i) => {
                                     self.is_valid_identifier(q, expr.loc.clone(), i.as_str());
-                                    self.gen_identifier_or_param(q, i.as_str(), false)
+                                    self.gen_identifier_or_param(q, i.as_str(), false, true)
                                 }
                                 _ => unreachable!("Cannot reach here"),
                             };
@@ -2023,7 +2070,7 @@ impl<'a> Ctx<'a> {
                                 }
                                 ExpressionType::Identifier(i) => {
                                     self.is_valid_identifier(q, expr.loc.clone(), i.as_str());
-                                    self.gen_identifier_or_param(q, i.as_str(), false)
+                                    self.gen_identifier_or_param(q, i.as_str(), false, true)
                                 }
                                 _ => unreachable!("Cannot reach here"),
                             };
@@ -2154,7 +2201,7 @@ impl<'a> Ctx<'a> {
                                                 field.value.loc.clone(),
                                                 i.as_str(),
                                             );
-                                            self.gen_identifier_or_param(q, i.as_str(), true)
+                                            self.gen_identifier_or_param(q, i.as_str(), true, true)
                                         }
                                         FieldValueType::Literal(l) => match l {
                                             Value::String(s) => {
@@ -2171,7 +2218,12 @@ impl<'a> Ctx<'a> {
                                                     e.loc.clone(),
                                                     i.as_str(),
                                                 );
-                                                self.gen_identifier_or_param(q, i.as_str(), true)
+                                                self.gen_identifier_or_param(
+                                                    q,
+                                                    i.as_str(),
+                                                    true,
+                                                    true,
+                                                )
                                             }
                                             ExpressionType::StringLiteral(i) => {
                                                 GeneratedValue::Primitive(GenRef::Std(
@@ -2225,8 +2277,8 @@ impl<'a> Ctx<'a> {
                 StepType::Range((start, end)) => {
                     let (start, end) = match (&start.expr, &end.expr) {
                         (ExpressionType::Identifier(i), ExpressionType::Identifier(j)) => (
-                            self.gen_identifier_or_param(q, i.as_str(), false),
-                            self.gen_identifier_or_param(q, j.as_str(), false),
+                            self.gen_identifier_or_param(q, i.as_str(), false, true),
+                            self.gen_identifier_or_param(q, j.as_str(), false, true),
                         ),
                         (ExpressionType::IntegerLiteral(i), ExpressionType::IntegerLiteral(j)) => (
                             GeneratedValue::Primitive(GenRef::Std(i.to_string())),
@@ -2470,7 +2522,17 @@ impl<'a> Ctx<'a> {
                                 gen_traversal.steps.push(Separator::Period(
                                     GeneratedStep::PropertyFetch(GenRef::Literal(lit.clone())),
                                 ));
-                                gen_traversal.should_collect = ShouldCollect::ToVal;
+                                match cur_ty {
+                                    Type::Nodes(_) | Type::Edges(_) | Type::Vectors(_) => {
+                                        gen_traversal.should_collect = ShouldCollect::ToVec;
+                                    }
+                                    Type::Node(_) | Type::Edge(_) | Type::Vector(_) => {
+                                        gen_traversal.should_collect = ShouldCollect::ToVal;
+                                    }
+                                    _ => {
+                                        unreachable!()
+                                    }   
+                                }
                             }
                             _ => unreachable!(),
                         }
@@ -2897,6 +2959,7 @@ impl<'a> Ctx<'a> {
                         }
                     }
                     None => {
+                        // TODO: throw error
                         unreachable!() // throw error
                     }
                 };
@@ -2922,7 +2985,7 @@ impl<'a> Ctx<'a> {
                         if EdgeType::Node == edge_type {
                             Some(Type::Nodes(Some(edge.unwrap().to.1.clone())))
                         } else if EdgeType::Vec == edge_type {
-                            Some(Type::Vector(Some(edge.unwrap().to.1.clone())))
+                            Some(Type::Vectors(Some(edge.unwrap().to.1.clone())))
                         } else {
                             None
                         }
@@ -2987,7 +3050,7 @@ impl<'a> Ctx<'a> {
                         if EdgeType::Node == edge_type {
                             Some(Type::Nodes(Some(edge.unwrap().to.1.clone())))
                         } else if EdgeType::Vec == edge_type {
-                            Some(Type::Vector(Some(edge.unwrap().to.1.clone())))
+                            Some(Type::Vectors(Some(edge.unwrap().to.1.clone())))
                         } else {
                             None
                         }
@@ -3201,7 +3264,7 @@ impl<'a> Ctx<'a> {
                     }
                     Some(VectorData::Embed(e)) => match &e.value {
                         EvaluatesToString::Identifier(i) => {
-                            VecData::Embed(self.gen_identifier_or_param(q, &i, true))
+                            VecData::Embed(self.gen_identifier_or_param(q, &i, true, false))
                         }
                         EvaluatesToString::StringLiteral(s) => {
                             VecData::Embed(GeneratedValue::Literal(GenRef::Ref(s.clone())))
@@ -3892,7 +3955,7 @@ impl<'a> Ctx<'a> {
                             source_step: Separator::Period(SourceStep::AddN(add_n)),
                             steps: vec![],
                             traversal_type: TraversalType::Mut,
-                            should_collect: ShouldCollect::ToVec,
+                            should_collect: ShouldCollect::ToVal,
                         });
                         query.is_mut = true;
 
@@ -4096,7 +4159,7 @@ impl<'a> Ctx<'a> {
                         source_step: Separator::Period(SourceStep::AddE(add_e)),
                         steps: vec![],
                         traversal_type: TraversalType::Mut,
-                        should_collect: ShouldCollect::ToVec,
+                        should_collect: ShouldCollect::ToVal,
                     });
                     query.is_mut = true;
                     // query.statements.push(stmt.clone());
@@ -4254,11 +4317,11 @@ impl<'a> Ctx<'a> {
                                 ))))
                             }
                             VectorData::Identifier(i) => {
-                                VecData::Standard(self.gen_identifier_or_param(q, &i, true))
+                                VecData::Standard(self.gen_identifier_or_param(q, &i, true, false))
                             }
                             VectorData::Embed(e) => match &e.value {
                                 EvaluatesToString::Identifier(i) => {
-                                    VecData::Embed(self.gen_identifier_or_param(q, &i, true))
+                                    VecData::Embed(self.gen_identifier_or_param(q, &i, true, false))
                                 }
                                 EvaluatesToString::StringLiteral(s) => {
                                     VecData::Embed(GeneratedValue::Literal(GenRef::Ref(s.clone())))
@@ -4274,7 +4337,7 @@ impl<'a> Ctx<'a> {
                             source_step: Separator::Period(SourceStep::AddV(add_v)),
                             steps: vec![],
                             traversal_type: TraversalType::Mut,
-                            should_collect: ShouldCollect::ToVec,
+                            should_collect: ShouldCollect::ToVal,
                         });
                         query.is_mut = true;
                         return Some(stmt);
@@ -4462,7 +4525,10 @@ impl<'a> Ctx<'a> {
                                 gen_traversal
                                     .steps
                                     .push(Separator::Period(GeneratedStep::Where(match expr {
-                                        BoExp::Exists(tr) => Where::Exists(WhereExists { tr }),
+                                        BoExp::Exists(mut tr) => {
+                                            tr.should_collect = ShouldCollect::No;
+                                            Where::Exists(WhereExists { tr })
+                                        }
                                         _ => Where::Ref(WhereRef { expr }),
                                     })));
                             }
@@ -4675,7 +4741,13 @@ impl<'a> Ctx<'a> {
         q.parameters.iter().find(|p| p.name.1 == *name).is_some()
     }
 
-    fn gen_identifier_or_param(&self, q: &Query, name: &str, should_ref: bool) -> GeneratedValue {
+    fn gen_identifier_or_param(
+        &self,
+        q: &Query,
+        name: &str,
+        should_ref: bool,
+        should_clone: bool,
+    ) -> GeneratedValue {
         if self.is_param(q, name) {
             if should_ref {
                 GeneratedValue::Parameter(GenRef::Ref(format!("data.{}", name)))

@@ -294,6 +294,7 @@ impl Display for Where {
     }
 }
 
+#[deprecated(note = "Use WhereRef instead with a BoExp Exists")]
 #[derive(Clone)]
 pub struct WhereExists {
     pub tr: Traversal,
@@ -304,7 +305,7 @@ impl Display for WhereExists {
             f,
             "filter_ref(|val, txn|{{
                 if let Ok(val) = val {{ 
-                    Ok({}.count().gt(&0))
+                    Ok(Exist::exists(&mut {}))
                 }} else {{
                     Ok(false)
                 }}
