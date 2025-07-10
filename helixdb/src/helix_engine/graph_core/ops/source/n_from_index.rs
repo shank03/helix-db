@@ -74,12 +74,12 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>, K: Into<Value> + 
             .storage
             .secondary_indices
             .get(index)
+            // TODO: this
             .ok_or(GraphError::New(format!(
                 "Secondary Index {} not found",
                 index
             )))
             .unwrap();
-        println!("DB: {:?}", self.storage.secondary_indices);
         let res = db
             .lazily_decode_data()
             .prefix_iter(self.txn, &bincode::serialize(&Value::from(key)).unwrap())

@@ -61,7 +61,6 @@ impl ReturnValue {
                 .into_iter()
                 .map(|val| match val {
                     TraversalVal::Node(node) => {
-                        println!("node processing");
                         ReturnValue::process_items_with_mixin(node, &mut mixin)
                     }
                     TraversalVal::Edge(edge) => {

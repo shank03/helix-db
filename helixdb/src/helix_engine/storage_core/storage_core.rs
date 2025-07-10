@@ -19,8 +19,12 @@ use crate::{
 };
 use heed3::byteorder::BE;
 use heed3::{types::*, Database, DatabaseFlags, Env, EnvOpenOptions, RoTxn, RwTxn, WithTls};
-use serde_json::{json, Value};
-use std::{collections::HashMap, fs, path::Path};
+use serde_json::json;
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    path::Path
+};
 
 // Database names for different stores
 const DB_NODES: &str = "nodes"; // For node data (n:)
@@ -190,7 +194,6 @@ impl HelixGraphStorage {
     /// The generated in edge key will remain the same for the same to_node_id and label.
     /// To save space, the key is only stored once,
     /// with the values being stored in a sorted sub-tree, with this key being the root.
-
     #[inline(always)]
     pub fn in_edge_key(to_node_id: &u128, label: &[u8; 4]) -> [u8; 20] {
         let mut key = [0u8; 20];
@@ -237,7 +240,7 @@ impl HelixGraphStorage {
     }
 
     // TODO: limit to 300 nodes
-    // TODO: use .into_iter()
+    // TODO: update comment
 
     /// Returns edges and nodes in a specific json format such that it can be visualized
     ///     strictly in this format (write you're own parser if you want it in a diff
@@ -248,19 +251,38 @@ impl HelixGraphStorage {
     /// }
     pub fn get_ne_json(
         &self,
+        k: Option<usize>,
         show_node_properties: Option<String>,
         show_edge_properties: Option<String>,
     ) -> Result<String, GraphError> {
-        let txn = self.graph_env.read_txn().unwrap();
+        let txn = self.graph_env.read_txn()?;
         if self.nodes_db.is_empty(&txn)? || self.edges_db.is_empty(&txn)? {
             return Err(GraphError::New("edges or nodes db is empty!".to_string()));
         }
+
+        let mut edge_counts: HashMap<u128, u32> = HashMap::new();
+        for result in self.out_edges_db.iter(&txn)? {
+            let (key, _) = result?;
+            let node_id = u128::from_be_bytes(key[0..16].try_into().map_err(|_| GraphError::SliceLengthError)?);
+            *edge_counts.entry(node_id).or_insert(0) += 1;
+        }
+
+        let k = k.unwrap_or(200);
+        let mut top_nodes: Vec<(u128, u32)> = edge_counts.into_iter().collect();
+        top_nodes.sort_by(|a, b| b.1.cmp(&a.1)); // Sort descending by count
+        let top_node_ids: HashSet<u128> = top_nodes.into_iter()
+            .take(k)
+            .map(|(id, _)| id)
+            .collect();
 
         let mut nodes = vec![];
         let mut edges = vec![];
 
         for node in self.nodes_db.iter(&txn)? {
             let (node_id, node_data) = node?;
+            if !top_node_ids.contains(&node_id) {
+                continue;
+            }
             let node = Node::decode_node(node_data, node_id)?;
             let mut json_node = json!({"id": node_id.to_string()});
 
@@ -278,36 +300,34 @@ impl HelixGraphStorage {
                     .ok_or_else(|| GraphError::New("Invalid JSON object".to_string()))?
                     .insert("label".to_string(), json!(value.to_string()));
             }
-
-            debug_println!("{:?}", json_node);
             nodes.push(json_node);
         }
 
         for edge in self.edges_db.iter(&txn)? {
             let (edge_id, edge_data) = edge?;
             let edge = Edge::decode_edge(edge_data, edge_id)?;
-            let mut json_edge = json!({
-                "from": edge.from_node.to_string(),
-                "to": edge.to_node.to_string(),
-            });
+            if top_node_ids.contains(&edge.from_node) || top_node_ids.contains(&edge.to_node) {
+                let mut json_edge = json!({
+                    "from": edge.from_node.to_string(),
+                    "to": edge.to_node.to_string(),
+                });
 
-            if let Some(sep) = &show_edge_properties {
-                let props = edge.properties.as_ref().ok_or_else(|| {
-                    debug_println!("No properties for edge {}", edge_id);
-                    GraphError::New(format!("No properties for edge {}", edge_id))
-                })?;
-                let value = props.get(sep).ok_or_else(|| {
-                    debug_println!("Property {} not found for edge {}", sep, edge_id);
-                    GraphError::New(format!("Property {} not found for edge {}", sep, edge_id))
-                })?;
-                json_edge
-                    .as_object_mut()
-                    .ok_or_else(|| GraphError::New("Invalid JSON object".to_string()))?
-                    .insert("label".to_string(), json!(value.to_string()));
+                if let Some(sep) = &show_edge_properties {
+                    let props = edge.properties.as_ref().ok_or_else(|| {
+                        debug_println!("No properties for edge {}", edge_id);
+                        GraphError::New(format!("No properties for edge {}", edge_id))
+                    })?;
+                    let value = props.get(sep).ok_or_else(|| {
+                        debug_println!("Property {} not found for edge {}", sep, edge_id);
+                        GraphError::New(format!("Property {} not found for edge {}", sep, edge_id))
+                    })?;
+                    json_edge
+                        .as_object_mut()
+                        .ok_or_else(|| GraphError::New("Invalid JSON object".to_string()))?
+                        .insert("label".to_string(), json!(value.to_string()));
+                }
+                edges.push(json_edge);
             }
-
-            debug_println!("{:?}", json_edge);
-            edges.push(json_edge);
         }
 
         let result = json!({

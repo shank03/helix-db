@@ -23,10 +23,12 @@ pub fn graphvis(input: &HandlerInput, response: &mut Response) -> Result<(), Gra
     };
     */
 
+    // TODO: pass in k, node, and edge in the url
     let db = Arc::clone(&input.graph.storage);
     let json_ne: String = match db.get_ne_json(
-        Some("entity_name".to_string()),
-        Some("edge_name".to_string()),
+        Some(300),
+        Some("user_num".to_string()),
+        None,
     ) {
         Ok(value) => value,
         Err(e) => {
