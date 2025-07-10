@@ -1019,7 +1019,7 @@ fi
                 }
             };
 
-            if OutputLanguage::TypeScript == command.gen {
+            if let Some(OutputLanguage::TypeScript) = command.lang {
                 match gen_typescript(&analyzed_source, &output) {
                     Ok(_) => {}
                     Err(e) => {
