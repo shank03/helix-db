@@ -354,7 +354,7 @@ impl HelixGraphStorage {
         &self,
         txn: &RwTxn,
         k: usize,
-    ) -> Result<HashSet<u128>, GraphError> {
+    ) -> Result<Vec<u128>, GraphError> {
         let node_count = self.nodes_db.len(&txn)?;
 
         struct EdgeCount {
@@ -469,9 +469,9 @@ impl HelixGraphStorage {
             });
         }
 
-        let mut top_nodes = HashSet::with_capacity(k);
+        let mut top_nodes = Vec::with_capacity(k);
         while let Some(edge_count) = ordered_edge_counts.pop() {
-            top_nodes.insert(edge_count.node_id);
+            top_nodes.push(edge_count.node_id);
             if top_nodes.len() >= k {
                 break;
             }
