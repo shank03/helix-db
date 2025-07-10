@@ -2085,6 +2085,11 @@ impl<'a> Ctx<'a> {
                 }
 
                 StepType::Update(update) => {
+
+                    // if type == node, edge, vector then update is valid 
+                    // otherwise it is invalid 
+
+                    
                     // Update returns the same type (nodes/edges) it started with.
                     match tr.steps.iter().nth_back(1) {
                         Some(step) => match &step.step {
