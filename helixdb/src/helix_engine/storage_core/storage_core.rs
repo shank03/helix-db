@@ -21,9 +21,12 @@ use heed3::byteorder::BE;
 use heed3::{types::*, Database, DatabaseFlags, Env, EnvOpenOptions, RoTxn, RwTxn, WithTls};
 use serde_json::json;
 use std::{
-    collections::{HashMap, HashSet},
+    cmp::Ordering,
+    collections::{BinaryHeap, HashMap, HashSet},
     fs,
-    path::Path
+    hash::Hash,
+    path::Path,
+    sync::{Arc, Mutex},
 };
 
 // Database names for different stores
@@ -269,7 +272,9 @@ impl HelixGraphStorage {
         let mut edges = vec![];
 
         for node_id in &top_node_ids {
-            let mut node = self.nodes_db.lazily_decode_data()
+            let mut node = self
+                .nodes_db
+                .lazily_decode_data()
                 .prefix_iter(&txn, &node_id)?;
             if let Some((_, node_data)) = node.next().transpose()? {
                 let node = Node::decode_node(node_data.decode().unwrap(), *node_id)?;
@@ -331,11 +336,7 @@ impl HelixGraphStorage {
     }
 
     /// Get the top k nodes with the highest cardinalities
-    fn nodes_by_highest_card(
-        &self,
-        txn: &RwTxn,
-        k: usize
-    ) -> Result<HashSet<u128>, GraphError> {
+    fn nodes_by_highest_card(&self, txn: &RwTxn, k: usize) -> Result<HashSet<u128>, GraphError> {
         let mut edge_counts: HashMap<u128, u32> = HashMap::new();
         for edge in self.edges_db.iter(&txn)? {
             let (edge_id, edge_data) = edge?;
@@ -346,10 +347,136 @@ impl HelixGraphStorage {
 
         let mut top_nodes: Vec<(u128, u32)> = edge_counts.into_iter().collect();
         top_nodes.sort_by(|a, b| b.1.cmp(&a.1));
-        Ok(top_nodes.into_iter()
-            .take(k)
-            .map(|(id, _)| id)
-            .collect())
+        Ok(top_nodes.into_iter().take(k).map(|(id, _)| id).collect())
+    }
+
+    pub fn get_top_nodes_by_cardinality(
+        &self,
+        txn: &RwTxn,
+        k: usize,
+    ) -> Result<HashSet<u128>, GraphError> {
+        let node_count = self.nodes_db.len(&txn)?;
+
+        struct EdgeCount {
+            node_id: u128,
+            edges_count: usize,
+        }
+        impl PartialEq for EdgeCount {
+            fn eq(&self, other: &Self) -> bool {
+                self.edges_count == other.edges_count
+            }
+        }
+        impl PartialOrd for EdgeCount {
+            fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+                Some(self.edges_count.cmp(&other.edges_count))
+            }
+        }
+        impl Eq for EdgeCount {}
+        impl Ord for EdgeCount {
+            fn cmp(&self, other: &Self) -> Ordering {
+                self.edges_count.cmp(&other.edges_count)
+            }
+        }
+        let db = Arc::new(self);
+        let out_db = Arc::clone(&db);
+        let in_db = Arc::clone(&db);
+
+        let edge_counts: Arc<Mutex<HashMap<u128, usize>>> =
+            Arc::new(Mutex::new(HashMap::with_capacity(node_count as usize)));
+        let mut ordered_edge_counts: BinaryHeap<EdgeCount> =
+            BinaryHeap::with_capacity(node_count as usize);
+
+            // out edges
+            let out_edge_counts = Arc::clone(&edge_counts);
+            std::thread::scope(|scope| {
+            let out_handle = scope.spawn(move || {
+                let txn = out_db.graph_env.read_txn().unwrap();
+                // this gets each node ID from the out edges db
+                // by using the out_edges_db it pulls data into os cache
+                let out_node_key_iter = out_db.out_edges_db.lazily_decode_data().iter(&txn).unwrap();
+                for data in out_node_key_iter {
+                    match data {
+                        Ok((key, _)) => {
+                            let node_id = &key[0..16];
+                            // for each node id, it gets the edges which are all stored in the same key
+                            // so it gets all the edges for a node at once
+                            // without decoding anything. so you only ever decode the key from LMDB once
+                            let edges_count = out_db
+                                .out_edges_db
+                                .lazily_decode_data()
+                                .get_duplicates(&txn, key)
+                                .unwrap()
+                                .iter()
+                                .count();
+
+                            let mut edge_counts = out_edge_counts.lock().unwrap();
+                            *edge_counts
+                                .entry(u128::from_be_bytes(node_id.try_into().unwrap()))
+                                .or_insert(0) += edges_count;
+                        }
+                        Err(e) => {
+                            debug_println!("Error in out_node_key_iter: {:?}", e);
+                        }
+                    }
+                }
+                Ok::<(), GraphError>(())
+            });
+
+            // in edges
+            let in_edge_counts = Arc::clone(&edge_counts);
+            let in_handle = scope.spawn(move || {
+                let txn = in_db.graph_env.read_txn().unwrap();
+                // this gets each node ID from the in edges db
+                // by using the in_edges_db it pulls data into os cache
+                let in_node_key_iter = in_db.in_edges_db.lazily_decode_data().iter(&txn).unwrap();
+                for data in in_node_key_iter {
+                    match data {
+                        Ok((key, _)) => {
+                            let node_id = &key[0..16];
+                            // for each node id, it gets the edges which are all stored in the same key
+                            // so it gets all the edges for a node at once
+                            // without decoding anything. so you only ever decode the key from LMDB once
+                            let edges_count = in_db
+                                .in_edges_db
+                                .lazily_decode_data()
+                                .get_duplicates(&txn, key)
+                                .unwrap()
+                                .iter()
+                                .count();
+
+                            let mut edge_counts = in_edge_counts.lock().unwrap();
+                            *edge_counts
+                                .entry(u128::from_be_bytes(node_id.try_into().unwrap()))
+                                .or_insert(0) += edges_count;
+                        }
+                        Err(e) => {
+                            debug_println!("Error in in_node_key_iter: {:?}", e);
+                        }
+                    }
+                }
+                Ok::<(), GraphError>(())
+            });
+
+            out_handle.join().unwrap().unwrap();
+            in_handle.join().unwrap().unwrap();
+        });
+
+        let counts = edge_counts.lock().unwrap();
+        for (node_id, edges_count) in counts.iter() {
+            ordered_edge_counts.push(EdgeCount {
+                node_id: *node_id,
+                edges_count: *edges_count,
+            });
+        }
+
+        let mut top_nodes = HashSet::with_capacity(k);
+        while let Some(edge_count) = ordered_edge_counts.pop() {
+            top_nodes.insert(edge_count.node_id);
+            if top_nodes.len() >= k {
+                break;
+            }
+        }
+        Ok(top_nodes)
     }
 
     /// Get number of nodes, edges, and vectors from lmdb
@@ -509,6 +636,4 @@ impl StorageMethods for HelixGraphStorage {
 
         Ok(())
     }
-
 }
-
