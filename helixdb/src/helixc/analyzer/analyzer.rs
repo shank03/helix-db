@@ -619,7 +619,7 @@ impl<'a> Ctx<'a> {
                                                 loc.clone(),
                                                 value.as_str(),
                                             );
-                                            self.gen_identifier_or_param(q, value, true)
+                                            self.gen_identifier_or_param(q, value, true, false)
                                         }
                                         v => {
                                             self.push_query_err(
@@ -3902,7 +3902,7 @@ impl<'a> Ctx<'a> {
                                                 loc.clone(),
                                                 value.as_str(),
                                             );
-                                            self.gen_identifier_or_param(q, value, true)
+                                            self.gen_identifier_or_param(q, value, true, false)
                                         }
                                         v => {
                                             self.push_query_err(
