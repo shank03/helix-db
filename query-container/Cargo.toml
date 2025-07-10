@@ -3,6 +3,9 @@ name = "query-container"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+crate-type = ["cdylib"]
+
 [dependencies]
 helixdb = { path = "../helixdb" }
 get_routes = { path = "../get_routes" }

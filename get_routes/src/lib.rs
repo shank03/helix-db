@@ -13,7 +13,10 @@ pub fn handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let fn_name_str = fn_name.to_string();
     println!("fn_name_str: {}", fn_name_str);
     // Create a unique static name for each handler
-    let static_name = quote::format_ident!("__HANDLER_REGISTRATION_{}", fn_name.to_string().to_uppercase());
+    let static_name = quote::format_ident!(
+        "__HANDLER_REGISTRATION_{}",
+        fn_name.to_string().to_uppercase()
+    );
 
     let expanded = quote! {
         #input_fn
@@ -34,7 +37,6 @@ pub fn handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
     expanded.into()
 }
 
-
 #[proc_macro_attribute]
 pub fn local_handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(item as ItemFn);
@@ -42,7 +44,10 @@ pub fn local_handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let fn_name_str = fn_name.to_string();
     println!("fn_name_str: {}", fn_name_str);
     // Create a unique static name for each handler
-    let static_name = quote::format_ident!("__HANDLER_REGISTRATION_{}", fn_name.to_string().to_uppercase());
+    let static_name = quote::format_ident!(
+        "__HANDLER_REGISTRATION_{}",
+        fn_name.to_string().to_uppercase()
+    );
 
     let expanded = quote! {
         #input_fn
@@ -69,7 +74,10 @@ pub fn mcp_handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let fn_name = &input_fn.sig.ident;
     let fn_name_str = fn_name.to_string();
     // Create a unique static name for each handler
-    let static_name = quote::format_ident!("__HANDLER_REGISTRATION_{}", fn_name.to_string().to_uppercase());
+    let static_name = quote::format_ident!(
+        "__HANDLER_REGISTRATION_{}",
+        fn_name.to_string().to_uppercase()
+    );
 
     let expanded = quote! {
         #input_fn
@@ -89,4 +97,3 @@ pub fn mcp_handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
     };
     expanded.into()
 }
-

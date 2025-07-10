@@ -47,6 +47,13 @@ impl Handler {
 
 inventory::collect!(HandlerSubmission);
 
+impl HandlerSubmission {
+    pub fn collect_linked_handlers() -> Vec<&'static HandlerSubmission> {
+        let submissions: Vec<_> = inventory::iter::<HandlerSubmission>.into_iter().collect();
+        submissions
+    }
+}
+
 /// Router for handling requests and MCP requests
 ///
 /// Standard Routes and MCP Routes are stored in a HashMap with the method and path as the key

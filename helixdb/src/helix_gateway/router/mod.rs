@@ -4,7 +4,7 @@ use crate::{
     protocol::response::Response,
 };
 
-mod dynamic;
+pub mod dynamic;
 pub mod router;
 
 pub trait QueryHandler: Send + Sync {
