@@ -1,7 +1,7 @@
 use crate::helix_engine::types::GraphError;
 use reqwest::blocking::Client;
 use serde_json::json;
-// #[cfg(feature = "embed_local")]
+#[cfg(feature = "embed_local")]
 use url::Url;
 #[cfg(feature = "embed_openai")]
 use std::env;

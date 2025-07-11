@@ -19,7 +19,7 @@ use std::{
 };
 
 pub fn check_helix_installation() -> Result<PathBuf, String> {
-    let home_dir = dirs::home_dir().ok_or("Could not determine home directory")?;
+    let home_dir = PathBuf::from(std::env::var("HOME").unwrap_or("~/".to_string()));
     let repo_path = home_dir.join(".helix/repo/helix-db");
     let container_path = repo_path.join("helix-container");
     let cargo_path = container_path.join("Cargo.toml");
@@ -80,7 +80,8 @@ fn compile(analyzed_source: GeneratedSource) -> Result<(), String> {
         Err(e) => return Err(format!("Error, helix is not installed: {:?}", e)),
     };
 
-    let output = dirs::home_dir().unwrap().join(".helix/repo/helix-db/helix-container".to_string());
+    let home_dir = PathBuf::from(std::env::var("HOME").unwrap_or("~/".to_string()));
+    let output = home_dir.join(".helix/repo/helix-db/helix-container".to_string());
     let file_path = PathBuf::from(&output).join("src/queries.rs");
     let mut generated_rust_code = String::new();
     match write!(&mut generated_rust_code, "{}", analyzed_source) {

@@ -7,7 +7,7 @@ use crate::{
         return_values::ReturnValue,
         value::Value,
     },
-    utils::filterable::{Filterable, FilterableType},
+    utils::{filterable::{Filterable, FilterableType}, id::v6_uuid},
 };
 use core::fmt;
 use serde::{Deserialize, Serialize};
@@ -55,7 +55,7 @@ impl Debug for HVector {
 impl HVector {
     #[inline(always)]
     pub fn new(data: Vec<f64>) -> Self {
-        let id = uuid::Uuid::new_v4().as_u128();
+        let id = v6_uuid();
         HVector {
             id,
             is_deleted: false,
@@ -68,7 +68,7 @@ impl HVector {
 
     #[inline(always)]
     pub fn from_slice(level: usize, data: Vec<f64>) -> Self {
-        let id = uuid::Uuid::new_v4().as_u128();
+        let id = v6_uuid();
         HVector {
             id,
             is_deleted: false,
