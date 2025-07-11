@@ -1,7 +1,7 @@
 use crate::helix_engine::types::GraphError;
 use reqwest::blocking::Client;
 use serde_json::json;
-#[cfg(feature = "embed_local")]
+// #[cfg(feature = "embed_local")]
 use url::Url;
 #[cfg(feature = "embed_openai")]
 use std::env;
@@ -15,7 +15,7 @@ pub trait EmbeddingModel {
 }
 
 #[cfg(feature = "embed_openai")]
-struct EmbeddingModelImpl {
+pub struct EmbeddingModelImpl {
     api_key: String,
     client: Client,
     model: String,
@@ -72,7 +72,7 @@ impl EmbeddingModel for EmbeddingModelImpl {
 }
 
 #[cfg(feature = "embed_local")]
-struct EmbeddingModelImpl {
+pub struct EmbeddingModelImpl {
     url: String,
     client: Client,
 }
@@ -128,12 +128,12 @@ pub fn get_embedding_model(
     api_key: Option<&str>,
     model: Option<&str>,
     url: Option<&str>,
-) -> Result<Box<dyn EmbeddingModel>, GraphError> {
+) -> Result<EmbeddingModelImpl, GraphError> {
     #[cfg(feature = "embed_openai")]
-    return Ok(Box::new(EmbeddingModelImpl::new(api_key, model)?));
+    return Ok(EmbeddingModelImpl::new(api_key, model)?);
 
     #[cfg(feature = "embed_local")]
-    return Ok(Box::new(EmbeddingModelImpl::new(url)?));
+    return Ok(EmbeddingModelImpl::new(url)?);
 
     #[cfg(not(any(feature = "embed_openai", feature = "embed_local")))]
     panic!("No embedding model feature enabled. Enable either 'openai' or 'local'.");

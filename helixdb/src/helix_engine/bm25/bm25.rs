@@ -1,4 +1,4 @@
-use heed3::{types::*, Database, Env, RoTxn, RwTxn, WithoutTls};
+use heed3::{types::*, Database, Env, RoTxn, RwTxn, };
 use serde::{Deserialize, Serialize};
 use std::{borrow::Cow, collections::HashMap};
 
@@ -54,7 +54,7 @@ pub trait BM25 {
 }
 
 pub struct HBM25Config {
-    pub graph_env: Env<WithoutTls>,
+    pub graph_env: Env,
     pub inverted_index_db: Database<Bytes, Bytes>,
     pub doc_lengths_db: Database<U128<heed3::byteorder::BE>, U32<heed3::byteorder::BE>>,
     pub term_frequencies_db: Database<Bytes, U32<heed3::byteorder::BE>>,
@@ -62,7 +62,7 @@ pub struct HBM25Config {
 }
 
 impl HBM25Config {
-    pub fn new(graph_env: &Env<WithoutTls>, wtxn: &mut RwTxn) -> Result<HBM25Config, GraphError> {
+    pub fn new(graph_env: &Env, wtxn: &mut RwTxn) -> Result<HBM25Config, GraphError> {
         let inverted_index_db: Database<Bytes, Bytes> = graph_env
             .database_options()
             .types::<Bytes, Bytes>()

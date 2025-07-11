@@ -24,7 +24,7 @@ use heed3::{
     RoTxn, RwTxn,
     byteorder::BE,
     RoIter,
-    WithoutTls
+    
 };
 use std::{
     cmp::Ordering,
@@ -50,7 +50,7 @@ pub type EdgeId = u128;
 
 pub struct HelixGraphStorage {
     // TODO: maybe make not public?
-    pub graph_env: Env<WithoutTls>,
+    pub graph_env: Env,
     pub nodes_db: Database<U128<BE>, Bytes>,
     pub edges_db: Database<U128<BE>, Bytes>,
     pub out_edges_db: Database<Bytes, Bytes>,
@@ -75,7 +75,6 @@ impl HelixGraphStorage {
 
         let graph_env = unsafe {
             EnvOpenOptions::new()
-                .read_txn_without_tls()
                 .map_size(db_size * 1024 * 1024 * 1024) // Sets max size of the database in GB
                 .max_dbs(20) // Sets max number of databases
                 .max_readers(200) // Sets max number of readers
