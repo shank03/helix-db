@@ -152,15 +152,15 @@ pub fn get_embedding_model(
 /// ```
 macro_rules! embed {
     ($query:expr) => {{
-        let embedding_model = get_embedding_model(None, db.embedding_model.as_deref(), None);
+        let embedding_model = get_embedding_model(None, db.embedding_model.as_deref(), None)?;
         embedding_model.fetch_embedding($query)?
     }};
     ($query:expr, $model:expr) => {{
-        let embedding_model = get_embedding_model(None, Some($model), None);
+        let embedding_model = get_embedding_model(None, Some($model), None)?;
         embedding_model.fetch_embedding($query)?
     }};
     ($query:expr, $model:expr, $url:expr) => {{
-        let embedding_model = get_embedding_model(None, Some($model), Some($url));
+        let embedding_model = get_embedding_model(None, Some($model), Some($url))?;
         embedding_model.fetch_embedding($query)?
     }};
 }
