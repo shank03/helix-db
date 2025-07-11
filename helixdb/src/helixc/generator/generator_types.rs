@@ -373,8 +373,8 @@ impl Display for ForEach {
                     self.in_variable
                 )?;
             }
-            ForVariable::Identifier(_) => {
-                write!(f, "for data in {}", self.in_variable)?;
+            ForVariable::Identifier(identifier) => {
+                write!(f, "for {} in {}", identifier, self.in_variable)?;
             }
             ForVariable::Empty => {
                 assert!(false, "For variable is empty");
@@ -404,7 +404,7 @@ impl Display for ForLoopInVariable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ForLoopInVariable::Identifier(identifier) => write!(f, "{}", identifier),
-            ForLoopInVariable::Parameter(parameter) => write!(f, "{}", parameter),
+            ForLoopInVariable::Parameter(parameter) => write!(f, "data.{}", parameter),
             ForLoopInVariable::Empty => {
                 assert!(false, "For loop in variable is empty");
                 write!(f, "_")
@@ -456,7 +456,7 @@ impl Display for BoExp {
                     .collect::<Vec<_>>();
                 write!(f, "{}", tr.join(" || "))
             }
-            BoExp::Exists(traversal) => write!(f, "{}", traversal),
+            BoExp::Exists(traversal) => write!(f, "Exist::exists(&mut {})", traversal),
             BoExp::Expr(traversal) => write!(f, "{}", traversal),
         }
     }
@@ -484,32 +484,42 @@ impl Display for ReturnValue {
                 )
             }
             ReturnType::NamedExpr(name) => {
-                write!(f, "    return_vals.insert({}.to_string(), ReturnValue::from_traversal_value_array_with_mixin({}.clone(), remapping_vals.borrow_mut()));\n", String::from(name.clone()), self.value)
+                write!(f, "    return_vals.insert({}.to_string(), ReturnValue::from_traversal_value_array_with_mixin({}.clone(), remapping_vals.borrow_mut()));\n", name, self.value)
+            }
+            ReturnType::SingleExpr(name) => {
+                write!(f, "    return_vals.insert({}.to_string(), ReturnValue::from_traversal_value_with_mixin({}.clone(), remapping_vals.borrow_mut()));\n", name, self.value)
             }
             ReturnType::UnnamedExpr => {
-                write!(f, "// need to implement unnamed return value\n todo!()")
+                write!(f, "// need to implement unnamed return value\n todo!()")?;
+                panic!("Unnamed return value is not supported");
             }
         }
     }
 }
 
 impl ReturnValue {
-    pub fn new_literal(name: GenRef<String>, value: GenRef<String>) -> Self {
+    pub fn new_literal(name: GeneratedValue, value: GeneratedValue) -> Self {
         Self {
             value: ReturnValueExpr::Value(value.clone()),
             return_type: ReturnType::Literal(name),
         }
     }
-    pub fn new_named_literal(name: GenRef<String>, value: GenRef<String>) -> Self {
+    pub fn new_named_literal(name: GeneratedValue, value: GeneratedValue) -> Self {
         Self {
             value: ReturnValueExpr::Value(value.clone()),
             return_type: ReturnType::NamedLiteral(name),
         }
     }
-    pub fn new_named(name: GenRef<String>, value: ReturnValueExpr) -> Self {
+    pub fn new_named(name: GeneratedValue, value: ReturnValueExpr) -> Self {
         Self {
             value,
             return_type: ReturnType::NamedExpr(name),
+        }
+    }
+    pub fn new_single_named(name: GeneratedValue, value: ReturnValueExpr) -> Self {
+        Self {
+            value,
+            return_type: ReturnType::SingleExpr(name),
         }
     }
     pub fn new_unnamed(value: ReturnValueExpr) -> Self {
@@ -522,16 +532,17 @@ impl ReturnValue {
 
 #[derive(Clone)]
 pub enum ReturnType {
-    Literal(GenRef<String>),
-    NamedLiteral(GenRef<String>),
-    NamedExpr(GenRef<String>),
+    Literal(GeneratedValue),
+    NamedLiteral(GeneratedValue),
+    NamedExpr(GeneratedValue),
+    SingleExpr(GeneratedValue),
     UnnamedExpr,
 }
 #[derive(Clone)]
 pub enum ReturnValueExpr {
     Traversal(Traversal),
-    Identifier(GenRef<String>),
-    Value(GenRef<String>),
+    Identifier(GeneratedValue),
+    Value(GeneratedValue),
 }
 impl Display for ReturnValueExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -16,7 +16,7 @@ pub struct SearchBM25<'scope, 'inner> {
     label: &'inner str,
 }
 
-// implementing iterator for OutIterator
+// implementing iterator for SearchBM25
 impl<'scope, 'inner> Iterator for SearchBM25<'scope, 'inner> {
     type Item = Result<TraversalVal, GraphError>;
 
@@ -65,7 +65,6 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> SearchBM25Adapter
             storage: Arc::clone(&self.storage),
             label,
         };
-        // Wrap it with the RoTraversalIterator adapter
         RoTraversalIterator {
             inner: iter,
             storage: self.storage,
