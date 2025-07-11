@@ -4,8 +4,7 @@ members = [
     "helix-container",
     "proc_macros",
     "helix-cli",
-    "hbuild",
-    "hbuild_redploy",
+    "hbuild_redeploy",
 ]
 resolver = "2"
 
