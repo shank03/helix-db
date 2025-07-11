@@ -2964,8 +2964,13 @@ impl<'a> Ctx<'a> {
                         }
                     }
                     None => {
-                        // TODO: throw error
-                        unreachable!() // throw error
+                        self.push_query_err(
+                            q,
+                            gs.loc.clone(),
+                            format!("Edge of type `{}` does not exist", label),
+                            "check the schema for valid edge types",
+                        );
+                        return None;
                     }
                 };
                 traversal
@@ -3024,7 +3029,13 @@ impl<'a> Ctx<'a> {
                         } else if self.vector_set.contains(edge.from.1.as_str()) {
                             EdgeType::Vec
                         } else {
-                            panic!("Edge of type `{}` does not exist", label);
+                            self.push_query_err(
+                                q,
+                                gs.loc.clone(),
+                                format!("Edge of type `{}` does not exist", label),
+                                "check the schema for valid edge types",
+                            );
+                            return None;
                         }
                     }
                     None => {
@@ -3053,9 +3064,9 @@ impl<'a> Ctx<'a> {
                 match edge.unwrap().to.1 == node_label.clone() {
                     true => {
                         if EdgeType::Node == edge_type {
-                            Some(Type::Nodes(Some(edge.unwrap().to.1.clone())))
+                            Some(Type::Nodes(Some(edge.unwrap().from.1.clone())))
                         } else if EdgeType::Vec == edge_type {
-                            Some(Type::Vectors(Some(edge.unwrap().to.1.clone())))
+                            Some(Type::Vectors(Some(edge.unwrap().from.1.clone())))
                         } else {
                             None
                         }
