@@ -384,6 +384,42 @@ fi
             }
         }
 
+        // TODO: assuming just local for now
+        CommandType::Visualize(command) => {
+            let instance_manager = InstanceManager::new().unwrap();
+            let iid = &command.instance;
+
+            match instance_manager.get_instance(iid) {
+                Ok(Some(instance)) => {
+                    println!("{}", "Helix instance found!".green().bold());
+                    let port = instance.port;
+                    let url = format!("http://localhost:{}/get/graphvis", port);
+
+                    if webbrowser::open(&url).is_ok() {
+                    } else {
+                        println!(
+                            "{} {}",
+                            "Failed to open graph visualizer for instance".red().bold(),
+                            iid.red().bold()
+                        );
+                        return;
+                    }
+                }
+                Ok(None) => {
+                    println!(
+                        "{} {}",
+                        "No Helix instance found with id".red().bold(),
+                        iid.red().bold()
+                    );
+                    return;
+                }
+                Err(e) => {
+                    println!("{} {}", "Error:".red().bold(), e);
+                    return;
+                }
+            };
+        }
+
         CommandType::Update(_) => {
             match check_helix_installation() {
                 Ok(_) => {}

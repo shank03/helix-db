@@ -20,8 +20,8 @@ pub enum CommandType {
     /// Demo a Helix project
     Demo,
 
-    // Open graph vis in default browser
-    //Visualize,
+    /// Open graph vis in default browser
+    Visualize(VisualizeCommand),
 
     /// Deploy a Helix project
     Deploy(DeployCommand),
@@ -189,6 +189,16 @@ pub struct StopCommand {
 pub struct StartCommand {
     #[clap(help = "Instance ID to Start")]
     pub instance: String,
+}
+
+#[derive(Debug, Args)]
+#[clap(name = "visualize", about = "Visualize the Helix graph")]
+pub struct VisualizeCommand {
+    #[clap(short, long, help = "Stop all running instances")]
+    pub instance: String,
+
+    #[clap(short, long, help = "Give nodes a label based on a property")]
+    pub node_prop: Option<String>,
 }
 
 #[derive(Debug, Args)]

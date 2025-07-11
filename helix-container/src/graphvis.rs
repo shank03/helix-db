@@ -15,6 +15,7 @@ pub struct GraphLabels {
 */
 
 // TODO: important is that errors are returned in the http response!
+// TODO: pass in k and node prop via the http request
 #[get_handler]
 pub fn graphvis(input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
     /*
@@ -26,10 +27,13 @@ pub fn graphvis(input: &HandlerInput, response: &mut Response) -> Result<(), Gra
 
     // TODO: pass in k, node, and edge in the url
     let db = Arc::clone(&input.graph.storage);
-    let json_ne: String = match db.get_ne_json(
-        Some(300),
-        Some("entity_name".to_string()),
-        Some("edge_name".to_string()),
+    let txn = db.graph_env.read_txn()?;
+
+    let json_ne: String = match db.nodes_edges_to_json(
+        &txn,
+        None,
+        None,
+        //Some("entity_name".to_string()),
     ) {
         Ok(value) => value,
         Err(e) => {

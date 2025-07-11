@@ -17,23 +17,33 @@ use crate::{
         label_hash::hash_label,
     },
 };
-use heed3::{byteorder::BE, RoIter, WithoutTls};
-use heed3::{types::*, Database, DatabaseFlags, Env, EnvOpenOptions, RoTxn, RwTxn, WithTls};
-use serde_json::json;
+use heed3::{
+    types::*,
+    Database, DatabaseFlags,
+    Env, EnvOpenOptions,
+    RoTxn, RwTxn,
+    byteorder::BE,
+    RoIter,
+    WithoutTls
+};
 use std::{
     cmp::Ordering,
-    collections::{BinaryHeap, HashMap, HashSet},
+    collections::{BinaryHeap, HashMap},
     fs,
-    hash::Hash,
     path::Path,
-    sync::{Arc, Mutex},
+    sync::Arc,
+};
+use sonic_rs::{
+    json,
+    Value as JsonValue,
+    JsonValueMutTrait
 };
 
-// Database names for different stores
-const DB_NODES: &str = "nodes"; // For node data (n:)
-const DB_EDGES: &str = "edges"; // For edge data (e:)
-const DB_OUT_EDGES: &str = "out_edges"; // For outgoing edge indices (o:)
-const DB_IN_EDGES: &str = "in_edges"; // For incoming edge indices (i:)
+// database names for different stores
+const DB_NODES: &str = "nodes"; // for node data (n:)
+const DB_EDGES: &str = "edges"; // for edge data (e:)
+const DB_OUT_EDGES: &str = "out_edges"; // for outgoing edge indices (o:)
+const DB_IN_EDGES: &str = "in_edges"; // for incoming edge indices (i:)
 
 pub type NodeId = u128;
 pub type EdgeId = u128;
@@ -243,117 +253,39 @@ impl HelixGraphStorage {
         Ok(vector)
     }
 
-    // TODO: limit to 300 nodes
-    // TODO: update comment
-
-    /// Returns edges and nodes in a specific json format such that it can be visualized
-    ///     strictly in this format (write you're own parser if you want it in a diff
-    ///     format):
-    /// {
-    ///     "nodes": [ { "id": 1, "label": "Node 1" } ],
-    ///     "edges": [ { "from": 1, "to": 2, "label": Edge from 1 to 2" } ]
-    /// }
-    ///
-    /// does not show nodes with no edges
-    pub fn get_ne_json(
+    pub fn nodes_edges_to_json(
         &self,
+        txn: &RoTxn,
         k: Option<usize>,
-        show_node_properties: Option<String>,
-        show_edge_properties: Option<String>,
+        node_prop: Option<String>
     ) -> Result<String, GraphError> {
-        let txn = self.graph_env.write_txn()?;
+        let k = k.unwrap_or(200);
+        if k > 300 {
+            return Err(GraphError::New("cannot not visualize more than 300 nodes!".to_string()));
+        }
+
         if self.nodes_db.is_empty(&txn)? || self.edges_db.is_empty(&txn)? {
             return Err(GraphError::New("edges or nodes db is empty!".to_string()));
         }
 
-        let k = k.unwrap_or(200);
-        let top_node_ids = self.nodes_by_highest_card(&txn, k)?;
+        let top_nodes = self.get_nodes_by_cardinality(&txn, k)?;
 
-        let mut nodes = vec![];
-        let mut edges = vec![];
-
-        for node_id in &top_node_ids {
-            let mut node = self
-                .nodes_db
-                .lazily_decode_data()
-                .prefix_iter(&txn, &node_id)?;
-            if let Some((_, node_data)) = node.next().transpose()? {
-                let node = Node::decode_node(node_data.decode().unwrap(), *node_id)?;
-                let mut json_node = json!({"id": node_id.to_string()});
-
-                if let Some(snp) = &show_node_properties {
-                    let props = node.properties.as_ref().ok_or_else(|| {
-                        debug_println!("No properties for node {}", node_id);
-                        GraphError::New(format!("No properties for node {}", node_id))
-                    })?;
-                    let value = props.get(snp).ok_or_else(|| {
-                        debug_println!("Property {} not found for node {}", snp, node_id);
-                        GraphError::New(format!("Property {} not found for node {}", snp, node_id))
-                    })?;
-                    json_node
-                        .as_object_mut()
-                        .ok_or_else(|| GraphError::New("Invalid JSON object".to_string()))?
-                        .insert("label".to_string(), json!(value.to_string()));
-                }
-                nodes.push(json_node);
-            } else {
-                return Err(GraphError::New(format!("no node for for id {:?}", node_id)));
-            }
-        }
-
-        for edge in self.edges_db.lazily_decode_data().iter(&txn)? {
-            let (edge_id, edge_data) = edge?;
-            let edge = Edge::decode_edge(edge_data.decode().unwrap(), edge_id)?;
-            if top_node_ids.contains(&edge.from_node) || top_node_ids.contains(&edge.to_node) {
-                let mut json_edge = json!({
-                    "from": edge.from_node.to_string(),
-                    "to": edge.to_node.to_string(),
-                });
-
-                if let Some(sep) = &show_edge_properties {
-                    let props = edge.properties.as_ref().ok_or_else(|| {
-                        debug_println!("No properties for edge {}", edge_id);
-                        GraphError::New(format!("No properties for edge {}", edge_id))
-                    })?;
-                    let value = props.get(sep).ok_or_else(|| {
-                        debug_println!("Property {} not found for edge {}", sep, edge_id);
-                        GraphError::New(format!("Property {} not found for edge {}", sep, edge_id))
-                    })?;
-                    json_edge
-                        .as_object_mut()
-                        .ok_or_else(|| GraphError::New("Invalid JSON object".to_string()))?
-                        .insert("label".to_string(), json!(value.to_string()));
-                }
-                edges.push(json_edge);
-            }
-        }
-
-        let result = json!({
-            "nodes": nodes,
-            "edges": edges,
-        });
-
-        serde_json::to_string(&result).map_err(|e| GraphError::New(e.to_string()))
+        let ret_json = self.cards_to_json(&txn, k, top_nodes, node_prop)?;
+        sonic_rs::to_string(&ret_json).map_err(|e| GraphError::New(e.to_string()))
     }
 
-    /// Get the top k nodes with the highest cardinalities
-    fn nodes_by_highest_card(&self, txn: &RwTxn, k: usize) -> Result<HashSet<u128>, GraphError> {
-        let mut edge_counts: HashMap<u128, u32> = HashMap::new();
-        for edge in self.edges_db.iter(&txn)? {
-            let (edge_id, edge_data) = edge?;
-            let edge = Edge::decode_edge(edge_data, edge_id)?;
-            *edge_counts.entry(edge.from_node).or_insert(0) += 1;
-            *edge_counts.entry(edge.to_node).or_insert(0) += 1;
-        }
-
-        let mut top_nodes: Vec<(u128, u32)> = edge_counts.into_iter().collect();
-        top_nodes.sort_by(|a, b| b.1.cmp(&a.1));
-        Ok(top_nodes.into_iter().take(k).map(|(id, _)| id).collect())
-    }
-
-    pub fn get_top_nodes_by_cardinality(
+    /// Get the top k nodes and all of the edges associated with them by checking their
+    /// cardinalities (total number of in and out edges)
+    ///
+    /// Output:
+    /// Vec [
+    ///     node_id: u128,
+    ///     out_edges: Vec<(EdgeID, FromNodeId, ToNodeId)>,
+    ///     in_edges: Vec<(EdgeID, FromNodeId, ToNodeId)>,
+    /// ]
+    fn get_nodes_by_cardinality(
         &self,
-        txn: &RwTxn,
+        txn: &RoTxn,
         k: usize,
     ) -> Result<Vec<(u128, Vec<(u128, u128, u128)>, Vec<(u128, u128, u128)>)>, GraphError> {
         let node_count = self.nodes_db.len(&txn)?;
@@ -368,6 +300,7 @@ impl HelixGraphStorage {
             out_edges: Vec<(EdgeID, FromNodeId, ToNodeId)>,
             in_edges: Vec<(EdgeID, FromNodeId, ToNodeId)>,
         }
+
         impl PartialEq for EdgeCount {
             fn eq(&self, other: &Self) -> bool {
                 self.edges_count == other.edges_count
@@ -384,6 +317,7 @@ impl HelixGraphStorage {
                 self.edges_count.cmp(&other.edges_count)
             }
         }
+
         let db = Arc::new(self);
         let out_db = Arc::clone(&db);
         let in_db = Arc::clone(&db);
@@ -447,14 +381,13 @@ impl HelixGraphStorage {
                     edge_count.edge_count += edges_count;
                     edge_count.out_edges = edges;
                 }
-                Err(e) => {
-                    debug_println!("Error in out_node_key_iter: {:?}", e);
+                Err(_e) => {
+                    debug_println!("Error in out_node_key_iter: {:?}", _e);
                 }
             }
         }
 
         // in edges
-
         // this gets each node ID from the in edges db
         // by using the in_edges_db it pulls data into os cache
         let in_node_key_iter = in_db.in_edges_db.lazily_decode_data().iter(&txn).unwrap();
@@ -478,8 +411,8 @@ impl HelixGraphStorage {
                     edge_count.edge_count += edges_count;
                     edge_count.in_edges = edges;
                 }
-                Err(e) => {
-                    debug_println!("Error in in_node_key_iter: {:?}", e);
+                Err(_e) => {
+                    debug_println!("Error in in_node_key_iter: {:?}", _e);
                 }
             }
         }
@@ -487,28 +420,35 @@ impl HelixGraphStorage {
         // for each node, get the decode the edges and extract the edge id and other node id
         // and add to the ordered_edge_counts heap
         for (node_id, edges_count) in edge_counts.into_iter() {
-            let out_edges = edges_count
-                .out_edges
-                .unwrap()
-                .map(|result| {
-                    let (key, value) = result.unwrap();
-                    let from_node = u128::from_be_bytes(key[0..16].try_into().unwrap());
-                    let (edge_id, to_node) =
-                        Self::unpack_adj_edge_data(value.decode().unwrap()).unwrap();
-                    (edge_id, from_node, to_node)
-                })
-                .collect::<Vec<_>>();
-            let in_edges = edges_count
-                .in_edges
-                .unwrap()
-                .map(|result| {
-                    let (key, value) = result.unwrap();
-                    let to_node = u128::from_be_bytes(key[0..16].try_into().unwrap());
-                    let (edge_id, from_node) =
-                        Self::unpack_adj_edge_data(value.decode().unwrap()).unwrap();
-                    (edge_id, from_node, to_node)
-                })
-                .collect::<Vec<_>>();
+            let out_edges = match edges_count.out_edges {
+                Some(out_edges_iter) => {
+                    out_edges_iter
+                        .map(|result| {
+                            let (key, value) = result.unwrap();
+                            let from_node = u128::from_be_bytes(key[0..16].try_into().unwrap());
+                            let (edge_id, to_node) =
+                                Self::unpack_adj_edge_data(value.decode().unwrap()).unwrap();
+                            (edge_id, from_node, to_node)
+                        })
+                    .collect::<Vec<(EdgeID, FromNodeId, ToNodeId)>>()
+                }
+                None => vec![]
+            };
+            let in_edges = match edges_count.in_edges {
+                Some(in_edges_iter) => {
+                    in_edges_iter
+                        .map(|result| {
+                            let (key, value) = result.unwrap();
+                            let to_node = u128::from_be_bytes(key[0..16].try_into().unwrap());
+                            let (edge_id, from_node) =
+                                Self::unpack_adj_edge_data(value.decode().unwrap()).unwrap();
+                            (edge_id, from_node, to_node)
+                        })
+                    .collect::<Vec<(EdgeID, FromNodeId, ToNodeId)>>()
+                }
+                None => vec![]
+            };
+
             ordered_edge_counts.push(EdgeCount {
                 node_id,
                 edges_count: edges_count.edge_count,
@@ -530,6 +470,74 @@ impl HelixGraphStorage {
         }
 
         Ok(top_nodes)
+    }
+
+    /// Output:
+    /// {
+    ///     "nodes": [{"id": uuid_id_node, "label": "optional_property", "title": "uuid"}],
+    ///     "edges": [{"from": uuid, "to": uuid, "title": "uuid"}]
+    /// }
+    fn cards_to_json(
+        &self,
+        txn: &RoTxn,
+        k: usize,
+        top_nodes: Vec<(u128, Vec<(u128, u128, u128)>, Vec<(u128, u128, u128)>)>,
+        node_prop: Option<String>,
+    ) -> Result<JsonValue, GraphError> {
+        let mut nodes = Vec::with_capacity(k);
+        let mut edges = Vec::new();
+
+        top_nodes.iter().try_for_each(|(id, out_edges, in_edges)| {
+            let mut json_node = json!({ "id": id.to_string(), "title": id.to_string() });
+            if let Some(prop) = &node_prop {
+                let mut node = self.nodes_db
+                    .lazily_decode_data()
+                    .prefix_iter(&txn, id)
+                    .unwrap();
+                if let Some((_, data)) = node.next().transpose().unwrap() {
+                    let node = Node::decode_node(data.decode().unwrap(), *id)?;
+                    let props = node.properties.as_ref().ok_or_else(|| {
+                        GraphError::New(format!("no properties for node {}", id))
+                    })?;
+                    let prop_value = props.get(prop).ok_or_else(|| {
+                        GraphError::New(format!("property {} not found for node {}", prop, id))
+                    })?;
+                    json_node
+                        .as_object_mut()
+                        .ok_or_else(|| GraphError::New("invalid JSON object".to_string()))?
+                        .insert("label", json!(prop_value));
+                }
+            }
+
+            nodes.push(json_node);
+            out_edges.iter().for_each(|(edge_id, from_node_id, to_node_id)| {
+                edges.push(json!({
+                    "from": from_node_id.to_string(),
+                    "to": to_node_id.to_string(),
+                    "title": edge_id.to_string(),
+                }));
+            });
+
+            // TODO: still having 1 error this is basically duplicated
+            /*
+            in_edges.iter().for_each(|(edge_id, from_node_id, to_node_id)| {
+                edges.push(json!({
+                    "from": from_node_id.to_string(),
+                    "to": to_node_id.to_string(),
+                    "title": edge_id.to_string(),
+                }));
+            });
+            */
+
+            Ok::<(), GraphError>(())
+        })?;
+
+        let result = json!({
+            "nodes": nodes,
+            "edges": edges,
+        });
+
+        Ok(result)
     }
 
     /// Get number of nodes, edges, and vectors from lmdb
