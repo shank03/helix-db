@@ -164,6 +164,8 @@ pub fn find_available_port(start_port: u16) -> Option<u16> {
     None
 }
 
+/// Checks if the path contains a schema.hx and config.hx.json file
+/// Returns a vector of DirEntry objects for all .hx files in the path
 pub fn check_and_read_files(path: &str) -> Result<Vec<DirEntry>, CliError> {
     if !fs::read_dir(&path)
         .map_err(CliError::Io)?
@@ -202,27 +204,14 @@ pub fn check_and_read_files(path: &str) -> Result<Vec<DirEntry>, CliError> {
     Ok(files)
 }
 
-pub fn to_snake_case(s: &str) -> String {
-    let mut result = String::with_capacity(s.len());
-    let mut prev_is_uppercase = false;
-
-    for (i, c) in s.chars().enumerate() {
-        if c.is_uppercase() {
-            if i > 0 && !prev_is_uppercase {
-                result.push('_');
-            }
-            result.push(c.to_lowercase().next().unwrap());
-            prev_is_uppercase = true;
-        } else {
-            result.push(c);
-            prev_is_uppercase = false;
-        }
-    }
-    result
-}
-
-fn generate_content(files: &Vec<DirEntry>) -> Result<Content, CliError> {
-    let files = files
+/// Generates a Content object from a vector of DirEntry objects
+/// Returns a Content object with the files and source
+///
+/// This essentially makes a full string of all of the files while having a separate vector of the individual files
+///
+/// This could be changed in the future but keeps the option open for being able to access the files separately or all at once
+pub fn generate_content(files: &Vec<DirEntry>) -> Result<Content, CliError> {
+    let files: Vec<HxFile> = files
         .iter()
         .map(|file| {
             let name = file.path().to_string_lossy().into_owned();
@@ -231,15 +220,17 @@ fn generate_content(files: &Vec<DirEntry>) -> Result<Content, CliError> {
         })
         .collect();
 
-    let content = Content {
-        content: String::new(),
-        files,
-        source: Source::default(),
-    };
+    let content = files.clone().iter().map(|file| file.content.clone()).collect::<Vec<String>>().join("\n");
 
-    Ok(content)
+    Ok(Content {
+        content,
+        files,
+        source: Source::default()
+    })
 }
 
+
+/// Uses the helix parser to parse the content into a Source object
 fn parse_content(content: &Content) -> Result<Source, CliError> {
     let source = match HelixParser::parse_source(&content) {
         Ok(source) => source,
@@ -251,6 +242,8 @@ fn parse_content(content: &Content) -> Result<Source, CliError> {
     Ok(source)
 }
 
+/// Runs the static analyzer on the parsed source to catch errors and generate diagnostics if any.
+/// Otherwise returns the generated source object which is an IR used to transpile the queries to rust.
 fn analyze_source(source: Source) -> Result<GeneratedSource, CliError> {
     let (diagnostics, source) = analyze(&source);
     if !diagnostics.is_empty() {
@@ -264,6 +257,12 @@ fn analyze_source(source: Source) -> Result<GeneratedSource, CliError> {
     Ok(source)
 }
 
+/// Generates a Content and GeneratedSource object from a vector of DirEntry objects
+/// Returns a tuple of the Content and GeneratedSource objects
+///
+/// This function is the main entry point for generating the Content and GeneratedSource objects
+///
+/// It first generates the content from the files, then parses the content into a Source object, and then analyzes the source to catch errors and generate diagnostics if any.
 pub fn generate(files: &Vec<DirEntry>) -> Result<(Content, GeneratedSource), CliError> {
     let mut content = generate_content(&files)?;
     content.source = parse_content(&content)?;

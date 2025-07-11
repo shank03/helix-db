@@ -2,11 +2,9 @@
 members = [
     "helixdb",
     "helix-container",
-    "get_routes",
-    "debug_trace",
+    "proc_macros",
     "helix-cli",
-    "hbuild",
-    "hbuild_redploy",
+    "hbuild_redeploy",
 ]
 resolver = "2"
 
@@ -23,4 +21,4 @@ opt-level = 0
 codegen-units = 256
 incremental = true
 panic = "abort"
-debug = 1           
+debug = 1

@@ -6,7 +6,7 @@ use crate::{
     },
     protocol::items::Edge,
 };
-use debug_trace::debug_trace;
+use proc_macros::debug_trace;
 use heed3::RoTxn;
 use std::{iter::Once, sync::Arc};
 

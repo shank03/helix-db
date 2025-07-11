@@ -5,7 +5,6 @@ use heed3::{RoTxn, RwTxn};
 use super::ops::tr_val::TraversalVal;
 use crate::{
     helix_engine::{storage_core::storage_core::HelixGraphStorage, types::GraphError},
-    helixc::generator::utils::Order,
     protocol::{filterable::Filterable, value::Value},
 };
 use itertools::Itertools;
@@ -37,7 +36,9 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> RoTraversalIterat
     }
 
     pub fn collect_to<B: FromIterator<TraversalVal>>(self) -> B {
-        self.inner.filter_map(|item| item.ok()).collect::<B>()
+        self.inner.filter_map(|item| {
+            item.ok()
+        }).collect::<B>()
     }
 
     pub fn collect_dedup<B: FromIterator<TraversalVal>>(self) -> B {
@@ -172,7 +173,9 @@ where
         self.inner.next()
     }
 }
-impl<'scope, 'env, I: Iterator> RwTraversalIterator<'scope, 'env, I> {
+impl<'scope, 'env, I: Iterator<Item = Result<TraversalVal, GraphError>>>
+    RwTraversalIterator<'scope, 'env, I>
+{
     pub fn new(storage: Arc<HelixGraphStorage>, txn: &'scope mut RwTxn<'env>, inner: I) -> Self {
         Self {
             inner,
@@ -199,6 +202,12 @@ impl<'scope, 'env, I: Iterator> RwTraversalIterator<'scope, 'env, I> {
             .first()
         {
             Some(val) => val.clone(), // TODO: Remove clone
+            None => TraversalVal::Empty,
+        }
+    }
+    pub fn collect_to_obj(self) -> TraversalVal {
+        match self.inner.filter_map(|item| item.ok()).next() {
+            Some(val) => val,
             None => TraversalVal::Empty,
         }
     }

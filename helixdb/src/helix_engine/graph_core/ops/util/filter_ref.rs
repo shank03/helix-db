@@ -2,7 +2,7 @@ use crate::helix_engine::{graph_core::traversal_iter::RoTraversalIterator, types
 
 use super::super::tr_val::TraversalVal;
 use heed3::RoTxn;
-use debug_trace::debug_trace;
+use proc_macros::debug_trace;
 
 pub struct FilterRef<'a, I, F> {
     iter: I,
@@ -47,7 +47,7 @@ pub trait FilterRefAdapter<'a>: Iterator {
 
 impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> FilterRefAdapter<'a>
     for RoTraversalIterator<'a, I>
-{   
+{
     #[inline]
     fn filter_ref<F>(
         self,

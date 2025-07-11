@@ -12,30 +12,29 @@ pub struct Drop<I> {
 
 impl<'a> Drop<Vec<Result<TraversalVal, GraphError>>> {
     pub fn drop_traversal(
-        iter: Vec<Result<TraversalVal, GraphError>>,
+        iter: Vec<TraversalVal>,
         storage: Arc<HelixGraphStorage>,
         txn: &mut RwTxn,
     ) -> Result<(), GraphError> {
+        println!("Dropping traversal {:?}", iter);
         iter.into_iter()
             .try_for_each(|item| -> Result<(), GraphError> {
                 match item {
-                    Ok(item) => match item {
-                        TraversalVal::Node(node) => match storage.drop_node(txn, &node.id) {
-                            Ok(_) => Ok(()),
-                            Err(e) => return Err(e),
-                        },
-                        TraversalVal::Edge(edge) => match storage.drop_edge(txn, &edge.id) {
-                            Ok(_) => Ok(()),
-                            Err(e) => return Err(e),
-                        },
-                        _ => {
-                            return Err(GraphError::ConversionError(format!(
-                                "Incorrect Type: {:?}",
-                                item
-                            )));
-                        }
+                    TraversalVal::Node(node) => match storage.drop_node(txn, &node.id) {
+                        Ok(_) => Ok(println!("Dropped node: {:?}", node.id)),
+                        Err(e) => return Err(e),
                     },
-                    Err(e) => return Err(e),
+                    TraversalVal::Edge(edge) => match storage.drop_edge(txn, &edge.id) {
+                        Ok(_) => Ok(()),
+                        Err(e) => return Err(e),
+                    },
+                    TraversalVal::Vector(_) => Ok(()),
+                    _ => {
+                        return Err(GraphError::ConversionError(format!(
+                            "Incorrect Type: {:?}",
+                            item
+                        )));
+                    }
                 }
             })
     }

@@ -10,7 +10,7 @@ use crate::{
     },
     helix_gateway::mcp::tools::{ToolArgs, ToolCalls},
 };
-use get_routes::mcp_handler;
+use proc_macros::mcp_handler;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},

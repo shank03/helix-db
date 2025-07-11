@@ -9,7 +9,7 @@ use crate::{
     },
     protocol::label_hash::hash_label,
 };
-use debug_trace::debug_trace;
+use proc_macros::debug_trace;
 use heed3::{types::Bytes, RoTxn};
 use std::sync::Arc;
 
@@ -59,7 +59,7 @@ pub trait InEdgesAdapter<'a, T>: Iterator<Item = Result<TraversalVal, GraphError
     /// Note that the `edge_label` cannot be empty and must be a valid, existing edge label.
     ///
     /// To provide safety, you cannot get all incoming edges as it would be ambiguous as to what
-    /// type that resulting edge would be.  
+    /// type that resulting edge would be.
     fn in_e(
         self,
         edge_label: &'a str,

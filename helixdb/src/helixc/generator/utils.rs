@@ -109,6 +109,23 @@ impl From<IdType> for GenRef<String> {
 }
 
 #[derive(Clone)]
+pub enum VecData {
+    Standard(GeneratedValue),
+    Embed(GeneratedValue),
+    Unknown,
+}
+
+impl Display for VecData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            VecData::Standard(v) => write!(f, "{}", v),
+            VecData::Embed(v) => write!(f, "&embed!({})", v),
+            VecData::Unknown => panic!("Cannot convert to string, VecData is unknown"),
+        }
+    }
+}
+
+#[derive(Clone)]
 pub enum Order {
     Asc,
     Desc,
@@ -299,8 +316,8 @@ pub fn write_headers() -> String {
     r#"
 
 use heed3::RoTxn;
-use get_routes::handler;
-use helixdb::{field_remapping, identifier_remapping, traversal_remapping, exclude_field, value_remapping};
+use proc_macros::handler;
+use helixdb::{field_remapping, identifier_remapping, traversal_remapping, exclude_field, value_remapping, embed};
 use helixdb::helix_engine::vector_core::vector::HVector;
 use helixdb::{
     helix_engine::graph_core::ops::{
@@ -320,14 +337,17 @@ use helixdb::{
         util::{
             dedup::DedupAdapter, filter_mut::FilterMut,
             filter_ref::FilterRefAdapter, range::RangeAdapter, update::UpdateAdapter,
-            map::MapAdapter, paths::ShortestPathAdapter, props::PropsAdapter, drop::Drop,
+            map::MapAdapter, paths::ShortestPathAdapter, props::PropsAdapter, drop::Drop, exist::Exist,
         },
         vectors::{insert::InsertVAdapter, search::SearchVAdapter, brute_force_search::BruteForceSearchVAdapter},
         bm25::search_bm25::SearchBM25Adapter,
 
     },
     helix_engine::types::GraphError,
-    helix_gateway::router::router::HandlerInput,
+    helix_gateway::{
+        router::router::HandlerInput,
+        embedding_providers::embedding_providers::get_embedding_model,
+    },
     node_matches, props,
     protocol::count::Count,
     protocol::remapping::{RemappingMap, ResponseRemapping},

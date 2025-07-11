@@ -9,6 +9,7 @@ use pest::{
     Parser as PestParser,
 };
 use pest_derive::Parser;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     fmt::{Debug, Display},
@@ -27,6 +28,7 @@ pub struct Content {
     pub files: Vec<HxFile>,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct HxFile {
     pub name: String,
     pub content: String,
@@ -536,6 +538,19 @@ pub enum BooleanOpType {
 pub enum VectorData {
     Vector(Vec<f64>),
     Identifier(String),
+    Embed(Embed),
+}
+
+#[derive(Debug, Clone)]
+pub struct Embed {
+    pub loc: Loc,
+    pub value: EvaluatesToString,
+}
+
+#[derive(Debug, Clone)]
+pub enum EvaluatesToString {
+    Identifier(String),
+    StringLiteral(String),
 }
 
 #[derive(Debug, Clone)]
@@ -629,7 +644,11 @@ impl Display for IdType {
         match self {
             IdType::Literal { value, loc: _ } => write!(f, "{}", value),
             IdType::Identifier { value, loc: _ } => write!(f, "{}", value),
-            IdType::ByIndex { index, value: _, loc: _ } => write!(f, "{}", index),
+            IdType::ByIndex {
+                index,
+                value: _,
+                loc: _,
+            } => write!(f, "{}", index),
         }
     }
 }
@@ -695,7 +714,11 @@ impl From<IdType> for String {
                 value
             }
             IdType::Identifier { value, loc: _ } => value,
-            IdType::ByIndex { index, value: _, loc: _ } => String::from(*index),
+            IdType::ByIndex {
+                index,
+                value: _,
+                loc: _,
+            } => String::from(*index),
         }
     }
 }
@@ -1314,14 +1337,58 @@ impl HelixParser {
                 Rule::identifier_upper => {
                     vector_type = Some(p.as_str().to_string());
                 }
-                Rule::vector_data => match p.clone().into_inner().next().unwrap().as_rule() {
-                    Rule::identifier => {
-                        data = Some(VectorData::Identifier(p.as_str().to_string()));
+                Rule::vector_data => match p.clone().into_inner().next() {
+                    Some(vector_data) => match vector_data.as_rule() {
+                        Rule::identifier => {
+                            data = Some(VectorData::Identifier(p.as_str().to_string()));
+                        }
+                        Rule::vec_literal => {
+                            data = Some(VectorData::Vector(self.parse_vec_literal(p)?));
+                        }
+                        Rule::embed_method => {
+                            data = Some(VectorData::Embed(Embed {
+                                loc: vector_data.loc(),
+                                value: match vector_data.clone().into_inner().next() {
+                                    Some(inner) => match inner.as_rule() {
+                                        Rule::identifier => EvaluatesToString::Identifier(
+                                            inner.as_str().to_string(),
+                                        ),
+                                        Rule::string_literal => EvaluatesToString::StringLiteral(
+                                            inner.as_str().to_string(),
+                                        ),
+                                        _ => {
+                                            return Err(ParserError::from(format!(
+                                                "Unexpected rule in AddV: {:?} => {:?}",
+                                                inner.as_rule(),
+                                                inner,
+                                            )))
+                                        }
+                                    },
+                                    None => {
+                                        return Err(ParserError::from(format!(
+                                            "Unexpected rule in AddV: {:?} => {:?}",
+                                            p.as_rule(),
+                                            p,
+                                        )))
+                                    }
+                                },
+                            }));
+                        }
+                        _ => {
+                            return Err(ParserError::from(format!(
+                                "Unexpected rule in AddV: {:?} => {:?}",
+                                vector_data.as_rule(),
+                                vector_data,
+                            )))
+                        }
+                    },
+                    None => {
+                        return Err(ParserError::from(format!(
+                            "Unexpected rule in AddV: {:?} => {:?}",
+                            p.as_rule(),
+                            p,
+                        )))
                     }
-                    Rule::vec_literal => {
-                        data = Some(VectorData::Vector(self.parse_vec_literal(p)?));
-                    }
-                    _ => unreachable!(),
                 },
                 Rule::create_field => {
                     fields = Some(self.parse_property_assignments(p)?);
@@ -2467,4 +2534,3 @@ pub fn write_to_temp_file(content: Vec<&str>) -> Content {
         source: Source::default(),
     }
 }
-

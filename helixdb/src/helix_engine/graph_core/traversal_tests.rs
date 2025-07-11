@@ -5,12 +5,9 @@ use crate::helix_engine::{
         g::G,
         in_::{in_e::InEdgesAdapter, to_n::ToNAdapter, to_v::ToVAdapter},
         out::{from_n::FromNAdapter, from_v::FromVAdapter, out::OutAdapter},
-        source::{
-            add_n::AddNAdapter, e_from_id::EFromIdAdapter, n_from_id::NFromIdAdapter,
-            n_from_index::NFromIndexAdapter,
-        },
+        source::{add_n::AddNAdapter, e_from_id::EFromIdAdapter, n_from_id::NFromIdAdapter},
         tr_val::{Traversable, TraversalVal},
-        util::{dedup::DedupAdapter, range::RangeAdapter},
+        util::{dedup::DedupAdapter, props::PropsAdapter, range::RangeAdapter},
         vectors::brute_force_search::BruteForceSearchVAdapter,
     },
     storage_core::storage_core::HelixGraphStorage,
@@ -882,14 +879,17 @@ fn test_filter_macro_single_argument() {
         .filter_ref(|val, _| has_name(val))
         .collect_to::<Vec<_>>();
     assert_eq!(traversal.len(), 2);
-    assert!(traversal
-        .iter()
-        .any(|val| if let TraversalVal::Node(node) = val {
-            let name = node.check_property("name").unwrap();
-            name == &Value::String("Alice".to_string()) || name == &Value::String("Bob".to_string())
-        } else {
-            false
-        }));
+    assert!(
+        traversal
+            .iter()
+            .any(|val| if let TraversalVal::Node(node) = val {
+                let name = node.check_property("name").unwrap();
+                name == &Value::String("Alice".to_string())
+                    || name == &Value::String("Bob".to_string())
+            } else {
+                false
+            })
+    );
 }
 
 #[test]
@@ -1235,7 +1235,7 @@ fn test_drop_node() {
     let mut txn = storage.graph_env.write_txn().unwrap();
     let traversal = G::new(Arc::clone(&storage), &txn)
         .n_from_id(&node.id())
-        .collect::<Vec<_>>();
+        .collect_to::<Vec<_>>();
 
     Drop::<Vec<_>>::drop_traversal(traversal, Arc::clone(&storage), &mut txn).unwrap();
     txn.commit().unwrap();
@@ -1279,7 +1279,7 @@ fn test_drop_edge() {
     let mut txn = storage.graph_env.write_txn().unwrap();
     let traversal = G::new(Arc::clone(&storage), &txn)
         .e_from_id(&edge.id())
-        .collect::<Vec<_>>();
+        .collect_to::<Vec<_>>();
     Drop::<Vec<_>>::drop_traversal(traversal, Arc::clone(&storage), &mut txn).unwrap();
     txn.commit().unwrap();
     let txn = storage.graph_env.read_txn().unwrap();
@@ -1893,7 +1893,8 @@ fn test_brute_force_vector_search() {
                 false,
                 EdgeType::Vec,
             )
-            .collect_to_val();
+            .collect_to_val()
+            .id();
         vector_ids.push(vector_id);
     }
 
@@ -1984,7 +1985,6 @@ fn test_vector_search() {
 
     let mut i = 0;
     let mut inserted_vectors = Vec::with_capacity(10000);
-    
 
     let mut rng = rand::rng();
     for _ in 10..2000 {
@@ -1997,7 +1997,7 @@ fn test_vector_search() {
             rng.random::<f64>(),
             rng.random::<f64>(),
         ];
-        let node = G::new_mut(Arc::clone(&storage), &mut txn)
+        let _ = G::new_mut(Arc::clone(&storage), &mut txn)
             .insert_v::<fn(&HVector, &RoTxn) -> bool>(&random_vector, "vector", None)
             .collect_to_val();
         println!("inserted vector: {:?}", i);
@@ -2029,16 +2029,151 @@ fn test_vector_search() {
     txn.commit().unwrap();
 
     let txn = storage.graph_env.read_txn().unwrap();
-    let mut traversal = G::new(Arc::clone(&storage), &txn)
+    let traversal = G::new(Arc::clone(&storage), &txn)
         .search_v::<fn(&HVector, &RoTxn) -> bool>(&vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 2000, None)
         .collect_to::<Vec<_>>();
     // traversal.reverse();
 
-
-    for vec in &traversal[0..10] { 
+    for vec in &traversal[0..10] {
         if let TraversalVal::Vector(vec) = vec {
             println!("vec {:?} {}", vec.get_data(), vec.get_distance());
             assert!(vec.get_distance() < 0.1);
         }
     }
+}
+
+#[test]
+fn test_double_add_and_double_fetch() {
+    let (db, _temp_dir) = setup_test_db();
+    let mut txn = db.graph_env.write_txn().unwrap();
+
+    let original_node1 = G::new_mut(Arc::clone(&db), &mut txn)
+        .add_n("person", Some(props! { "entity_name" => "person1" }), None)
+        .collect_to_val();
+
+    let original_node2 = G::new_mut(Arc::clone(&db), &mut txn)
+        .add_n("person", Some(props! { "entity_name" => "person2" }), None)
+        .collect_to_val();
+
+    txn.commit().unwrap();
+
+    let mut txn = db.graph_env.write_txn().unwrap();
+    let node1 = G::new(Arc::clone(&db), &txn)
+        .n_from_type("person")
+        .filter_ref(|val, txn| {
+            if let Ok(val) = val {
+                Ok(G::new_from(Arc::clone(&db), &txn, val.clone())
+                    .check_property("entity_name")
+                    .map_value_or(false, |v| *v == "person1")?)
+            } else {
+                Ok(false)
+            }
+        })
+        .collect_to::<Vec<_>>();
+
+    let node2 = G::new(Arc::clone(&db), &txn)
+        .n_from_type("person")
+        .filter_ref(|val, txn| {
+            if let Ok(val) = val {
+                Ok(G::new_from(Arc::clone(&db), &txn, val.clone())
+                    .check_property("entity_name")
+                    .map_value_or(false, |v| *v == "person2")?)
+            } else {
+                Ok(false)
+            }
+        })
+        .collect_to::<Vec<_>>();
+
+    assert_eq!(node1.len(), 1);
+    assert_eq!(node1[0].id(), original_node1.id());
+    assert_eq!(node2.len(), 1);
+    assert_eq!(node2[0].id(), original_node2.id());
+
+    let _e = G::new_mut(Arc::clone(&db), &mut txn)
+        .add_e("knows", None, node1.id(), node2.id(), false, EdgeType::Node)
+        .collect_to_val();
+
+    txn.commit().unwrap();
+
+    let txn = db.graph_env.read_txn().unwrap();
+    let e = G::new(Arc::clone(&db), &txn)
+        .e_from_type("knows")
+        .collect_to::<Vec<_>>();
+    assert_eq!(e.len(), 1);
+    assert_eq!(e[0].id(), e.id());
+    if let TraversalVal::Edge(e) = &e[0] {
+        assert_eq!(e.from_node(), node1.id());
+        assert_eq!(e.to_node(), node2.id());
+    } else {
+        panic!("e[0] is not an edge");
+    }
+}
+
+#[test]
+fn test_drop_traversal() {
+    let (storage, _temp_dir) = setup_test_db();
+    let mut txn = storage.graph_env.write_txn().unwrap();
+
+    let node = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_n("person", None, None)
+        .collect_to_val();
+
+    for _ in 0..10 {
+        let new_node = G::new_mut(Arc::clone(&storage), &mut txn)
+            .add_n("person", None, None)
+            .collect_to_val();
+        let _ = G::new_mut(Arc::clone(&storage), &mut txn)
+            .add_e(
+                "knows",
+                None,
+                node.id(),
+                new_node.id(),
+                false,
+                EdgeType::Node,
+            )
+            .collect_to_val();
+    }
+
+    txn.commit().unwrap();
+
+    let txn = storage.graph_env.read_txn().unwrap();
+    let traversal = G::new(Arc::clone(&storage), &txn)
+        .n_from_type("person")
+        .collect_to::<Vec<_>>();
+    txn.commit().unwrap();
+    println!("traversal: {:?}", traversal);
+
+    assert_eq!(traversal.len(), 11);
+
+    let mut txn = storage.graph_env.write_txn().unwrap();
+
+    Drop::drop_traversal(
+        G::new(Arc::clone(&storage), &txn)
+            .n_from_id(&node.id())
+            .out("knows", &EdgeType::Node)
+            .collect_to::<Vec<_>>(),
+        Arc::clone(&storage),
+        &mut txn,
+    )
+    .unwrap();
+
+    Drop::drop_traversal(
+        G::new(Arc::clone(&storage), &txn)
+            .n_from_id(&node.id())
+            .collect_to::<Vec<_>>(),
+        Arc::clone(&storage),
+        &mut txn,
+    )
+    .unwrap();
+
+    txn.commit().unwrap();
+
+    let txn = storage.graph_env.read_txn().unwrap();
+    let traversal = G::new(Arc::clone(&storage), &txn)
+        .n_from_type("person")
+        .collect_to::<Vec<_>>();
+    txn.commit().unwrap();
+    println!("traversal: {:?}", traversal);
+
+    assert_eq!(traversal.len(), 0);
 }

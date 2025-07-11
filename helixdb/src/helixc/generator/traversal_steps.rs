@@ -1,4 +1,4 @@
-use crate::helixc::generator::utils::write_properties;
+use crate::helixc::generator::utils::{write_properties, VecData};
 
 use super::{
     bool_op::BoolOp,
@@ -294,6 +294,7 @@ impl Display for Where {
     }
 }
 
+#[deprecated(note = "Use WhereRef instead with a BoExp Exists")]
 #[derive(Clone)]
 pub struct WhereExists {
     pub tr: Traversal,
@@ -304,7 +305,7 @@ impl Display for WhereExists {
             f,
             "filter_ref(|val, txn|{{
                 if let Ok(val) = val {{ 
-                    Ok({}.count().gt(&0))
+                    Ok(Exist::exists(&mut {}))
                 }} else {{
                     Ok(false)
                 }}
@@ -394,7 +395,7 @@ impl Display for ShortestPath {
 
 #[derive(Clone)]
 pub struct SearchVectorStep {
-    pub vec: GeneratedValue,
+    pub vec: VecData,
     pub k: GeneratedValue,
 }
 impl Display for SearchVectorStep {

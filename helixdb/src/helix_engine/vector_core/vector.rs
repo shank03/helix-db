@@ -17,7 +17,6 @@ use std::{cmp::Ordering, collections::HashMap, fmt::Debug};
 // TODO: use const param to set dimension
 // TODO: set level as u8
 
-
 #[repr(C, align(16))] // TODO: see performance impact of repr(C) and align(16)
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub struct HVector {
