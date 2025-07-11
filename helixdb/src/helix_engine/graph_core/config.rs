@@ -113,7 +113,7 @@ impl Default for Config {
             db_max_size_gb: Some(10),
             mcp: true,
             schema: None,
-            embedding_model: Some("text_embedding-ada-002".to_string()),
+            embedding_model: Some("text-embedding-ada-002".to_string()),
             graphvis_node_label: None,
         }
     }
