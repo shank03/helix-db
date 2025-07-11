@@ -62,9 +62,6 @@ pub enum CommandType {
     /// Give an instance a short description
     Label(LabelCommand),
 
-    /// Login to helix
-    // Login(LoginCommand),
-
     /// Save an instnaces data.mdb file
     Save(SaveCommand),
 
@@ -225,9 +222,6 @@ pub struct DeleteCommand {
     pub instance: String,
 }
 
-// #[derive(Debug, Args)]
-// #[clap(name = "login", about = "Login to helix")]
-// pub struct LoginCommand {}
 
 #[derive(Debug, Args)]
 #[clap(name = "config", about = "Configure Helix Credentials")]
