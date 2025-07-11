@@ -29,7 +29,10 @@ use helixdb::{
 
     },
     helix_engine::types::GraphError,
-    helix_gateway::router::router::HandlerInput,
+    helix_gateway::{
+        router::router::HandlerInput,
+        embedding_providers::embedding_providers::get_embedding_model,
+    },
     node_matches, props,
     protocol::count::Count,
     protocol::remapping::{RemappingMap, ResponseRemapping},
@@ -37,7 +40,6 @@ use helixdb::{
     protocol::{
         filterable::Filterable, remapping::Remapping, return_values::ReturnValue, value::Value, id::ID,
     },
-    providers::embedding_providers::get_embedding_model,
 };
 use sonic_rs::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -45,7 +47,7 @@ use std::sync::Arc;
 use std::time::Instant;
 use std::cell::RefCell;
 use chrono::{DateTime, Utc};
-    
+
 pub struct Entity {
     pub entity_name: String,
 }

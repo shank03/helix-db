@@ -565,7 +565,7 @@ fi
 
                 let path = match get_cfg_deploy_path(command.path) {
                     Ok(path) => path,
-                    Err(e) => {
+                    Err(_e) => {
                         sp.stop_with_message(format!(
                             "{}",
                             "Error getting config path".red().bold()
@@ -582,7 +582,7 @@ fi
                         ));
                         return;
                     }
-                    Err(e) => {
+                    Err(_e) => {
                         sp.stop_with_message(format!("{}", "Error getting files".red().bold()));
                         return;
                     }

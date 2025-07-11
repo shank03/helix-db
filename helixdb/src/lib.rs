@@ -6,5 +6,4 @@ pub mod helixc;
 pub mod ingestion_engine;
 pub mod protocol;
 pub mod utils;
-pub mod providers;
 
