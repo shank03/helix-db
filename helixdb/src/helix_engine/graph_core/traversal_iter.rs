@@ -36,7 +36,9 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> RoTraversalIterat
     }
 
     pub fn collect_to<B: FromIterator<TraversalVal>>(self) -> B {
-        self.inner.filter_map(|item| item.ok()).collect::<B>()
+        self.inner.filter_map(|item| {
+            item.ok()
+        }).collect::<B>()
     }
 
     pub fn collect_dedup<B: FromIterator<TraversalVal>>(self) -> B {

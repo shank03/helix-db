@@ -176,6 +176,7 @@ fi
             // print "to see the results run `sh call.sh`" in all green bold
             println!("{}", "to see the results run `sh call.sh`".green().bold());
         }
+
         CommandType::Deploy(command) => {
             match Command::new("cargo").output() {
                 Ok(_) => {}
@@ -383,6 +384,42 @@ fi
             }
         }
 
+        // TODO: assuming just local for now
+        CommandType::Visualize(command) => {
+            let instance_manager = InstanceManager::new().unwrap();
+            let iid = &command.instance;
+
+            match instance_manager.get_instance(iid) {
+                Ok(Some(instance)) => {
+                    println!("{}", "Helix instance found!".green().bold());
+                    let port = instance.port;
+                    let url = format!("http://localhost:{}/get/graphvis", port);
+
+                    if webbrowser::open(&url).is_ok() {
+                    } else {
+                        println!(
+                            "{} {}",
+                            "Failed to open graph visualizer for instance".red().bold(),
+                            iid.red().bold()
+                        );
+                        return;
+                    }
+                }
+                Ok(None) => {
+                    println!(
+                        "{} {}",
+                        "No Helix instance found with id".red().bold(),
+                        iid.red().bold()
+                    );
+                    return;
+                }
+                Err(e) => {
+                    println!("{} {}", "Error:".red().bold(), e);
+                    return;
+                }
+            };
+        }
+
         CommandType::Update(_) => {
             match check_helix_installation() {
                 Ok(_) => {}
@@ -528,7 +565,7 @@ fi
 
                 let path = match get_cfg_deploy_path(command.path) {
                     Ok(path) => path,
-                    Err(e) => {
+                    Err(_e) => {
                         sp.stop_with_message(format!(
                             "{}",
                             "Error getting config path".red().bold()
@@ -545,7 +582,7 @@ fi
                         ));
                         return;
                     }
-                    Err(e) => {
+                    Err(_e) => {
                         sp.stop_with_message(format!("{}", "Error getting files".red().bold()));
                         return;
                     }
@@ -1172,6 +1209,10 @@ fi
             let mut runner = Command::new("git");
             runner.arg("clone");
             runner.arg("https://github.com/HelixDB/helix-db.git");
+            if command.dev {
+                runner.arg("--branch");
+                runner.arg("dev");
+            }
             runner.current_dir(&repo_path);
 
             match runner.output() {

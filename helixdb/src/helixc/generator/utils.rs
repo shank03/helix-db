@@ -316,7 +316,7 @@ pub fn write_headers() -> String {
     r#"
 
 use heed3::RoTxn;
-use get_routes::handler;
+use proc_macros::handler;
 use helixdb::{field_remapping, identifier_remapping, traversal_remapping, exclude_field, value_remapping, embed};
 use helixdb::helix_engine::vector_core::vector::HVector;
 use helixdb::{
@@ -344,7 +344,10 @@ use helixdb::{
 
     },
     helix_engine::types::GraphError,
-    helix_gateway::router::router::HandlerInput,
+    helix_gateway::{
+        router::router::HandlerInput,
+        embedding_providers::embedding_providers::get_embedding_model,
+    },
     node_matches, props,
     protocol::count::Count,
     protocol::remapping::{RemappingMap, ResponseRemapping},
@@ -352,7 +355,6 @@ use helixdb::{
     protocol::{
         filterable::Filterable, remapping::Remapping, return_values::ReturnValue, value::Value, id::ID,
     },
-    providers::embedding_providers::get_embedding_model,
 };
 use sonic_rs::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};

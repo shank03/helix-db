@@ -1509,18 +1509,35 @@ impl<'a> Ctx<'a> {
                                     {
                                         Some((_, field)) => {
                                             if !field.is_indexed() {
-                                                self.push_query_err(q, loc.clone(), format!("field `{}` has not been indexed for node type `{}`", index, node_type), format!("use a field that has been indexed with `INDEX` in the schema for node type `{}`", node_type));
+                                                self.push_query_err(
+                                                    q,
+                                                    loc.clone(),
+                                                    format!("field `{}` has not been indexed for node type `{}`", index, node_type),
+                                                    format!("use a field that has been indexed with `INDEX` in the schema for node type `{}`", node_type)
+                                                );
                                             } else {
                                                 if let ValueType::Literal { ref value, ref loc } =
                                                     *value
                                                 {
                                                     if !field.field_type.eq(value) {
-                                                        self.push_query_err(q, loc.clone(), format!("value `{}` is of type `{}`, expected `{}`", value.to_string(), value, field.field_type), format!("use a value of type `{}`", field.field_type ));
+                                                        self.push_query_err(
+                                                            q,
+                                                            loc.clone(),
+                                                            format!("value `{}` is of type `{}`, expected `{}`", value.to_string(), value, field.field_type),
+                                                            format!("use a value of type `{}`", field.field_type )
+                                                        );
                                                     }
                                                 }
                                             }
                                         }
-                                        None => unreachable!(),
+                                        None => {
+                                            self.push_query_err(
+                                                q,
+                                                loc.clone(),
+                                                format!("field `{}` has not been defined and/or indexed for node type `{}`", index, node_type),
+                                                format!("use a field that has been defined and indexed with `INDEX` in the schema for node type `{}`", node_type)
+                                            );
+                                        }
                                     }
                                 }
                                 None => unreachable!(),
@@ -1577,6 +1594,7 @@ impl<'a> Ctx<'a> {
                                     }),
                                 },
                             ));
+                            gen_traversal.should_collect = ShouldCollect::ToVal;
                             gen_traversal.traversal_type = TraversalType::Ref;
                             Type::Node(Some(node_type.to_string()))
                         }

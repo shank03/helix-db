@@ -20,6 +20,9 @@ pub enum CommandType {
     /// Demo a Helix project
     Demo,
 
+    /// Open graph vis in default browser
+    Visualize(VisualizeCommand),
+
     /// Deploy a Helix project
     Deploy(DeployCommand),
 
@@ -144,6 +147,9 @@ pub struct LintCommand {
 #[derive(Debug, Args)]
 #[clap(name = "install", about = "Install the Helix repo")]
 pub struct InstallCommand {
+    #[clap(long, help = "Install HelixDb on the development branch (considered unstable)")]
+    pub dev: bool,
+
     #[clap(short, long, help = "The path to the project")]
     pub path: Option<String>,
 }
@@ -175,7 +181,7 @@ pub struct StopCommand {
     #[clap(long, help = "Stop all running instances")]
     pub all: bool,
 
-    #[clap(help = "Instance ID to stop")]
+    #[clap(short, long, help = "Instance ID to stop")]
     pub instance: Option<String>,
 }
 
@@ -184,6 +190,16 @@ pub struct StopCommand {
 pub struct StartCommand {
     #[clap(help = "Instance ID to Start")]
     pub instance: String,
+}
+
+#[derive(Debug, Args)]
+#[clap(name = "visualize", about = "Visualize the Helix graph")]
+pub struct VisualizeCommand {
+    #[clap(help = "Id of instance to visualize")]
+    pub instance: String,
+
+    #[clap(short, long, help = "Give nodes a label based on a property")]
+    pub node_prop: Option<String>,
 }
 
 #[derive(Debug, Args)]
