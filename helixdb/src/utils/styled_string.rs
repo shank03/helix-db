@@ -63,4 +63,3 @@ impl StyledString for str {
         format!("\x1b[91m{}\x1b[0m", self)
     }
 }
-

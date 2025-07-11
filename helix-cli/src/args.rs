@@ -35,9 +35,8 @@ pub enum CommandType {
     /// Compile a Helix project
     Compile(CompileCommand),
 
-    /// Configure Helix Credentials
-    Config(ConfigCommand),
-
+    // /// Configure Helix Credentials
+    // Config(ConfigCommand),
     /// Lint a Helix project
     Check(LintCommand),
 
@@ -70,6 +69,12 @@ pub enum CommandType {
 
     /// Get the current version of the cli and db
     Version(VersionCommand),
+
+    /// Check login credentials or login with github
+    Login,
+
+    /// Remove login credentials
+    Logout,
 }
 
 #[derive(Debug, Args)]
@@ -122,7 +127,7 @@ pub struct CompileCommand {
     pub output: Option<String>,
 
     #[clap(short, long, help = "The target language")]
-    pub lang: Option<OutputLanguage>,
+    pub r#gen: OutputLanguage,
 }
 
 #[derive(Debug, Args)]
