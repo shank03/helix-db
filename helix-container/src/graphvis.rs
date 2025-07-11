@@ -6,33 +6,15 @@ use helixdb::{
 use serde_json::Value;
 use std::sync::Arc;
 
-/*
-use serde::{Serialize, Deserialize};
-#[derive(Serialize, Deserialize)]
-pub struct GraphLabels {
-    pub node_label: String,
-}
-*/
-
-// TODO: important is that errors are returned in the http response!
-// TODO: pass in k and node prop via the http request
 #[get_handler]
 pub fn graphvis(input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
-    /*
-    let data: GraphLabels = match sonic_rs::from_slice(&input.request.body) {
-        Ok(data) => data,
-        Err(err) => return Err(GraphError::from(err)),
-    };
-    */
-
-    // TODO: pass in k, node, and edge in the url
     let db = Arc::clone(&input.graph.storage);
     let txn = db.graph_env.read_txn()?;
 
     let json_ne: String = match db.nodes_edges_to_json(
         &txn,
         None,
-        None,
+        db.graphvis_node_label.clone(),
     ) {
         Ok(value) => value,
         Err(e) => {
