@@ -147,8 +147,9 @@ pub struct LintCommand {
 #[derive(Debug, Args)]
 #[clap(name = "install", about = "Install the Helix repo")]
 pub struct InstallCommand {
-    #[clap(help = "Install HelixDb on the development(considered unstable) branch")]
+    #[clap(long, help = "Install HelixDb on the development branch (considered unstable)")]
     pub dev: bool,
+
     #[clap(short, long, help = "The path to the project")]
     pub path: Option<String>,
 }
