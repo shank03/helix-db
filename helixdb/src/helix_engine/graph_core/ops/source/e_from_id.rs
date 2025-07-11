@@ -4,7 +4,7 @@ use crate::{
         storage_core::{storage_core::HelixGraphStorage, storage_methods::StorageMethods},
         types::GraphError,
     },
-    protocol::items::Edge,
+    utils::items::Edge,
 };
 use proc_macros::debug_trace;
 use heed3::RoTxn;

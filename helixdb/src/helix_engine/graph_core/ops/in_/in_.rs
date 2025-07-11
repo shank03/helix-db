@@ -10,10 +10,10 @@ use crate::{
         storage_core::{storage_core::HelixGraphStorage, storage_methods::StorageMethods},
         types::GraphError,
     },
-    protocol::label_hash::hash_label,
+    utils::label_hash::hash_label,
 };
+use heed3::{RoTxn, types::Bytes};
 use proc_macros::debug_trace;
-use heed3::{types::Bytes, RoTxn};
 use std::sync::Arc;
 
 pub struct InNodesIterator<'a, T> {

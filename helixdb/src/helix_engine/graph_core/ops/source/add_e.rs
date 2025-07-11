@@ -6,7 +6,8 @@ use crate::{
         graph_core::traversal_iter::RwTraversalIterator,
         storage_core::storage_core::HelixGraphStorage, types::GraphError, vector_core::hnsw::HNSW,
     },
-    protocol::{id::v6_uuid, items::Edge, label_hash::hash_label, value::Value},
+    protocol::value::Value,
+    utils::{id::v6_uuid, items::Edge, label_hash::hash_label},
 };
 use heed3::PutFlags;
 use serde::{Deserialize, Serialize};

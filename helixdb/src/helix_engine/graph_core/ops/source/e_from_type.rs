@@ -3,7 +3,7 @@ use crate::{
         graph_core::{ops::tr_val::TraversalVal, traversal_iter::RoTraversalIterator},
         types::GraphError,
     },
-    protocol::items::Edge,
+    utils::items::Edge,
 };
 use heed3::{
     byteorder::BE,

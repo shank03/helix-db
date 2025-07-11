@@ -5,7 +5,8 @@ use heed3::{RoTxn, RwTxn};
 use super::ops::tr_val::TraversalVal;
 use crate::{
     helix_engine::{storage_core::storage_core::HelixGraphStorage, types::GraphError},
-    protocol::{filterable::Filterable, value::Value},
+    protocol::value::Value,
+    utils::filterable::Filterable,
 };
 use itertools::Itertools;
 
