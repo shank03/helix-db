@@ -151,15 +151,15 @@ pub fn get_embedding_model(
 /// let embedding = embed!("Hello, world!", "text-embedding-ada-002", "http://localhost:8699/embed");
 /// ```
 macro_rules! embed {
-    ($query:expr) => {{
-        let embedding_model = get_embedding_model(None, db.embedding_model.as_deref(), None)?;
+    ($db:expr, $query:expr) => {{
+        let embedding_model = get_embedding_model(None, $db.embedding_model.as_deref(), None)?;
         embedding_model.fetch_embedding($query)?
     }};
-    ($query:expr, $model:expr) => {{
+    ($db:expr, $query:expr, $model:expr) => {{
         let embedding_model = get_embedding_model(None, Some($model), None)?;
         embedding_model.fetch_embedding($query)?
     }};
-    ($query:expr, $model:expr, $url:expr) => {{
+    ($db:expr, $query:expr, $model:expr, $url:expr) => {{
         let embedding_model = get_embedding_model(None, Some($model), Some($url))?;
         embedding_model.fetch_embedding($query)?
     }};

@@ -119,7 +119,7 @@ impl Display for VecData {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             VecData::Standard(v) => write!(f, "{}", v),
-            VecData::Embed(v) => write!(f, "&embed!({})", v),
+            VecData::Embed(v) => write!(f, "&embed!(db, {})", v),
             VecData::Unknown => panic!("Cannot convert to string, VecData is unknown"),
         }
     }
@@ -317,50 +317,62 @@ pub fn write_headers() -> String {
 
 use heed3::RoTxn;
 use proc_macros::handler;
-use helixdb::{field_remapping, identifier_remapping, traversal_remapping, exclude_field, value_remapping, embed};
-use helixdb::helix_engine::vector_core::vector::HVector;
 use helixdb::{
-    helix_engine::graph_core::ops::{
-        g::G,
-        in_::{in_::InAdapter, in_e::InEdgesAdapter, to_n::ToNAdapter, to_v::ToVAdapter},
-        out::{from_n::FromNAdapter, from_v::FromVAdapter, out::OutAdapter, out_e::OutEdgesAdapter},
-        source::{
-            add_e::{AddEAdapter, EdgeType},
-            add_n::AddNAdapter,
-            e_from_id::EFromIdAdapter,
-            e_from_type::EFromTypeAdapter,
-            n_from_id::NFromIdAdapter,
-            n_from_type::NFromTypeAdapter,
-            n_from_index::NFromIndexAdapter,
+    helix_engine::{
+        graph_core::ops::{
+            bm25::search_bm25::SearchBM25Adapter,
+            g::G,
+            in_::{in_::InAdapter, in_e::InEdgesAdapter, to_n::ToNAdapter, to_v::ToVAdapter},
+            out::{
+                from_n::FromNAdapter, from_v::FromVAdapter, out::OutAdapter, out_e::OutEdgesAdapter,
+            },
+            source::{
+                add_e::{AddEAdapter, EdgeType},
+                add_n::AddNAdapter,
+                e_from_id::EFromIdAdapter,
+                e_from_type::EFromTypeAdapter,
+                n_from_id::NFromIdAdapter,
+                n_from_index::NFromIndexAdapter,
+                n_from_type::NFromTypeAdapter,
+            },
+            tr_val::{Traversable, TraversalVal},
+            util::{
+                dedup::DedupAdapter, drop::Drop, exist::Exist, filter_mut::FilterMut,
+                filter_ref::FilterRefAdapter, map::MapAdapter, paths::ShortestPathAdapter,
+                props::PropsAdapter, range::RangeAdapter, update::UpdateAdapter,
+            },
+            vectors::{
+                brute_force_search::BruteForceSearchVAdapter, insert::InsertVAdapter,
+                search::SearchVAdapter,
+            },
         },
-        tr_val::{Traversable, TraversalVal},
-        util::{
-            dedup::DedupAdapter, filter_mut::FilterMut,
-            filter_ref::FilterRefAdapter, range::RangeAdapter, update::UpdateAdapter,
-            map::MapAdapter, paths::ShortestPathAdapter, props::PropsAdapter, drop::Drop, exist::Exist,
-        },
-        vectors::{insert::InsertVAdapter, search::SearchVAdapter, brute_force_search::BruteForceSearchVAdapter},
-        bm25::search_bm25::SearchBM25Adapter,
-
+        types::GraphError,
+        vector_core::vector::HVector,
     },
-    helix_engine::types::GraphError,
     helix_gateway::{
+        embedding_providers::embedding_providers::{EmbeddingModel, get_embedding_model},
         router::router::HandlerInput,
-        embedding_providers::embedding_providers::get_embedding_model,
     },
-    node_matches, props,
-    protocol::count::Count,
-    protocol::remapping::{RemappingMap, ResponseRemapping},
-    protocol::response::Response,
+    node_matches, props, embed,
+    field_remapping, identifier_remapping, 
+    traversal_remapping, exclude_field, value_remapping, 
     protocol::{
-        filterable::Filterable, remapping::Remapping, return_values::ReturnValue, value::Value, id::ID,
+        remapping::{Remapping, RemappingMap, ResponseRemapping},
+        response::Response,
+        return_values::ReturnValue,
+        value::Value,
+    },
+    utils::{
+        count::Count,
+        filterable::Filterable,
+        id::ID,
+        items::{Edge, Node},
     },
 };
 use sonic_rs::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Instant;
-use std::cell::RefCell;
 use chrono::{DateTime, Utc};
     "#
     .to_string()
