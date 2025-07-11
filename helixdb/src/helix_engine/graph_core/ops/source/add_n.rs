@@ -5,11 +5,8 @@ use crate::{
         graph_core::traversal_iter::RwTraversalIterator,
         types::GraphError,
     },
-    protocol::{
-        filterable::Filterable,
-        id::v6_uuid, items::Node,
-        value::Value,
-    },
+    protocol::value::Value,
+    utils::{filterable::Filterable, id::v6_uuid, items::Node},
 };
 use heed3::PutFlags;
 

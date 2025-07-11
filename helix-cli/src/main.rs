@@ -10,8 +10,8 @@ use sonic_rs::json;
 use spinners::{Spinner, Spinners};
 use std::{
     fmt::Write,
-    fs::{self, File},
-    io::Write as iWrite,
+    fs::{self, File, OpenOptions, read_to_string},
+    io::{Read, Write as iWrite},
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
@@ -1052,7 +1052,7 @@ fi
                 }
             };
 
-            if let Some(OutputLanguage::TypeScript) = command.lang {
+            if let Some(OutputLanguage::TypeScript) = command.r#gen {
                 match gen_typescript(&analyzed_source, &output) {
                     Ok(_) => {}
                     Err(e) => {
@@ -1222,9 +1222,13 @@ fi
                     println!("|");
                     println!("└── To get started, begin writing helix queries in your project.");
                     println!("|");
-                    println!("└── Then run `helix check --path <path-to-project>` to check your queries.");
+                    println!(
+                        "└── Then run `helix check --path <path-to-project>` to check your queries."
+                    );
                     println!("|");
-                    println!("└── Then run `helix deploy --path <path-to-project>` to build your queries.");
+                    println!(
+                        "└── Then run `helix deploy --path <path-to-project>` to build your queries."
+                    );
                 }
                 Err(e) => {
                     println!("{}", "Failed to install Helix repo".red().bold());
@@ -1384,48 +1388,7 @@ fi
             }
         }
 
-        // CommandType::Login(_) => {
-        //     println!("{}", "Logging in to helix".green().bold());
-
-        //     // read config from  ~/.helix/credentials
-        //     // in the format:
-        //     // helix_user_id=<user_id>
-        //     // helis_user_key=<user_key>
-
-        //     let config_path = Path::new("~/.helix/credentials");
-        //     if !config_path.exists() {
-        //         println!("{}", "No credentials found".red().bold());
-        //         return;
-        //     }
-
-        //     let config = match fs::read_to_string(config_path) {
-        //         Ok(config) => config,
-        //         Err(e) => {
-        //             println!("{}", "No credentials found".yellow().bold());
-        //             println!("{}", "Logging in with GitHub".yellow().bold());
-        //             return;
-        //         }
-        //     };
-        //     let user_id = config.split("helix_user_id=").nth(1).unwrap().split("\n").nth(0).unwrap();
-        //     let user_key = config.split("helis_user_key=").nth(1).unwrap().split("\n").nth(0).unwrap();
-
-        //     println!("{}", "User ID:".green().bold());
-        //     println!("{}", user_id.green().bold());
-        //     println!("{}", "User Key:".green().bold());
-        //     println!("{}", user_key.green().bold());
-
-        // }
-        CommandType::Config(_) => {
-            println!("{}", "Please enter your Helix user ID:".green().bold());
-            let mut input = String::new();
-            std::io::stdin().read_line(&mut input).unwrap();
-            let user_id = input.trim();
-
-            println!("{}", "Please enter your Helix user key:".green().bold());
-            let mut input = String::new();
-            std::io::stdin().read_line(&mut input).unwrap();
-            let user_key = input.trim();
-
+        CommandType::Login => {
             let home_dir = std::env::var("HOME").unwrap_or("~/".to_string());
             let config_path = &format!("{}/.helix", home_dir);
             let config_path = Path::new(config_path);
@@ -1433,18 +1396,48 @@ fi
                 fs::create_dir_all(config_path).unwrap();
             }
 
-            let config_path = config_path.join("credentials");
-            let mut config_file = File::create(config_path).unwrap();
-            config_file
-                .write_all(
-                    format!("helix_user_id={}\nhelix_user_key={}", user_id, user_key).as_bytes(),
-                )
+            let cred_path = config_path.join("credentials");
+
+            if let Ok(contents) = read_to_string(&cred_path)
+                && let Some(_key) = parse_credentials(&contents)
+            {
+                println!(
+                    "You have an existing key which may be valid, only continue if it doesn't work or you want to switch accounts. (Key checking is WIP)"
+                );
+            }
+
+            let key = github_login().await.unwrap();
+            println!("{}", "Successfully logged in!".green().bold());
+
+            let mut cred_file = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(cred_path)
                 .unwrap();
 
-            println!(
-                "{}",
-                "Helix credentials configured successfully".green().bold()
-            );
+            if let Err(e) = cred_file.write_all(&format!("helix_user_key={key}").into_bytes()) {
+                println!(
+                    "Got error when writing key: {}\nYou're key is: {}",
+                    e.to_string().red(),
+                    key
+                );
+            }
+        }
+
+        CommandType::Logout => {
+            let home_dir = std::env::var("HOME").unwrap_or("~/".to_string());
+            let config_path = &format!("{}/.helix", home_dir);
+            let config_path = Path::new(config_path);
+            if !config_path.exists() {
+                fs::create_dir_all(config_path).unwrap();
+            }
+
+            let cred_path = config_path.join("credentials");
+            if cred_path.exists() {
+                fs::remove_file(cred_path).unwrap()
+            }
         }
     }
 }

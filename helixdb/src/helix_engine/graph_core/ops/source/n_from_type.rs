@@ -3,7 +3,7 @@ use crate::{
         graph_core::{ops::tr_val::TraversalVal, traversal_iter::RoTraversalIterator},
         types::GraphError,
     },
-    protocol::items::Node,
+    utils::items::Node,
 };
 use proc_macros::debug_trace;
 use heed3::{

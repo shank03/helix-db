@@ -1,7 +1,5 @@
-use crate::{
-    instance_manager::InstanceInfo,
-    types::*,
-};
+use crate::{instance_manager::InstanceInfo, types::*};
+use futures_util::StreamExt;
 use helixdb::{
     helixc::{
         analyzer::analyzer::analyze,
@@ -10,17 +8,25 @@ use helixdb::{
     },
     utils::styled_string::StyledString,
 };
+use reqwest::blocking::Client;
+use serde::Deserialize;
+use serde_json::Value as JsonValue;
 use std::{
     error::Error,
     fs::{self, DirEntry, File},
     io::{ErrorKind, Write},
     net::{SocketAddr, TcpListener},
     path::{Path, PathBuf},
-    process::{Stdio, Command},
+    process::{Command, Stdio},
+};
+use tokio_tungstenite::{
+    connect_async,
+    tungstenite::{
+        Message,
+        protocol::{CloseFrame, frame::coding::CloseCode},
+    },
 };
 use toml::Value;
-use reqwest::blocking::Client;
-use serde_json::Value as JsonValue;
 
 pub const DB_DIR: &str = "helixdb-cfg/";
 
@@ -220,15 +226,19 @@ pub fn generate_content(files: &Vec<DirEntry>) -> Result<Content, CliError> {
         })
         .collect();
 
-    let content = files.clone().iter().map(|file| file.content.clone()).collect::<Vec<String>>().join("\n");
+    let content = files
+        .clone()
+        .iter()
+        .map(|file| file.content.clone())
+        .collect::<Vec<String>>()
+        .join("\n");
 
     Ok(Content {
         content,
         files,
-        source: Source::default()
+        source: Source::default(),
     })
 }
-
 
 /// Uses the helix parser to parse the content into a Source object
 fn parse_content(content: &Content) -> Result<Source, CliError> {
@@ -369,9 +379,12 @@ pub fn get_n_helix_cli() -> Result<(), Box<dyn Error>> {
             "PATH",
             format!(
                 "{}:{}",
-                std::env::var("HOME").map(|h| format!("{}/.cargo/bin", h)).unwrap_or_default(),
+                std::env::var("HOME")
+                    .map(|h| format!("{}/.cargo/bin", h))
+                    .unwrap_or_default(),
                 std::env::var("PATH").unwrap_or_default()
-            ))
+            ),
+        )
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .status()?;
@@ -388,3 +401,58 @@ pub fn get_n_helix_cli() -> Result<(), Box<dyn Error>> {
 // Spinner::stop_with_message
 // Dots9 style
 
+pub async fn github_login() -> Result<String, Box<dyn Error>> {
+    // TODO: get control server
+    let url = "ws://127.0.0.1:3000/login";
+    let (mut ws_stream, _) = connect_async(url).await?;
+
+    let init_msg: UserCodeMsg = match ws_stream.next().await {
+        Some(Ok(Message::Text(payload))) => sonic_rs::from_str(&payload)?,
+        Some(Ok(m)) => return Err(format!("Unexpected message: {m:?}").into()),
+        Some(Err(e)) => return Err(e.into()),
+        None => return Err("Connection Closed Unexpectedly".into()),
+    };
+
+    println!(
+        "To Login please go \x1b]8;;{}\x1b\\here\x1b]8;;\x1b\\({}),\nand enter the code: {}",
+        init_msg.verification_uri,
+        init_msg.verification_uri,
+        init_msg.user_code.bold()
+    );
+
+    let msg: ApiKeyMsg = match ws_stream.next().await {
+        Some(Ok(Message::Text(payload))) => sonic_rs::from_str(&payload)?,
+        Some(Ok(Message::Close(Some(CloseFrame {
+            code: CloseCode::Error,
+            reason,
+        })))) => return Err(format!("Error: {reason}").into()),
+        Some(Ok(m)) => return Err(format!("Unexpected message: {m:?}").into()),
+        Some(Err(e)) => return Err(e.into()),
+        None => return Err("Connection Closed Unexpectedly".into()),
+    };
+
+    Ok(msg.key)
+}
+
+#[derive(Deserialize)]
+struct UserCodeMsg {
+    user_code: String,
+    verification_uri: String,
+}
+
+#[derive(Deserialize)]
+struct ApiKeyMsg {
+    key: String,
+}
+
+/// tries to parse a credential file, returning the key, if any
+pub fn parse_credentials(creds: &String) -> Option<&str> {
+    for line in creds.lines() {
+        if let Some((key, value)) = line.split_once("=")
+            && key.to_lowercase() == "helix_user_key"
+        {
+            return Some(value);
+        }
+    }
+    None
+}

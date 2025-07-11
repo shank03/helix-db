@@ -8,6 +8,10 @@ authors = ["HelixDB Team"]
 repository = "https://github.com/HelixDB/helix-db"
 
 [dependencies]
+# Local dependencies
+proc_macros = { version = "0.1.0", path = "../proc_macros" }
+
+# External dependencies
 tokio = { version = "1.44.2", features = ["full"] }
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.110"
@@ -16,21 +20,20 @@ sonic-rs = "0.5.0"
 inventory = "0.3.16"
 twox-hash = "2.1.0"
 heed3 = "0.22.0"
-uuid = { version = "1.12.1", features = ["std", "v4", "v6", "fast-rng"] }
+uuid = { version = "1.12.1", features = ["v4", "v6", "fast-rng"] }
 rand = "0.9.0"
-dirs = "6.0.0"
 chrono = "0.4.39"
 flume = "0.11.1"
-rayon = "1.8.0"
 itertools = "0.14.0"
-proc_macros = { version = "0.1.0", path = "../proc_macros" }
 tempfile = "3.20.0"
-reqwest = { version = "0.12.15", features = [ "json", "blocking"] }
-url = "2.5"
 
-# Compiler
+# Compiler dependencies
 pest = { version = "2.7", optional = true }
 pest_derive = { version = "2.7", optional = true }
+
+# Embedding dependencies
+reqwest = { version = "0.12.15", features = [ "json", "blocking"], optional = true }
+url = { version = "2.5", optional = true }
 
 [dev-dependencies]
 rand = "0.9.0"
@@ -43,9 +46,10 @@ debug-output = ["proc_macros/debug-output"]
 compiler = ["pest", "pest_derive"]
 
 # vector features
+
 cosine = []
-embed_local = []
-embed_openai = []
+embed_local = ["reqwest", "url"]
+embed_openai = ["reqwest"]
 
 build = ["compiler"]
 vectors = ["cosine", "embed_openai"]

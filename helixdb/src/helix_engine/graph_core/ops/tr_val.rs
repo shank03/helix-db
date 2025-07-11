@@ -1,10 +1,10 @@
 use crate::{
     helix_engine::{types::GraphError, vector_core::vector::HVector},
-    protocol::{
+    protocol::value::Value,
+    utils::{
         count::Count,
         filterable::Filterable,
         items::{Edge, Node},
-        value::Value,
     },
 };
 use std::hash::Hash;

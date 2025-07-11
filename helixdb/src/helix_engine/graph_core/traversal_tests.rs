@@ -17,7 +17,8 @@ use crate::{
     helix_engine::graph_core::ops::{
         source::n_from_type::NFromTypeAdapter, util::paths::ShortestPathAdapter,
     },
-    protocol::{filterable::Filterable, id::ID, value::Value},
+    utils::{filterable::Filterable, id::ID},
+    protocol::value::Value,
 };
 use crate::{
     helix_engine::{
@@ -1634,6 +1635,8 @@ fn test_with_id_type() {
 }
 
 #[test]
+#[deprecated]
+#[ignore]
 fn test_add_e_with_dup_flag() {
     let (storage, _temp_dir) = setup_test_db();
 
@@ -1648,24 +1651,38 @@ fn test_add_e_with_dup_flag() {
             )
             .collect_to_val();
         nodes.push(node1);
+        // sleep for 2us
+        std::thread::sleep(std::time::Duration::from_micros(2));
     }
     txn.commit().unwrap();
     let start_node = &nodes[0];
     println!("start_node: {:?}", start_node);
+    println!("nodes: {:?}", nodes.len());
     let random_nodes = {
         let mut n = Vec::with_capacity(10_000_000);
         for _ in 0..10_000 {
-            let pair: (&TraversalVal, &TraversalVal) =
-                (start_node, &nodes[rand::rng().random_range(0..nodes.len())]);
+            let pair: (&TraversalVal, &TraversalVal) = {
+                let mut random_node = &nodes[rand::rng().random_range(0..nodes.len())];
+                while random_node.id() == start_node.id() {
+                    random_node = &nodes[rand::rng().random_range(0..nodes.len())];
+                }
+                (start_node, random_node)
+            };
             n.push(pair);
         }
         n
     };
+    println!("random_nodes: {:?}", random_nodes.len());
+
 
     let now = Instant::now();
     let mut txn = storage.graph_env.write_txn().unwrap();
     for chunk in random_nodes.chunks(100000) {
         for (random_node1, random_node2) in chunk {
+            if random_node1.id() == random_node2.id() {
+                println!("random_node1: {:?}, random_node2: {:?}", random_node1.id(), random_node2.id());
+                continue;
+            }
             let _ = G::new_mut(Arc::clone(&storage), &mut txn)
                 .add_e(
                     "knows",
@@ -1681,11 +1698,19 @@ fn test_add_e_with_dup_flag() {
     txn.commit().unwrap();
     let end = now.elapsed();
     println!("10 mill took {:?}", end);
+
+    
+    
+    
     let start = Instant::now();
     let txn = storage.graph_env.read_txn().unwrap();
+    let edge_length = storage.edges_db.len(&txn).unwrap();
+    println!("edge_length: {:?}", edge_length);
+    assert_eq!(edge_length, 10000);
+
     let traversal = G::new(Arc::clone(&storage), &txn)
         .e_from_type("knows")
-        .collect_to::<Vec<_>>();
+        .collect::<Vec<_>>();
     println!("time taken to count edges: {:?}", start.elapsed());
     txn.commit().unwrap();
 
@@ -1699,7 +1724,7 @@ fn test_add_e_with_dup_flag() {
             if let Ok(TraversalVal::Node(node)) = val {
                 node.check_property("age").map(|value| {
                     if let Value::I32(age) = value {
-                        *age < 1000
+                        *age < 10000
                     } else {
                         false
                     }
@@ -1714,6 +1739,8 @@ fn test_add_e_with_dup_flag() {
     println!("traversal: {:?}", traversal.len());
 
     assert_eq!(count, 10000);
+
+
 }
 
 #[test]

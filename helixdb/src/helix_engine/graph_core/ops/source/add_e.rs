@@ -6,7 +6,8 @@ use crate::{
         graph_core::traversal_iter::RwTraversalIterator,
         storage_core::storage_core::HelixGraphStorage, types::GraphError, vector_core::hnsw::HNSW,
     },
-    protocol::{id::v6_uuid, items::Edge, label_hash::hash_label, value::Value},
+    protocol::value::Value,
+    utils::{id::v6_uuid, items::Edge, label_hash::hash_label},
 };
 use heed3::PutFlags;
 use serde::{Deserialize, Serialize};
@@ -137,7 +138,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddEAdapter<'
         ) {
             Ok(_) => {}
             Err(e) => {
-                println!("add_e => error adding out edge: {:?}", e);
+                println!("add_e => error adding out edge between {:?} and {:?}: {:?}", from_node, to_node, e);
                 result = Err(GraphError::from(e));
             }
         }
@@ -150,7 +151,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddEAdapter<'
         ) {
             Ok(_) => {}
             Err(e) => {
-                println!("add_e => error adding in edge: {:?}", e);
+                println!("add_e => error adding in edge between {:?} and {:?}: {:?}", from_node, to_node, e);
                 result = Err(GraphError::from(e));
             }
         }

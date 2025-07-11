@@ -1,8 +1,8 @@
 use crate::{helix_engine::types::GraphError, helixc::generator::utils::GenRef};
 use chrono::Utc;
 use serde::{
-    de::{DeserializeSeed, VariantAccess, Visitor},
     Deserializer, Serializer,
+    de::{DeserializeSeed, VariantAccess, Visitor},
 };
 use serde_json::Value as JsonValue;
 use sonic_rs::{Deserialize, Serialize};
@@ -11,8 +11,8 @@ use std::{
     collections::HashMap,
     fmt::{self, Display},
 };
+use crate::utils::id::ID;
 
-use super::id::ID;
 
 /// A flexible value type that can represent various property values in nodes and edges.
 /// Handles both JSON and binary serialisation formats via custom implementaions of the Serialize and Deserialize traits.
@@ -35,6 +35,7 @@ pub enum Value {
     Object(HashMap<String, Value>),
     Empty,
 }
+
 impl Value {
     pub fn to_string(&self) -> String {
         match self {
@@ -64,6 +65,7 @@ impl Value {
             _ => panic!("Not primitive"),
         }
     }
+
     pub fn as_str(&self) -> &str {
         match self {
             Value::String(s) => s.as_str(),
