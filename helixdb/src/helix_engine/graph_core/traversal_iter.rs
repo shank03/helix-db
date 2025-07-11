@@ -173,7 +173,9 @@ where
         self.inner.next()
     }
 }
-impl<'scope, 'env, I: Iterator> RwTraversalIterator<'scope, 'env, I> {
+impl<'scope, 'env, I: Iterator<Item = Result<TraversalVal, GraphError>>>
+    RwTraversalIterator<'scope, 'env, I>
+{
     pub fn new(storage: Arc<HelixGraphStorage>, txn: &'scope mut RwTxn<'env>, inner: I) -> Self {
         Self {
             inner,
@@ -200,6 +202,12 @@ impl<'scope, 'env, I: Iterator> RwTraversalIterator<'scope, 'env, I> {
             .first()
         {
             Some(val) => val.clone(), // TODO: Remove clone
+            None => TraversalVal::Empty,
+        }
+    }
+    pub fn collect_to_obj(self) -> TraversalVal {
+        match self.inner.filter_map(|item| item.ok()).next() {
+            Some(val) => val,
             None => TraversalVal::Empty,
         }
     }

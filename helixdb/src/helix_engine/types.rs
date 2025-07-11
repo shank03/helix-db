@@ -2,12 +2,7 @@ use crate::helixc::parser::parser_methods::ParserError;
 use core::fmt;
 use heed3::Error as HeedError;
 use sonic_rs::Error as SonicError;
-use std::{
-    net::AddrParseError,
-    str::Utf8Error,
-    string::FromUtf8Error,
-    env,
-};
+use std::{net::AddrParseError, str::Utf8Error, string::FromUtf8Error};
 
 #[derive(Debug)]
 pub enum GraphError {
@@ -190,4 +185,3 @@ impl From<bincode::Error> for VectorError {
         VectorError::ConversionError(format!("bincode error: {}", error.to_string()))
     }
 }
-

@@ -99,6 +99,50 @@ impl ReturnValue {
         )
     }
 
+    #[inline]
+    pub fn from_traversal_value_with_mixin(
+        traversal_value: TraversalVal,
+        mut mixin: RefMut<HashMap<u128, ResponseRemapping>>,
+    ) -> Self {
+        match traversal_value {
+                    TraversalVal::Node(node) => {
+                        println!("node processing");
+                        ReturnValue::process_items_with_mixin(node, &mut mixin)
+                    }
+                    TraversalVal::Edge(edge) => {
+                        ReturnValue::process_items_with_mixin(edge, &mut mixin)
+                    }
+                    TraversalVal::Vector(vector) => {
+                        ReturnValue::process_items_with_mixin(vector, &mut mixin)
+                    }
+                    TraversalVal::Count(count) => ReturnValue::from(count),
+                    TraversalVal::Empty => ReturnValue::Empty,
+                    TraversalVal::Value(value) => ReturnValue::from(value),
+                    TraversalVal::Path((nodes, edges)) => {
+                        let mut properties = HashMap::with_capacity(2);
+                        properties.insert(
+                            "nodes".to_string(),
+                            ReturnValue::Array(
+                                nodes
+                                    .into_iter()
+                                    .map(|node| ReturnValue::from(node))
+                                    .collect(),
+                            ),
+                        );
+                        properties.insert(
+                            "edges".to_string(),
+                            ReturnValue::Array(
+                                edges
+                                    .into_iter()
+                                    .map(|edge| ReturnValue::from(edge))
+                                    .collect(),
+                            ),
+                        );
+                        ReturnValue::Object(properties)
+                    }
+        }
+    }
+
     #[inline(always)]
     #[allow(unused_attributes)]
     #[ignore = "No use for this function yet, however, I believe it may be useful in the future so I'm keeping it here"]

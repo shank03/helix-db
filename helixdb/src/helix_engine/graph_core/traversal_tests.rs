@@ -1,21 +1,18 @@
 use std::{sync::Arc, time::Instant};
 
-use crate::{embed, helix_engine::{
+use crate::helix_engine::{
     graph_core::ops::{
         g::G,
         in_::{in_e::InEdgesAdapter, to_n::ToNAdapter, to_v::ToVAdapter},
         out::{from_n::FromNAdapter, from_v::FromVAdapter, out::OutAdapter},
-        source::{
-            add_n::AddNAdapter, e_from_id::EFromIdAdapter, n_from_id::NFromIdAdapter,
-            n_from_index::NFromIndexAdapter, n_from_type,
-        },
+        source::{add_n::AddNAdapter, e_from_id::EFromIdAdapter, n_from_id::NFromIdAdapter},
         tr_val::{Traversable, TraversalVal},
         util::{dedup::DedupAdapter, props::PropsAdapter, range::RangeAdapter},
         vectors::brute_force_search::BruteForceSearchVAdapter,
     },
     storage_core::storage_core::HelixGraphStorage,
     types::GraphError,
-}, providers::embedding_providers::get_embedding_model};
+};
 use crate::{
     helix_engine::graph_core::ops::{
         source::n_from_type::NFromTypeAdapter, util::paths::ShortestPathAdapter,
@@ -882,14 +879,17 @@ fn test_filter_macro_single_argument() {
         .filter_ref(|val, _| has_name(val))
         .collect_to::<Vec<_>>();
     assert_eq!(traversal.len(), 2);
-    assert!(traversal
-        .iter()
-        .any(|val| if let TraversalVal::Node(node) = val {
-            let name = node.check_property("name").unwrap();
-            name == &Value::String("Alice".to_string()) || name == &Value::String("Bob".to_string())
-        } else {
-            false
-        }));
+    assert!(
+        traversal
+            .iter()
+            .any(|val| if let TraversalVal::Node(node) = val {
+                let name = node.check_property("name").unwrap();
+                name == &Value::String("Alice".to_string())
+                    || name == &Value::String("Bob".to_string())
+            } else {
+                false
+            })
+    );
 }
 
 #[test]
@@ -1997,7 +1997,7 @@ fn test_vector_search() {
             rng.random::<f64>(),
             rng.random::<f64>(),
         ];
-        let node = G::new_mut(Arc::clone(&storage), &mut txn)
+        let _ = G::new_mut(Arc::clone(&storage), &mut txn)
             .insert_v::<fn(&HVector, &RoTxn) -> bool>(&random_vector, "vector", None)
             .collect_to_val();
         println!("inserted vector: {:?}", i);
@@ -2029,7 +2029,7 @@ fn test_vector_search() {
     txn.commit().unwrap();
 
     let txn = storage.graph_env.read_txn().unwrap();
-    let mut traversal = G::new(Arc::clone(&storage), &txn)
+    let traversal = G::new(Arc::clone(&storage), &txn)
         .search_v::<fn(&HVector, &RoTxn) -> bool>(&vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 2000, None)
         .collect_to::<Vec<_>>();
     // traversal.reverse();
@@ -2109,7 +2109,6 @@ fn test_double_add_and_double_fetch() {
     }
 }
 
-
 #[test]
 fn test_drop_traversal() {
     let (storage, _temp_dir) = setup_test_db();
@@ -2124,7 +2123,14 @@ fn test_drop_traversal() {
             .add_n("person", None, None)
             .collect_to_val();
         let _ = G::new_mut(Arc::clone(&storage), &mut txn)
-            .add_e("knows", None, node.id(), new_node.id(), false, EdgeType::Node)
+            .add_e(
+                "knows",
+                None,
+                node.id(),
+                new_node.id(),
+                false,
+                EdgeType::Node,
+            )
             .collect_to_val();
     }
 
@@ -2170,5 +2176,4 @@ fn test_drop_traversal() {
     println!("traversal: {:?}", traversal);
 
     assert_eq!(traversal.len(), 0);
-
 }
