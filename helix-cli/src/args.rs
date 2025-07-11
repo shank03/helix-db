@@ -123,11 +123,6 @@ pub struct CompileCommand {
 
     #[clap(short, long, help = "The target language")]
     pub lang: Option<OutputLanguage>,
-    // #[clap(short, long, help = "The target platform")]
-    // pub target: Option<String>,
-
-    // #[clap(short, long, help = "Should compile in release mode")]
-    // pub release: bool,
 }
 
 #[derive(Debug, Args)]
