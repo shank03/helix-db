@@ -60,6 +60,7 @@ pub struct HelixGraphStorage {
     pub bm25: HBM25Config,
     pub schema: String,
     pub graphvis_node_label: Option<String>,
+    pub embedding_model: Option<String>,
 }
 
 impl HelixGraphStorage {
@@ -157,6 +158,7 @@ impl HelixGraphStorage {
         let bm25 = HBM25Config::new(&graph_env, &mut wtxn)?;
         let schema = config.schema.unwrap_or("".to_string());
         let graphvis_node_label = config.graphvis_node_label;
+        let embedding_model = config.embedding_model;
 
         wtxn.commit()?;
         Ok(Self {
@@ -170,6 +172,7 @@ impl HelixGraphStorage {
             bm25,
             schema,
             graphvis_node_label,
+            embedding_model,
         })
     }
 

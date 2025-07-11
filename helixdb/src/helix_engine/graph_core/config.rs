@@ -1,9 +1,9 @@
+use crate::helix_engine::types::GraphError;
 use std::{
     path::PathBuf,
     fmt,
 };
 use serde::{Deserialize, Serialize};
-use crate::helix_engine::types::GraphError;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct VectorConfig {
@@ -24,7 +24,7 @@ pub struct Config {
     pub db_max_size_gb: Option<usize>, // database in GB
     pub mcp: bool,
     pub schema: Option<String>,
-    //pub embedding_model: Option<String>,
+    pub embedding_model: Option<String>,
     pub graphvis_node_label: Option<String>,
 }
 
@@ -35,7 +35,7 @@ impl Config {
         ef_search: usize,
         db_max_size_gb: usize,
         schema: Option<String>,
-        //embedding_model: Option<String>,
+        embedding_model: Option<String>,
         graphvis_node_label: Option<String>,
     ) -> Self {
         Self {
@@ -50,7 +50,7 @@ impl Config {
             db_max_size_gb: Some(db_max_size_gb),
             mcp: true,
             schema,
-            //embedding_model,
+            embedding_model,
             graphvis_node_label,
         }
     }
@@ -113,7 +113,7 @@ impl Default for Config {
             db_max_size_gb: Some(10),
             mcp: true,
             schema: None,
-            //embedding_model: Some("text_embedding-ada-002".to_string()),
+            embedding_model: Some("text_embedding-ada-002".to_string()),
             graphvis_node_label: None,
         }
     }
@@ -128,6 +128,7 @@ impl fmt::Display for Config {
             db_max_size_gb: {:?}\n
             mcp: {:?}\n
             schema: {:?}\n
+            embedding_model: {:?}\n
             graphvis_node_label: {:?}",
             self.vector_config.m,
             self.vector_config.ef_construction,
@@ -136,7 +137,7 @@ impl fmt::Display for Config {
             self.db_max_size_gb,
             self.mcp,
             self.schema,
-            //self.embedding_model,
+            self.embedding_model,
             self.graphvis_node_label,
         )
     }

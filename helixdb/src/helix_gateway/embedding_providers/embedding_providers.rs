@@ -33,7 +33,10 @@ impl EmbeddingModelImpl {
             client: Client::new(),
             model: model
                 .map(String::from)
-                .unwrap_or("text-embedding-ada-002".into()),
+                .unwrap_or(
+                    // get embedding model from config
+                    "text-embedding-ada-002".into()
+                ),
         })
     }
 }
@@ -149,7 +152,7 @@ pub fn get_embedding_model(
 /// ```
 macro_rules! embed {
     ($query:expr) => {{
-        let embedding_model = get_embedding_model(None, None, None);
+        let embedding_model = get_embedding_model(None, db.embedding_model.as_deref(), None);
         embedding_model.fetch_embedding($query)?
     }};
     ($query:expr, $model:expr) => {{
