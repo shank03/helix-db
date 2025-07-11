@@ -33,7 +33,6 @@ pub fn graphvis(input: &HandlerInput, response: &mut Response) -> Result<(), Gra
         &txn,
         None,
         None,
-        //Some("entity_name".to_string()),
     ) {
         Ok(value) => value,
         Err(e) => {
