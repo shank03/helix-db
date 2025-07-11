@@ -127,7 +127,7 @@ pub struct CompileCommand {
     pub output: Option<String>,
 
     #[clap(short, long, help = "The target language")]
-    pub r#gen: OutputLanguage,
+    pub r#gen: Option<OutputLanguage>,
 }
 
 #[derive(Debug, Args)]
