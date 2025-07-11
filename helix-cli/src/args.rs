@@ -195,7 +195,7 @@ pub struct StartCommand {
 #[derive(Debug, Args)]
 #[clap(name = "visualize", about = "Visualize the Helix graph")]
 pub struct VisualizeCommand {
-    #[clap(help = "Stop all running instances")]
+    #[clap(help = "Id of instance to visualize")]
     pub instance: String,
 
     #[clap(short, long, help = "Give nodes a label based on a property")]
