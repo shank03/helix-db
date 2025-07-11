@@ -59,10 +59,6 @@ pub enum CommandType {
     /// Start a stopped Helix instance
     Start(StartCommand),
 
-    /// Ingest data into Helix
-    #[cfg(feature = "ingestion")]
-    Ingest(IngestCommand),
-
     /// Give an instance a short description
     Label(LabelCommand),
 
@@ -200,48 +196,6 @@ pub struct VisualizeCommand {
 
     #[clap(short, long, help = "Give nodes a label based on a property")]
     pub node_prop: Option<String>,
-}
-
-#[derive(Debug, Args)]
-#[clap(name = "ingest", about = "Ingest data into Helix")]
-pub struct IngestCommand {
-    /// Type of database to ingest from ('sqlite' or 'pg')
-    #[clap(short = 't', long = "type", value_parser = ["sqlite", "pg"])]
-    pub db_type: String,
-
-    /// Database connection string or path
-    #[clap(short, long = "db", help = "Database connection string or path")]
-    pub db_url: String,
-
-    /// Helix instance to ingest data into
-    #[clap(
-        short = 'i',
-        long = "instance",
-        help = "Helixdb instance to ingest data into"
-    )]
-    pub instance: String,
-
-    /// Batch size for ingestion (only used for PostgreSQL)
-    #[clap(
-        short = 'b',
-        long = "batch",
-        default_value = "1000",
-        help = "Batch size for ingestion"
-    )]
-    pub batch_size: usize,
-
-    /// Output directory for JSONL files
-    #[clap(
-        short = 'o',
-        long = "output",
-        default_value = "./",
-        help = "Output directory for JSONL files"
-    )]
-    pub output_dir: Option<String>,
-
-    /// Use SSL for PostgreSQL
-    #[clap(short = 's', long = "ssl", help = "Use SSL for PostgreSQL")]
-    pub use_ssl: bool,
 }
 
 #[derive(Debug, Args)]
