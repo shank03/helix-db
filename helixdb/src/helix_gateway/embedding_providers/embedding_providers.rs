@@ -1,8 +1,10 @@
 use crate::helix_engine::types::GraphError;
 use reqwest::blocking::Client;
 use serde_json::json;
-use std::env;
+// #[cfg(feature = "embed_local")]
 use url::Url;
+#[cfg(feature = "embed_openai")]
+use std::env;
 
 // TODO: add support for rust native embedding model libs as well so it runs fully built in
 //      in case we have a gpu or something on the server we're running it on
@@ -13,7 +15,7 @@ pub trait EmbeddingModel {
 }
 
 #[cfg(feature = "embed_openai")]
-struct EmbeddingModelImpl {
+pub struct EmbeddingModelImpl {
     api_key: String,
     client: Client,
     model: String,
@@ -31,7 +33,10 @@ impl EmbeddingModelImpl {
             client: Client::new(),
             model: model
                 .map(String::from)
-                .unwrap_or("text-embedding-ada-002".into()),
+                .unwrap_or(
+                    // get embedding model from config
+                    "text-embedding-ada-002".into()
+                ),
         })
     }
 }
@@ -67,7 +72,7 @@ impl EmbeddingModel for EmbeddingModelImpl {
 }
 
 #[cfg(feature = "embed_local")]
-struct EmbeddingModelImpl {
+pub struct EmbeddingModelImpl {
     url: String,
     client: Client,
 }
@@ -123,12 +128,12 @@ pub fn get_embedding_model(
     api_key: Option<&str>,
     model: Option<&str>,
     url: Option<&str>,
-) -> Result<Box<dyn EmbeddingModel>, GraphError> {
+) -> Result<EmbeddingModelImpl, GraphError> {
     #[cfg(feature = "embed_openai")]
-    return Ok(Box::new(EmbeddingModelImpl::new(api_key, model)?));
+    return Ok(EmbeddingModelImpl::new(api_key, model)?);
 
     #[cfg(feature = "embed_local")]
-    return Ok(Box::new(EmbeddingModelImpl::new(url)?));
+    return Ok(EmbeddingModelImpl::new(url)?);
 
     #[cfg(not(any(feature = "embed_openai", feature = "embed_local")))]
     panic!("No embedding model feature enabled. Enable either 'openai' or 'local'.");
@@ -147,15 +152,15 @@ pub fn get_embedding_model(
 /// ```
 macro_rules! embed {
     ($query:expr) => {{
-        let embedding_model = get_embedding_model(None, None, None);
+        let embedding_model = get_embedding_model(None, db.embedding_model.as_deref(), None)?;
         embedding_model.fetch_embedding($query)?
     }};
     ($query:expr, $model:expr) => {{
-        let embedding_model = get_embedding_model(None, Some($model), None);
+        let embedding_model = get_embedding_model(None, Some($model), None)?;
         embedding_model.fetch_embedding($query)?
     }};
     ($query:expr, $model:expr, $url:expr) => {{
-        let embedding_model = get_embedding_model(None, Some($model), Some($url));
+        let embedding_model = get_embedding_model(None, Some($model), Some($url))?;
         embedding_model.fetch_embedding($query)?
     }};
 }

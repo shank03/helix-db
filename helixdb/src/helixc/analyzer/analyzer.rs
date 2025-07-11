@@ -1594,6 +1594,7 @@ impl<'a> Ctx<'a> {
                                     }),
                                 },
                             ));
+                            gen_traversal.should_collect = ShouldCollect::ToVal;
                             gen_traversal.traversal_type = TraversalType::Ref;
                             Type::Node(Some(node_type.to_string()))
                         }

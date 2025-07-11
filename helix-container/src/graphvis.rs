@@ -6,27 +6,15 @@ use helixdb::{
 use serde_json::Value;
 use std::sync::Arc;
 
-/*
-use serde::{Serialize, Deserialize};
-#[derive(Serialize, Deserialize)]
-pub struct GraphLabels {
-    pub node_label: String,
-}
-*/
-
 #[get_handler]
 pub fn graphvis(input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
-    /*
-    let data: GraphLabels = match sonic_rs::from_slice(&input.request.body) {
-        Ok(data) => data,
-        Err(err) => return Err(GraphError::from(err)),
-    };
-    */
-
     let db = Arc::clone(&input.graph.storage);
-    let json_ne: String = match db.get_ne_json(
-        Some("entity_name".to_string()),
-        Some("edge_name".to_string()),
+    let txn = db.graph_env.read_txn()?;
+
+    let json_ne: String = match db.nodes_edges_to_json(
+        &txn,
+        None,
+        db.graphvis_node_label.clone(),
     ) {
         Ok(value) => value,
         Err(e) => {
@@ -50,6 +38,7 @@ pub fn graphvis(input: &HandlerInput, response: &mut Response) -> Result<(), Gra
             return Ok(());
         }
     };
+    let num_nodes = json_ne_m["nodes"].as_array().map(|arr| arr.len()).unwrap_or(0);
 
     let html_template = include_str!("graphvis.html");
     let html_content = html_template
@@ -72,6 +61,10 @@ pub fn graphvis(input: &HandlerInput, response: &mut Response) -> Result<(), Gra
         .replace(
             "{NUM_VECTORS}",
             &serde_json::to_string(&db_counts_m["num_vectors"]).unwrap(),
+        )
+        .replace(
+            "{NUM_NODES_SHOWING}",
+            &num_nodes.to_string(),
         );
 
     response

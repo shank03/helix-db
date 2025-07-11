@@ -1,9 +1,9 @@
+use crate::helix_engine::types::GraphError;
 use std::{
     path::PathBuf,
     fmt,
 };
 use serde::{Deserialize, Serialize};
-use crate::helix_engine::types::GraphError;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct VectorConfig {
@@ -24,6 +24,8 @@ pub struct Config {
     pub db_max_size_gb: Option<usize>, // database in GB
     pub mcp: bool,
     pub schema: Option<String>,
+    pub embedding_model: Option<String>,
+    pub graphvis_node_label: Option<String>,
 }
 
 impl Config {
@@ -34,6 +36,7 @@ impl Config {
         db_max_size_gb: usize,
         schema: Option<String>,
         embedding_model: Option<String>,
+        graphvis_node_label: Option<String>,
     ) -> Self {
         Self {
             vector_config: VectorConfig {
@@ -47,6 +50,8 @@ impl Config {
             db_max_size_gb: Some(db_max_size_gb),
             mcp: true,
             schema,
+            embedding_model,
+            graphvis_node_label,
         }
     }
 
@@ -66,8 +71,6 @@ impl Config {
             config.schema = None;
         }
 
-
-
         Ok(config)
     }
 
@@ -83,7 +86,9 @@ impl Config {
             "secondary_indices": []
         },
         "db_max_size_gb": 10,
-        "mcp": true
+        "mcp": true,
+        "embedding_model": "text-embedding-ada-002",
+        "graphvis_node_label": ""
     }
     "#
     .to_string()
@@ -103,11 +108,13 @@ impl Default for Config {
                 ef_search: Some(768),
             },
             graph_config: GraphConfig {
-                secondary_indices: Some(vec!["entity_name".to_string()]),
+                secondary_indices: None,
             },
             db_max_size_gb: Some(10),
             mcp: true,
-            schema: None
+            schema: None,
+            embedding_model: Some("text-embedding-ada-002".to_string()),
+            graphvis_node_label: None,
         }
     }
 }
@@ -120,7 +127,9 @@ impl fmt::Display for Config {
             Graph config => secondary_indicies: {:?}\n
             db_max_size_gb: {:?}\n
             mcp: {:?}\n
-            schema: {:?}",
+            schema: {:?}\n
+            embedding_model: {:?}\n
+            graphvis_node_label: {:?}",
             self.vector_config.m,
             self.vector_config.ef_construction,
             self.vector_config.ef_search,
@@ -128,6 +137,8 @@ impl fmt::Display for Config {
             self.db_max_size_gb,
             self.mcp,
             self.schema,
+            self.embedding_model,
+            self.graphvis_node_label,
         )
     }
 }
