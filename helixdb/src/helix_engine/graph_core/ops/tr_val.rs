@@ -112,7 +112,6 @@ impl Traversable for TraversalVal {
 impl Traversable for Vec<TraversalVal> {
     fn id(&self) -> u128 {
         if self.is_empty() {
-            println!("retting zero line 118!");
             return 0;
         }
         self[0].id()
