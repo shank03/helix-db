@@ -86,9 +86,9 @@ impl Config {
             "secondary_indices": []
         },
         "db_max_size_gb": 10,
-        "mcp": true
+        "mcp": true,
         "embedding_model": "text-embedding-ada-002",
-        "graphvis_node_label": "",
+        "graphvis_node_label": ""
     }
     "#
     .to_string()
