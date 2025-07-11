@@ -4,10 +4,10 @@ use crate::{
         vector_core::vector_distance::DistanceCalc,
     },
     protocol::{
-        filterable::{Filterable, FilterableType},
         return_values::ReturnValue,
         value::Value,
     },
+    utils::filterable::{Filterable, FilterableType},
 };
 use core::fmt;
 use serde::{Deserialize, Serialize};

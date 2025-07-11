@@ -4,7 +4,7 @@
 //!
 //! Nodes and edges are serialised without enum variant names in JSON format.
 
-use super::value::Value;
+use crate::protocol::value::Value;
 use crate::helix_engine::types::GraphError;
 use sonic_rs::{Deserialize, Serialize};
 use std::{cmp::Ordering, collections::HashMap};

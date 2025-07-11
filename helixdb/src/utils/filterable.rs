@@ -2,8 +2,11 @@ use std::collections::HashMap;
 
 use crate::{
     helix_engine::types::GraphError,
-    protocol::{
+    utils::{
         items::{Edge, Node},
+    },
+    protocol:: {
+        return_values::ReturnValue,
         value::Value,
     },
 };
@@ -14,8 +17,6 @@ pub enum FilterableType {
     Edge,
     Vector,
 }
-
-use super::return_values::ReturnValue;
 
 /// Trait for types that can be filtered based on their properties.
 /// Implemented by both Node and Edge types.

@@ -17,7 +17,8 @@ use crate::{
     helix_engine::graph_core::ops::{
         source::n_from_type::NFromTypeAdapter, util::paths::ShortestPathAdapter,
     },
-    protocol::{filterable::Filterable, id::ID, value::Value},
+    utils::{filterable::Filterable, id::ID},
+    protocol::value::Value,
 };
 use crate::{
     helix_engine::{

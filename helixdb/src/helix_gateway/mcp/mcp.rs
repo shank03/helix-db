@@ -5,9 +5,10 @@ use crate::{
         types::GraphError,
     },
     protocol::{
-        id::v6_uuid, request::Request, response::Response,
+        request::Request, response::Response,
         return_values::ReturnValue,
     },
+    utils::id::v6_uuid,
     helix_gateway::mcp::tools::{ToolArgs, ToolCalls},
 };
 use proc_macros::mcp_handler;

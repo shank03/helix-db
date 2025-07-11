@@ -1,5 +1,5 @@
 use crate::helix_engine::types::GraphError;
-use crate::protocol::items::{Edge, Node};
+use crate::utils::items::{Edge, Node};
 use heed3::{RoTxn, RwTxn};
 
 pub trait DBMethods {

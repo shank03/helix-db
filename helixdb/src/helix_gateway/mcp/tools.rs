@@ -14,7 +14,7 @@ use crate::{
         storage_core::storage_core::HelixGraphStorage,
         types::GraphError,
     },
-    protocol::label_hash::hash_label,
+    utils::label_hash::hash_label,
     helix_gateway::mcp::mcp::{MCPConnection, McpBackend},
 };
 use heed3::RoTxn;

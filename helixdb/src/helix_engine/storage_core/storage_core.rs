@@ -12,7 +12,7 @@ use crate::{
             vector_core::{HNSWConfig, VectorCore},
         },
     },
-    protocol::{
+    utils::{
         items::{Edge, Node},
         label_hash::hash_label,
     },
