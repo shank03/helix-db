@@ -132,7 +132,7 @@ impl Display for Traversal {
                                                                              // scrappy
                 )?;
                 write!(f, "\n    .update({})", write_properties(&properties))?;
-                write!(f, "\n    .collect_to::<Vec<_>>()")?;
+                write!(f, "\n    .collect_to_obj()")?;
                 write!(f, "}}")?;
             }
         }
