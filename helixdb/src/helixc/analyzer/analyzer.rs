@@ -3393,7 +3393,7 @@ impl<'a> Ctx<'a> {
                     )));
                 // traversal.traversal_type = TraversalType::Ref;
                 traversal.should_collect = ShouldCollect::ToVec;
-                Some(Type::Vector(Some(vector_ty.clone())))
+                Some(Type::Vectors(Some(vector_ty.clone())))
             }
             // Anything else is illegal
             _ => {
