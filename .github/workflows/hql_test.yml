@@ -8,7 +8,7 @@ on:
 
 jobs:
   hql-tests:
-    runs-on: ubuntu-latest-4-cores  # 8 vCPUs, 32 GB RAM
+    runs-on: ubuntu-latest  # 8 vCPUs, 32 GB RAM
     strategy:
       matrix:
         batch: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] 
