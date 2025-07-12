@@ -10,8 +10,8 @@ use sonic_rs::json;
 use spinners::{Spinner, Spinners};
 use std::{
     fmt::Write,
-    fs::{self, File, OpenOptions, read_to_string},
-    io::{Read, Write as iWrite},
+    fs::{self, OpenOptions, read_to_string},
+    io::{Write as iWrite},
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
@@ -23,6 +23,8 @@ mod utils;
 #[tokio::main]
 async fn main() {
     let args = HelixCLI::parse();
+
+    check_helix_version().await;
 
     match args.command {
         CommandType::Demo => {

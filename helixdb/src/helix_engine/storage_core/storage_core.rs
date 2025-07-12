@@ -24,7 +24,7 @@ use heed3::{
     RoTxn, RwTxn,
     byteorder::BE,
     RoIter,
-    
+
 };
 use std::{
     cmp::Ordering,
@@ -546,9 +546,7 @@ impl HelixGraphStorage {
     }
 
     /// Get number of nodes, edges, and vectors from lmdb
-    pub fn get_db_stats_json(&self) -> Result<String, GraphError> {
-        let txn = self.graph_env.read_txn().unwrap();
-
+    pub fn get_db_stats_json(&self, txn: &RoTxn) -> Result<String, GraphError> {
         let result = json!({
             "num_nodes":   self.nodes_db.len(&txn).unwrap_or(0),
             "num_edges":   self.edges_db.len(&txn).unwrap_or(0),

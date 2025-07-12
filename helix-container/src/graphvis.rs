@@ -24,7 +24,7 @@ pub fn graphvis(input: &HandlerInput, response: &mut Response) -> Result<(), Gra
     };
     let json_ne_m = modify_graph_json(&json_ne).unwrap();
 
-    let db_counts: String = match db.get_db_stats_json() {
+    let db_counts: String = match db.get_db_stats_json(&txn) {
         Ok(value) => value,
         Err(e) => {
             println!("error with json: {:?}", e);

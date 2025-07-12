@@ -458,3 +458,49 @@ pub fn parse_credentials(creds: &String) -> Option<&str> {
     }
     None
 }
+
+pub async fn check_helix_version() {
+    match check_helix_installation() {
+        Ok(_) => {}
+        Err(_) => {
+            println!(
+                "{}",
+                "Helix is not installed. Please run `helix install` first."
+                .red()
+                .bold()
+            );
+            return;
+        }
+    };
+
+    let repo_path = {
+        let home_dir = match dirs::home_dir() {
+            Some(dir) => dir,
+            None => {
+                println!("{}", "Could not determine home directory".red().bold());
+                return;
+            }
+        };
+        home_dir.join(".helix/repo/helix-db/helixdb")
+    };
+
+    let local_cli_version =
+        Version::parse(&format!("v{}", env!("CARGO_PKG_VERSION"))).unwrap();
+    let local_db_version =
+        Version::parse(&format!("v{}", get_crate_version(&repo_path).unwrap())).unwrap();
+    let remote_helix_version = get_remote_helix_version().await.unwrap();
+    println!(
+        "helix-cli version: {}, helix-db version: {}, remote helix version: {}",
+        local_cli_version, local_db_version, remote_helix_version
+    );
+
+    if local_db_version < remote_helix_version || local_cli_version < remote_helix_version {
+        println!("{} {} {} {}",
+            "New HelixDB version is available!".yellow().bold(),
+            "Run".yellow().bold(),
+            "helix update".white().bold(),
+            "to install the newest version!".yellow().bold(),
+        );
+    }
+}
+
