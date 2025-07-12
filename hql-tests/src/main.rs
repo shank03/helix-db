@@ -327,10 +327,10 @@ async fn main() -> Result<()> {
     // Run helix init command
     let output = Command::new("helix")
         .arg("install")
+        .arg("-b")
+        .arg(branch)
         .arg("-p")
         .arg(&temp_repo)
-        .arg("--branch")
-        .arg(branch)
         .output()
         .context("Failed to execute helix init command")?;
 
