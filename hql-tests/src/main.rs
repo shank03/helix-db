@@ -278,6 +278,15 @@ async fn main() -> Result<()> {
                 .value_parser(clap::value_parser!(u32))
                 .required(false),
         )
+        .arg(
+            Arg::new("batch")
+                .long("batch")
+                .help("Enable batch processing with total batches and current batch")
+                .num_args(2)
+                .value_names(&["TOTAL_BATCHES", "CURRENT_BATCH"])
+                .value_parser(clap::value_parser!(u32))
+                .required(false),
+        )
         .get_matches();
 
     let current_dir = env::current_dir().context("Failed to get current directory")?;
@@ -330,8 +339,67 @@ async fn main() -> Result<()> {
         }
 
         process_file_parallel(*file_num, &current_dir, &temp_repo, &github_config).await?;
+    } else if let Some(batch_args) = matches.get_many::<u32>("batch") {
+        // Process in batch mode
+        let batch_values: Vec<u32> = batch_args.copied().collect();
+        if batch_values.len() != 2 {
+            bail!("Error: --batch requires exactly 2 arguments: total_batches current_batch");
+        }
+        
+        let total_batches = batch_values[0];
+        let current_batch = batch_values[1];
+        
+        if current_batch < 1 || current_batch > total_batches {
+            bail!("Error: Current batch ({}) must be between 1 and {}", current_batch, total_batches);
+        }
+        
+        if total_batches == 0 {
+            bail!("Error: Total batches must be greater than 0");
+        }
+
+        // Calculate which files this batch should process
+        let files_per_batch = 100 / total_batches;
+        let remainder = 100 % total_batches;
+        
+        // Calculate start and end for this batch
+        let start_file = ((current_batch - 1) * files_per_batch) + 1;
+        let mut end_file = current_batch * files_per_batch;
+        
+        // Add remainder files to the last batch
+        if current_batch == total_batches {
+            end_file += remainder;
+        }
+        
+        println!("Processing batch {}/{}: files {}-{}", current_batch, total_batches, start_file, end_file);
+
+        let tasks: Vec<_> = (start_file..=end_file)
+            .map(|file_num| {
+                let current_dir = current_dir.clone();
+                let temp_repo = temp_repo.clone();
+                let github_config = github_config.clone();
+                tokio::spawn(async move {
+                    match process_file_parallel(file_num, &current_dir, &temp_repo, &github_config)
+                        .await
+                    {
+                        Ok(()) => {
+                            println!("Successfully processed file{}", file_num);
+                        }
+                        Err(e) => {
+                            eprintln!("Error processing file{}: {}", file_num, e);
+                        }
+                    }
+                })
+            })
+            .collect();
+
+        // Wait for all tasks to complete
+        for task in tasks {
+            let _ = task.await;
+        }
+
+        println!("Finished processing batch {}/{}", current_batch, total_batches);
     } else {
-        // Process all files in parallel
+        // Process all files in parallel (default behavior)
         println!("Processing all files 1-100 in parallel...");
 
         let tasks: Vec<_> = (1..=100)
