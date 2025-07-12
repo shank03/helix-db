@@ -15,44 +15,42 @@ jobs:
       issues: write
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Set up Rust
-          uses: actions-rs/toolchain@v1
-          with:
-            profile: minimal
-            toolchain: stable
-            target: x86_64-unknown-linux-gnu
-            override: true
-      
-      - name: Cache cargo registry
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-      
-      - name: Install helix CLI
-        run: |
-          # Add helix installation commands here
-          # This is a placeholder - replace with actual helix installation
-          echo "Installing helix CLI..."
-          curl -sSL https://install.helix-db.com | bash
-          echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
-          source ~/.bashrc
-      
-      - name: Make run.sh executable
-        run: chmod +x ./hql-tests/run.sh
-      
-      - name: Run HQL tests
-        working-directory: ./hql-tests
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_OWNER: ${{ github.repository_owner }}
-          GITHUB_REPO: ${{ github.event.repository.name }}
-        run: ./run.sh
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        target: x86_64-unknown-linux-gnu
+        override: true
+    
+    - name: Cache cargo registry
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+    
+    - name: Install helix CLI
+      run: |
+        echo "Installing helix CLI..."
+        curl -sSL https://install.helix-db.com | bash
+        echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
+        source ~/.bashrc
+    
+    - name: Make run.sh executable
+      run: chmod +x ./hql-tests/run.sh
+    
+    - name: Run HQL tests
+      working-directory: ./hql-tests
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_OWNER: ${{ github.repository_owner }}
+        GITHUB_REPO: ${{ github.event.repository.name }}
+      run: ./run.sh
