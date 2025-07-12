@@ -647,18 +647,18 @@ fi
                 let payload = json!({
                     "user_id": user_id,
                     "queries": content.files,
-                    "instance_id": command.instance,
+                    "cluster_id": command.cluster,
                     "version": "0.1.0",
                     "helix_config": config.to_json()
                 });
                 println!("{:#?}", payload);
                 let client = reqwest::Client::new();
                 println!("{}", user_key);
-                println!("{}", &command.instance);
+                println!("{}", &command.cluster);
                 match client
                     .post("http://ec2-184-72-27-116.us-west-1.compute.amazonaws.com:3000/clusters/deploy-queries")
                     .header("x-api-key", user_key) // used to verify user
-                    .header("x-instance-id", &command.instance) // used to verify instance with user
+                    .header("x-cluster-id", &command.cluster) // used to verify instance with user
                     .header("Content-Type", "application/json")
                     .body(sonic_rs::to_string(&payload).unwrap())
                     .send()
@@ -703,7 +703,7 @@ fi
                 };
 
                 let instance_manager = InstanceManager::new().unwrap();
-                let iid = &command.instance;
+                let iid = &command.cluster;
 
                 match instance_manager.get_instance(iid) {
                     Ok(Some(_)) => println!("{}", "Helix instance found!".green().bold()),

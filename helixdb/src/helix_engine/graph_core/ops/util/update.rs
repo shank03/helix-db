@@ -43,11 +43,12 @@ impl<'scope, 'env, I: Iterator<Item = Result<TraversalVal, GraphError>>> UpdateA
     {
         let storage = self.storage.clone();
 
-        let capacity = match self.inner.size_hint() {
-            (_, Some(upper)) => upper,
-            (lower, None) => lower,
+        let mut vec = match self.inner.size_hint() {
+            (_, Some(upper)) => Vec::with_capacity(upper),
+            // no upper bound means infinite size
+            // don't want to allocate usize::MAX sized vector
+            _ => Vec::new(), // default vector capacity
         };
-        let mut vec = Vec::with_capacity(capacity);
 
         for item in self.inner {
             match item {
