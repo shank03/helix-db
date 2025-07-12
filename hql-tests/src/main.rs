@@ -287,6 +287,13 @@ async fn main() -> Result<()> {
                 .value_parser(clap::value_parser!(u32))
                 .required(false),
         )
+        .arg(
+            Arg::new("branch")
+                .long("branch")
+                .help("Branch to process")
+                .value_parser(clap::value_parser!(String))
+                .required(false),
+        )
         .get_matches();
 
     let current_dir = env::current_dir().context("Failed to get current directory")?;
@@ -314,11 +321,16 @@ async fn main() -> Result<()> {
             .await
             .context("Failed to create temp directory")?;
     }
+
+    let branch = matches.get_one::<String>("branch").map(|s| s.as_str()).unwrap_or("dev");
+    println!("DEBUG: Branch: {}", branch);
     // Run helix init command
     let output = Command::new("helix")
         .arg("install")
         .arg("-p")
         .arg(&temp_repo)
+        .arg("--branch")
+        .arg(branch)
         .output()
         .context("Failed to execute helix init command")?;
 

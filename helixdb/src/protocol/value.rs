@@ -72,6 +72,16 @@ impl Value {
             _ => panic!("Not a string"),
         }
     }
+
+    #[inline]
+    #[allow(unused_variables)] // default is not used but needed for function signature
+    pub fn map_value_or(
+        self,
+        default: bool,
+        f: impl Fn(&Value) -> bool,
+    ) -> Result<bool, GraphError> {
+        Ok(f(&self))
+    }
 }
 impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

@@ -1215,9 +1215,9 @@ fi
             let mut runner = Command::new("git");
             runner.arg("clone");
             runner.arg("https://github.com/HelixDB/helix-db.git");
-            if command.dev {
+            if let Some(branch) = command.branch {
                 runner.arg("--branch");
-                runner.arg("dev");
+                runner.arg(branch);
             }
             runner.current_dir(&repo_path);
 
