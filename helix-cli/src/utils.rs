@@ -8,7 +8,7 @@ use helixdb::{
     },
     utils::styled_string::StyledString,
 };
-use reqwest::blocking::Client;
+use reqwest::Client;
 use serde::Deserialize;
 use serde_json::Value as JsonValue;
 use std::{
@@ -348,7 +348,7 @@ pub fn get_crate_version<P: AsRef<Path>>(path: P) -> Result<Version, String> {
     Ok(vers)
 }
 
-pub fn get_remote_helix_version() -> Result<Version, Box<dyn Error>> {
+pub async fn get_remote_helix_version() -> Result<Version, Box<dyn Error>> {
     let client = Client::new();
 
     let url = "https://api.github.com/repos/HelixDB/helix-db/releases/latest";
@@ -357,8 +357,10 @@ pub fn get_remote_helix_version() -> Result<Version, Box<dyn Error>> {
         .get(url)
         .header("User-Agent", "rust")
         .header("Accept", "application/vnd.github+json")
-        .send()?
-        .text()?;
+        .send()
+        .await?
+        .text()
+        .await?;
 
     let json: JsonValue = serde_json::from_str(&response)?;
     let tag_name = json

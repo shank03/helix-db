@@ -86,7 +86,7 @@ pub struct DeployCommand {
     #[clap(short, long, help = "The output path")]
     pub output: Option<String>,
 
-    #[clap(short, long, help = "Port to run the instance on")]
+    #[clap(long, help = "Port to run the instance on")]
     pub port: Option<u16>,
 }
 
