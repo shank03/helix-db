@@ -1,6 +1,10 @@
 use proc_macros::get_handler;
 use helixdb::{
-    helix_engine::types::GraphError, helix_gateway::router::router::HandlerInput,
+    helix_engine::{
+        storage_core::graph_visualization::GraphVisualization,
+        types::GraphError,
+    },
+    helix_gateway::router::router::HandlerInput,
     protocol::response::Response,
 };
 use serde_json::Value;
@@ -24,7 +28,7 @@ pub fn graphvis(input: &HandlerInput, response: &mut Response) -> Result<(), Gra
     };
     let json_ne_m = modify_graph_json(&json_ne).unwrap();
 
-    let db_counts: String = match db.get_db_stats_json() {
+    let db_counts: String = match db.get_db_stats_json(&txn) {
         Ok(value) => value,
         Err(e) => {
             println!("error with json: {:?}", e);
@@ -96,3 +100,4 @@ fn modify_graph_json(input: &str) -> Result<Value, serde_json::Error> {
 
     Ok(json)
 }
+

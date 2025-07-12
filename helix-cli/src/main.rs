@@ -10,8 +10,8 @@ use sonic_rs::json;
 use spinners::{Spinner, Spinners};
 use std::{
     fmt::Write,
-    fs::{self, File, OpenOptions, read_to_string},
-    io::{Read, Write as iWrite},
+    fs::{self, OpenOptions, read_to_string},
+    io::{Write as iWrite},
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
@@ -23,6 +23,8 @@ mod utils;
 #[tokio::main]
 async fn main() {
     let args = HelixCLI::parse();
+
+    check_helix_version().await;
 
     match args.command {
         CommandType::Demo => {
@@ -441,6 +443,15 @@ fi
                 home_dir.join(".helix/repo/helix-db/helixdb")
             };
 
+            if !check_cargo_version() {
+                match Command::new("rustup").arg("update").output() {
+                    Ok(_) => println!("{}", "Updating cargo!".green().bold()),
+                    Err(e) => println!("{} {}", "Error updating cargo!", e),
+                }
+            } else {
+                println!("{}", "cargo up-to-date!".green().bold());
+            }
+
             let local_cli_version =
                 Version::parse(&format!("v{}", env!("CARGO_PKG_VERSION"))).unwrap();
             let local_db_version =
@@ -506,7 +517,6 @@ fi
                 }
             } else {
                 println!("{}", "HelixDB is up to date!".green().bold());
-                return;
             }
         }
 
