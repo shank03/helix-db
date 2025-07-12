@@ -1,6 +1,6 @@
 [package]
 name = "helixdb"
-version = "1.0.106"
+version = "1.0.107"
 edition = "2024"
 description = "HelixDB is a multi-model database built for performance and simplicity."
 license = "AGPL-3.0"
