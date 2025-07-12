@@ -1,6 +1,10 @@
 use proc_macros::get_handler;
 use helixdb::{
-    helix_engine::types::GraphError, helix_gateway::router::router::HandlerInput,
+    helix_engine::{
+        storage_core::graph_visualization::GraphVisualization,
+        types::GraphError,
+    },
+    helix_gateway::router::router::HandlerInput,
     protocol::response::Response,
 };
 use serde_json::Value;
@@ -96,3 +100,4 @@ fn modify_graph_json(input: &str) -> Result<Value, serde_json::Error> {
 
     Ok(json)
 }
+

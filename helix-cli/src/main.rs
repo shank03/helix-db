@@ -443,6 +443,15 @@ fi
                 home_dir.join(".helix/repo/helix-db/helixdb")
             };
 
+            if !check_cargo_version() {
+                match Command::new("rustup").arg("update").output() {
+                    Ok(_) => println!("{}", "Updating cargo!".green().bold()),
+                    Err(e) => println!("{} {}", "Error updating cargo!", e),
+                }
+            } else {
+                println!("{}", "cargo up-to-date!".green().bold());
+            }
+
             let local_cli_version =
                 Version::parse(&format!("v{}", env!("CARGO_PKG_VERSION"))).unwrap();
             let local_db_version =
@@ -508,7 +517,6 @@ fi
                 }
             } else {
                 println!("{}", "HelixDB is up to date!".green().bold());
-                return;
             }
         }
 
