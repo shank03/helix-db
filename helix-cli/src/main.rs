@@ -445,7 +445,7 @@ fi
                 Version::parse(&format!("v{}", env!("CARGO_PKG_VERSION"))).unwrap();
             let local_db_version =
                 Version::parse(&format!("v{}", get_crate_version(&repo_path).unwrap())).unwrap();
-            let remote_helix_version = get_remote_helix_version().unwrap();
+            let remote_helix_version = get_remote_helix_version().await.unwrap();
             println!(
                 "helix-cli version: {}, helix-db version: {}, remote helix version: {}",
                 local_cli_version, local_db_version, remote_helix_version
