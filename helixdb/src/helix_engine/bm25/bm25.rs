@@ -32,15 +32,20 @@ pub struct PostingListEntry {
 
 pub trait BM25 {
     fn tokenize<const SHOULD_FILTER: bool>(&self, text: &str) -> Vec<Cow<'_, str>>;
+
     fn insert_doc(&self, txn: &mut RwTxn, doc_id: u128, doc: &str) -> Result<(), GraphError>;
+
     fn update_doc(&self, txn: &mut RwTxn, doc_id: u128, doc: &str) -> Result<(), GraphError>;
+
     fn delete_doc(&self, txn: &mut RwTxn, doc_id: u128) -> Result<(), GraphError>;
+
     fn search(
         &self,
         txn: &RoTxn,
         query: &str,
         limit: usize,
     ) -> Result<Vec<(u128, f32)>, GraphError>;
+
     fn calculate_bm25_score(
         &self,
         term: &str,
