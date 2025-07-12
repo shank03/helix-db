@@ -24,6 +24,8 @@ mod utils;
 async fn main() {
     let args = HelixCLI::parse();
 
+    check_helix_version().await;
+
     match args.command {
         CommandType::Demo => {
             println!("{}", "Demoing Helix".green().bold());
