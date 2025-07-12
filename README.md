@@ -13,6 +13,8 @@
   <a href="https://x.com/hlx_db">X</a>
 </h3>
 
+[![Docs](https://img.shields.io/badge/docs-latest-blue)](https://docs.helix-db.com)
+[![Change Log](https://img.shields.io/badge/changelog-latest-blue)](https://docs.helix-db.com/change-log/helixdb)
 [![GitHub Repo stars](https://img.shields.io/github/stars/HelixDB/helix-db)](https://github.com/HelixDB/helix-db/stargazers)
 [![Discord](https://img.shields.io/discord/1354148209005559819)](https://discord.gg/2stgMPr5BD)
 [![LOC](https://img.shields.io/endpoint?url=https://ghloc.vercel.app/api/HelixDB/helix-db/badge?filter=.rs$,.sh$&style=flat&logoColor=white&label=Lines%20of%20Code)](https://github.com/HelixDB/helix-db)

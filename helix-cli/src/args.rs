@@ -107,8 +107,8 @@ pub struct VersionCommand {}
     about = "Re-deploy a Helix project with new queries"
 )]
 pub struct RedeployCommand {
-    #[clap(help = "Existing helix instance ID")]
-    pub instance: String,
+    #[clap(help = "Existing helix cluster ID")]
+    pub cluster: String,
 
     #[clap(short, long, help = "The path to the project")]
     pub path: Option<String>,
