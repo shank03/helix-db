@@ -803,9 +803,7 @@ impl<'a> Ctx<'a> {
                                                         loc.clone(),
                                                         value.as_str(),
                                                     );
-                                                    GeneratedValue::Identifier(GenRef::Std(
-                                                        format!("data.{}.clone()", value.clone()),
-                                                    ))
+                                                    self.gen_identifier_or_param(q, value.as_str(), false, true)
                                                 }
                                                 v => {
                                                     self.push_query_err(
@@ -1005,10 +1003,7 @@ impl<'a> Ctx<'a> {
                                                     loc.clone(),
                                                     value.as_str(),
                                                 );
-                                                GeneratedValue::Identifier(GenRef::Std(format!(
-                                                    "data.{}",
-                                                    value.clone()
-                                                )))
+                                                self.gen_identifier_or_param(q, value.as_str(), false, true)
                                             }
                                             v => {
                                                 self.push_query_err(
@@ -1040,16 +1035,13 @@ impl<'a> Ctx<'a> {
                             }
                             VectorData::Identifier(i) => {
                                 self.is_valid_identifier(q, add.loc.clone(), i.as_str());
-                                // TODO: if in params then do data.i else i
-                                VecData::Standard(GeneratedValue::Identifier(GenRef::Ref(format!(
-                                    "data.{}",
-                                    i
-                                ))))
+                                let id = self.gen_identifier_or_param(q, i.as_str(), true, false);
+                                VecData::Standard(id)
                             }
                             VectorData::Embed(e) => match &e.value {
-                                EvaluatesToString::Identifier(i) => VecData::Embed(
-                                    GeneratedValue::Identifier(GenRef::Ref(format!("data.{}", i))),
-                                ),
+                                EvaluatesToString::Identifier(i) => {
+                                    VecData::Embed(self.gen_identifier_or_param(q, i.as_str(), true, false))
+                                }
                                 EvaluatesToString::StringLiteral(s) => {
                                     VecData::Embed(GeneratedValue::Literal(GenRef::Ref(s.clone())))
                                 }
@@ -4126,9 +4118,7 @@ impl<'a> Ctx<'a> {
                                                         loc.clone(),
                                                         value.as_str(),
                                                     );
-                                                    GeneratedValue::Identifier(GenRef::Std(
-                                                        format!("data.{}.clone()", value.clone()), // keep track of used variables
-                                                    ))
+                                                    self.gen_identifier_or_param(q, value.as_str(), false, true)
                                                 }
                                                 v => {
                                                     self.push_query_err(
@@ -4327,10 +4317,7 @@ impl<'a> Ctx<'a> {
                                                     loc.clone(),
                                                     value.as_str(),
                                                 );
-                                                GeneratedValue::Identifier(GenRef::Std(format!(
-                                                    "data.{}.clone()",
-                                                    value.clone()
-                                                )))
+                                                self.gen_identifier_or_param(q, value.as_str(), false, true)
                                             }
                                             v => {
                                                 self.push_query_err(
@@ -4799,7 +4786,11 @@ impl<'a> Ctx<'a> {
                 GeneratedValue::Parameter(GenRef::Std(format!("data.{}.clone()", name)))
             }
         } else {
-            GeneratedValue::Identifier(GenRef::Std(format!("{}.clone()", name.to_string())))
+            if should_ref {
+                GeneratedValue::Identifier(GenRef::Ref(name.to_string()))
+            } else {
+                GeneratedValue::Identifier(GenRef::Std(format!("{}.clone()", name.to_string())))
+            }
         }
     }
 

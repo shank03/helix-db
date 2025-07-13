@@ -338,17 +338,71 @@ async fn main() -> Result<()> {
     copy_dir_recursive(&project_root, &temp_repo).await?;
 
     // build rust cli from ./helix-db/helix-cli with sh build.sh dev
+    println!("DEBUG: Building rust cli from ./helix-db/helix-cli with sh build.sh dev");
+    let build_script_path = project_root.join("helix-cli/build.sh");
+    println!("DEBUG: Build script path: {}", build_script_path.display());
+    println!("DEBUG: Build script exists: {}", build_script_path.exists());
+    
+    let helix_cli_dir = project_root.join("helix-cli");
+    println!("DEBUG: Helix CLI dir: {}", helix_cli_dir.display());
+    println!("DEBUG: Helix CLI dir exists: {}", helix_cli_dir.exists());
+    
+    // Check if helix is already available
+    let helix_check = Command::new("helix")
+        .arg("--version")
+        .output();
+    
+    match helix_check {
+        Ok(output) => {
+            if output.status.success() {
+                println!("DEBUG: Helix already available: {}", String::from_utf8_lossy(&output.stdout));
+            } else {
+                println!("DEBUG: Helix not available or failed version check");
+            }
+        }
+        Err(e) => {
+            println!("DEBUG: Helix command not found: {}", e);
+        }
+    }
+    
     let output = Command::new("sh")
-        .arg(format!("{}/helix-cli/build.sh", project_root.display()))
+        .arg("build.sh")
         .arg("dev")
+        .current_dir(&helix_cli_dir)  // Change to helix-cli directory first
         .output()
         .context("Failed to execute build.sh")?;
+    
+    println!("DEBUG: build.sh exit code: {:?}", output.status.code());
+    println!("DEBUG: build.sh stdout: {}", String::from_utf8_lossy(&output.stdout));
+    println!("DEBUG: build.sh stderr: {}", String::from_utf8_lossy(&output.stderr));
+    
     if !output.status.success() {
         bail!(
             "Error: build.sh failed\nStderr: {}\nStdout: {}",
             String::from_utf8_lossy(&output.stderr),
             String::from_utf8_lossy(&output.stdout)
         );
+    } else {
+        println!("DEBUG: build.sh dev succeeded");
+        
+        // Check if helix is available after build
+        let helix_check_after = Command::new("helix")
+            .arg("--version")
+            .output();
+        
+        match helix_check_after {
+            Ok(output) => {
+                if output.status.success() {
+                    println!("DEBUG: Helix available after build: {}", String::from_utf8_lossy(&output.stdout));
+                } else {
+                    println!("DEBUG: Helix still not available after build");
+                    println!("DEBUG: Helix version check stderr: {}", String::from_utf8_lossy(&output.stderr));
+                }
+            }
+            Err(e) => {
+                println!("DEBUG: Helix command still not found after build: {}", e);
+            }
+        }
     }
 
     if let Some(file_num) = matches.get_one::<u32>("file_number") {
@@ -635,10 +689,12 @@ async fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
             if IGNORE_DIRS.contains(&path.file_name().unwrap().to_str().unwrap()) {
                 continue;
             }
-            Box::pin(copy_dir_recursive(&path, &dest_path)).await.map_err(|e| {
-                println!("DEBUG: Failed to copy directory {}: {}", path.display(), e);
-                e
-            })?;
+            Box::pin(copy_dir_recursive(&path, &dest_path))
+                .await
+                .map_err(|e| {
+                    println!("DEBUG: Failed to copy directory {}: {}", path.display(), e);
+                    e
+                })?;
         } else {
             fs::copy(&path, &dest_path).await.map_err(|e| {
                 println!("DEBUG: Failed to copy file {}: {}", path.display(), e);
