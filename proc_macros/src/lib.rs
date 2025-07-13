@@ -243,8 +243,6 @@ pub fn tool_calls(_attr: TokenStream, input: TokenStream) -> TokenStream {
                     input: &'a mut MCPToolInput,
                     response: &mut Response,
                 ) -> Result<(), GraphError> {
-
-
                     let data: #struct_name = match sonic_rs::from_slice(&input.request.body) {
                         Ok(data) => data,
                         Err(err) => return Err(GraphError::from(err)),
@@ -283,8 +281,69 @@ pub fn tool_calls(_attr: TokenStream, input: TokenStream) -> TokenStream {
         #input_trait
     };
 
-    std::fs::write("/tmp/macro_output.rs", format!("{}", expanded))
-        .unwrap_or_else(|_| eprintln!("Failed to write output file"));
+    TokenStream::from(expanded)
+}
+
+
+#[proc_macro_attribute]
+pub fn tool_call(args: TokenStream, input: TokenStream) -> TokenStream {
+    let prefix = if args.is_empty() {
+        "DEBUG".to_string()
+    } else {
+        args.to_string().trim_matches('"').to_string()
+    };
+
+    let method = parse_macro_input!(input as ItemFn);
+
+    let fn_name = &method.sig.ident;
+    let fn_block = &method.block;
+
+    let struct_name = quote::format_ident!("{}Input", fn_name);
+    let mcp_function_name = quote::format_ident!("{}Mcp", fn_name);
+    let mcp_struct_name = quote::format_ident!("{}McpInput", fn_name);
+    let new_method = quote! {
+        
+        #[derive(Deserialize)]
+        #[allow(non_camel_case_types)]
+        struct #mcp_struct_name{
+            connection_id: String,
+            input: #struct_name,
+        }
+
+        #[mcp_handler]
+        pub fn #mcp_function_name<'a>(
+            input: &'a mut MCPToolInput,
+            response: &mut Response,
+        ) -> Result<(), GraphError> {
+            let data: #mcp_struct_name = match sonic_rs::from_slice(&input.request.body) {
+                Ok(data) => data,
+                Err(err) => return Err(GraphError::from(err)),
+            };
+
+            let mut connections = input.mcp_connections.lock().unwrap();
+            let mut connection = match connections.remove_connection(&data.connection_id) {
+                Some(conn) => conn,
+                None => return Err(GraphError::Default),
+            };
+
+            let txn = input.mcp_backend.db.graph_env.read_txn()?;
+
+            let result = (|| #fn_block)();
+
+            let first = result.first().unwrap_or(&TraversalVal::Empty).clone();
+
+            connection.iter = result.into_iter();
+            let mut connections = input.mcp_connections.lock().unwrap();
+            connections.add_connection(connection);
+            drop(connections);
+            Ok(())
+        }
+    };
+
+    let expanded = quote! {
+        #method
+        #new_method
+    };
 
     TokenStream::from(expanded)
 }

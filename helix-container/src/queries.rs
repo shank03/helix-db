@@ -37,6 +37,9 @@ use helixdb::{
         embedding_providers::embedding_providers::{EmbeddingModel, get_embedding_model},
         router::router::HandlerInput,
     },
+    helix_gateway::mcp::mcp::{
+        MCPConnection, MCPHandler, MCPHandlerSubmission, MCPToolInput, McpBackend,
+    },
     identifier_remapping, node_matches, props,
     protocol::{
         remapping::{Remapping, RemappingMap, ResponseRemapping},
@@ -53,7 +56,7 @@ use helixdb::{
     },
     value_remapping,
 };
-use proc_macros::handler;
+use proc_macros::{handler, mcp_handler, tool_call};
 use sonic_rs::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -128,7 +131,7 @@ pub fn CompanyEmbeddingSearch(
 pub struct GetAllCompanyEmbeddingsInput {
     pub company_number: String,
 }
-#[handler]
+#[tool_call]
 pub fn GetAllCompanyEmbeddings(
     input: &HandlerInput,
     response: &mut Response,
