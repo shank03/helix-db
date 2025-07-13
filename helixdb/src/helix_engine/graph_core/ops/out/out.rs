@@ -24,7 +24,7 @@ pub struct OutNodesIterator<'a, T> {
         heed3::iteration_method::MoveOnCurrentKeyDuplicates,
     >,
     pub storage: Arc<HelixGraphStorage>,
-    pub edge_type: &'a EdgeType,
+    pub edge_type: EdgeType,
     pub txn: &'a T,
 }
 
@@ -112,7 +112,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> OutAdapter<'a, Ro
                     Ok(Some(iter)) => Some(OutNodesIterator {
                         iter,
                         storage: Arc::clone(&db),
-                        edge_type,
+                        edge_type: edge_type.clone(),
                         txn,
                     }),
                     Ok(None) => None,
