@@ -344,7 +344,6 @@ impl BM25 for HBM25Config {
     }
 }
 
-/*
 pub trait HybridSearch {
     fn hybrid_search(
         &self,
@@ -367,7 +366,7 @@ impl HybridSearch for HelixGraphStorage {
         alpha: f32,
         limit: usize,
     ) -> Result<Vec<(u128, f32)>, GraphError> {
-        let bm25_results = self.bm25.search(txn, query, limit * 2)?; // get more results for better fusion
+        let bm25_results = self.bm25.as_ref().unwrap().search(txn, query, limit * 2)?; // get more results for better fusion
         let mut combined_scores: HashMap<u128, f32> = HashMap::new();
 
         // Add BM25 scores (weighted by alpha)
@@ -402,7 +401,6 @@ impl HybridSearch for HelixGraphStorage {
         Ok(results)
     }
 }
-*/
 
 pub trait BM25Flatten {
     fn flatten_bm25(&self) -> String;

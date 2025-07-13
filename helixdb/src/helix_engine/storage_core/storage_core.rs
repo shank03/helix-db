@@ -35,7 +35,6 @@ pub struct StorageConfig {
 }
 
 pub struct HelixGraphStorage {
-    // TODO: maybe make not everything public?
     pub graph_env: Env,
 
     pub nodes_db: Database<U128<BE>, Bytes>,
@@ -403,3 +402,4 @@ impl StorageMethods for HelixGraphStorage {
         Ok(())
     }
 }
+
