@@ -1,7 +1,3 @@
-use heed3::{types::*, Database, Env, RoTxn, RwTxn};
-use serde::{Deserialize, Serialize};
-use std::{borrow::Cow, collections::HashMap};
-
 use crate::{
     helix_engine::{
         storage_core::storage_core::HelixGraphStorage,
@@ -10,6 +6,10 @@ use crate::{
     },
     protocol::value::Value,
 };
+
+use heed3::{types::*, Database, Env, RoTxn, RwTxn};
+use serde::{Deserialize, Serialize};
+use std::{borrow::Cow, collections::HashMap};
 
 const DB_BM25_INVERTED_INDEX: &str = "bm25_inverted_index"; // term -> list of (doc_id, tf)
 const DB_BM25_DOC_LENGTHS: &str = "bm25_doc_lengths"; // doc_id -> document length
@@ -20,10 +20,11 @@ const DB_BM25_METADATA: &str = "bm25_metadata"; // stores total docs, avgdl, etc
 pub struct BM25Metadata {
     pub total_docs: u64,
     pub avgdl: f64,
-    pub k1: f32,
-    pub b: f32,
+    pub k1: f32, // controls term frequency saturation
+    pub b: f32,  // controls document length normalization
 }
 
+/// For inverted index
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PostingListEntry {
     pub doc_id: u128,
@@ -35,16 +36,9 @@ pub trait BM25 {
 
     fn insert_doc(&self, txn: &mut RwTxn, doc_id: u128, doc: &str) -> Result<(), GraphError>;
 
-    fn update_doc(&self, txn: &mut RwTxn, doc_id: u128, doc: &str) -> Result<(), GraphError>;
-
     fn delete_doc(&self, txn: &mut RwTxn, doc_id: u128) -> Result<(), GraphError>;
 
-    fn search(
-        &self,
-        txn: &RoTxn,
-        query: &str,
-        limit: usize,
-    ) -> Result<Vec<(u128, f32)>, GraphError>;
+    fn update_doc(&self, txn: &mut RwTxn, doc_id: u128, doc: &str) -> Result<(), GraphError>;
 
     fn calculate_bm25_score(
         &self,
@@ -56,6 +50,13 @@ pub trait BM25 {
         total_docs: u64,
         avgdl: f64,
     ) -> f32;
+
+    fn search(
+        &self,
+        txn: &RoTxn,
+        query: &str,
+        limit: usize,
+    ) -> Result<Vec<(u128, f32)>, GraphError>;
 }
 
 pub struct HBM25Config {
@@ -105,6 +106,7 @@ impl HBM25Config {
 }
 
 impl BM25 for HBM25Config {
+    /// Converts text to lowercase, removes non-alphanumeric chars, splits into words
     fn tokenize<const SHOULD_FILTER: bool>(&self, text: &str) -> Vec<Cow<'_, str>> {
         text.to_lowercase()
             .replace(|c: char| !c.is_alphanumeric(), " ")
@@ -114,6 +116,8 @@ impl BM25 for HBM25Config {
             .collect()
     }
 
+    /// Inserts needed information into doc_lengths_db, inverted_index_db, term_frequencies_db, and
+    /// metadata_db
     fn insert_doc(&self, txn: &mut RwTxn, doc_id: u128, doc: &str) -> Result<(), GraphError> {
         let tokens = self.tokenize::<true>(doc);
         let doc_length = tokens.len() as u32;
@@ -142,6 +146,7 @@ impl BM25 for HBM25Config {
             self.term_frequencies_db
                 .put(txn, term_bytes, &(current_df + 1))?;
         }
+
         let metadata_key = b"metadata";
         let mut metadata = if let Some(data) = self.metadata_db.get(txn, metadata_key)? {
             bincode::deserialize::<BM25Metadata>(data)?
@@ -162,14 +167,8 @@ impl BM25 for HBM25Config {
         let metadata_bytes = bincode::serialize(&metadata)?;
         self.metadata_db.put(txn, metadata_key, &metadata_bytes)?;
 
-        // txn.commit()?;
+        // txn.commit()?; // TODO: probably don't need this
         Ok(())
-    }
-
-    fn update_doc(&self, txn: &mut RwTxn, doc_id: u128, doc: &str) -> Result<(), GraphError> {
-        // For simplicity, delete and re-insert
-        self.delete_doc(txn, doc_id)?;
-        self.insert_doc(txn, doc_id, doc)
     }
 
     fn delete_doc(&self, txn: &mut RwTxn, doc_id: u128) -> Result<(), GraphError> {
@@ -251,6 +250,52 @@ impl BM25 for HBM25Config {
         Ok(())
     }
 
+    /// Simply delete doc_id and then re-insert new doc with same doc-id
+    fn update_doc(&self, txn: &mut RwTxn, doc_id: u128, doc: &str) -> Result<(), GraphError> {
+        self.delete_doc(txn, doc_id)?;
+        self.insert_doc(txn, doc_id, doc)
+    }
+
+    fn calculate_bm25_score(
+        &self,
+        _term: &str,
+        _doc_id: u128,
+        tf: u32,
+        doc_length: u32,
+        df: u32,
+        total_docs: u64,
+        avgdl: f64,
+    ) -> f32 {
+        let k1 = 1.2;
+        let b = 0.75;
+
+        // Ensure we don't have division by zero
+        let df = df.max(1);
+        let total_docs = total_docs.max(1);
+
+        // Calculate IDF: log((N - df + 0.5) / (df + 0.5))
+        // This can be negative when df is high relative to N, which is mathematically correct
+        let idf = ((total_docs as f64 - df as f64 + 0.5) / (df as f64 + 0.5)).ln();
+
+        // Ensure avgdl is not zero
+        let avgdl = if avgdl > 0.0 {
+            avgdl
+        } else {
+            doc_length as f64
+        };
+
+        // Calculate BM25 score
+        let tf_component = (tf as f64 * (k1 as f64 + 1.0))
+            / (tf as f64 + k1 as f64 * (1.0 - b as f64 + b as f64 * (doc_length as f64 / avgdl)));
+
+        let score = (idf * tf_component) as f32;
+
+        // The score can be negative when IDF is negative (term appears in most documents)
+        // This is mathematically correct - such terms have low discriminative power
+        // But documents with higher tf should still score higher than those with lower tf
+        score
+    }
+
     fn search(
         &self,
         txn: &RoTxn,
@@ -310,48 +355,9 @@ impl BM25 for HBM25Config {
 
         Ok(results)
     }
-
-    fn calculate_bm25_score(
-        &self,
-        _term: &str,
-        _doc_id: u128,
-        tf: u32,
-        doc_length: u32,
-        df: u32,
-        total_docs: u64,
-        avgdl: f64,
-    ) -> f32 {
-        let k1 = 1.2;
-        let b = 0.75;
-
-        // Ensure we don't have division by zero
-        let df = df.max(1);
-        let total_docs = total_docs.max(1);
-
-        // Calculate IDF: log((N - df + 0.5) / (df + 0.5))
-        // This can be negative when df is high relative to N, which is mathematically correct
-        let idf = ((total_docs as f64 - df as f64 + 0.5) / (df as f64 + 0.5)).ln();
-
-        // Ensure avgdl is not zero
-        let avgdl = if avgdl > 0.0 {
-            avgdl
-        } else {
-            doc_length as f64
-        };
-
-        // Calculate BM25 score
-        let tf_component = (tf as f64 * (k1 as f64 + 1.0))
-            / (tf as f64 + k1 as f64 * (1.0 - b as f64 + b as f64 * (doc_length as f64 / avgdl)));
-
-        let score = (idf * tf_component) as f32;
-
-        // The score can be negative when IDF is negative (term appears in most documents)
-        // This is mathematically correct - such terms have low discriminative power
-        // But documents with higher tf should still score higher than those with lower tf
-        score
-    }
 }
 
+/*
 pub trait HybridSearch {
     fn hybrid_search(
         &self,
@@ -410,6 +416,7 @@ impl HybridSearch for HelixGraphStorage {
         Ok(results)
     }
 }
+*/
 
 pub trait BM25Flatten {
     fn flatten_bm25(&self) -> String;

@@ -95,6 +95,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddNAdapter<'
         }
 
         // auto inserts to bm25 if should_add_to_bm25 is true
+        // TODO: check a diff way, possibly set in the config?
         if node.properties.is_some() {
             let mut data = node
                 .properties

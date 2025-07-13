@@ -251,13 +251,23 @@ impl HelixGraphStorage {
         Ok((edge_id, node_id))
     }
 
-    /// Gets a vector
+    /// Gets a vector from level 0 of HNSW index (because that's where all are stored)
     pub fn get_vector(&self, txn: &RoTxn, id: &u128) -> Result<HVector, GraphError> {
-        // uses level 0 because thats where all vectors are stored
-        let vector = self.vectors.get_vector(txn, *id, 0, true)?;
-        Ok(vector)
+        Ok(self.vectors.get_vector(txn, *id, 0, true)?)
     }
 
+        /// Converts graph nodes and edges to a JSON string for visualization.
+        ///
+        /// # Arguments
+        /// * `txn` - Read-only transaction for database access.
+        /// * `k` - Optional number of top nodes to include (default: 200, max: 300).
+        /// * `node_prop` - Optional node property to include in the output.
+        ///
+        /// # Returns
+        /// A `Result` containing the JSON string or a `GraphError` if:
+        /// - More than 300 nodes are requested.
+        /// - Nodes or edges database is empty.
+        /// - JSON serialization fails.
     pub fn nodes_edges_to_json(
         &self,
         txn: &RoTxn,
@@ -559,7 +569,7 @@ impl HelixGraphStorage {
 }
 
 impl DBMethods for HelixGraphStorage {
-    // Creates a secondary index lmdb db (table) for a given index name
+    /// Creates a secondary index lmdb db (table) for a given index name
     fn create_secondary_index(&mut self, name: &str) -> Result<(), GraphError> {
         let mut wtxn = self.graph_env.write_txn()?;
         let db = self.graph_env.create_database(&mut wtxn, Some(name))?;
@@ -568,7 +578,7 @@ impl DBMethods for HelixGraphStorage {
         Ok(())
     }
 
-    // Drops a secondary index lmdb db (table) for a given index name
+    /// Drops a secondary index lmdb db (table) for a given index name
     fn drop_secondary_index(&mut self, name: &str) -> Result<(), GraphError> {
         let mut wtxn = self.graph_env.write_txn()?;
         let db = self
@@ -588,8 +598,7 @@ impl DBMethods for HelixGraphStorage {
 impl StorageMethods for HelixGraphStorage {
     #[inline(always)]
     fn check_exists(&self, txn: &RoTxn, id: &u128) -> Result<bool, GraphError> {
-        let exists = self.nodes_db.get(txn, Self::node_key(id))?.is_some();
-        Ok(exists)
+        Ok(self.nodes_db.get(txn, Self::node_key(id))?.is_some())
     }
 
     #[inline(always)]

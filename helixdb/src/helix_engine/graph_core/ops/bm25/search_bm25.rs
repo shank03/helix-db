@@ -72,3 +72,4 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> SearchBM25Adapter
         }
     }
 }
+
