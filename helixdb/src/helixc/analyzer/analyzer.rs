@@ -265,7 +265,10 @@ impl<'a> Ctx<'a> {
         // -------------------------------------------------
         let mut scope: HashMap<&str, Type> = HashMap::new();
         for param in &q.parameters {
-            scope.insert(param.name.1.as_str(), Type::from(param.param_type.1.clone()));
+            scope.insert(
+                param.name.1.as_str(),
+                Type::from(param.param_type.1.clone()),
+            );
         }
         for stmt in &q.statements {
             let statement = self.walk_statements(&mut scope, q, &mut query, stmt);
@@ -1274,7 +1277,7 @@ impl<'a> Ctx<'a> {
                             GeneratedStatement::BoExp(expr) => {
                                 match expr {
                                     BoExp::Exists(mut tr) => {
-                                        // keep as iterator 
+                                        // keep as iterator
                                         tr.should_collect = ShouldCollect::No;
                                         BoExp::Exists(tr)
                                     }
@@ -1302,15 +1305,13 @@ impl<'a> Ctx<'a> {
                             "incorrect stmt should've been caught by `infer_expr_type`"
                         );
                         match stmt.unwrap() {
-                            GeneratedStatement::BoExp(expr) => {
-                                match expr {
-                                    BoExp::Exists(mut tr) => {
-                                        tr.should_collect = ShouldCollect::No;
-                                        BoExp::Exists(tr)
-                                    }
-                                    _ => expr,
+                            GeneratedStatement::BoExp(expr) => match expr {
+                                BoExp::Exists(mut tr) => {
+                                    tr.should_collect = ShouldCollect::No;
+                                    BoExp::Exists(tr)
                                 }
-                            }
+                                _ => expr,
+                            },
                             GeneratedStatement::Traversal(tr) => BoExp::Expr(tr),
                             _ => unreachable!(),
                         }
@@ -2105,11 +2106,9 @@ impl<'a> Ctx<'a> {
                 }
 
                 StepType::Update(update) => {
+                    // if type == node, edge, vector then update is valid
+                    // otherwise it is invalid
 
-                    // if type == node, edge, vector then update is valid 
-                    // otherwise it is invalid 
-
-                    
                     // Update returns the same type (nodes/edges) it started with.
                     match tr.steps.iter().nth_back(1) {
                         Some(step) => match &step.step {
@@ -2556,7 +2555,7 @@ impl<'a> Ctx<'a> {
                                     }
                                     _ => {
                                         unreachable!()
-                                    }   
+                                    }
                                 }
                             }
                             _ => unreachable!(),
@@ -4417,7 +4416,7 @@ impl<'a> Ctx<'a> {
                 // query.statements.push(stmt.clone().unwrap());
                 assert!(stmt.is_some());
                 if let Some(GeneratedStatement::Traversal(mut tr)) = stmt {
-                    tr.should_collect = ShouldCollect::No;
+                    // tr.should_collect = ShouldCollect::To;
                     // tr.traversal_type = TraversalType::Mut;
                     Some(GeneratedStatement::Drop(GeneratedDrop { expression: tr }))
                 } else {

@@ -15,3 +15,7 @@ QUERY file15() =>
 QUERY file15_2(userID: ID) =>
     DROP N<File15>(userID)::Out<Follows>
     RETURN NONE
+
+QUERY file15_3(userID: ID) =>
+    DROP N<File15>(userID)
+    RETURN NONE
