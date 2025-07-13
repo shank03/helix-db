@@ -15,6 +15,7 @@ const DB_BM25_INVERTED_INDEX: &str = "bm25_inverted_index"; // term -> list of (
 const DB_BM25_DOC_LENGTHS: &str = "bm25_doc_lengths"; // doc_id -> document length
 const DB_BM25_TERM_FREQUENCIES: &str = "bm25_term_frequencies"; // term -> document frequency
 const DB_BM25_METADATA: &str = "bm25_metadata"; // stores total docs, avgdl, etc.
+const METADATA_KEY: &[u8] = b"metadata";
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct BM25Metadata {
@@ -42,10 +43,8 @@ pub trait BM25 {
 
     fn calculate_bm25_score(
         &self,
-        term: &str,
-        doc_id: u128,
         tf: u32,
-        doc_length: u32,
+        doc_len: u32,
         df: u32,
         total_docs: u64,
         avgdl: f64,
@@ -65,6 +64,8 @@ pub struct HBM25Config {
     pub doc_lengths_db: Database<U128<heed3::byteorder::BE>, U32<heed3::byteorder::BE>>,
     pub term_frequencies_db: Database<Bytes, U32<heed3::byteorder::BE>>,
     pub metadata_db: Database<Bytes, Bytes>,
+    k1: f64,
+    b: f64,
 }
 
 impl HBM25Config {
@@ -101,6 +102,8 @@ impl HBM25Config {
             doc_lengths_db,
             term_frequencies_db,
             metadata_db,
+            k1: 1.2,
+            b: 0.75,
         })
     }
 }
@@ -147,8 +150,7 @@ impl BM25 for HBM25Config {
                 .put(txn, term_bytes, &(current_df + 1))?;
         }
 
-        let metadata_key = b"metadata";
-        let mut metadata = if let Some(data) = self.metadata_db.get(txn, metadata_key)? {
+        let mut metadata = if let Some(data) = self.metadata_db.get(txn, METADATA_KEY)? {
             bincode::deserialize::<BM25Metadata>(data)?
         } else {
             BM25Metadata {
@@ -165,9 +167,8 @@ impl BM25 for HBM25Config {
             / metadata.total_docs as f64;
 
         let metadata_bytes = bincode::serialize(&metadata)?;
-        self.metadata_db.put(txn, metadata_key, &metadata_bytes)?;
+        self.metadata_db.put(txn, METADATA_KEY, &metadata_bytes)?;
 
-        // txn.commit()?; // TODO: probably don't need this
         Ok(())
     }
 
@@ -185,9 +186,9 @@ impl BM25 for HBM25Config {
             terms
         };
 
-        // Remove postings and update term frequencies
+        // remove postings and update term frequencies
         for term_bytes in terms_to_update {
-            // Collect entries to keep
+            // collect entries to keep
             let entries_to_keep = {
                 let mut entries = Vec::new();
                 if let Some(duplicates) = self.inverted_index_db.get_duplicates(txn, &term_bytes)? {
@@ -202,15 +203,14 @@ impl BM25 for HBM25Config {
                 entries
             };
 
-            // Delete all entries for this term
+            // delete all entries for this term
             self.inverted_index_db.delete(txn, &term_bytes)?;
 
-            // Re-add the entries we want to keep
+            // re-add the entries we want to keep
             for entry_bytes in entries_to_keep {
                 self.inverted_index_db.put(txn, &term_bytes, &entry_bytes)?;
             }
 
-            // Update document frequency
             let current_df = self.term_frequencies_db.get(txn, &term_bytes)?.unwrap_or(0);
             if current_df > 0 {
                 self.term_frequencies_db
@@ -218,22 +218,19 @@ impl BM25 for HBM25Config {
             }
         }
 
-        // Get document length before deleting it
         let doc_length = self.doc_lengths_db.get(txn, &doc_id)?.unwrap_or(0);
 
         self.doc_lengths_db.delete(txn, &doc_id)?;
 
-        // Update metadata
-        let metadata_key = b"metadata";
         let metadata_data = self
             .metadata_db
-            .get(txn, metadata_key)?
+            .get(txn, METADATA_KEY)?
             .map(|data| data.to_vec());
 
         if let Some(data) = metadata_data {
             let mut metadata: BM25Metadata = bincode::deserialize(&data)?;
             if metadata.total_docs > 0 {
-                // Update average document length
+                // update average document length
                 metadata.avgdl = if metadata.total_docs > 1 {
                     (metadata.avgdl * metadata.total_docs as f64 - doc_length as f64)
                         / (metadata.total_docs - 1) as f64
@@ -243,7 +240,7 @@ impl BM25 for HBM25Config {
                 metadata.total_docs -= 1;
 
                 let metadata_bytes = bincode::serialize(&metadata)?;
-                self.metadata_db.put(txn, metadata_key, &metadata_bytes)?;
+                self.metadata_db.put(txn, METADATA_KEY, &metadata_bytes)?;
             }
         }
 
@@ -258,41 +255,34 @@ impl BM25 for HBM25Config {
 
     fn calculate_bm25_score(
         &self,
-        _term: &str,
-        _doc_id: u128,
         tf: u32,
-        doc_length: u32,
+        doc_len: u32,
         df: u32,
         total_docs: u64,
         avgdl: f64,
     ) -> f32 {
-        let k1 = 1.2;
-        let b = 0.75;
+        // ensure we don't have division by zero
+        let df = df.max(1) as f64;
+        let total_docs = total_docs.max(1) as f64;
 
-        // Ensure we don't have division by zero
-        let df = df.max(1);
-        let total_docs = total_docs.max(1);
+        // calculate IDF: log((N - df + 0.5) / (df + 0.5))
+        // this can be negative when df is high relative to N, which is mathematically correct
+        let idf = ((total_docs - df + 0.5) / (df + 0.5)).ln();
 
-        // Calculate IDF: log((N - df + 0.5) / (df + 0.5))
-        // This can be negative when df is high relative to N, which is mathematically correct
-        let idf = ((total_docs as f64 - df as f64 + 0.5) / (df as f64 + 0.5)).ln();
+        // ensure avgdl is not zero
+        let avgdl = if avgdl > 0.0 { avgdl } else { doc_len as f64 };
 
-        // Ensure avgdl is not zero
-        let avgdl = if avgdl > 0.0 {
-            avgdl
-        } else {
-            doc_length as f64
-        };
-
-        // Calculate BM25 score
-        let tf_component = (tf as f64 * (k1 as f64 + 1.0))
-            / (tf as f64 + k1 as f64 * (1.0 - b as f64 + b as f64 * (doc_length as f64 / avgdl)));
+        // calculate BM25 score
+        let tf = tf as f64;
+        let doc_len = doc_len as f64;
+        let tf_component =
+            (tf * (self.k1 + 1.0)) / (tf + self.k1 * (1.0 - self.b + self.b * (doc_len / avgdl)));
 
         let score = (idf * tf_component) as f32;
 
-        // The score can be negative when IDF is negative (term appears in most documents)
-        // This is mathematically correct - such terms have low discriminative power
-        // But documents with higher tf should still score higher than those with lower tf
+        // the score can be negative when IDF is negative (term appears in most documents)
+        // this is mathematically correct - such terms have low discriminative power
+        // but documents with higher tf should still score higher than those with lower tf
         score
     }
 
@@ -305,10 +295,9 @@ impl BM25 for HBM25Config {
         let query_terms = self.tokenize::<true>(query);
         let mut doc_scores: HashMap<u128, f32> = HashMap::with_capacity(limit);
 
-        let metadata_key = b"metadata";
         let metadata = self
             .metadata_db
-            .get(txn, metadata_key)?
+            .get(txn, METADATA_KEY)?
             .ok_or(GraphError::New("BM25 metadata not found".to_string()))?;
         let metadata: BM25Metadata = bincode::deserialize(metadata)?;
 
@@ -333,8 +322,6 @@ impl BM25 for HBM25Config {
 
                     // Calculate BM25 score for this term in this document
                     let score = self.calculate_bm25_score(
-                        &term,
-                        posting.doc_id,
                         posting.term_frequency,
                         doc_length,
                         df,
@@ -380,8 +367,7 @@ impl HybridSearch for HelixGraphStorage {
         alpha: f32,
         limit: usize,
     ) -> Result<Vec<(u128, f32)>, GraphError> {
-        // Get BM25 scores
-        let bm25_results = self.bm25.search(txn, query, limit * 2)?; // Get more results for better fusion
+        let bm25_results = self.bm25.search(txn, query, limit * 2)?; // get more results for better fusion
         let mut combined_scores: HashMap<u128, f32> = HashMap::new();
 
         // Add BM25 scores (weighted by alpha)
@@ -432,3 +418,4 @@ impl BM25Flatten for HashMap<String, Value> {
         s
     }
 }
+

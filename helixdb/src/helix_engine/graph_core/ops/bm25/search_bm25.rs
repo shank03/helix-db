@@ -56,6 +56,8 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> SearchBM25Adapter
         let results = self
             .storage
             .bm25
+            .as_ref()
+            .unwrap() // TODO: temp solution, idk how to do
             .search(self.txn, query, k)
             .unwrap_or_default();
 
@@ -72,4 +74,3 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> SearchBM25Adapter
         }
     }
 }
-

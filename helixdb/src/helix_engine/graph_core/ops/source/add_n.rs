@@ -94,18 +94,11 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddNAdapter<'
             }
         }
 
-        // auto inserts to bm25 if should_add_to_bm25 is true
-        // TODO: check a diff way, possibly set in the config?
-        if node.properties.is_some() {
-            let mut data = node
-                .properties
-                .as_ref()
-                .map(|props| props.flatten_bm25())
-                .unwrap_or_default();
-            data.push_str(&node.label);
-            match self.storage.bm25.insert_doc(self.txn, node.id, &data) {
-                Ok(_) => {}
-                Err(e) => {
+        if let Some(bm25) = &self.storage.bm25 {
+            if let Some(props) = node.properties.as_ref() {
+                let mut data = props.flatten_bm25();
+                data.push_str(&node.label);
+                if let Err(e) = bm25.insert_doc(self.txn, node.id, &data) {
                     result = Err(GraphError::from(e));
                 }
             }
@@ -126,3 +119,4 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddNAdapter<'
         }
     }
 }
+

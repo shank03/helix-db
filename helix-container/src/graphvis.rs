@@ -18,7 +18,7 @@ pub fn graphvis(input: &HandlerInput, response: &mut Response) -> Result<(), Gra
     let json_ne: String = match db.nodes_edges_to_json(
         &txn,
         None,
-        db.graphvis_node_label.clone(),
+        db.storage_config.graphvis_node_label.clone(),
     ) {
         Ok(value) => value,
         Err(e) => {
