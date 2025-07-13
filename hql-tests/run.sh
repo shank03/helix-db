@@ -1,6 +1,8 @@
 #!/bin/bash
 
 ## Handle different argument patterns
+
+
 if [ $# -eq 1 ]; then
     # Single file number
     cargo run --release --bin test -- $1
