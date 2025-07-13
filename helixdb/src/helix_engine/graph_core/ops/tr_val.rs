@@ -54,6 +54,14 @@ impl PartialEq for TraversalVal {
     }
 }
 
+impl IntoIterator for TraversalVal {
+    type Item = TraversalVal;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+    fn into_iter(self) -> Self::IntoIter {
+        vec![self].into_iter()
+    }
+}
+
 /// A trait for all traversable values in the graph
 ///
 /// This trait is used to define the common methods for all traversable values in the graph so we don't need to write match statements to access id's and properties every time.

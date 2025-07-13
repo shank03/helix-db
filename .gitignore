@@ -10,7 +10,6 @@ count.sh
 **/*.txt
 **/trump-map/
 **/call.sh
-**/*.json
 .DS_Store
 push.sh
 .vscode/
@@ -22,7 +21,6 @@ dpedia_openai_ground_truths_1m.csv
 helixdb_test/
 other_data/
 *.jsonl
-*.hx
 !examples/rag_demo/**
 test-store/
 

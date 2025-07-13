@@ -421,7 +421,7 @@ impl Display for Drop {
         write!(
             f,
             "Drop::<Vec<_>>::drop_traversal(
-                {}.collect::<Vec<_>>(),
+                {},
                 Arc::clone(&db),
                 &mut txn,
             )?;",

@@ -189,7 +189,7 @@ pub enum Step {
 impl Display for Step {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Step::Count => write!(f, "count()"),
+            Step::Count => write!(f, "count_to_val()"),
             Step::Dedup => write!(f, "dedup()"),
             Step::FromN => write!(f, "from_n()"),
             Step::FromV => write!(f, "from_v()"),

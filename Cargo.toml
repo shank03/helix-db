@@ -5,6 +5,7 @@ members = [
     "proc_macros",
     "helix-cli",
     "hbuild_redeploy",
+    "hql-tests"
 ]
 resolver = "2"
 

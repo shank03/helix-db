@@ -4,15 +4,18 @@ use crate::helix_engine::{
     types::GraphError,
 };
 use heed3::RwTxn;
-use std::sync::Arc;
+use std::{fmt::Debug, sync::Arc};
 
 pub struct Drop<I> {
     pub iter: I,
 }
 
-impl<'a> Drop<Vec<Result<TraversalVal, GraphError>>> {
+impl<'a, T> Drop<Vec<Result<T, GraphError>>>
+where
+    T: IntoIterator<Item = TraversalVal> + Debug,
+{
     pub fn drop_traversal(
-        iter: Vec<TraversalVal>,
+        iter: T,
         storage: Arc<HelixGraphStorage>,
         txn: &mut RwTxn,
     ) -> Result<(), GraphError> {
@@ -39,3 +42,4 @@ impl<'a> Drop<Vec<Result<TraversalVal, GraphError>>> {
             })
     }
 }
+
