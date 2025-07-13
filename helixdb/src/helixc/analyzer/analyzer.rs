@@ -265,7 +265,10 @@ impl<'a> Ctx<'a> {
         // -------------------------------------------------
         let mut scope: HashMap<&str, Type> = HashMap::new();
         for param in &q.parameters {
-            scope.insert(param.name.1.as_str(), Type::from(param.param_type.1.clone()));
+            scope.insert(
+                param.name.1.as_str(),
+                Type::from(param.param_type.1.clone()),
+            );
         }
         for stmt in &q.statements {
             let statement = self.walk_statements(&mut scope, q, &mut query, stmt);
@@ -800,9 +803,7 @@ impl<'a> Ctx<'a> {
                                                         loc.clone(),
                                                         value.as_str(),
                                                     );
-                                                    GeneratedValue::Identifier(GenRef::Std(
-                                                        format!("data.{}.clone()", value.clone()),
-                                                    ))
+                                                    self.gen_identifier_or_param(q, value.as_str(), false, true)
                                                 }
                                                 v => {
                                                     self.push_query_err(
@@ -1002,10 +1003,7 @@ impl<'a> Ctx<'a> {
                                                     loc.clone(),
                                                     value.as_str(),
                                                 );
-                                                GeneratedValue::Identifier(GenRef::Std(format!(
-                                                    "data.{}",
-                                                    value.clone()
-                                                )))
+                                                self.gen_identifier_or_param(q, value.as_str(), false, true)
                                             }
                                             v => {
                                                 self.push_query_err(
@@ -1037,16 +1035,13 @@ impl<'a> Ctx<'a> {
                             }
                             VectorData::Identifier(i) => {
                                 self.is_valid_identifier(q, add.loc.clone(), i.as_str());
-                                // TODO: if in params then do data.i else i
-                                VecData::Standard(GeneratedValue::Identifier(GenRef::Ref(format!(
-                                    "data.{}",
-                                    i
-                                ))))
+                                let id = self.gen_identifier_or_param(q, i.as_str(), true, false);
+                                VecData::Standard(id)
                             }
                             VectorData::Embed(e) => match &e.value {
-                                EvaluatesToString::Identifier(i) => VecData::Embed(
-                                    GeneratedValue::Identifier(GenRef::Ref(format!("data.{}", i))),
-                                ),
+                                EvaluatesToString::Identifier(i) => {
+                                    VecData::Embed(self.gen_identifier_or_param(q, i.as_str(), true, false))
+                                }
                                 EvaluatesToString::StringLiteral(s) => {
                                     VecData::Embed(GeneratedValue::Literal(GenRef::Ref(s.clone())))
                                 }
@@ -1274,7 +1269,7 @@ impl<'a> Ctx<'a> {
                             GeneratedStatement::BoExp(expr) => {
                                 match expr {
                                     BoExp::Exists(mut tr) => {
-                                        // keep as iterator 
+                                        // keep as iterator
                                         tr.should_collect = ShouldCollect::No;
                                         BoExp::Exists(tr)
                                     }
@@ -1302,15 +1297,13 @@ impl<'a> Ctx<'a> {
                             "incorrect stmt should've been caught by `infer_expr_type`"
                         );
                         match stmt.unwrap() {
-                            GeneratedStatement::BoExp(expr) => {
-                                match expr {
-                                    BoExp::Exists(mut tr) => {
-                                        tr.should_collect = ShouldCollect::No;
-                                        BoExp::Exists(tr)
-                                    }
-                                    _ => expr,
+                            GeneratedStatement::BoExp(expr) => match expr {
+                                BoExp::Exists(mut tr) => {
+                                    tr.should_collect = ShouldCollect::No;
+                                    BoExp::Exists(tr)
                                 }
-                            }
+                                _ => expr,
+                            },
                             GeneratedStatement::Traversal(tr) => BoExp::Expr(tr),
                             _ => unreachable!(),
                         }
@@ -2105,11 +2098,9 @@ impl<'a> Ctx<'a> {
                 }
 
                 StepType::Update(update) => {
+                    // if type == node, edge, vector then update is valid
+                    // otherwise it is invalid
 
-                    // if type == node, edge, vector then update is valid 
-                    // otherwise it is invalid 
-
-                    
                     // Update returns the same type (nodes/edges) it started with.
                     match tr.steps.iter().nth_back(1) {
                         Some(step) => match &step.step {
@@ -2556,7 +2547,7 @@ impl<'a> Ctx<'a> {
                                     }
                                     _ => {
                                         unreachable!()
-                                    }   
+                                    }
                                 }
                             }
                             _ => unreachable!(),
@@ -4127,9 +4118,7 @@ impl<'a> Ctx<'a> {
                                                         loc.clone(),
                                                         value.as_str(),
                                                     );
-                                                    GeneratedValue::Identifier(GenRef::Std(
-                                                        format!("data.{}.clone()", value.clone()), // keep track of used variables
-                                                    ))
+                                                    self.gen_identifier_or_param(q, value.as_str(), false, true)
                                                 }
                                                 v => {
                                                     self.push_query_err(
@@ -4328,10 +4317,7 @@ impl<'a> Ctx<'a> {
                                                     loc.clone(),
                                                     value.as_str(),
                                                 );
-                                                GeneratedValue::Identifier(GenRef::Std(format!(
-                                                    "data.{}.clone()",
-                                                    value.clone()
-                                                )))
+                                                self.gen_identifier_or_param(q, value.as_str(), false, true)
                                             }
                                             v => {
                                                 self.push_query_err(
@@ -4417,7 +4403,7 @@ impl<'a> Ctx<'a> {
                 // query.statements.push(stmt.clone().unwrap());
                 assert!(stmt.is_some());
                 if let Some(GeneratedStatement::Traversal(mut tr)) = stmt {
-                    tr.should_collect = ShouldCollect::No;
+                    // tr.should_collect = ShouldCollect::To;
                     // tr.traversal_type = TraversalType::Mut;
                     Some(GeneratedStatement::Drop(GeneratedDrop { expression: tr }))
                 } else {
@@ -4800,7 +4786,11 @@ impl<'a> Ctx<'a> {
                 GeneratedValue::Parameter(GenRef::Std(format!("data.{}.clone()", name)))
             }
         } else {
-            GeneratedValue::Identifier(GenRef::Std(format!("{}.clone()", name.to_string())))
+            if should_ref {
+                GeneratedValue::Identifier(GenRef::Ref(name.to_string()))
+            } else {
+                GeneratedValue::Identifier(GenRef::Std(format!("{}.clone()", name.to_string())))
+            }
         }
     }
 
