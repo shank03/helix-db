@@ -489,10 +489,6 @@ pub async fn check_helix_version() {
     let local_db_version =
         Version::parse(&format!("v{}", get_crate_version(&repo_path).unwrap())).unwrap();
     let remote_helix_version = get_remote_helix_version().await.unwrap();
-    println!(
-        "helix-cli version: {}, helix-db version: {}, remote helix version: {}",
-        local_cli_version, local_db_version, remote_helix_version
-    );
 
     if local_db_version < remote_helix_version || local_cli_version < remote_helix_version {
         println!("{} {} {} {}",
