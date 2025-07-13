@@ -1618,6 +1618,7 @@ impl<'a> Ctx<'a> {
                                     label: GenRef::Literal(node_type.clone()),
                                 }));
                             gen_traversal.traversal_type = TraversalType::Ref;
+                            gen_traversal.should_collect = ShouldCollect::ToVal;
                             Type::Node(Some(node_type.to_string()))
                         }
                         IdType::Literal { value: s, loc } => {
@@ -1627,6 +1628,7 @@ impl<'a> Ctx<'a> {
                                     label: GenRef::Literal(node_type.clone()),
                                 }));
                             gen_traversal.traversal_type = TraversalType::Ref;
+                            gen_traversal.should_collect = ShouldCollect::ToVal;
                             Type::Node(Some(node_type.to_string()))
                         }
                     }
@@ -2900,6 +2902,7 @@ impl<'a> Ctx<'a> {
                     .push(Separator::Period(GeneratedStep::OutE(GeneratedOutE {
                         label: GenRef::Literal(label.clone()),
                     })));
+                traversal.should_collect = ShouldCollect::ToVec;
                 let edge = self.edge_map.get(label.as_str());
                 if edge.is_none() {
                     self.push_query_err(
@@ -2938,6 +2941,7 @@ impl<'a> Ctx<'a> {
                     .push(Separator::Period(GeneratedStep::InE(GeneratedInE {
                         label: GenRef::Literal(label.clone()),
                     })));
+                traversal.should_collect = ShouldCollect::ToVec;
                 let edge = self.edge_map.get(label.as_str());
                 if edge.is_none() {
                     self.push_query_err(
@@ -2997,6 +3001,7 @@ impl<'a> Ctx<'a> {
                         edge_type: GenRef::Ref(edge_type.to_string()),
                         label: GenRef::Literal(label.clone()),
                     })));
+                traversal.should_collect = ShouldCollect::ToVec;
                 let edge = self.edge_map.get(label.as_str());
                 // assert!(edge.is_some()); // make sure is caught
                 if edge.is_none() {
@@ -3067,6 +3072,7 @@ impl<'a> Ctx<'a> {
                         edge_type: GenRef::Ref(edge_type.to_string()),
                         label: GenRef::Literal(label.clone()),
                     })));
+                traversal.should_collect = ShouldCollect::ToVec;
                 let edge = self.edge_map.get(label.as_str());
                 // assert!(edge.is_some());
                 if edge.is_none() {
@@ -3130,6 +3136,7 @@ impl<'a> Ctx<'a> {
                 traversal
                     .steps
                     .push(Separator::Period(GeneratedStep::FromN));
+                traversal.should_collect = ShouldCollect::ToVec;
                 new_ty
             }
             (ToN, Type::Edges(Some(edge_ty)) | Type::Edge(Some(edge_ty))) => {
@@ -3155,6 +3162,7 @@ impl<'a> Ctx<'a> {
                     None
                 };
                 traversal.steps.push(Separator::Period(GeneratedStep::ToN));
+                traversal.should_collect = ShouldCollect::ToVec;
                 new_ty
             }
             (FromV, Type::Edges(Some(edge_ty)) | Type::Edge(Some(edge_ty))) => {
@@ -3183,6 +3191,7 @@ impl<'a> Ctx<'a> {
                 traversal
                     .steps
                     .push(Separator::Period(GeneratedStep::FromV));
+                traversal.should_collect = ShouldCollect::ToVec;
                 new_ty
             }
             (ToV, Type::Edges(Some(edge_ty)) | Type::Edge(Some(edge_ty))) => {
@@ -3209,6 +3218,7 @@ impl<'a> Ctx<'a> {
                     None
                 };
                 traversal.steps.push(Separator::Period(GeneratedStep::ToV));
+                traversal.should_collect = ShouldCollect::ToVec;
                 new_ty
             }
             (ShortestPath(sp), Type::Nodes(_) | Type::Node(_)) => {
@@ -3240,6 +3250,7 @@ impl<'a> Ctx<'a> {
                             (None, None) => panic!("Invalid shortest path"),
                         },
                     )));
+                traversal.should_collect = ShouldCollect::ToVec;
                 Some(Type::Unknown)
             }
             (SearchVector(sv), Type::Vectors(Some(vector_ty)) | Type::Vector(Some(vector_ty))) => {

@@ -56,3 +56,4 @@ pub trait SearchMethods {
         to_id: &u128,
     ) -> Result<(Vec<Node>, Vec<Edge>), GraphError>;
 }
+

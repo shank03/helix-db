@@ -504,3 +504,28 @@ pub async fn check_helix_version() {
     }
 }
 
+pub fn check_cargo_version() -> bool {
+    match Command::new("cargo").arg("--version").output() {
+        Ok(output) => {
+            let version_str = String::from_utf8_lossy(&output.stdout);
+            let version = version_str
+                .split_whitespace()
+                .nth(1)
+                .unwrap_or("0.0.0")
+                .split('-')
+                .next()
+                .unwrap_or("0.0.0");
+            let parts: Vec<u32> = version
+                .split('.')
+                .filter_map(|s| s.parse().ok())
+                .collect();
+            if parts.len() >= 2 {
+                parts[0] >= 1 && parts[1] >= 88
+            } else {
+                false
+            }
+        }
+        Err(_) => false,
+    }
+}
+
