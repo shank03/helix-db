@@ -59,38 +59,42 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Instant;
 
-pub struct Chapter {
-    pub chapter_index: i64,
+pub struct Company {
+    pub company_number: String,
+    pub number_of_filings: i32,
 }
 
-pub struct SubChapter {
-    pub title: String,
-    pub content: String,
+pub struct DocumentEdge {
+    pub from: Company,
+    pub to: DocumentEmbedding,
+    pub filing_id: String,
+    pub category: String,
+    pub subcategory: String,
+    pub date: String,
+    pub description: String,
 }
 
-pub struct Contains {
-    pub from: Chapter,
-    pub to: SubChapter,
-}
-
-pub struct EmbeddingOf {
-    pub from: SubChapter,
-    pub to: Embedding,
-    pub chunk: String,
-}
-
-pub struct Embedding {
-    pub chunk: String,
+pub struct DocumentEmbedding {
+    pub text: String,
+    pub chunk_id: String,
+    pub page_number: u16,
+    pub reference: String,
+    pub source_link: String,
+    pub source_date: String,
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct searchdocs_ragInput {
+pub struct CompanyEmbeddingSearchInput {
+    pub company_number: String,
     pub query: Vec<f64>,
     pub k: i32,
 }
 #[handler]
-pub fn searchdocs_rag(input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
-    let data: searchdocs_ragInput = match sonic_rs::from_slice(&input.request.body) {
+pub fn CompanyEmbeddingSearch(
+    input: &HandlerInput,
+    response: &mut Response,
+) -> Result<(), GraphError> {
+    let data: CompanyEmbeddingSearchInput = match sonic_rs::from_slice(&input.request.body) {
         Ok(data) => data,
         Err(err) => return Err(GraphError::from(err)),
     };
@@ -98,106 +102,21 @@ pub fn searchdocs_rag(input: &HandlerInput, response: &mut Response) -> Result<(
     let mut remapping_vals = RemappingMap::new();
     let db = Arc::clone(&input.graph.storage);
     let txn = db.graph_env.read_txn().unwrap();
-    let vecs = G::new(Arc::clone(&db), &txn)
-        .search_v::<fn(&HVector, &RoTxn) -> bool>(&data.query, data.k as usize, None)
+    let c = G::new(Arc::clone(&db), &txn)
+        .n_from_index("company_number", &data.company_number)
+        .out_e("DocumentEdge")
+        .to_v()
         .collect_to::<Vec<_>>();
-    let subchapters = G::new_from(Arc::clone(&db), &txn, vecs.clone())
-        .in_("EmbeddingOf", &EdgeType::Node)
+    let embedding_search = G::new_from(Arc::clone(&db), &txn, c.clone())
+        .brute_force_search_v(&data.query, data.k as usize)
         .collect_to::<Vec<_>>();
-    let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
-    return_vals.insert("subchapters".to_string(), ReturnValue::from_traversal_value_array_with_mixin(G::new_from(Arc::clone(&db), &txn, subchapters.clone())
-
-.map_traversal(|item, txn| { traversal_remapping!(remapping_vals, item.clone(), "title" => G::new_from(Arc::clone(&db), &txn, vec![item.clone()])
-
-.check_property("title").collect_to::<Vec<_>>())?;
-traversal_remapping!(remapping_vals, item.clone(), "content" => G::new_from(Arc::clone(&db), &txn, vec![item.clone()])
-
-.check_property("content").collect_to::<Vec<_>>())?;
- Ok(item) }).collect_to::<Vec<_>>().clone(), remapping_vals.borrow_mut()));
-
-    txn.commit().unwrap();
-    response.body = sonic_rs::to_vec(&return_vals).unwrap();
-    Ok(())
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct chunksData {
-    pub vector: Vec<f64>,
-    pub chunk: String,
-}
-#[derive(Serialize, Deserialize)]
-pub struct subchaptersData {
-    pub chunks: Vec<chunksData>,
-    pub title: String,
-    pub content: String,
-}
-#[derive(Serialize, Deserialize)]
-pub struct chaptersData {
-    pub id: i64,
-    pub subchapters: Vec<subchaptersData>,
-}
-#[derive(Serialize, Deserialize)]
-pub struct loaddocs_ragInput {
-    pub chapters: Vec<chaptersData>,
-}
-#[handler]
-pub fn loaddocs_rag(input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
-    let data: loaddocs_ragInput = match sonic_rs::from_slice(&input.request.body) {
-        Ok(data) => data,
-        Err(err) => return Err(GraphError::from(err)),
-    };
-
-    let mut remapping_vals = RemappingMap::new();
-    let db = Arc::clone(&input.graph.storage);
-    let mut txn = db.graph_env.write_txn().unwrap();
-    for chaptersData { id, subchapters } in data.chapters {
-        let chapter_node = G::new_mut(Arc::clone(&db), &mut txn)
-            .add_n("Chapter", Some(props! { "chapter_index" => &id }), None)
-            .collect_to_obj();
-        for subchaptersData {
-            title,
-            content,
-            chunks,
-        } in subchapters
-        {
-            let subchapter_node = G::new_mut(Arc::clone(&db), &mut txn)
-                .add_n(
-                    "SubChapter",
-                    Some(props! { "title" => &title, "content" => &content }),
-                    None,
-                )
-                .collect_to_obj();
-            G::new_mut(Arc::clone(&db), &mut txn)
-                .add_e(
-                    "Contains",
-                    None,
-                    chapter_node.id(),
-                    subchapter_node.id(),
-                    true,
-                    EdgeType::Node,
-                )
-                .collect_to_obj();
-            for chunksData { chunk, vector } in chunks {
-                let vec = G::new_mut(Arc::clone(&db), &mut txn)
-                    .insert_v::<fn(&HVector, &RoTxn) -> bool>(&vector, "Embedding", None)
-                    .collect_to_obj();
-                G::new_mut(Arc::clone(&db), &mut txn)
-                    .add_e(
-                        "EmbeddingOf",
-                        Some(props! { "chunk" => chunk.clone() }),
-                        subchapter_node.id(),
-                        vec.id(),
-                        true,
-                        EdgeType::Node,
-                    )
-                    .collect_to_obj();
-            }
-        }
-    }
     let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
     return_vals.insert(
-        "Success".to_string(),
-        ReturnValue::from(Value::from("Success")),
+        "embedding_search".to_string(),
+        ReturnValue::from_traversal_value_array_with_mixin(
+            embedding_search.clone().clone(),
+            remapping_vals.borrow_mut(),
+        ),
     );
 
     txn.commit().unwrap();
@@ -206,12 +125,15 @@ pub fn loaddocs_rag(input: &HandlerInput, response: &mut Response) -> Result<(),
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct edge_nodeInput {
-    pub id: ID,
+pub struct GetAllCompanyEmbeddingsInput {
+    pub company_number: String,
 }
 #[handler]
-pub fn edge_node(input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
-    let data: edge_nodeInput = match sonic_rs::from_slice(&input.request.body) {
+pub fn GetAllCompanyEmbeddings(
+    input: &HandlerInput,
+    response: &mut Response,
+) -> Result<(), GraphError> {
+    let data: GetAllCompanyEmbeddingsInput = match sonic_rs::from_slice(&input.request.body) {
         Ok(data) => data,
         Err(err) => return Err(GraphError::from(err)),
     };
@@ -219,15 +141,334 @@ pub fn edge_node(input: &HandlerInput, response: &mut Response) -> Result<(), Gr
     let mut remapping_vals = RemappingMap::new();
     let db = Arc::clone(&input.graph.storage);
     let txn = db.graph_env.read_txn().unwrap();
-    let e = G::new(Arc::clone(&db), &txn)
-        .n_from_type("Chapter")
-        .out_e("Contains")
+    let c = G::new(Arc::clone(&db), &txn)
+        .n_from_index("company_number", &data.company_number)
+        .collect_to_obj();
+    let embeddings = G::new_from(Arc::clone(&db), &txn, c.clone())
+        .out("DocumentEdge", &EdgeType::Vec)
         .collect_to::<Vec<_>>();
     let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
     return_vals.insert(
-        "e".to_string(),
+        "embeddings".to_string(),
         ReturnValue::from_traversal_value_array_with_mixin(
-            e.clone().clone(),
+            embeddings.clone().clone(),
+            remapping_vals.borrow_mut(),
+        ),
+    );
+
+    txn.commit().unwrap();
+    response.body = sonic_rs::to_vec(&return_vals).unwrap();
+    Ok(())
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct HasCompanyInput {
+    pub company_number: String,
+}
+#[handler]
+pub fn HasCompany(input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
+    let data: HasCompanyInput = match sonic_rs::from_slice(&input.request.body) {
+        Ok(data) => data,
+        Err(err) => return Err(GraphError::from(err)),
+    };
+
+    let mut remapping_vals = RemappingMap::new();
+    let db = Arc::clone(&input.graph.storage);
+    let txn = db.graph_env.read_txn().unwrap();
+    let company = G::new(Arc::clone(&db), &txn)
+        .n_from_index("company_number", &data.company_number)
+        .collect_to_obj();
+    let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
+    return_vals.insert(
+        "company".to_string(),
+        ReturnValue::from_traversal_value_with_mixin(
+            company.clone().clone(),
+            remapping_vals.borrow_mut(),
+        ),
+    );
+
+    txn.commit().unwrap();
+    response.body = sonic_rs::to_vec(&return_vals).unwrap();
+    Ok(())
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct HasDocumentEmbeddingsInput {
+    pub company_number: String,
+}
+#[handler]
+pub fn HasDocumentEmbeddings(
+    input: &HandlerInput,
+    response: &mut Response,
+) -> Result<(), GraphError> {
+    let data: HasDocumentEmbeddingsInput = match sonic_rs::from_slice(&input.request.body) {
+        Ok(data) => data,
+        Err(err) => return Err(GraphError::from(err)),
+    };
+
+    let mut remapping_vals = RemappingMap::new();
+    let db = Arc::clone(&input.graph.storage);
+    let txn = db.graph_env.read_txn().unwrap();
+    let c = G::new(Arc::clone(&db), &txn)
+        .n_from_index("company_number", &data.company_number)
+        .collect_to_obj();
+    let embeddings = G::new_from(Arc::clone(&db), &txn, c.clone())
+        .out("DocumentEdge", &EdgeType::Vec)
+        .collect_to::<Vec<_>>();
+    let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
+    return_vals.insert(
+        "embeddings".to_string(),
+        ReturnValue::from_traversal_value_array_with_mixin(
+            embeddings.clone().clone(),
+            remapping_vals.borrow_mut(),
+        ),
+    );
+
+    txn.commit().unwrap();
+    response.body = sonic_rs::to_vec(&return_vals).unwrap();
+    Ok(())
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SearchVectorInput {
+    pub query: Vec<f64>,
+    pub k: i32,
+}
+#[handler]
+pub fn SearchVector(input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
+    let data: SearchVectorInput = match sonic_rs::from_slice(&input.request.body) {
+        Ok(data) => data,
+        Err(err) => return Err(GraphError::from(err)),
+    };
+
+    let mut remapping_vals = RemappingMap::new();
+    let db = Arc::clone(&input.graph.storage);
+    let txn = db.graph_env.read_txn().unwrap();
+    let embedding_search = G::new(Arc::clone(&db), &txn)
+        .search_v::<fn(&HVector, &RoTxn) -> bool>(&data.query, data.k as usize, None)
+        .collect_to::<Vec<_>>();
+    let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
+    return_vals.insert(
+        "embedding_search".to_string(),
+        ReturnValue::from_traversal_value_array_with_mixin(
+            embedding_search.clone().clone(),
+            remapping_vals.borrow_mut(),
+        ),
+    );
+
+    txn.commit().unwrap();
+    response.body = sonic_rs::to_vec(&return_vals).unwrap();
+    Ok(())
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct AddVectorInput {
+    pub vector: Vec<f64>,
+    pub text: String,
+    pub chunk_id: String,
+    pub page_number: i32,
+    pub reference: String,
+}
+#[handler]
+pub fn AddVector(input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
+    let data: AddVectorInput = match sonic_rs::from_slice(&input.request.body) {
+        Ok(data) => data,
+        Err(err) => return Err(GraphError::from(err)),
+    };
+
+    let mut remapping_vals = RemappingMap::new();
+    let db = Arc::clone(&input.graph.storage);
+    let mut txn = db.graph_env.write_txn().unwrap();
+    let embedding = G::new_mut(Arc::clone(&db), &mut txn)
+.insert_v::<fn(&HVector, &RoTxn) -> bool>(&data.vector, "DocumentEmbedding", Some(props! { "text" => data.text.clone(), "reference" => data.reference.clone(), "chunk_id" => data.chunk_id.clone(), "page_number" => data.page_number.clone() })).collect_to_obj();
+    let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
+    return_vals.insert(
+        "embedding".to_string(),
+        ReturnValue::from_traversal_value_with_mixin(
+            embedding.clone().clone(),
+            remapping_vals.borrow_mut(),
+        ),
+    );
+
+    txn.commit().unwrap();
+    response.body = sonic_rs::to_vec(&return_vals).unwrap();
+    Ok(())
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DeleteCompanyInput {
+    pub company_number: String,
+}
+#[handler]
+pub fn DeleteCompany(input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
+    let data: DeleteCompanyInput = match sonic_rs::from_slice(&input.request.body) {
+        Ok(data) => data,
+        Err(err) => return Err(GraphError::from(err)),
+    };
+
+    let mut remapping_vals = RemappingMap::new();
+    let db = Arc::clone(&input.graph.storage);
+    let mut txn = db.graph_env.write_txn().unwrap();
+    Drop::<Vec<_>>::drop_traversal(
+        G::new(Arc::clone(&db), &txn)
+            .n_from_index("company_number", &data.company_number)
+            .out("DocumentEdge", &EdgeType::Vec)
+            .collect_to::<Vec<_>>(),
+        Arc::clone(&db),
+        &mut txn,
+    )?;
+    Drop::<Vec<_>>::drop_traversal(
+        G::new(Arc::clone(&db), &txn)
+            .n_from_index("company_number", &data.company_number)
+            .collect_to_obj(),
+        Arc::clone(&db),
+        &mut txn,
+    )?;
+    let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
+    return_vals.insert(
+        "success".to_string(),
+        ReturnValue::from(Value::from("success")),
+    );
+
+    txn.commit().unwrap();
+    response.body = sonic_rs::to_vec(&return_vals).unwrap();
+    Ok(())
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct embeddings_dataData {
+    pub reference: String,
+    pub date1: String,
+    pub date2: String,
+    pub chunk_id: String,
+    pub description: String,
+    pub category: String,
+    pub vector: Vec<f64>,
+    pub page_number: i32,
+    pub source: String,
+    pub subcategory: String,
+    pub filing_id: String,
+    pub text: String,
+}
+#[derive(Serialize, Deserialize)]
+pub struct AddEmbeddingsToCompanyInput {
+    pub company_number: String,
+    pub embeddings_data: Vec<embeddings_dataData>,
+}
+#[handler]
+pub fn AddEmbeddingsToCompany(
+    input: &HandlerInput,
+    response: &mut Response,
+) -> Result<(), GraphError> {
+    let data: AddEmbeddingsToCompanyInput = match sonic_rs::from_slice(&input.request.body) {
+        Ok(data) => data,
+        Err(err) => return Err(GraphError::from(err)),
+    };
+
+    let mut remapping_vals = RemappingMap::new();
+    let db = Arc::clone(&input.graph.storage);
+    let mut txn = db.graph_env.write_txn().unwrap();
+    let c = G::new(Arc::clone(&db), &txn)
+        .n_from_index("company_number", &data.company_number)
+        .collect_to_obj();
+    for embeddings_dataData {
+        vector,
+        text,
+        chunk_id,
+        page_number,
+        reference,
+        filing_id,
+        category,
+        subcategory,
+        date1,
+        date2,
+        source,
+        description,
+    } in data.embeddings_data
+    {
+        let embedding = G::new_mut(Arc::clone(&db), &mut txn)
+.insert_v::<fn(&HVector, &RoTxn) -> bool>(&vector, "DocumentEmbedding", Some(props! { "text" => text.clone(), "page_number" => page_number.clone(), "chunk_id" => chunk_id.clone(), "source_link" => source.clone(), "source_date" => date1.clone(), "reference" => reference.clone() })).collect_to_obj();
+        let edges = G::new_mut(Arc::clone(&db), &mut txn)
+.add_e("DocumentEdge", Some(props! { "category" => category.clone(), "date" => date2.clone(), "description" => description.clone(), "filing_id" => filing_id.clone(), "subcategory" => subcategory.clone() }), c.id(), embedding.id(), true, EdgeType::Node).collect_to_obj();
+    }
+    let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
+    return_vals.insert(
+        "success".to_string(),
+        ReturnValue::from(Value::from("success")),
+    );
+
+    txn.commit().unwrap();
+    response.body = sonic_rs::to_vec(&return_vals).unwrap();
+    Ok(())
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct AddCompanyInput {
+    pub company_number: String,
+    pub number_of_filings: i32,
+}
+#[handler]
+pub fn AddCompany(input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
+    let data: AddCompanyInput = match sonic_rs::from_slice(&input.request.body) {
+        Ok(data) => data,
+        Err(err) => return Err(GraphError::from(err)),
+    };
+
+    let mut remapping_vals = RemappingMap::new();
+    let db = Arc::clone(&input.graph.storage);
+    let mut txn = db.graph_env.write_txn().unwrap();
+    let company = G::new_mut(Arc::clone(&db), &mut txn)
+.add_n("Company", Some(props! { "number_of_filings" => &data.number_of_filings, "company_number" => &data.company_number }), Some(&["company_number"])).collect_to_obj();
+    let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
+    return_vals.insert(
+        "company".to_string(),
+        ReturnValue::from_traversal_value_with_mixin(
+            company.clone().clone(),
+            remapping_vals.borrow_mut(),
+        ),
+    );
+
+    txn.commit().unwrap();
+    response.body = sonic_rs::to_vec(&return_vals).unwrap();
+    Ok(())
+}
+
+#[handler]
+pub fn DeleteAll(input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
+    let mut remapping_vals = RemappingMap::new();
+    let db = Arc::clone(&input.graph.storage);
+    let mut txn = db.graph_env.write_txn().unwrap();
+    Drop::<Vec<_>>::drop_traversal(
+        G::new(Arc::clone(&db), &txn)
+            .n_from_type("Company")
+            .collect_to::<Vec<_>>(),
+        Arc::clone(&db),
+        &mut txn,
+    )?;
+    let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
+    return_vals.insert(
+        "success".to_string(),
+        ReturnValue::from(Value::from("success")),
+    );
+
+    txn.commit().unwrap();
+    response.body = sonic_rs::to_vec(&return_vals).unwrap();
+    Ok(())
+}
+
+#[handler]
+pub fn GetCompanies(input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
+    let mut remapping_vals = RemappingMap::new();
+    let db = Arc::clone(&input.graph.storage);
+    let txn = db.graph_env.read_txn().unwrap();
+    let companies = G::new(Arc::clone(&db), &txn)
+        .n_from_type("Company")
+        .collect_to::<Vec<_>>();
+    let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
+    return_vals.insert(
+        "companies".to_string(),
+        ReturnValue::from_traversal_value_array_with_mixin(
+            companies.clone().clone(),
             remapping_vals.borrow_mut(),
         ),
     );

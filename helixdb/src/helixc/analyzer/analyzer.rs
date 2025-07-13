@@ -1003,10 +1003,7 @@ impl<'a> Ctx<'a> {
                                                     loc.clone(),
                                                     value.as_str(),
                                                 );
-                                                GeneratedValue::Identifier(GenRef::Std(format!(
-                                                    "data.{}",
-                                                    value.clone()
-                                                )))
+                                                self.gen_identifier_or_param(q, value.as_str(), false, true)
                                             }
                                             v => {
                                                 self.push_query_err(
@@ -4320,10 +4317,7 @@ impl<'a> Ctx<'a> {
                                                     loc.clone(),
                                                     value.as_str(),
                                                 );
-                                                GeneratedValue::Identifier(GenRef::Std(format!(
-                                                    "data.{}.clone()",
-                                                    value.clone()
-                                                )))
+                                                self.gen_identifier_or_param(q, value.as_str(), false, true)
                                             }
                                             v => {
                                                 self.push_query_err(
