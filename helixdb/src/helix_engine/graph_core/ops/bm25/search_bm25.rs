@@ -41,7 +41,10 @@ pub trait SearchBM25Adapter<'a>: Iterator<Item = Result<TraversalVal, GraphError
         label: &str,
         query: &str,
         k: usize,
-    ) -> Result<RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>, GraphError>;
+    ) -> Result<
+        RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>,
+        GraphError,
+    >;
 }
 
 impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> SearchBM25Adapter<'a>
@@ -52,16 +55,16 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> SearchBM25Adapter
         label: &str,
         query: &str,
         k: usize,
-    ) -> Result<RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>, GraphError> {
-        let results = match self
-            .storage
-            .bm25
-            .as_ref()
-            .unwrap() // TODO: temp solution, idk how to do
-            .search(self.txn, query, k)
-        {
-            Ok(results) => results,
-            Err(e) => return Err(e),
+    ) -> Result<
+        RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>,
+        GraphError,
+    > {
+        let results = match self.storage.bm25.as_ref() {
+            Some(s) => match s.search(self.txn, query, k) {
+                Ok(results) => results,
+                Err(e) => return Err(e),
+            },
+            None => return Err(GraphError::from("BM25 not found")),
         };
 
         let iter = SearchBM25 {
@@ -77,4 +80,3 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> SearchBM25Adapter
         })
     }
 }
-
