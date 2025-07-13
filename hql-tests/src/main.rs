@@ -39,51 +39,56 @@ fn generate_error_hash(error_type: &str, error_message: &str, _file_num: u32) ->
 
 fn extract_cargo_errors(stderr: &str, stdout: &str) -> String {
     let mut errors = Vec::new();
-    
+
     // Parse both stderr and stdout for error messages
     let combined_output = format!("{}\n{}", stderr, stdout);
-    
+
     let lines: Vec<&str> = combined_output.lines().collect();
     let mut i = 0;
-    
+
     while i < lines.len() {
         let line = lines[i];
-        
+
         // Look for error lines
         if line.starts_with("error:") || line.contains("error:") {
             // Start collecting this error
             let mut error_block = Vec::new();
             error_block.push(line);
-            
+
             // Continue collecting related lines until we hit a blank line or another error/warning
             i += 1;
             while i < lines.len() {
                 let next_line = lines[i];
-                
+
                 // Stop if we hit another error or warning
-                if next_line.starts_with("error:") || next_line.starts_with("warning:") || next_line.starts_with("note:") {
+                if next_line.starts_with("error:")
+                    || next_line.starts_with("warning:")
+                    || next_line.starts_with("note:")
+                {
                     break;
                 }
-                
+
                 // Stop if we hit compilation result lines
-                if next_line.contains("error: could not compile") || 
-                   next_line.contains("error: aborting due to") ||
-                   next_line.contains("For more information about this error") {
+                if next_line.contains("error: could not compile")
+                    || next_line.contains("error: aborting due to")
+                    || next_line.contains("For more information about this error")
+                {
                     break;
                 }
-                
+
                 // Include the line if it's not empty or if it's providing error context
-                if !next_line.trim().is_empty() || 
-                   next_line.starts_with("  ") || 
-                   next_line.starts_with("   ") ||
-                   next_line.contains("-->") ||
-                   next_line.contains("|") {
+                if !next_line.trim().is_empty()
+                    || next_line.starts_with("  ")
+                    || next_line.starts_with("   ")
+                    || next_line.contains("-->")
+                    || next_line.contains("|")
+                {
                     error_block.push(next_line);
                 }
-                
+
                 i += 1;
             }
-            
+
             // Add this error block to our collection
             if !error_block.is_empty() {
                 errors.push(error_block.join("\n"));
@@ -92,18 +97,19 @@ fn extract_cargo_errors(stderr: &str, stdout: &str) -> String {
             i += 1;
         }
     }
-    
+
     // If no structured errors found, look for any line containing "error:"
     if errors.is_empty() {
         for line in lines {
-            if line.contains("error:") && 
-               !line.contains("error: could not compile") &&
-               !line.contains("error: aborting due to") {
+            if line.contains("error:")
+                && !line.contains("error: could not compile")
+                && !line.contains("error: aborting due to")
+            {
                 errors.push(line.to_string());
             }
         }
     }
-    
+
     // Join all errors with double newlines
     if errors.is_empty() {
         "Unknown compilation error".to_string()
@@ -287,6 +293,13 @@ async fn main() -> Result<()> {
                 .value_parser(clap::value_parser!(u32))
                 .required(false),
         )
+        .arg(
+            Arg::new("branch")
+                .long("branch")
+                .help("Branch to process")
+                .value_parser(clap::value_parser!(String))
+                .required(false),
+        )
         .get_matches();
 
     let current_dir = env::current_dir().context("Failed to get current directory")?;
@@ -314,19 +327,25 @@ async fn main() -> Result<()> {
             .await
             .context("Failed to create temp directory")?;
     }
-    // Run helix init command
-    let output = Command::new("helix")
-        .arg("install")
-        .arg("-p")
-        .arg(&temp_repo)
-        .output()
-        .context("Failed to execute helix init command")?;
 
+    // copy source code from project root to temp_repo
+    let project_root = match current_dir.parent() {
+        Some(parent) if parent.join("helix-cli").exists() => parent.to_path_buf(),
+        Some(_) if current_dir.join("helix-cli").exists() => current_dir.to_path_buf(),
+        Some(parent) => bail!("Error: Failed to get project root: {}", parent.display()),
+        None => bail!("Error: Failed to get project root"),
+    };
+    copy_dir_recursive(&project_root, &temp_repo).await?;
+
+    // build rust cli from ./helix-db/helix-cli with sh build.sh dev
+    let output = Command::new("sh")
+        .arg(format!("{}/helix-cli/build.sh", project_root.display()))
+        .arg("dev")
+        .output()
+        .context("Failed to execute build.sh")?;
     if !output.status.success() {
-        fs::remove_dir_all(&temp_repo).await.ok();
         bail!(
-            "Error: Helix init failed for {}\nStderr: {}\nStdout: {}",
-            temp_repo.display(),
+            "Error: build.sh failed\nStderr: {}\nStdout: {}",
             String::from_utf8_lossy(&output.stderr),
             String::from_utf8_lossy(&output.stdout)
         );
@@ -345,14 +364,18 @@ async fn main() -> Result<()> {
         if batch_values.len() != 2 {
             bail!("Error: --batch requires exactly 2 arguments: total_batches current_batch");
         }
-        
+
         let total_batches = batch_values[0];
         let current_batch = batch_values[1];
-        
+
         if current_batch < 1 || current_batch > total_batches {
-            bail!("Error: Current batch ({}) must be between 1 and {}", current_batch, total_batches);
+            bail!(
+                "Error: Current batch ({}) must be between 1 and {}",
+                current_batch,
+                total_batches
+            );
         }
-        
+
         if total_batches == 0 {
             bail!("Error: Total batches must be greater than 0");
         }
@@ -360,17 +383,20 @@ async fn main() -> Result<()> {
         // Calculate which files this batch should process
         let files_per_batch = 100 / total_batches;
         let remainder = 100 % total_batches;
-        
+
         // Calculate start and end for this batch
         let start_file = ((current_batch - 1) * files_per_batch) + 1;
         let mut end_file = current_batch * files_per_batch;
-        
+
         // Add remainder files to the last batch
         if current_batch == total_batches {
             end_file += remainder;
         }
-        
-        println!("Processing batch {}/{}: files {}-{}", current_batch, total_batches, start_file, end_file);
+
+        println!(
+            "Processing batch {}/{}: files {}-{}",
+            current_batch, total_batches, start_file, end_file
+        );
 
         let tasks: Vec<_> = (start_file..=end_file)
             .map(|file_num| {
@@ -397,7 +423,10 @@ async fn main() -> Result<()> {
             let _ = task.await;
         }
 
-        println!("Finished processing batch {}/{}", current_batch, total_batches);
+        println!(
+            "Finished processing batch {}/{}",
+            current_batch, total_batches
+        );
     } else {
         // Process all files in parallel (default behavior)
         println!("Processing all files 1-100 in parallel...");
@@ -475,7 +504,7 @@ async fn process_file_parallel(
     copy_dir_recursive(&temp_repo, &temp_dir).await?;
 
     // Run helix compile command
-    let compile_output_path = temp_dir.join(".helix/repo/helix-db/helix-container/src");
+    let compile_output_path = temp_dir.join("helix-db/helix-container/src");
     fs::create_dir_all(&compile_output_path)
         .await
         .context("Failed to create compile output directory")?;
@@ -496,9 +525,7 @@ async fn process_file_parallel(
         // For helix compilation, we'll show the raw output since it's not cargo format
         let error_message = format!(
             "Helix compile failed for file{}\nStderr: {}\nStdout: {}",
-            file_num,
-            stderr,
-            stdout
+            file_num, stderr, stdout
         );
 
         // Create GitHub issue if configuration is available
@@ -512,8 +539,9 @@ async fn process_file_parallel(
                 println!("DEBUG: Failed to read schema.hx: {}", e);
                 e
             })?;
-            let generated_rust_code =
-                fs::read_to_string(&compile_output_path.join("queries.rs")).await.map_err(|e| {
+            let generated_rust_code = fs::read_to_string(&compile_output_path.join("queries.rs"))
+                .await
+                .map_err(|e| {
                     println!("DEBUG: Failed to read queries.rs: {}", e);
                     e
                 })?;
@@ -535,7 +563,7 @@ async fn process_file_parallel(
     }
 
     // Run cargo check on the helix container path
-    let helix_container_path = temp_dir.join(".helix/repo/helix-db/helix-container");
+    let helix_container_path = temp_dir.join("helix-db/helix-container");
     if helix_container_path.exists() {
         let output = Command::new("cargo")
             .arg("check")
@@ -544,15 +572,10 @@ async fn process_file_parallel(
             .context("Failed to execute cargo check")?;
 
         if !output.status.success() {
-            
             let stderr = String::from_utf8_lossy(&output.stderr);
             let stdout = String::from_utf8_lossy(&output.stdout);
             // let filtered_errors = extract_cargo_errors(&stderr, &stdout);
-            let error_message = format!(
-                "Cargo check failed for file{}\n{}",
-                file_num,
-                stderr
-            );
+            let error_message = format!("Cargo check failed for file{}\n{}", file_num, stderr);
 
             // Create GitHub issue if configuration is available
             if let Some(config) = github_config {
@@ -560,15 +583,18 @@ async fn process_file_parallel(
                 let query_content = fs::read_to_string(&queries_hx_path).await.map_err(|e| {
                     println!("DEBUG: Failed to read queries.hx: {}", e);
                     e
-                })? ;
+                })?;
                 let schema_content = fs::read_to_string(&schema_hx_path).await.map_err(|e| {
                     println!("DEBUG: Failed to read schema.hx: {}", e);
                     e
                 })?;
-                let generated_rust_code = fs::read_to_string(&compile_output_path.join("queries.rs")).await.map_err(|e| {
-                    println!("DEBUG: Failed to read queries.rs: {}", e);
-                    e
-                })?;
+                let generated_rust_code =
+                    fs::read_to_string(&compile_output_path.join("queries.rs"))
+                        .await
+                        .map_err(|e| {
+                            println!("DEBUG: Failed to read queries.rs: {}", e);
+                            e
+                        })?;
                 handle_error_with_github(
                     config,
                     "Cargo Check",
@@ -606,11 +632,22 @@ async fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
         let dest_path = dst.join(file_name);
 
         if path.is_dir() {
-            Box::pin(copy_dir_recursive(&path, &dest_path)).await?;
+            if IGNORE_DIRS.contains(&path.file_name().unwrap().to_str().unwrap()) {
+                continue;
+            }
+            Box::pin(copy_dir_recursive(&path, &dest_path)).await.map_err(|e| {
+                println!("DEBUG: Failed to copy directory {}: {}", path.display(), e);
+                e
+            })?;
         } else {
-            fs::copy(&path, &dest_path).await?;
+            fs::copy(&path, &dest_path).await.map_err(|e| {
+                println!("DEBUG: Failed to copy file {}: {}", path.display(), e);
+                e
+            })?;
         }
     }
 
     Ok(())
 }
+
+const IGNORE_DIRS: [&str; 2] = ["target", ".git"];

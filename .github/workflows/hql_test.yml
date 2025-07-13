@@ -40,13 +40,6 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-cargo-
     
-    - name: Install helix CLI
-      run: |
-        echo "Installing helix CLI..."
-        curl -sSL https://install.helix-db.com | bash
-        echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
-        source ~/.bashrc
-    
     - name: Make run.sh executable
       run: chmod +x ./hql-tests/run.sh
     
