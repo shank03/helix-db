@@ -41,7 +41,7 @@ pub trait SearchBM25Adapter<'a>: Iterator<Item = Result<TraversalVal, GraphError
         label: &str,
         query: &str,
         k: usize,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>;
+    ) -> Result<RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>, GraphError>;
 }
 
 impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> SearchBM25Adapter<'a>
@@ -52,14 +52,17 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> SearchBM25Adapter
         label: &str,
         query: &str,
         k: usize,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>> {
-        let results = self
+    ) -> Result<RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>, GraphError> {
+        let results = match self
             .storage
             .bm25
             .as_ref()
             .unwrap() // TODO: temp solution, idk how to do
             .search(self.txn, query, k)
-            .unwrap_or_default();
+        {
+            Ok(results) => results,
+            Err(e) => return Err(e),
+        };
 
         let iter = SearchBM25 {
             txn: self.txn,
@@ -67,11 +70,11 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> SearchBM25Adapter
             storage: Arc::clone(&self.storage),
             label,
         };
-        RoTraversalIterator {
+        Ok(RoTraversalIterator {
             inner: iter,
             storage: self.storage,
             txn: self.txn,
-        }
+        })
     }
 }
 
