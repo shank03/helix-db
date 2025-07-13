@@ -360,16 +360,16 @@ pub struct ForEach {
 impl Display for ForEach {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.for_variables {
-            ForVariable::ObjectDestructure(_) => {
+            ForVariable::ObjectDestructure(variables) => {
                 write!(
                     f,
-                    "for data in data.{}",
-                    // self.in_variable,
-                    // variables
-                    //     .iter()
-                    //     .map(|v| format!("{}", v))
-                    //     .collect::<Vec<_>>()
-                    //     .join(", "),
+                    "for {}Data {{ {} }} in {}",
+                    self.in_variable.inner(),
+                    variables
+                        .iter()
+                        .map(|v| format!("{}", v))
+                        .collect::<Vec<_>>()
+                        .join(", "),
                     self.in_variable
                 )?;
             }
@@ -399,6 +399,15 @@ pub enum ForLoopInVariable {
     Identifier(GenRef<String>),
     Parameter(GenRef<String>),
     Empty,
+}
+impl ForLoopInVariable {
+    pub fn inner(&self) -> String {
+        match self {
+            ForLoopInVariable::Identifier(identifier) => identifier.to_string(),
+            ForLoopInVariable::Parameter(parameter) => parameter.to_string(),
+            ForLoopInVariable::Empty => "".to_string(),
+        }
+    }
 }
 impl Display for ForLoopInVariable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
