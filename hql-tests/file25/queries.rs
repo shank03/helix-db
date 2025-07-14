@@ -2,9 +2,9 @@
 
 use heed3::RoTxn;
 use get_routes::handler;
-use helixdb::{field_remapping, identifier_remapping, traversal_remapping, exclude_field, value_remapping};
-use helixdb::helix_engine::vector_core::vector::HVector;
-use helixdb::{
+use helix_db::{field_remapping, identifier_remapping, traversal_remapping, exclude_field, value_remapping};
+use helix_db::helix_engine::vector_core::vector::HVector;
+use helix_db::{
     helix_engine::graph_core::ops::{
         g::G,
         in_::{in_::InAdapter, in_e::InEdgesAdapter, to_n::ToNAdapter},

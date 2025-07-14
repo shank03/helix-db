@@ -5,7 +5,7 @@ use crate::{
     utils::*,
 };
 use clap::Parser;
-use helixdb::{helix_engine::graph_core::config::Config, utils::styled_string::StyledString};
+use helix_db::{helix_engine::graph_core::config::Config, utils::styled_string::StyledString};
 use sonic_rs::json;
 use spinners::{Spinner, Spinners};
 use std::{
@@ -440,7 +440,7 @@ fi
                         return;
                     }
                 };
-                home_dir.join(".helix/repo/helix-db/helixdb")
+                home_dir.join(".helix/repo/helix-db/helix_db")
             };
 
             if !check_cargo_version() {
@@ -542,7 +542,7 @@ fi
                         return;
                     }
                 };
-                home_dir.join(".helix/repo/helix-db/helixdb")
+                home_dir.join(".helix/repo/helix-db/helix_db")
             };
 
             let local_cli_version =
