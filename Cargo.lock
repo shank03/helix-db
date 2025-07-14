@@ -1806,13 +1806,13 @@ dependencies = [
 
 [[package]]
 name = "helix-cli"
-version = "1.0.112"
+version = "1.0.113"
 dependencies = [
  "chrono",
  "clap",
  "dirs 6.0.0",
  "futures-util",
- "helix-db 1.0.112 (registry+https://github.com/rust-lang/crates.io-index)",
+ "helix-db 1.0.112",
  "indicatif",
  "libc",
  "open",
@@ -1838,7 +1838,7 @@ dependencies = [
  "chrono",
  "dirs 5.0.1",
  "heed3",
- "helix-db 1.0.112 (registry+https://github.com/rust-lang/crates.io-index)",
+ "helix-db 1.0.112",
  "helix-macros 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "inventory",
  "rand 0.9.1",
@@ -1846,34 +1846,6 @@ dependencies = [
  "serde_json",
  "sonic-rs",
  "tokio",
- "uuid",
-]
-
-[[package]]
-name = "helix-db"
-version = "1.0.112"
-dependencies = [
- "bincode",
- "chrono",
- "flume",
- "heed3",
- "helix-macros 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "inventory",
- "itertools 0.14.0",
- "kdam",
- "lazy_static",
- "pest",
- "pest_derive",
- "polars",
- "rand 0.9.1",
- "reqwest",
- "serde",
- "serde_json",
- "sonic-rs",
- "tempfile",
- "tokio",
- "twox-hash",
- "url",
  "uuid",
 ]
 
@@ -1900,6 +1872,34 @@ dependencies = [
  "tempfile",
  "tokio",
  "twox-hash",
+ "uuid",
+]
+
+[[package]]
+name = "helix-db"
+version = "1.0.113"
+dependencies = [
+ "bincode",
+ "chrono",
+ "flume",
+ "heed3",
+ "helix-macros 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "inventory",
+ "itertools 0.14.0",
+ "kdam",
+ "lazy_static",
+ "pest",
+ "pest_derive",
+ "polars",
+ "rand 0.9.1",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sonic-rs",
+ "tempfile",
+ "tokio",
+ "twox-hash",
+ "url",
  "uuid",
 ]
 
