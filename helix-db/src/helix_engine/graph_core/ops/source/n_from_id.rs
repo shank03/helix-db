@@ -6,7 +6,7 @@ use crate::{
     },
     utils::items::Node,
 };
-use helix_proc_macros::debug_trace;
+use helix_macros::debug_trace;
 use heed3::RoTxn;
 use std::{iter::Once, sync::Arc};
 

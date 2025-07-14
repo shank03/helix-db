@@ -11,7 +11,7 @@ use crate::{
     utils::id::v6_uuid,
     helix_gateway::mcp::tools::{ToolArgs, ToolCalls},
 };
-use helix_proc_macros::mcp_handler;
+use helix_macros::mcp_handler;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},

@@ -12,7 +12,7 @@ use crate::{
     },
     utils::label_hash::hash_label,
 };
-use helix_proc_macros::debug_trace;
+use helix_macros::debug_trace;
 use heed3::{types::Bytes, RoTxn};
 use std::sync::Arc;
 

@@ -9,7 +9,7 @@ repository = "https://github.com/HelixDB/helix-db"
 
 [dependencies]
 # HelixDB dependencies
-helix_proc_macros = "0.1.1"
+helix-macros = "0.1.1"
 
 # External dependencies
 tokio = { version = "1.44.2", features = ["full"] }
@@ -45,7 +45,7 @@ polars = { version = "0.46.0", features = ["parquet", "lazy", "json"] }
 kdam = "0.3"
 
 [features]
-debug-output = ["helix_proc_macros/debug-output"]
+debug-output = ["helix-macros/debug-output"]
 compiler = ["pest", "pest_derive"]
 
 # vector features

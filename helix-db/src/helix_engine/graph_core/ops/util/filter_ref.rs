@@ -2,7 +2,7 @@ use crate::helix_engine::{graph_core::traversal_iter::RoTraversalIterator, types
 
 use super::super::tr_val::TraversalVal;
 use heed3::RoTxn;
-use helix_proc_macros::debug_trace;
+use helix_macros::debug_trace;
 
 pub struct FilterRef<'a, I, F> {
     iter: I,

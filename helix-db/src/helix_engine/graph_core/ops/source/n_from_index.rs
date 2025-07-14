@@ -6,7 +6,7 @@ use crate::{
     },
     protocol::value::Value,
 };
-use helix_proc_macros::debug_trace;
+use helix_macros::debug_trace;
 use heed3::{byteorder::BE, RoTxn};
 use serde::Serialize;
 use std::sync::Arc;
