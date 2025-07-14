@@ -3,6 +3,7 @@ use std::{
     fmt,
 };
 
+/*
 #[derive(Debug)]
 pub enum CliError {
     Io(std::io::Error),
@@ -43,6 +44,7 @@ impl From<sonic_rs::Error> for CliError {
         CliError::New(e.to_string())
     }
 }
+*/
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Version {

@@ -8,58 +8,28 @@ pub mod version {
 
 use version::{AUTHORS, NAME, VERSION};
 
-#[derive(Debug, Parser)]
-#[clap(name = NAME, version = VERSION, author = AUTHORS)]
-pub struct HelixCLI {
-    #[clap(subcommand)]
-    pub command: CommandType,
-}
-
 #[derive(Debug, Subcommand)]
 pub enum CommandType {
-    /// Demo a Helix project
-    Demo,
-
-    /// Open graph vis in default browser
-    Visualize(VisualizeCommand),
-
     /// Deploy a Helix project
     Deploy(DeployCommand),
 
-    /// Update the helix-cli and helix-db repo
-    Update(UpdateCommand),
+    /// Update the cli and core database
+    Update,
 
-    /// Re-deploy a Helix project with new queries
-    Redeploy(RedeployCommand),
-
-    /// Compile a Helix project
+    /// Lint and Compile a Helix project
     Compile(CompileCommand),
 
-    // /// Configure Helix Credentials
-    // Config(ConfigCommand),
-    /// Lint a Helix project
-    Check(LintCommand),
-
-    /// Install the Helix repo
+    /// Install the Helix core database
     Install(InstallCommand),
 
     /// Initialise a new Helix project
     Init(InitCommand),
 
-    /// Test a Helix project
-    Test(TestCommand),
-
-    /// List running Helix instances
-    Instances(InstancesCommand),
+    /// List all Helix instances
+    Status,
 
     /// Stop Helix instances
     Stop(StopCommand),
-
-    /// Start a stopped Helix instance
-    Start(StartCommand),
-
-    /// Give an instance a short description
-    Label(LabelCommand),
 
     /// Save an instnaces data.mdb file
     Save(SaveCommand),
@@ -67,8 +37,11 @@ pub enum CommandType {
     /// Delete an instance and all its data
     Delete(DeleteCommand),
 
-    /// Get the current version of the cli and db
-    Version(VersionCommand),
+    /// Get the current version of the cli and core database
+    Version,
+
+    /// Open graph visualizer in default browser
+    Visualize(VisualizeCommand),
 
     /// Check login credentials or login with github
     Login,
@@ -91,33 +64,6 @@ pub struct DeployCommand {
 }
 
 #[derive(Debug, Args)]
-#[clap(name = "update", about = "Update helix-cli and helix-db")]
-pub struct UpdateCommand {}
-
-#[derive(Debug, Args)]
-#[clap(
-    name = "version",
-    about = "Get the installed verison of helix-cli and helix-db"
-)]
-pub struct VersionCommand {}
-
-#[derive(Debug, Args)]
-#[clap(
-    name = "redeploy",
-    about = "Re-deploy a Helix project with new queries"
-)]
-pub struct RedeployCommand {
-    #[clap(help = "Existing helix cluster ID")]
-    pub cluster: String,
-
-    #[clap(short, long, help = "The path to the project")]
-    pub path: Option<String>,
-
-    #[clap(short, long, help = "Remote cluster ID")]
-    pub remote: bool,
-}
-
-#[derive(Debug, Args)]
 #[clap(name = "compile", about = "Compile a Helix project")]
 pub struct CompileCommand {
     #[clap(short, long, help = "The path to the project")]
@@ -131,20 +77,10 @@ pub struct CompileCommand {
 }
 
 #[derive(Debug, Args)]
-#[clap(name = "check", about = "Lint a Helix project")]
-pub struct LintCommand {
-    #[clap(short, long, help = "The path to the project")]
-    pub path: Option<String>,
-}
-
-#[derive(Debug, Args)]
 #[clap(name = "install", about = "Install the Helix repo")]
 pub struct InstallCommand {
     #[clap(long, help = "Install HelixDb on the development branch (considered unstable)")]
     pub dev: bool,
-
-    #[clap(short, long, help = "The path to the project")]
-    pub path: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -155,20 +91,6 @@ pub struct InitCommand {
 }
 
 #[derive(Debug, Args)]
-#[clap(name = "test", about = "Test a Helix project")]
-pub struct TestCommand {
-    #[clap(short, long, help = "The path to the project")]
-    pub path: Option<String>,
-
-    #[clap(short, long, help = "The test to run")]
-    pub test: Option<String>,
-}
-
-#[derive(Debug, Args)]
-#[clap(name = "instances", about = "List running Helix instances")]
-pub struct InstancesCommand {}
-
-#[derive(Debug, Args)]
 #[clap(name = "stop", about = "Stop Helix instances")]
 pub struct StopCommand {
     #[clap(long, help = "Stop all running instances")]
@@ -176,33 +98,6 @@ pub struct StopCommand {
 
     #[clap(short, long, help = "Instance ID to stop")]
     pub instance: Option<String>,
-}
-
-#[derive(Debug, Args)]
-#[clap(name = "start", about = "Start a stopped Helix instance")]
-pub struct StartCommand {
-    #[clap(help = "Instance ID to Start")]
-    pub instance: String,
-}
-
-#[derive(Debug, Args)]
-#[clap(name = "visualize", about = "Visualize the Helix graph")]
-pub struct VisualizeCommand {
-    #[clap(help = "Id of instance to visualize")]
-    pub instance: String,
-
-    #[clap(short, long, help = "Give nodes a label based on a property")]
-    pub node_prop: Option<String>,
-}
-
-#[derive(Debug, Args)]
-#[clap(name = "label", about = "Give an instance a short description")]
-pub struct LabelCommand {
-    #[clap(help = "Instance ID to label")]
-    pub instance: String,
-
-    #[clap(help = "Short description to label")]
-    pub label: String,
 }
 
 #[derive(Debug, Args)]
@@ -222,26 +117,13 @@ pub struct DeleteCommand {
     pub instance: String,
 }
 
-
 #[derive(Debug, Args)]
-#[clap(name = "config", about = "Configure Helix Credentials")]
-pub struct ConfigCommand {}
+#[clap(name = "visualize", about = "Visualize the Helix graph")]
+pub struct VisualizeCommand {
+    #[clap(help = "Id of instance to visualize")]
+    pub instance: String,
 
-#[derive(Debug, Subcommand, Clone, ValueEnum)]
-#[clap(name = "output")]
-pub enum OutputLanguage {
-    #[clap(name = "rust", alias = "rs")]
-    Rust,
-    #[clap(name = "typescript", alias = "ts")]
-    TypeScript,
+    #[clap(short, long, help = "Give nodes a label based on a property")]
+    pub node_prop: Option<String>,
 }
 
-impl PartialEq for OutputLanguage {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (OutputLanguage::TypeScript, OutputLanguage::TypeScript) => true,
-            (OutputLanguage::Rust, OutputLanguage::Rust) => true,
-            _ => false,
-        }
-    }
-}
