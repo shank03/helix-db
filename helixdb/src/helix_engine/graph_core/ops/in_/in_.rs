@@ -13,7 +13,7 @@ use crate::{
     utils::label_hash::hash_label,
 };
 use heed3::{RoTxn, types::Bytes};
-use proc_macros::debug_trace;
+use helix_proc_macros::debug_trace;
 use std::sync::Arc;
 
 pub struct InNodesIterator<'a, T> {

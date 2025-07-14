@@ -9,7 +9,7 @@ use heed3::{
     byteorder::BE,
     types::{Bytes, U128},
 };
-use proc_macros::debug_trace;
+use helix_proc_macros::debug_trace;
 
 pub struct EFromType<'a> {
     pub iter: heed3::RoIter<'a, U128<BE>, heed3::types::LazyDecode<Bytes>>,

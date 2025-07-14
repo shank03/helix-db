@@ -5,7 +5,7 @@ use crate::{
     },
     utils::items::Node,
 };
-use proc_macros::debug_trace;
+use helix_proc_macros::debug_trace;
 use heed3::{
     byteorder::BE,
     types::{Bytes, U128},

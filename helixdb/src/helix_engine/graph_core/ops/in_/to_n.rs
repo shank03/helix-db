@@ -3,7 +3,7 @@ use crate::helix_engine::{
     storage_core::{storage_core::HelixGraphStorage, storage_methods::StorageMethods},
     types::GraphError,
 };
-use proc_macros::debug_trace;
+use helix_proc_macros::debug_trace;
 use heed3::RoTxn;
 use std::sync::Arc;
 

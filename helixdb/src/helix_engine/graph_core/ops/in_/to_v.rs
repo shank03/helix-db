@@ -5,7 +5,7 @@ use crate::helix_engine::{
 };
 use heed3::RoTxn;
 use std::sync::Arc;
-use proc_macros::debug_trace;
+use helix_proc_macros::debug_trace;
 
 pub struct ToVIterator<'a, I, T> {
     iter: I,

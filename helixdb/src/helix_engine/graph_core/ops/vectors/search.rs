@@ -8,7 +8,7 @@ use crate::{
         vector_core::{hnsw::HNSW, vector::HVector},
     },
 };
-use proc_macros::debug_trace;
+use helix_proc_macros::debug_trace;
 use std::iter::once;
 
 pub struct SearchV<I: Iterator<Item = Result<TraversalVal, GraphError>>> {

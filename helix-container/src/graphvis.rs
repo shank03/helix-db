@@ -1,4 +1,4 @@
-use proc_macros::get_handler;
+use helix_proc_macros::get_handler;
 use helixdb::{
     helix_engine::{
         storage_core::graph_visualization::GraphVisualization,

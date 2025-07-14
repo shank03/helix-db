@@ -8,14 +8,14 @@ authors = ["HelixDB Team"]
 repository = "https://github.com/HelixDB/helix-db"
 
 [dependencies]
-# Local dependencies
-helix_proc_macros = { version = "0.1.1", path = "../helix_proc_macros" }
+# HelixDB dependencies
+helix_proc_macros = "0.1.1"
 
 # External dependencies
 tokio = { version = "1.44.2", features = ["full"] }
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.110"
-bincode = "1.3.3"                                                         # TODO: Figure out bincode 2 impl with current serde impl
+bincode = "1.3.3"                                                  # TODO: Figure out bincode 2 impl with current serde impl
 sonic-rs = "0.5.0"
 inventory = "0.3.16"
 twox-hash = "2.1.0"
@@ -32,7 +32,10 @@ pest = { version = "2.7", optional = true }
 pest_derive = { version = "2.7", optional = true }
 
 # Embedding dependencies
-reqwest = { version = "0.12.15", features = [ "json", "blocking"], optional = true }
+reqwest = { version = "0.12.15", features = [
+    "json",
+    "blocking",
+], optional = true }
 url = { version = "2.5", optional = true }
 
 [dev-dependencies]
@@ -57,4 +60,3 @@ server = ["build", "compiler", "vectors"]
 full = ["build", "compiler", "vectors"]
 dev = ["debug-output", "server"]
 default = ["server"]
-

@@ -316,7 +316,7 @@ pub fn write_headers() -> String {
     r#"
 
 use heed3::RoTxn;
-use proc_macros::handler;
+use helix_proc_macros::handler;
 use helixdb::{
     helix_engine::{
         graph_core::ops::{
