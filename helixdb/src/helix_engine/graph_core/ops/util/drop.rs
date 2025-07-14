@@ -1,7 +1,5 @@
 use crate::helix_engine::{
-    graph_core::ops::tr_val::TraversalVal,
-    storage_core::{storage_core::HelixGraphStorage, storage_methods::StorageMethods},
-    types::GraphError,
+    bm25::bm25::BM25, graph_core::ops::tr_val::TraversalVal, storage_core::{storage_core::HelixGraphStorage, storage_methods::StorageMethods}, types::GraphError
 };
 use heed3::RwTxn;
 use std::sync::Arc;
@@ -21,7 +19,14 @@ impl<'a> Drop<Vec<Result<TraversalVal, GraphError>>> {
             .try_for_each(|item| -> Result<(), GraphError> {
                 match item {
                     TraversalVal::Node(node) => match storage.drop_node(txn, &node.id) {
-                        Ok(_) => Ok(println!("Dropped node: {:?}", node.id)),
+                        Ok(_) => {
+                            if let Some(bm25) = &storage.bm25 {
+                                if let Err(e) = bm25.delete_doc(txn, node.id) {
+                                    println!("failed to delete doc from bm25: {}", e);
+                                }
+                            }
+                            Ok(println!("Dropped node: {:?}", node.id))
+                        }
                         Err(e) => return Err(e),
                     },
                     TraversalVal::Edge(edge) => match storage.drop_edge(txn, &edge.id) {

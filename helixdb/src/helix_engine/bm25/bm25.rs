@@ -15,7 +15,7 @@ const DB_BM25_INVERTED_INDEX: &str = "bm25_inverted_index"; // term -> list of (
 const DB_BM25_DOC_LENGTHS: &str = "bm25_doc_lengths"; // doc_id -> document length
 const DB_BM25_TERM_FREQUENCIES: &str = "bm25_term_frequencies"; // term -> document frequency
 const DB_BM25_METADATA: &str = "bm25_metadata"; // stores total docs, avgdl, etc.
-const METADATA_KEY: &[u8] = b"metadata";
+pub const METADATA_KEY: &[u8] = b"metadata";
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct BM25Metadata {
@@ -41,13 +41,14 @@ pub trait BM25 {
 
     fn update_doc(&self, txn: &mut RwTxn, doc_id: u128, doc: &str) -> Result<(), GraphError>;
 
+    /// Calculate the BM25 score for a single term of a query (no sum)
     fn calculate_bm25_score(
         &self,
-        tf: u32,
-        doc_len: u32,
-        df: u32,
-        total_docs: u64,
-        avgdl: f64,
+        tf: u32,         // term frequency
+        doc_len: u32,    // document length
+        df: u32,         // document frequency
+        total_docs: u64, // total documents
+        avgdl: f64,      // average document length
     ) -> f32;
 
     fn search(
@@ -113,6 +114,7 @@ impl BM25 for HBM25Config {
     fn tokenize<const SHOULD_FILTER: bool>(&self, text: &str) -> Vec<String> {
         text.to_lowercase()
             .split(|c: char| !c.is_alphanumeric())
+            .filter(|s| !s.is_empty())
             .filter_map(|s| (!SHOULD_FILTER || s.len() > 2).then_some(s.to_string()))
             .collect()
     }
@@ -263,9 +265,9 @@ impl BM25 for HBM25Config {
         let df = df.max(1) as f64;
         let total_docs = total_docs.max(1) as f64;
 
-        // calculate IDF: log((N - df + 0.5) / (df + 0.5))
+        // calculate IDF: ln((N - df + 0.5) / (df + 0.5) + 1)
         // this can be negative when df is high relative to N, which is mathematically correct
-        let idf = ((total_docs - df + 0.5) / (df + 0.5)).ln();
+        let idf = (((total_docs - df + 0.5) / (df + 0.5)) + 1.0).ln();
 
         // ensure avgdl is not zero
         let avgdl = if avgdl > 0.0 { avgdl } else { doc_len as f64 };
@@ -273,14 +275,11 @@ impl BM25 for HBM25Config {
         // calculate BM25 score
         let tf = tf as f64;
         let doc_len = doc_len as f64;
-        let tf_component =
-            (tf * (self.k1 + 1.0)) / (tf + self.k1 * (1.0 - self.b + self.b * (doc_len / avgdl)));
+        let tf_component = (tf * (self.k1 + 1.0))
+            / (tf + self.k1 * (1.0 - self.b + self.b * (doc_len.abs() / avgdl)));
 
         let score = (idf * tf_component) as f32;
 
-        // the score can be negative when IDF is negative (term appears in most documents)
-        // this is mathematically correct - such terms have low discriminative power
-        // but documents with higher tf should still score higher than those with lower tf
         score
     }
 
@@ -401,16 +400,17 @@ impl HybridSearch for HelixGraphStorage {
 }
 
 pub trait BM25Flatten {
+    /// util func to flatten array of strings to a single string
     fn flatten_bm25(&self) -> String;
 }
 
 impl BM25Flatten for HashMap<String, Value> {
     fn flatten_bm25(&self) -> String {
-        let mut s = String::with_capacity(self.len() * 2);
-        for (k, v) in self.iter() {
-            s.push_str(&k);
-            s.push_str(&v.to_string());
-        }
-        s
+        self.iter()
+            .fold(String::with_capacity(self.len() * 4), |mut s, (k, v)| {
+                s.push_str(k);
+                s.push_str(&v.to_string());
+                s
+            })
     }
 }

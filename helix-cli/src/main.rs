@@ -20,6 +20,12 @@ mod instance_manager;
 mod types;
 mod utils;
 
+// TODO:
+// - helix start, helix deploy should be 1
+// - remove helix test, helix demo
+// - helix instances -> helix status
+// - remove duplicate things
+
 #[tokio::main]
 async fn main() {
     let args = HelixCLI::parse();
