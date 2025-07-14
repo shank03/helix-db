@@ -1812,7 +1812,7 @@ dependencies = [
  "clap",
  "dirs 6.0.0",
  "futures-util",
- "helix-db 1.0.111 (registry+https://github.com/rust-lang/crates.io-index)",
+ "helix-db 1.0.112 (registry+https://github.com/rust-lang/crates.io-index)",
  "indicatif",
  "libc",
  "open",
@@ -1838,8 +1838,8 @@ dependencies = [
  "chrono",
  "dirs 5.0.1",
  "heed3",
- "helix-db 1.0.111 (registry+https://github.com/rust-lang/crates.io-index)",
- "helix-macros 0.1.1",
+ "helix-db 1.0.112 (registry+https://github.com/rust-lang/crates.io-index)",
+ "helix-macros 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "inventory",
  "rand 0.9.1",
  "serde",
@@ -1851,13 +1851,13 @@ dependencies = [
 
 [[package]]
 name = "helix-db"
-version = "1.0.111"
+version = "1.0.112"
 dependencies = [
  "bincode",
  "chrono",
  "flume",
  "heed3",
- "helix-macros 0.1.1",
+ "helix-macros 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "inventory",
  "itertools 0.14.0",
  "kdam",
@@ -1879,15 +1879,15 @@ dependencies = [
 
 [[package]]
 name = "helix-db"
-version = "1.0.111"
+version = "1.0.112"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cdb5259db28caaaa69abb2fc6b36faeea01ef183aee0e769b63dc463fd948a49"
+checksum = "0d0184e04ebc9c10479a5a8e3125d38f2c91acac92af00b2b1e58cbe89432b3f"
 dependencies = [
  "bincode",
  "chrono",
  "flume",
  "heed3",
- "helix-macros 0.1.1",
+ "helix-macros 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "inventory",
  "itertools 0.14.0",
  "pest",
@@ -1905,9 +1905,7 @@ dependencies = [
 
 [[package]]
 name = "helix-macros"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6bd6afd5885db97961f36564212bf74eaaa8a43a6fc5b229906d0ea70d8b1708"
+version = "0.1.2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1917,6 +1915,8 @@ dependencies = [
 [[package]]
 name = "helix-macros"
 version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1957788276d585029396d98bd4613292572c36cd558906ef5a1861b077d71828"
 dependencies = [
  "proc-macro2",
  "quote",

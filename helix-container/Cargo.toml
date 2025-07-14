@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-helix-db = "1.0.111"
-helix-macros = "0.1.1"
+helix-db = "1.0.112"
+helix-macros = "0.1.2"
 
 inventory = "0.3.16"
 rand = "0.9.1"
