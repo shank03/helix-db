@@ -24,7 +24,7 @@ use crate::{
     utils::label_hash::hash_label,
 };
 use heed3::RoTxn;
-use proc_macros::{mcp_handler, tool_calls};
+use helix_macros::{tool_calls, mcp_handler, tool_call};
 use serde::Deserialize;
 use std::{marker::PhantomData, sync::Arc};
 

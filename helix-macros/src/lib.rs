@@ -5,22 +5,50 @@ extern crate syn;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
-use syn::{parse_macro_input, FnArg, ItemFn, ItemTrait, Pat, TraitItem, Type};
+use syn::{
+    Block, Expr, FnArg, Item, ItemFn, ItemTrait, Pat, Stmt, TraitItem, Type, parse_macro_input,
+};
 
 #[proc_macro_attribute]
 pub fn handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(item as ItemFn);
+    let input_fn_block_contents = &input_fn.block.stmts;
     let fn_name = &input_fn.sig.ident;
     let fn_name_str = fn_name.to_string();
+    let vis = &input_fn.vis;
+    let sig = &input_fn.sig;
     println!("fn_name_str: {}", fn_name_str);
     // Create a unique static name for each handler
     let static_name = quote::format_ident!(
         "_MAIN_HANDLER_REGISTRATION_{}",
         fn_name.to_string().to_uppercase()
     );
+    let input_data_name = quote::format_ident!("{}Input", fn_name);
+
+    let query_stmts = match input_fn_block_contents.first() {
+        Some(Stmt::Expr(Expr::Block(block), _)) => block.block.stmts.clone(),
+        _ => panic!("Query block not found"),
+    };
 
     let expanded = quote! {
-        #input_fn
+        #[allow(non_camel_case_types)]
+        #vis #sig {
+            let data: #input_data_name = match sonic_rs::from_slice(&input.request.body) {
+                Ok(data) => data,
+                Err(err) => return Err(GraphError::from(err)),
+            };
+
+            let mut remapping_vals = RemappingMap::new();
+            let db = Arc::clone(&input.graph.storage);
+            let mut txn = db.graph_env.write_txn().unwrap();
+
+
+            #(#query_stmts)*
+
+            response.body = sonic_rs::to_vec(&return_vals).unwrap();
+
+            Ok(())
+        }
 
         #[doc(hidden)]
         #[used]
@@ -213,20 +241,23 @@ pub fn tool_calls(_attr: TokenStream, input: TokenStream) -> TokenStream {
 
             // Extract method parameters (skip &self and txn)
             let method_params: Vec<_> = method.sig.inputs.iter().skip(3).collect();
-            let (field_names, struct_fields): (Vec<_>, Vec<_>) = method_params.iter().filter_map(|param| {
-                if let FnArg::Typed(pat_type) = param {
-                    let field_name = if let Pat::Ident(pat_ident) = &*pat_type.pat {
-                        &pat_ident.ident
+            let (field_names, struct_fields): (Vec<_>, Vec<_>) = method_params
+                .iter()
+                .filter_map(|param| {
+                    if let FnArg::Typed(pat_type) = param {
+                        let field_name = if let Pat::Ident(pat_ident) = &*pat_type.pat {
+                            &pat_ident.ident
+                        } else {
+                            return None;
+                        };
+
+                        let field_type = &pat_type.ty;
+                        Some((quote! { #field_name }, quote! { #field_name: #field_type }))
                     } else {
-                        return None;
-                    };
-                    
-                    let field_type = &pat_type.ty;
-                    Some((quote!{ #field_name }, quote! { #field_name: #field_type }))
-                } else {
-                    None
-                }
-            }).collect();
+                        None
+                    }
+                })
+                .collect();
 
             println!("method_params: {:?}", method_params);
             let struct_name = quote::format_ident!("{}Data", fn_name);
@@ -284,30 +315,48 @@ pub fn tool_calls(_attr: TokenStream, input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-
 #[proc_macro_attribute]
 pub fn tool_call(args: TokenStream, input: TokenStream) -> TokenStream {
     let prefix = if args.is_empty() {
-        "DEBUG".to_string()
+        panic!("No prefix provided");
     } else {
-        args.to_string().trim_matches('"').to_string()
+        quote::format_ident!("{}", args.to_string().trim_matches('"').to_string())
     };
 
     let method = parse_macro_input!(input as ItemFn);
 
     let fn_name = &method.sig.ident;
-    let fn_block = &method.block;
+    let fn_block = &method.block.stmts;
 
     let struct_name = quote::format_ident!("{}Input", fn_name);
     let mcp_function_name = quote::format_ident!("{}Mcp", fn_name);
     let mcp_struct_name = quote::format_ident!("{}McpInput", fn_name);
+
+    let query_stmts = match fn_block.first() {
+        Some(Stmt::Expr(Expr::Block(block), _)) => block.block.stmts.clone(),
+        _ => panic!("Query block not found"),
+    };
+
+    let mcp_query_block = quote! {
+        {
+
+            let mut remapping_vals = RemappingMap::new();
+            let db = Arc::clone(&input.mcp_backend.db);
+            let mut txn = db.graph_env.write_txn().unwrap();
+            let data: #struct_name = data.data;
+            #(#query_stmts)*
+            txn.commit().unwrap();
+            #prefix.into_iter()
+        }
+    };
+
     let new_method = quote! {
-        
+
         #[derive(Deserialize)]
         #[allow(non_camel_case_types)]
         struct #mcp_struct_name{
             connection_id: String,
-            input: #struct_name,
+            data: #struct_name,
         }
 
         #[mcp_handler]
@@ -325,13 +374,15 @@ pub fn tool_call(args: TokenStream, input: TokenStream) -> TokenStream {
                 Some(conn) => conn,
                 None => return Err(GraphError::Default),
             };
+            drop(connections);
 
             let txn = input.mcp_backend.db.graph_env.read_txn()?;
 
-            let result = (|| #fn_block)();
+            let mut result = #mcp_query_block;
 
-            let first = result.first().unwrap_or(&TraversalVal::Empty).clone();
+            let first = result.next().unwrap_or(TraversalVal::Empty);
 
+            response.body = sonic_rs::to_vec(&ReturnValue::from(first)).unwrap();
             connection.iter = result.into_iter();
             let mut connections = input.mcp_connections.lock().unwrap();
             connections.add_connection(connection);
