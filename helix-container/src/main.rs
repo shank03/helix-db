@@ -55,27 +55,27 @@ async fn main() {
     let submissions: Vec<_> = inventory::iter::<HandlerSubmission>.into_iter().collect();
     println!("Found {} submissions", submissions.len());
 
-    let routes = unsafe { Plugin::open("../target/release/libquery_container.dylib").unwrap() }
-        .get_queries()
-        .unwrap();
+    // let routes = unsafe { Plugin::open("../target/release/libquery_container.dylib").unwrap() }
+    //     .get_queries()
+    //     .unwrap();
 
-    // let routes = HashMap::from_iter(
-    //     submissions
-    //         .into_iter()
-    //         .map(|submission| {
-    //             println!("Processing submission for handler: {}", submission.0.name);
-    //             let handler = &submission.0;
-    //             let func: HandlerFn = Arc::new(handler.func);
-    //             (
-    //                 (
-    //                     "post".to_ascii_uppercase().to_string(),
-    //                     format!("/{}", handler.name.to_string()),
-    //                 ),
-    //                 func,
-    //             )
-    //         })
-    //         .collect::<Vec<((String, String), HandlerFn)>>(),
-    // );
+    let routes = HashMap::from_iter(
+        submissions
+            .into_iter()
+            .map(|submission| {
+                println!("Processing submission for handler: {}", submission.0.name);
+                let handler = &submission.0;
+                let func: HandlerFn = Arc::new(handler.func);
+                (
+                    (
+                        "post".to_ascii_uppercase().to_string(),
+                        format!("/{}", handler.name.to_string()),
+                    ),
+                    func,
+                )
+            })
+            .collect::<Vec<((String, String), HandlerFn)>>(),
+    );
 
     let mcp_submissions: Vec<_> = inventory::iter::<MCPHandlerSubmission>
         .into_iter()

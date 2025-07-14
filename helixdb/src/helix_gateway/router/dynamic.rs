@@ -57,7 +57,7 @@ impl Plugin {
                 func,
             };
 
-            acc.insert(("post".to_string(), format!("/{n}")), Arc::new(handler));
+            acc.insert(("POST".to_string(), format!("/{n}")), Arc::new(handler));
         }
         Ok(acc)
     }

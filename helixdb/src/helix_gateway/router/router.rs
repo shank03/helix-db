@@ -7,15 +7,17 @@
 
 // returns response
 
+use tokio::sync::RwLock;
+
 use crate::{
     helix_engine::{graph_core::graph_core::HelixGraphEngine, types::GraphError},
     helix_gateway::{
         mcp::mcp::{MCPHandlerFn, MCPToolInput},
-        router::QueryHandler,
+        router::{dynamic::Plugin, QueryHandler},
     },
 };
 use core::fmt;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, ffi::OsStr, os::unix::ffi::OsStrExt, sync::Arc};
 
 use crate::protocol::{request::Request, response::Response};
 
@@ -59,7 +61,7 @@ impl HandlerSubmission {
 /// Standard Routes and MCP Routes are stored in a HashMap with the method and path as the key
 pub struct HelixRouter {
     /// Method+Path => Function
-    pub routes: HashMap<(String, String), HandlerFn>,
+    pub routes: RwLock<HashMap<(String, String), HandlerFn>>,
     pub mcp_routes: HashMap<(String, String), MCPHandlerFn>,
 }
 
@@ -78,14 +80,16 @@ impl HelixRouter {
             None => HashMap::new(),
         };
         Self {
-            routes: rts,
+            routes: RwLock::new(rts),
             mcp_routes: mcp_rts,
         }
     }
 
     /// Add a route to the router
-    pub fn add_route(&mut self, method: &str, path: &str, handler: HandlerFn) {
+    pub async fn add_route(&mut self, method: &str, path: &str, handler: HandlerFn) {
         self.routes
+            .write()
+            .await
             .insert((method.to_uppercase(), path.to_string()), handler);
     }
 
@@ -101,7 +105,7 @@ impl HelixRouter {
     ///
     /// * `Ok(())` if the request was handled successfully
     /// * `Err(RouterError)` if there was an error handling the request
-    pub fn handle(
+    pub async fn handle(
         &self,
         graph_access: Arc<HelixGraphEngine>,
         request: Request,
@@ -109,7 +113,20 @@ impl HelixRouter {
     ) -> Result<(), GraphError> {
         let route_key = (request.method.clone(), request.path.clone());
 
-        if let Some(handler) = self.routes.get(&route_key) {
+        if route_key.0 == "PATCH" {
+            let body = OsStr::from_bytes(&request.body);
+
+            let plugin = unsafe { Plugin::open(body) }.unwrap();
+
+            let qs = plugin.get_queries().unwrap();
+
+            self.routes.write().await.extend(qs);
+
+            response.status = 200;
+            return Ok(());
+        }
+
+        if let Some(handler) = self.routes.read().await.get(&route_key) {
             let input = HandlerInput {
                 request,
                 graph: Arc::clone(&graph_access),
