@@ -52,7 +52,7 @@ mod tests {
         assert_eq!(tokens.len(), expected.len());
 
         for (i, token) in tokens.iter().enumerate() {
-            assert_eq!(token.as_ref(), expected[i]);
+            assert_eq!(token, expected[i]);
         }
     }
 
@@ -68,7 +68,7 @@ mod tests {
         assert_eq!(tokens.len(), expected.len());
 
         for (i, token) in tokens.iter().enumerate() {
-            assert_eq!(token.as_ref(), expected[i]);
+            assert_eq!(token, expected[i]);
         }
     }
 
