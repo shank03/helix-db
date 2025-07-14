@@ -1,6 +1,6 @@
 use crate::{instance_manager::InstanceInfo, types::*};
 use futures_util::StreamExt;
-use helixdb::{
+use helix_db::{
     helixc::{
         analyzer::analyzer::analyze,
         generator::{generator_types::Source as GeneratedSource, tsdisplay::ToTypeScript},
@@ -28,7 +28,7 @@ use tokio_tungstenite::{
 };
 use toml::Value;
 
-pub const DB_DIR: &str = "helixdb-cfg/";
+pub const DB_DIR: &str = "helix_db-cfg/";
 
 pub const DEFAULT_SCHEMA: &str = r#"// Start building your schema here.
 //
@@ -481,7 +481,7 @@ pub async fn check_helix_version() {
                 return;
             }
         };
-        home_dir.join(".helix/repo/helix-db/helixdb")
+        home_dir.join(".helix/repo/helix-db/helix_db")
     };
 
     let local_cli_version =
