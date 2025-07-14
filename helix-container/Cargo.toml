@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-helixdb = { version = "1.0.111", path = "../helixdb" }
+helixdb = "1.0.111"
 helix_proc_macros = "0.1.1"
 
 inventory = "0.3.16"

@@ -1812,7 +1812,7 @@ dependencies = [
  "clap",
  "dirs 6.0.0",
  "futures-util",
- "helixdb",
+ "helixdb 1.0.111 (registry+https://github.com/rust-lang/crates.io-index)",
  "indicatif",
  "libc",
  "open",
@@ -1839,7 +1839,7 @@ dependencies = [
  "dirs 5.0.1",
  "heed3",
  "helix_proc_macros 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "helixdb",
+ "helixdb 1.0.111 (registry+https://github.com/rust-lang/crates.io-index)",
  "inventory",
  "rand 0.9.1",
  "serde",
@@ -1894,6 +1894,32 @@ dependencies = [
  "tokio",
  "twox-hash",
  "url",
+ "uuid",
+]
+
+[[package]]
+name = "helixdb"
+version = "1.0.111"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7c91167c6827e52f389e0e3a1a87fb6fda0665bc53376c6e4153f0a20bf388cc"
+dependencies = [
+ "bincode",
+ "chrono",
+ "flume",
+ "heed3",
+ "helix_proc_macros 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "inventory",
+ "itertools 0.14.0",
+ "pest",
+ "pest_derive",
+ "rand 0.9.1",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sonic-rs",
+ "tempfile",
+ "tokio",
+ "twox-hash",
  "uuid",
 ]
 
