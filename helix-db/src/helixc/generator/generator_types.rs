@@ -6,7 +6,7 @@ use crate::helixc::parser::helix_parser::FieldPrefix;
 use super::{
     traversal_steps::Traversal,
     tsdisplay::ToTypeScript,
-    utils::{write_headers, GenRef, GeneratedType, GeneratedValue},
+    utils::{GenRef, GeneratedType, GeneratedValue, write_headers},
 };
 
 pub struct Source {
@@ -215,50 +215,55 @@ impl Display for Query {
             write!(f, "}}\n")?;
         }
         // prints top level parameters (e.g. (docs: {doc: String, id: String}))
-        if !self.parameters.is_empty() {
-            writeln!(f, "#[derive(Serialize, Deserialize)]")?;
-            writeln!(f, "pub struct {}Input {{\n", self.name)?;
-            write!(
-                f,
-                "{}",
-                self.parameters
-                    .iter()
-                    .map(|p| format!("{}", p))
-                    .collect::<Vec<_>>()
-                    .join(",\n")
-            )?;
-            write!(f, "\n}}\n")?;
-        }
-
-        write!(f, "#[handler]\n")?; // Handler macro
+        // if !self.parameters.is_empty() {
+        writeln!(f, "#[derive(Serialize, Deserialize)]")?;
+        writeln!(f, "pub struct {}Input {{\n", self.name)?;
+        write!(
+            f,
+            "{}",
+            self.parameters
+                .iter()
+                .map(|p| format!("{}", p))
+                .collect::<Vec<_>>()
+                .join(",\n")
+        )?;
+        write!(f, "\n}}\n")?;
+        // }
 
         if let Some(mcp_handler) = &self.mcp_handler {
-            write!(f, "#[mcp_handler({})]\n", mcp_handler)?;
-        }
-        // prints the function signature
-        write!(f, "pub fn {} (input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {{\n", self.name)?;
-
-        // prints basic query items
-        if !self.parameters.is_empty() {
             write!(
                 f,
-                "let data: {}Input = match sonic_rs::from_slice(&input.request.body) {{\n",
-                self.name
+                "#[tool_call({}, {})]\n",
+                mcp_handler,
+                match self.is_mut {
+                    true => "with_write",
+                    false => "with_read",
+                }
             )?;
-            writeln!(f, "    Ok(data) => data,")?;
-            writeln!(f, "    Err(err) => return Err(GraphError::from(err)),")?;
-            writeln!(f, "}};\n")?;
         }
-        writeln!(f, "let mut remapping_vals = RemappingMap::new();")?;
+        write!(f, "#[handler({})]\n", match self.is_mut {
+            true => "with_write",
+            false => "with_read",
+        })?; // Handler macro
 
-        writeln!(f, "let db = Arc::clone(&input.graph.storage);")?;
+        // prints the function signature
+        write!(
+            f,
+            "pub fn {} (input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {{\n",
+            self.name
+        )?;
+        write!(f, "{{\n")?;
+        // prints basic query items
+        // writeln!(f, "let mut remapping_vals = RemappingMap::new();")?;
+
+        // writeln!(f, "let db = Arc::clone(&input.graph.storage);")?;
         // if mut then get write txn
         // if not then get read txn
-        if self.is_mut {
-            writeln!(f, "let mut txn = db.graph_env.write_txn().unwrap();")?;
-        } else {
-            writeln!(f, "let txn = db.graph_env.read_txn().unwrap();")?;
-        }
+        // if self.is_mut {
+        //     writeln!(f, "let mut txn = db.graph_env.write_txn().unwrap();")?;
+        // } else {
+        //     writeln!(f, "let txn = db.graph_env.read_txn().unwrap();")?;
+        // }
 
         // prints each statement
         for statement in &self.statements {
@@ -277,13 +282,14 @@ impl Display for Query {
 
         // commit the transaction
         // if self.is_mut {
-        writeln!(f, "    txn.commit().unwrap();")?;
-        // }/
-        // closes the handler function
-        write!(
-            f,
-            "    response.body = sonic_rs::to_vec(&return_vals).unwrap();\n"
-        )?;
+        // writeln!(f, "    txn.commit().unwrap();")?;
+        // // }/
+        // // closes the handler function
+        // write!(
+        //     f,
+        //     "    response.body = sonic_rs::to_vec(&return_vals).unwrap();\n"
+        // )?;
+        write!(f, "}}\n")?;
         write!(f, "    Ok(())\n")?;
         write!(f, "}}\n")
     }
@@ -498,10 +504,18 @@ impl Display for ReturnValue {
                 )
             }
             ReturnType::NamedExpr(name) => {
-                write!(f, "    return_vals.insert({}.to_string(), ReturnValue::from_traversal_value_array_with_mixin({}.clone(), remapping_vals.borrow_mut()));\n", name, self.value)
+                write!(
+                    f,
+                    "    return_vals.insert({}.to_string(), ReturnValue::from_traversal_value_array_with_mixin({}.clone(), remapping_vals.borrow_mut()));\n",
+                    name, self.value
+                )
             }
             ReturnType::SingleExpr(name) => {
-                write!(f, "    return_vals.insert({}.to_string(), ReturnValue::from_traversal_value_with_mixin({}.clone(), remapping_vals.borrow_mut()));\n", name, self.value)
+                write!(
+                    f,
+                    "    return_vals.insert({}.to_string(), ReturnValue::from_traversal_value_with_mixin({}.clone(), remapping_vals.borrow_mut()));\n",
+                    name, self.value
+                )
             }
             ReturnType::UnnamedExpr => {
                 write!(f, "// need to implement unnamed return value\n todo!()")?;
@@ -514,10 +528,10 @@ impl Display for ReturnValue {
 impl ReturnValue {
     pub fn get_name(&self) -> String {
         match &self.return_type {
-            ReturnType::Literal(name) => name.to_string(),
-            ReturnType::NamedLiteral(name) => name.to_string(),
-            ReturnType::NamedExpr(name) => name.to_string(),
-            ReturnType::SingleExpr(name) => name.to_string(),
+            ReturnType::Literal(name) => name.inner().inner().to_string(),
+            ReturnType::NamedLiteral(name) => name.inner().inner().to_string(),
+            ReturnType::NamedExpr(name) => name.inner().inner().to_string(),
+            ReturnType::SingleExpr(name) => name.inner().inner().to_string(),
             ReturnType::UnnamedExpr => todo!(),
         }
     }

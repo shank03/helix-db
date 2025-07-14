@@ -198,7 +198,7 @@ mapping_field = { (identifier ~ (":" ~ (anonymous_traversal | evaluates_to_anyth
 // Macros
 // ---------------------------------------------------------------------
 built_in_macro = { mcp_macro | model_macro }
-mcp_macro = { "#[" ~ "mcp" ~ "]" }
+mcp_macro = { "#[mcp]" }
 
 model_macro = { "#[" ~ "model" ~ "(" ~ model_name ~ ")" ~ "]" }
 model_name = { identifier }

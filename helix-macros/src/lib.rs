@@ -3,15 +3,28 @@ extern crate quote;
 extern crate syn;
 
 use proc_macro::TokenStream;
-use proc_macro2::Span;
 use quote::quote;
 use syn::{
-    Block, Expr, FnArg, Item, ItemFn, ItemTrait, Pat, Stmt, TraitItem, Type, parse_macro_input,
+    Block, Expr, FnArg, Ident, Item, ItemFn, ItemTrait, Pat, Stmt, Token, TraitItem, Type,
+    parse::{Parse, ParseStream},
+    parse_macro_input,
 };
 
+struct HandlerArgs {
+    txn_type: Ident,
+}
+impl Parse for HandlerArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        Ok(HandlerArgs {
+            txn_type: input.parse()?,
+        })
+    }
+}
+
 #[proc_macro_attribute]
-pub fn handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn handler(args: TokenStream, item: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(item as ItemFn);
+    let args = parse_macro_input!(args as HandlerArgs);
     let input_fn_block_contents = &input_fn.block.stmts;
     let fn_name = &input_fn.sig.ident;
     let fn_name_str = fn_name.to_string();
@@ -30,6 +43,13 @@ pub fn handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
         _ => panic!("Query block not found"),
     };
 
+
+    let txn_type = match args.txn_type.to_string().as_str() {
+        "with_read" => quote! { let txn = db.graph_env.read_txn().unwrap(); },
+        "with_write" => quote! { let mut txn = db.graph_env.write_txn().unwrap(); },
+        _ => panic!("Invalid transaction type: expected 'with_read' or 'with_write'"),
+    };
+
     let expanded = quote! {
         #[allow(non_camel_case_types)]
         #vis #sig {
@@ -40,7 +60,7 @@ pub fn handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
             let mut remapping_vals = RemappingMap::new();
             let db = Arc::clone(&input.graph.storage);
-            let mut txn = db.graph_env.write_txn().unwrap();
+            #txn_type
 
 
             #(#query_stmts)*
@@ -315,15 +335,32 @@ pub fn tool_calls(_attr: TokenStream, input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
+struct ToolCallArgs {
+    name: Ident,
+    _comma: Token![,],
+    txn_type: Ident,
+}
+impl Parse for ToolCallArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        Ok(ToolCallArgs {
+            name: input.parse()?,
+            _comma: input.parse()?,
+            txn_type: input.parse()?,
+        })
+    }
+}
+
 #[proc_macro_attribute]
 pub fn tool_call(args: TokenStream, input: TokenStream) -> TokenStream {
-    let prefix = if args.is_empty() {
-        panic!("No prefix provided");
-    } else {
-        quote::format_ident!("{}", args.to_string().trim_matches('"').to_string())
-    };
-
+    let args = parse_macro_input!(args as ToolCallArgs);
     let method = parse_macro_input!(input as ItemFn);
+
+    let name = args.name;
+    let txn_type = match args.txn_type.to_string().as_str() {
+        "with_read" => quote! { let txn = db.graph_env.read_txn().unwrap(); },
+        "with_write" => quote! { let mut txn = db.graph_env.write_txn().unwrap(); },
+        _ => panic!("Invalid transaction type: expected 'with_read' or 'with_write'"),
+    };
 
     let fn_name = &method.sig.ident;
     let fn_block = &method.block.stmts;
@@ -342,11 +379,11 @@ pub fn tool_call(args: TokenStream, input: TokenStream) -> TokenStream {
 
             let mut remapping_vals = RemappingMap::new();
             let db = Arc::clone(&input.mcp_backend.db);
-            let mut txn = db.graph_env.write_txn().unwrap();
+            #txn_type
             let data: #struct_name = data.data;
             #(#query_stmts)*
             txn.commit().unwrap();
-            #prefix.into_iter()
+            #name.into_iter()
         }
     };
 
