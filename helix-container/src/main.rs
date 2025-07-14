@@ -6,6 +6,7 @@ use helixdb::helix_gateway::{
     gateway::{GatewayOpts, HelixGateway},
     router::router::{HandlerFn, HandlerSubmission},
 };
+use helixdb::protocol::request::Method;
 use inventory;
 use std::{collections::HashMap, sync::Arc};
 
@@ -67,14 +68,11 @@ async fn main() {
     //             let handler = &submission.0;
     //             let func: HandlerFn = Arc::new(handler.func);
     //             (
-    //                 (
-    //                     "post".to_ascii_uppercase().to_string(),
-    //                     format!("/{}", handler.name.to_string()),
-    //                 ),
+    //                 (Method::POST, format!("/{}", handler.name.to_string())),
     //                 func,
     //             )
     //         })
-    //         .collect::<Vec<((String, String), HandlerFn)>>(),
+    //         .collect::<Vec<((Method, String), HandlerFn)>>(),
     // );
 
     let mcp_submissions: Vec<_> = inventory::iter::<MCPHandlerSubmission>
@@ -89,14 +87,11 @@ async fn main() {
                 let func: MCPHandlerFn =
                     Arc::new(move |input, response| (handler.func)(input, response));
                 (
-                    (
-                        "post".to_ascii_uppercase().to_string(),
-                        format!("/mcp/{}", handler.name.to_string()),
-                    ),
+                    (Method::POST, format!("/mcp/{}", handler.name.to_string())),
                     func,
                 )
             })
-            .collect::<Vec<((String, String), MCPHandlerFn)>>(),
+            .collect::<Vec<((Method, String), MCPHandlerFn)>>(),
     );
 
     println!("Routes: {:?}", routes.keys());

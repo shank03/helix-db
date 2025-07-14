@@ -7,6 +7,9 @@
 
 // returns response
 
+use crate::{helix_gateway::router::dynamic::Plugin, protocol::request::Method};
+use tokio::sync::RwLock;
+
 use crate::{
     helix_engine::{graph_core::graph_core::HelixGraphEngine, types::GraphError},
     helix_gateway::{
@@ -15,7 +18,12 @@ use crate::{
     },
 };
 use core::fmt;
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    ffi::{CString, OsStr},
+    os::unix::ffi::OsStrExt,
+    sync::Arc,
+};
 
 use crate::protocol::{request::Request, response::Response};
 
@@ -58,16 +66,17 @@ impl HandlerSubmission {
 ///
 /// Standard Routes and MCP Routes are stored in a HashMap with the method and path as the key
 pub struct HelixRouter {
+    // TODO: Use Arc not RwLock
     /// Method+Path => Function
-    pub routes: HashMap<(String, String), HandlerFn>,
-    pub mcp_routes: HashMap<(String, String), MCPHandlerFn>,
+    pub routes: RwLock<HashMap<(Method, String), HandlerFn>>,
+    pub mcp_routes: HashMap<(Method, String), MCPHandlerFn>,
 }
 
 impl HelixRouter {
     /// Create a new router with a set of routes
     pub fn new(
-        routes: Option<HashMap<(String, String), HandlerFn>>,
-        mcp_routes: Option<HashMap<(String, String), MCPHandlerFn>>,
+        routes: Option<HashMap<(Method, String), HandlerFn>>,
+        mcp_routes: Option<HashMap<(Method, String), MCPHandlerFn>>,
     ) -> Self {
         let rts = match routes {
             Some(routes) => routes,
@@ -78,15 +87,17 @@ impl HelixRouter {
             None => HashMap::new(),
         };
         Self {
-            routes: rts,
+            routes: RwLock::new(rts),
             mcp_routes: mcp_rts,
         }
     }
 
     /// Add a route to the router
-    pub fn add_route(&mut self, method: &str, path: &str, handler: HandlerFn) {
+    pub async fn add_route(&mut self, method: Method, path: &str, handler: HandlerFn) {
         self.routes
-            .insert((method.to_uppercase(), path.to_string()), handler);
+            .write()
+            .await
+            .insert((method, path.to_string()), handler);
     }
 
     /// Handle a request by finding the appropriate handler and executing it
@@ -101,15 +112,22 @@ impl HelixRouter {
     ///
     /// * `Ok(())` if the request was handled successfully
     /// * `Err(RouterError)` if there was an error handling the request
-    pub fn handle(
+    pub async fn handle(
         &self,
         graph_access: Arc<HelixGraphEngine>,
         request: Request,
         response: &mut Response,
     ) -> Result<(), GraphError> {
-        let route_key = (request.method.clone(), request.path.clone());
+        let route_key = (request.method, request.path.clone());
 
-        if let Some(handler) = self.routes.get(&route_key) {
+        if route_key.0 == Method::PATCH {
+            let plugin = unsafe { Plugin::open(OsStr::from_bytes(&request.body)).unwrap() };
+            plugin.add_queries(self).await.unwrap();
+            println!("new routes: {:?}", self.routes.read().await.keys());
+            return Ok(());
+        }
+
+        if let Some(handler) = self.routes.read().await.get(&route_key) {
             let input = HandlerInput {
                 request,
                 graph: Arc::clone(&graph_access),

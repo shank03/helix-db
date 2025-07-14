@@ -2,6 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use super::connection::connection::ConnectionHandler;
 use super::router::router::{HandlerFn, HelixRouter};
+use crate::protocol::request::Method;
 use crate::{
     helix_engine::graph_core::graph_core::HelixGraphEngine, helix_gateway::mcp::mcp::MCPHandlerFn,
 };
@@ -21,8 +22,8 @@ impl HelixGateway {
         address: &str,
         graph: Arc<HelixGraphEngine>,
         size: usize,
-        routes: Option<HashMap<(String, String), HandlerFn>>,
-        mcp_routes: Option<HashMap<(String, String), MCPHandlerFn>>,
+        routes: Option<HashMap<(Method, String), HandlerFn>>,
+        mcp_routes: Option<HashMap<(Method, String), MCPHandlerFn>>,
     ) -> HelixGateway {
         let router = HelixRouter::new(routes, mcp_routes);
         let connection_handler = ConnectionHandler::new(address, graph, size, router).unwrap();

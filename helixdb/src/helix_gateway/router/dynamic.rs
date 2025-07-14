@@ -16,6 +16,8 @@ use crate::{
     protocol::response::Response,
 };
 
+use crate::protocol::request::Method;
+
 #[derive(Clone)]
 pub struct DynHandler {
     // holding this guarentees that the Symbol is still valid
@@ -43,13 +45,14 @@ impl Plugin {
         Ok(Plugin { lib: Arc::new(lib) })
     }
 
-    pub fn get_queries(&self) -> Result<HashMap<(String, String), HandlerFn>, Box<dyn Error>> {
+    pub fn get_queries(&self) -> Result<HashMap<(Method, String), HandlerFn>, Box<dyn Error>> {
         // SAFETY: If a valid file was opened it will have a get_queries function of this type
         let get_fn: Symbol<GetQueryFn> = unsafe { self.lib.get(b"get_queries")? };
 
+        println!("before get_fn call");
         let queries = get_fn();
 
-        let mut acc: HashMap<(String, String), HandlerFn> = HashMap::new();
+        let mut acc: HashMap<(Method, String), HandlerFn> = HashMap::new();
 
         for (n, func) in queries.into_iter() {
             let handler = DynHandler {
@@ -57,25 +60,17 @@ impl Plugin {
                 func,
             };
 
-            acc.insert(("post".to_string(), format!("/{n}")), Arc::new(handler));
+            acc.insert((Method::POST, format!("/{n}")), Arc::new(handler));
         }
         Ok(acc)
     }
 
-    pub fn add_queries(&self, router: &mut HelixRouter) -> Result<(), Box<dyn Error>> {
-        // SAFETY: If a valid file was opened it will have a get_queries function of this type
-        let get_fn: Symbol<GetQueryFn> = unsafe { self.lib.get(b"get_queries")? };
+    pub async fn add_queries(&self, router: &HelixRouter) -> Result<(), Box<dyn Error>> {
+        let queries = self.get_queries()?;
+        let mut guard = router.routes.write().await;
 
-        let queries = get_fn();
+        guard.extend(queries);
 
-        for (name, func) in queries {
-            let handler = DynHandler {
-                _source: self.lib.clone(),
-                func,
-            };
-            router.add_route("post", &format!("/{name}"), Arc::new(handler));
-        }
-
-        todo!()
+        Ok(())
     }
 }

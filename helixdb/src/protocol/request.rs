@@ -1,12 +1,33 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, BufReader, Result};
 
 #[derive(Debug)]
 pub struct Request {
-    pub method: String,
+    pub method: Method,
     pub headers: HashMap<String, String>,
     pub path: String,
     pub body: Vec<u8>,
+}
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
+pub enum Method {
+    POST,
+    PATCH,
+}
+
+impl FromStr for Method {
+    type Err = std::io::Error;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "POST" => Ok(Self::POST),
+            "PATCH" => Ok(Self::PATCH),
+            _ => Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Invalid header: {s}"),
+            )),
+        }
+    }
 }
 
 impl Request {
@@ -29,16 +50,32 @@ impl Request {
 
         // Get method and path
         let mut parts = first_line.trim().split_whitespace();
-        let method = parts.next()
-            .ok_or_else(|| std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                format!("Missing HTTP method: {}", first_line)
-            ))?.to_string();
-        let path = parts.next()
-            .ok_or_else(|| std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                format!("Missing path: {}", first_line)
-            ))?.to_string();
+        let method = parts
+            .next()
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("Missing HTTP method: {}", first_line),
+                )
+            })?
+            .to_string()
+            .parse()
+            .map_err(|e| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("Invalid HTTP method: {}", e),
+                )
+            })?;
+
+        let path = parts
+            .next()
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("Missing path: {}", first_line),
+                )
+            })?
+            .to_string();
 
         // Parse headers
         let mut headers = HashMap::new();
@@ -50,10 +87,7 @@ impl Request {
                 break;
             }
             if let Some((key, value)) = line.trim().split_once(':') {
-                headers.insert(
-                    key.trim().to_lowercase(),
-                    value.trim().to_string()
-                );
+                headers.insert(key.trim().to_lowercase(), value.trim().to_string());
             }
         }
 
@@ -64,21 +98,23 @@ impl Request {
                 let mut buffer = vec![0; length];
                 match tokio::time::timeout(
                     std::time::Duration::from_secs(5),
-                    reader.read_exact(&mut buffer)
-                ).await {
+                    reader.read_exact(&mut buffer),
+                )
+                .await
+                {
                     Ok(Ok(_)) => body = buffer,
                     Ok(Err(e)) => {
                         eprintln!("Error reading body: {}", e);
                         return Err(std::io::Error::new(
                             std::io::ErrorKind::Other,
-                            "Error reading body"
+                            "Error reading body",
                         ));
-                    },
+                    }
                     Err(_) => {
                         eprintln!("Timeout reading body");
                         return Err(std::io::Error::new(
                             std::io::ErrorKind::TimedOut,
-                            "Timeout reading body"
+                            "Timeout reading body",
                         ));
                     }
                 }
