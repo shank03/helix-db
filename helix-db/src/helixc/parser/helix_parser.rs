@@ -5,8 +5,8 @@ use super::{
 use crate::protocol::value::Value;
 use chrono::{DateTime, NaiveDate, Utc};
 use pest::{
-    iterators::{Pair, Pairs},
     Parser as PestParser,
+    iterators::{Pair, Pairs},
 };
 use pest_derive::Parser;
 use serde::{Deserialize, Serialize};
@@ -288,6 +288,7 @@ impl PartialEq<Value> for FieldType {
 #[derive(Debug, Clone)]
 pub struct Query {
     pub original_query: String,
+    pub is_mcp: bool,
     pub name: String,
     pub parameters: Vec<Parameter>,
     pub statements: Vec<Statement>,
@@ -1080,6 +1081,13 @@ impl HelixParser {
     fn parse_query_def(&self, pair: Pair<Rule>, filepath: String) -> Result<Query, ParserError> {
         let original_query = pair.clone().as_str().to_string();
         let mut pairs = pair.clone().into_inner();
+        let is_mcp = match pairs.peek() {
+            Some(pair) if pair.as_rule() == Rule::mcp_macro => {
+                pairs.next();
+                true
+            }
+            _ => false,
+        };
         let name = pairs.next().unwrap().as_str().to_string();
         let parameters = self.parse_parameters(pairs.next().unwrap())?;
         let nect = pairs.next().unwrap();
@@ -1087,6 +1095,7 @@ impl HelixParser {
         let return_values = self.parse_return_statement(pairs.next().unwrap())?;
 
         Ok(Query {
+            is_mcp,
             name,
             parameters,
             statements,
@@ -1314,7 +1323,7 @@ impl HelixParser {
                         "Unexpected rule in AddV: {:?} => {:?}",
                         p.as_rule(),
                         p,
-                    )))
+                    )));
                 }
             }
         }
@@ -1361,7 +1370,7 @@ impl HelixParser {
                                                 "Unexpected rule in AddV: {:?} => {:?}",
                                                 inner.as_rule(),
                                                 inner,
-                                            )))
+                                            )));
                                         }
                                     },
                                     None => {
@@ -1369,7 +1378,7 @@ impl HelixParser {
                                             "Unexpected rule in AddV: {:?} => {:?}",
                                             p.as_rule(),
                                             p,
-                                        )))
+                                        )));
                                     }
                                 },
                             }));
@@ -1379,7 +1388,7 @@ impl HelixParser {
                                 "Unexpected rule in AddV: {:?} => {:?}",
                                 vector_data.as_rule(),
                                 vector_data,
-                            )))
+                            )));
                         }
                     },
                     None => {
@@ -1387,7 +1396,7 @@ impl HelixParser {
                             "Unexpected rule in AddV: {:?} => {:?}",
                             p.as_rule(),
                             p,
-                        )))
+                        )));
                     }
                 },
                 Rule::create_field => {
@@ -1398,7 +1407,7 @@ impl HelixParser {
                         "Unexpected rule in AddV: {:?} => {:?}",
                         p.as_rule(),
                         p,
-                    )))
+                    )));
                 }
             }
         }
@@ -1445,7 +1454,7 @@ impl HelixParser {
                                                 "Unexpected rule in SearchV: {:?} => {:?}",
                                                 inner.as_rule(),
                                                 inner,
-                                            )))
+                                            )));
                                         }
                                     },
                                     None => {
@@ -1453,7 +1462,7 @@ impl HelixParser {
                                             "Unexpected rule in SearchV: {:?} => {:?}",
                                             p.as_rule(),
                                             p,
-                                        )))
+                                        )));
                                     }
                                 },
                             }));
@@ -1463,7 +1472,7 @@ impl HelixParser {
                                 "Unexpected rule in SearchV: {:?} => {:?}",
                                 vector_data.as_rule(),
                                 vector_data,
-                            )))
+                            )));
                         }
                     },
                     None => {
@@ -1471,7 +1480,7 @@ impl HelixParser {
                             "Unexpected rule in SearchV: {:?} => {:?}",
                             p.as_rule(),
                             p,
-                        )))
+                        )));
                     }
                 },
                 Rule::integer => {
@@ -1499,7 +1508,7 @@ impl HelixParser {
                         "Unexpected rule in SearchV: {:?} => {:?}",
                         p.as_rule(),
                         p,
-                    )))
+                    )));
                 }
             }
         }
@@ -1543,7 +1552,7 @@ impl HelixParser {
                         "Unexpected rule in AddV: {:?} => {:?}",
                         p.as_rule(),
                         p,
-                    )))
+                    )));
                 }
             }
         }
@@ -1633,7 +1642,7 @@ impl HelixParser {
                     return Err(ParserError::from(format!(
                         "Unexpected rule in AddE: {:?}",
                         p.as_rule()
-                    )))
+                    )));
                 }
             }
         }
@@ -2404,7 +2413,7 @@ impl HelixParser {
                     value_pair.as_rule(),
                     value_pair,
                     pair
-                )))
+                )));
             }
         };
 
@@ -2471,7 +2480,7 @@ impl HelixParser {
                     "Unexpected field value type: {:?} \n {:?}",
                     value_pair.as_rule(),
                     value_pair,
-                )))
+                )));
             }
         };
 

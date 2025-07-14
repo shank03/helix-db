@@ -195,6 +195,7 @@ pub struct SchemaProperty {
 }
 
 pub struct Query {
+    pub mcp_handler: Option<String>,
     pub name: String,
     pub statements: Vec<Statement>,
     pub parameters: Vec<Parameter>, // iterate through and print each one
@@ -231,6 +232,9 @@ impl Display for Query {
 
         write!(f, "#[handler]\n")?; // Handler macro
 
+        if let Some(mcp_handler) = &self.mcp_handler {
+            write!(f, "#[mcp_handler({})]\n", mcp_handler)?;
+        }
         // prints the function signature
         write!(f, "pub fn {} (input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {{\n", self.name)?;
 
@@ -287,6 +291,7 @@ impl Display for Query {
 impl Default for Query {
     fn default() -> Self {
         Self {
+            mcp_handler: None,
             name: "".to_string(),
             statements: vec![],
             parameters: vec![],
@@ -507,6 +512,16 @@ impl Display for ReturnValue {
 }
 
 impl ReturnValue {
+    pub fn get_name(&self) -> String {
+        match &self.return_type {
+            ReturnType::Literal(name) => name.to_string(),
+            ReturnType::NamedLiteral(name) => name.to_string(),
+            ReturnType::NamedExpr(name) => name.to_string(),
+            ReturnType::SingleExpr(name) => name.to_string(),
+            ReturnType::UnnamedExpr => todo!(),
+        }
+    }
+
     pub fn new_literal(name: GeneratedValue, value: GeneratedValue) -> Self {
         Self {
             value: ReturnValueExpr::Value(value.clone()),
