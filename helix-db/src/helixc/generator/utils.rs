@@ -317,7 +317,7 @@ pub fn write_headers() -> String {
 
 use heed3::RoTxn;
 use helix_macros::handler;
-use helixdb::{
+use helix_db::{
     helix_engine::{
         graph_core::ops::{
             bm25::search_bm25::SearchBM25Adapter,

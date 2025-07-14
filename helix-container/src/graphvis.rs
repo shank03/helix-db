@@ -1,5 +1,5 @@
 use helix_macros::get_handler;
-use helixdb::{
+use helix_db::{
     helix_engine::{
         storage_core::graph_visualization::GraphVisualization,
         types::GraphError,

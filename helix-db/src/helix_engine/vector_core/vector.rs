@@ -167,9 +167,9 @@ impl HVector {
 
 /// Filterable implementation for HVector
 /// 
-/// see helixdb/src/protocol/filterable.rs
+/// see helix_db/src/protocol/filterable.rs
 /// 
-/// NOTE: This could be moved to the protocol module with the node and edges in `helixdb/protocol/items.rs``
+/// NOTE: This could be moved to the protocol module with the node and edges in `helix_db/protocol/items.rs``
 impl Filterable for HVector {
     fn type_name(&self) -> FilterableType {
         FilterableType::Vector

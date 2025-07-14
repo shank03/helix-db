@@ -172,7 +172,7 @@ impl ReturnValue {
     /// Basic usage:
     ///
     /// ```rust
-    /// use helixdb::protocol::{ReturnValue, Remapping};
+    /// use helix_db::protocol::{ReturnValue, Remapping};
     /// use std::collections::HashMap;
     ///
     /// let remappings = HashMap::new();

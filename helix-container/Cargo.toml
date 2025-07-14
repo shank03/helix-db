@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-helixdb = "1.0.111"
+helix-db = "1.0.111"
 helix-macros = "0.1.1"
 
 inventory = "0.3.16"
@@ -27,6 +27,5 @@ codegen-units = 1
 panic = "abort"
 
 [features]
-dev = ["helixdb/dev"]
-default = ["helixdb/default"]
-
+dev = ["helix-db/dev"]
+default = ["helix-db/default"]

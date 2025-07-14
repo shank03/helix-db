@@ -16,7 +16,7 @@ impl Request {
     ///
     /// ```rust
     /// use std::io::Cursor;
-    /// use helixdb::protocol::request::Request;
+    /// use helix_db::protocol::request::Request;
     ///
     /// let request = Request::from_stream(Cursor::new("GET /test HTTP/1.1\r\n\r\n")).unwrap();
     /// assert_eq!(request.method, "GET");

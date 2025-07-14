@@ -1,12 +1,12 @@
 use chrono::{DateTime, Utc};
 use get_routes::handler;
 use heed3::RoTxn;
-use helixdb::helix_engine::vector_core::vector::HVector;
-use helixdb::{
+use helix_db::helix_engine::vector_core::vector::HVector;
+use helix_db::{
     embed, exclude_field, field_remapping, identifier_remapping, traversal_remapping,
     value_remapping,
 };
-use helixdb::{
+use helix_db::{
     helix_engine::graph_core::ops::{
         bm25::search_bm25::SearchBM25Adapter,
         g::G,

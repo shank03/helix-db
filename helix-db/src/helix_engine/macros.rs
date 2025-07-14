@@ -6,8 +6,8 @@ pub mod macros {
     ///
     /// ## Example Use
     /// ```rust
-    /// use helixdb::optional_props;
-    /// use helixdb::protocol::value::Value;
+    /// use helix_db::optional_props;
+    /// use helix_db::protocol::value::Value;
     ///
     /// let properties: Vec<(String, Value)> = optional_props! {
     ///     "name" => Some("Will"),
@@ -45,8 +45,8 @@ pub mod macros {
     ///
     /// ## Example Use
     /// ```rust
-    /// use helixdb::props;
-    /// use helixdb::protocol::value::Value;
+    /// use helix_db::props;
+    /// use helix_db::protocol::value::Value;
     ///
     /// let properties: Vec<(String, Value)> = props! {
     ///     "name" => "Will",
@@ -74,10 +74,10 @@ pub mod macros {
     /// ## Example Use
     ///
     /// ```rust
-    /// use helixdb::node_matches;
-    /// use helixdb::protocol::value::Value;
-    /// use helixdb::protocol::items::Node;
-    /// use helixdb::protocol::filterable::Filterable;
+    /// use helix_db::node_matches;
+    /// use helix_db::protocol::value::Value;
+    /// use helix_db::protocol::items::Node;
+    /// use helix_db::protocol::filterable::Filterable;
     /// let pred = node_matches!("name", "Will");
     ///
     /// let node = Node::new("person", vec![
@@ -90,17 +90,17 @@ pub mod macros {
     /// ```
     macro_rules! node_matches {
         ($key:expr, $value:expr) => {
-            |node: &helixdb::protocol::items::Node| {
+            |node: &helix_db::protocol::items::Node| {
                 if let Some(val) = node.check_property($key) {
-                    if let helixdb::protocol::value::Value::String(val) = &val {
+                    if let helix_db::protocol::value::Value::String(val) = &val {
                         Ok(*val == $value)
                     } else {
-                        Err(helixdb::helix_engine::types::GraphError::from(
+                        Err(helix_db::helix_engine::types::GraphError::from(
                             "Invalid node".to_string(),
                         ))
                     }
                 } else {
-                    Err(helixdb::helix_engine::types::GraphError::from(
+                    Err(helix_db::helix_engine::types::GraphError::from(
                         "Invalid node".to_string(),
                     ))
                 }
@@ -111,17 +111,17 @@ pub mod macros {
     #[macro_export]
     macro_rules! edge_matches {
         ($key:expr, $value:expr) => {
-            |edge: &helixdb::protocol::items::Edge| {
+            |edge: &helix_db::protocol::items::Edge| {
                 if let Some(val) = edge.check_property($key) {
-                    if let helixdb::protocol::value::Value::String(val) = &val {
+                    if let helix_db::protocol::value::Value::String(val) = &val {
                         Ok(*val == $value)
                     } else {
-                        Err(helixdb::helix_engine::types::GraphError::from(
+                        Err(helix_db::helix_engine::types::GraphError::from(
                             "Invalid edge".to_string(),
                         ))
                     }
                 } else {
-                    Err(helixdb::helix_engine::types::GraphError::from(
+                    Err(helix_db::helix_engine::types::GraphError::from(
                         "Invalid edge".to_string(),
                     ))
                 }
