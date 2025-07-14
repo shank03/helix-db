@@ -1838,15 +1838,24 @@ dependencies = [
  "chrono",
  "dirs 5.0.1",
  "heed3",
+ "helix_proc_macros",
  "helixdb",
  "inventory",
- "proc_macros",
  "rand 0.9.1",
  "serde",
  "serde_json",
  "sonic-rs",
  "tokio",
  "uuid",
+]
+
+[[package]]
+name = "helix_proc_macros"
+version = "0.1.1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -1857,6 +1866,7 @@ dependencies = [
  "chrono",
  "flume",
  "heed3",
+ "helix_proc_macros",
  "inventory",
  "itertools 0.14.0",
  "kdam",
@@ -1864,7 +1874,6 @@ dependencies = [
  "pest",
  "pest_derive",
  "polars",
- "proc_macros",
  "rand 0.9.1",
  "reqwest",
  "serde",
@@ -3716,15 +3725,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "02b3e5e68a3a1a02aad3ec490a98007cbc13c37cbe84a3cd7b8e406d76e7f778"
 dependencies = [
  "unicode-ident",
-]
-
-[[package]]
-name = "proc_macros"
-version = "0.1.1"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.104",
 ]
 
 [[package]]

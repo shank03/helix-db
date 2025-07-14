@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-helixdb = { path = "../helixdb" }
-proc_macros = { path = "../proc_macros" }
+helixdb = { version = "1.0.111", path = "../helixdb" }
+helix_proc_macros = { version = "0.1.1", path = "../helix_proc_macros" }
 inventory = "0.3.16"
 rand = "0.9.1"
 dirs = "5.0.1"
