@@ -28,7 +28,7 @@ use tokio_tungstenite::{
 };
 use toml::Value;
 
-pub const DB_DIR: &str = "helix-db-cfg/";
+pub const DB_DIR: &str = "helixdb-cfg/";
 
 pub const DEFAULT_SCHEMA: &str = r#"// Start building your schema here.
 //
