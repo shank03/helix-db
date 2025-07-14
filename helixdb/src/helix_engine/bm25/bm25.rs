@@ -33,7 +33,7 @@ pub struct PostingListEntry {
 }
 
 pub trait BM25 {
-    fn tokenize<const SHOULD_FILTER: bool>(&self, text: &str) -> Vec<Cow<'_, str>>;
+    fn tokenize<const SHOULD_FILTER: bool>(&self, text: &str) -> Vec<String>;
 
     fn insert_doc(&self, txn: &mut RwTxn, doc_id: u128, doc: &str) -> Result<(), GraphError>;
 
@@ -110,12 +110,10 @@ impl HBM25Config {
 
 impl BM25 for HBM25Config {
     /// Converts text to lowercase, removes non-alphanumeric chars, splits into words
-    fn tokenize<const SHOULD_FILTER: bool>(&self, text: &str) -> Vec<Cow<'_, str>> {
+    fn tokenize<const SHOULD_FILTER: bool>(&self, text: &str) -> Vec<String> {
         text.to_lowercase()
-            .replace(|c: char| !c.is_alphanumeric(), " ")
-            .split_whitespace()
-            .filter(|s| !SHOULD_FILTER || s.len() > 2)
-            .map(|s| Cow::Owned(s.to_string()))
+            .split(|c: char| !c.is_alphanumeric())
+            .filter_map(|s| (!SHOULD_FILTER || s.len() > 2).then_some(s.to_string()))
             .collect()
     }
 
@@ -125,7 +123,7 @@ impl BM25 for HBM25Config {
         let tokens = self.tokenize::<true>(doc);
         let doc_length = tokens.len() as u32;
 
-        let mut term_counts: HashMap<Cow<'_, str>, u32> = HashMap::new();
+        let mut term_counts: HashMap<String, u32> = HashMap::new();
         for token in tokens {
             *term_counts.entry(token).or_insert(0) += 1;
         }
@@ -416,4 +414,3 @@ impl BM25Flatten for HashMap<String, Value> {
         s
     }
 }
-

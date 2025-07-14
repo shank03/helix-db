@@ -462,33 +462,36 @@ pub fn parse_credentials(creds: &String) -> Option<&str> {
 pub async fn check_helix_version() {
     match check_helix_installation() {
         Ok(_) => {}
-        Err(_) => {
-            println!(
-                "{}",
-                "Helix is not installed. Please run `helix install` first."
-                .red()
-                .bold()
-            );
-            return;
-        }
-    };
+        Err(_) => return,
+    }
 
     let repo_path = {
         let home_dir = match dirs::home_dir() {
             Some(dir) => dir,
-            None => {
-                println!("{}", "Could not determine home directory".red().bold());
-                return;
-            }
+            None => return,
         };
         home_dir.join(".helix/repo/helix-db/helixdb")
     };
 
-    let local_cli_version =
-        Version::parse(&format!("v{}", env!("CARGO_PKG_VERSION"))).unwrap();
-    let local_db_version =
-        Version::parse(&format!("v{}", get_crate_version(&repo_path).unwrap())).unwrap();
-    let remote_helix_version = get_remote_helix_version().await.unwrap();
+    let local_cli_version = match Version::parse(&format!("v{}", env!("CARGO_PKG_VERSION"))) {
+        Ok(value) => value,
+        Err(_) => return,
+    };
+
+    let crate_version = match get_crate_version(&repo_path) {
+        Ok(value) => value,
+        Err(_) => return,
+    };
+
+    let local_db_version = match Version::parse(&format!("v{}", crate_version)) {
+        Ok(value) => value,
+        Err(_) => return,
+    };
+
+    let remote_helix_version = match get_remote_helix_version().await {
+        Ok(value) => value,
+        Err(_) => return,
+    };
 
     if local_db_version < remote_helix_version || local_cli_version < remote_helix_version {
         println!("{} {} {} {}",
