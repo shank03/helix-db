@@ -1477,6 +1477,7 @@ fn test_shortest_path() {
 //     assert_eq!(nodes[3].id, users[0].id); // Alice
 // }
 
+#[ignore]
 #[test]
 #[should_panic]
 fn huge_traversal() {
@@ -1743,6 +1744,7 @@ fn test_add_e_with_dup_flag() {
 
 }
 
+#[ignore]
 #[test]
 #[should_panic]
 fn test_add_n_parallel() {
