@@ -28,7 +28,7 @@ use tokio_tungstenite::{
 };
 use toml::Value;
 
-pub const DB_DIR: &str = "helix_db-cfg/";
+pub const DB_DIR: &str = "helixdb-cfg/";
 
 pub const DEFAULT_SCHEMA: &str = r#"// Start building your schema here.
 //
@@ -349,7 +349,9 @@ pub fn get_crate_version<P: AsRef<Path>>(path: P) -> Result<Version, String> {
 }
 
 pub async fn get_remote_helix_version() -> Result<Version, Box<dyn Error>> {
-    let client = Client::new();
+    let client = Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()?;
 
     let url = "https://api.github.com/repos/HelixDB/helix-db/releases/latest";
 
@@ -460,15 +462,11 @@ pub fn parse_credentials(creds: &String) -> Option<&str> {
 }
 
 pub async fn check_helix_version() {
+    // Skip version check if helix is not installed to avoid unnecessary errors
     match check_helix_installation() {
         Ok(_) => {}
         Err(_) => {
-            println!(
-                "{}",
-                "Helix is not installed. Please run `helix install` first."
-                .red()
-                .bold()
-            );
+            // Don't print error message here - let individual commands handle this
             return;
         }
     };
@@ -477,18 +475,38 @@ pub async fn check_helix_version() {
         let home_dir = match dirs::home_dir() {
             Some(dir) => dir,
             None => {
-                println!("{}", "Could not determine home directory".red().bold());
+                // Silently fail - don't interrupt user workflow
                 return;
             }
         };
-        home_dir.join(".helix/repo/helix-db/helix_db")
+        home_dir.join(".helix/repo/helix-db/helix-db")
     };
 
-    let local_cli_version =
-        Version::parse(&format!("v{}", env!("CARGO_PKG_VERSION"))).unwrap();
-    let local_db_version =
-        Version::parse(&format!("v{}", get_crate_version(&repo_path).unwrap())).unwrap();
-    let remote_helix_version = get_remote_helix_version().await.unwrap();
+    let local_cli_version = match Version::parse(&format!("v{}", env!("CARGO_PKG_VERSION"))) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+    
+    let local_db_version = match get_crate_version(&repo_path) {
+        Ok(version_str) => match Version::parse(&format!("v{}", version_str)) {
+            Ok(v) => v,
+            Err(_) => return,
+        },
+        Err(_) => return,
+    };
+    
+    let remote_helix_version = match get_remote_helix_version().await {
+        Ok(v) => v,
+        Err(_) => {
+            // Silently fail on network errors - don't interrupt user workflow
+            return;
+        }
+    };
+    
+    println!(
+        "helix-cli version: {}, helix-db version: {}, remote helix version: {}",
+        local_cli_version, local_db_version, remote_helix_version
+    );
 
     if local_db_version < remote_helix_version || local_cli_version < remote_helix_version {
         println!("{} {} {} {}",

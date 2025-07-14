@@ -1,6 +1,6 @@
 [package]
 name = "helix-cli"
-version = "1.0.112"
+version = "1.0.114"
 edition = "2024"
 
 [dependencies]

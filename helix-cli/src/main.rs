@@ -24,7 +24,7 @@ mod utils;
 async fn main() {
     let args = HelixCLI::parse();
 
-    check_helix_version().await;
+        check_helix_version().await;
 
     match args.command {
         CommandType::Demo => {
@@ -440,7 +440,7 @@ fi
                         return;
                     }
                 };
-                home_dir.join(".helix/repo/helix-db/helix_db")
+                home_dir.join(".helix/repo/helix-db/helix-db")
             };
 
             if !check_cargo_version() {
@@ -521,39 +521,41 @@ fi
         }
 
         CommandType::Version(_) => {
+            let local_cli_version = Version::parse(&format!("v{}", env!("CARGO_PKG_VERSION"))).unwrap();
+            
             match check_helix_installation() {
-                Ok(_) => {}
-                Err(_) => {
-                    println!(
-                        "{}",
-                        "Helix is not installed. Please run `helix install` first."
-                            .red()
-                            .bold()
-                    );
-                    return;
-                }
-            };
+                Ok(_) => {
+                    let repo_path = {
+                        let home_dir = match dirs::home_dir() {
+                            Some(dir) => dir,
+                            None => {
+                                println!("helix-cli version: {}", local_cli_version);
+                                println!("helix-db: not installed (could not determine home directory)");
+                                return;
+                            }
+                        };
+                        home_dir.join(".helix/repo/helix-db/helix-db")
+                    };
 
-            let repo_path = {
-                let home_dir = match dirs::home_dir() {
-                    Some(dir) => dir,
-                    None => {
-                        println!("{}", "Could not determine home directory".red().bold());
-                        return;
+                    match get_crate_version(repo_path) {
+                        Ok(db_version) => {
+                            let local_db_version = Version::parse(&format!("v{}", db_version)).unwrap();
+                            println!(
+                                "helix-cli version: {}, helix-db version: {}",
+                                local_cli_version, local_db_version
+                            );
+                        }
+                        Err(_) => {
+                            println!("helix-cli version: {}", local_cli_version);
+                            println!("helix-db: installed but version could not be determined");
+                        }
                     }
-                };
-                home_dir.join(".helix/repo/helix-db/helix_db")
-            };
-
-            let local_cli_version =
-                Version::parse(&format!("v{}", env!("CARGO_PKG_VERSION"))).unwrap();
-            let local_db_version =
-                Version::parse(&format!("v{}", get_crate_version(repo_path).unwrap())).unwrap();
-
-            println!(
-                "{} {}, {} {}",
-                "helix-cli version:", local_cli_version, "helix-db version:", local_db_version
-            );
+                }
+                Err(_) => {
+                    println!("helix-cli version: {}", local_cli_version);
+                    println!("helix-db: not installed (run 'helix install' to install)");
+                }
+            }
         }
 
         CommandType::Redeploy(command) => {
