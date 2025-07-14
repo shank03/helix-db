@@ -534,7 +534,7 @@ fi
                                 return;
                             }
                         };
-                        home_dir.join(".helix/repo/helix-db/helix_db")
+                        home_dir.join(".helix/repo/helix-db/helix-db")
                     };
 
                     match get_crate_version(repo_path) {
