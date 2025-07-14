@@ -4,7 +4,7 @@ version = "1.0.111"
 edition = "2024"
 
 [dependencies]
-helix-db = "1.0.111"
+helixdb = "1.0.111"
 clap = { version = "4.5.40", features = ["derive"] }
 tempfile = "3.19.1"
 dirs = "6.0.0"
@@ -35,6 +35,6 @@ name = "helix"
 path = "src/main.rs"
 
 [features]
-normal = ["helix-db/server"]
-ingestion = ["helix-db/full"]
+normal = ["helixdb/server"]
+ingestion = ["helixdb/full"]
 default = ["normal"]

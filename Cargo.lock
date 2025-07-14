@@ -1812,7 +1812,7 @@ dependencies = [
  "clap",
  "dirs 6.0.0",
  "futures-util",
- "helixdb 1.0.111 (registry+https://github.com/rust-lang/crates.io-index)",
+ "helixdb",
  "indicatif",
  "libc",
  "open",
@@ -1838,8 +1838,8 @@ dependencies = [
  "chrono",
  "dirs 5.0.1",
  "heed3",
- "helix_proc_macros 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "helixdb 1.0.111 (registry+https://github.com/rust-lang/crates.io-index)",
+ "helix_proc_macros",
+ "helixdb",
  "inventory",
  "rand 0.9.1",
  "serde",
@@ -1850,7 +1850,35 @@ dependencies = [
 ]
 
 [[package]]
-name = "helix_proc_macros"
+name = "helix-db"
+version = "1.0.111"
+dependencies = [
+ "bincode",
+ "chrono",
+ "flume",
+ "heed3",
+ "helix_proc_macros",
+ "inventory",
+ "itertools 0.14.0",
+ "kdam",
+ "lazy_static",
+ "pest",
+ "pest_derive",
+ "polars",
+ "rand 0.9.1",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sonic-rs",
+ "tempfile",
+ "tokio",
+ "twox-hash",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "helix-proc-macros"
 version = "0.1.1"
 dependencies = [
  "proc-macro2",
@@ -1872,34 +1900,6 @@ dependencies = [
 [[package]]
 name = "helixdb"
 version = "1.0.111"
-dependencies = [
- "bincode",
- "chrono",
- "flume",
- "heed3",
- "helix_proc_macros 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "inventory",
- "itertools 0.14.0",
- "kdam",
- "lazy_static",
- "pest",
- "pest_derive",
- "polars",
- "rand 0.9.1",
- "reqwest",
- "serde",
- "serde_json",
- "sonic-rs",
- "tempfile",
- "tokio",
- "twox-hash",
- "url",
- "uuid",
-]
-
-[[package]]
-name = "helixdb"
-version = "1.0.111"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c91167c6827e52f389e0e3a1a87fb6fda0665bc53376c6e4153f0a20bf388cc"
 dependencies = [
@@ -1907,7 +1907,7 @@ dependencies = [
  "chrono",
  "flume",
  "heed3",
- "helix_proc_macros 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "helix_proc_macros",
  "inventory",
  "itertools 0.14.0",
  "pest",

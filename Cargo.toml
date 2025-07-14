@@ -2,7 +2,7 @@
 members = [
     "helix-db",
     "helix-container",
-    "helix_proc_macros",
+    "helix-proc-macros",
     "helix-cli",
     "hbuild_redeploy",
     "hql-tests"
