@@ -64,36 +64,36 @@ pub enum CommandType {
 #[derive(Debug, Args)]
 #[clap(name = "deploy", about = "Deploy a Helix project")]
 pub struct DeployCommand {
-    #[clap(help = "Redeploy a remote instance of HelixDB")]
+    #[clap(short, long, help = "Redeploy a remote instance of HelixDB")]
     pub remote: bool,
 
-    #[clap(help = "The path to the project")]
+    #[clap(short, long, help = "The path to the project")]
     pub path: Option<String>,
 
-    #[clap(help = "Instance id if restarting a running instance")]
+    #[clap(short, long, help = "Instance id if restarting a running instance")]
     pub instance: Option<String>,
 
-    #[clap(help = "Port to run the instance on")]
+    #[clap(long, help = "Port to run the instance on")]
     pub port: Option<u16>,
 }
 
 #[derive(Debug, Args)]
 #[clap(name = "compile", about = "Compile a Helix project")]
 pub struct CompileCommand {
-    #[clap(help = "The path to the project")]
+    #[clap(short, long, help = "The path to the project")]
     pub path: Option<String>,
 
-    #[clap(help = "The output path")]
+    #[clap(short, long, help = "The output path")]
     pub output: Option<String>,
 
-    #[clap(help = "The target language")]
+    #[clap(short, long, help = "The target language")]
     pub r#gen: Option<OutputLanguage>,
 }
 
 #[derive(Debug, Args)]
 #[clap(name = "check", about = "Lint a Helix project")]
 pub struct CheckCommand {
-    #[clap(help = "The path to the project")]
+    #[clap(short, long, help = "The path to the project")]
     pub path: Option<String>,
 }
 
@@ -114,7 +114,7 @@ pub struct InitCommand {
 #[derive(Debug, Args)]
 #[clap(name = "stop", about = "Stop Helix instances")]
 pub struct StopCommand {
-    #[clap(help = "Stop all running instances")]
+    #[clap(short, long, help = "Stop all running instances")]
     pub all: bool,
 
     #[clap(help = "Instance ID to stop")]
@@ -127,7 +127,7 @@ pub struct SaveCommand {
     #[clap(help = "Instance ID to save")]
     pub instance: String,
 
-    #[clap(help = "Where to save the file to")]
+    #[clap(short, long, help = "Where to save the file to")]
     pub output: Option<String>,
 }
 
@@ -143,8 +143,5 @@ pub struct DeleteCommand {
 pub struct VisualizeCommand {
     #[clap(help = "Id of instance to visualize")]
     pub instance: String,
-
-    #[clap(help = "Give nodes a label based on a property")]
-    pub node_prop: Option<String>,
 }
 

@@ -133,7 +133,7 @@ async fn main() {
                 };
 
                 if command.instance.is_some() &&
-                    (command.path.is_some() || !Path::new(&format!("./{}", DB_DIR)).is_dir())
+                    (command.path.is_some() || Path::new(&format!("./{}", DB_DIR)).is_dir())
                 {
                     match redeploy_helix(command.instance.unwrap(), code) {
                         Ok(_) => {}
@@ -144,7 +144,7 @@ async fn main() {
 
                 // -- helix deploy --
                 if command.instance.is_none() &&
-                    (command.path.is_some() || !Path::new(&format!("./{}", DB_DIR)).is_dir())
+                    (command.path.is_some() || Path::new(&format!("./{}", DB_DIR)).is_dir())
                 {
                     match deploy_helix(port, code, None) {
                         Ok(_) => {}
@@ -346,9 +346,10 @@ async fn main() {
             let file_path = PathBuf::from(&output).join("queries.rs");
             let mut generated_rust_code = String::new();
             match write!(&mut generated_rust_code, "{}", analyzed_source) {
-                Ok(_) => {
-                    println!("{}", "Successfully transpiled queries".green().bold());
-                }
+                Ok(_) => sp.stop_with_message(format!(
+                        "{}",
+                        "Successfully transpiled queries".green().bold()
+                )),
                 Err(e) => {
                     println!("{}", "Failed to transpile queries".red().bold());
                     println!("└── {} {}", "Error:".red().bold(), e);
@@ -357,13 +358,11 @@ async fn main() {
             }
 
             match fs::write(file_path, generated_rust_code) {
-                Ok(_) => {
-                    println!(
-                        "{} {}",
-                        "Successfully compiled queries to".green().bold(),
-                        output
-                    );
-                }
+                Ok(_) => println!(
+                    "{} {}",
+                    "Successfully compiled queries to".green().bold(),
+                    output
+                ),
                 Err(e) => {
                     println!("{} {}", "Failed to write queries file".red().bold(), e);
                     println!("└── {} {}", "Error:".red().bold(), e);
