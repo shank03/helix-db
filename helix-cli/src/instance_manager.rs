@@ -12,13 +12,13 @@ use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct InstanceInfo {
+    pub short_id: u16,
     pub id: String,
     pub pid: u32,
     pub port: u16,
     pub started_at: String,
     pub available_endpoints: Vec<String>,
     pub binary_path: PathBuf,
-    pub label: String,
     pub running: bool,
 }
 
@@ -43,6 +43,15 @@ impl InstanceManager {
             cache_dir,
             logs_dir,
         })
+    }
+
+    fn id_from_short_id(&self, n: u16) -> Result<InstanceInfo, String> {
+        let instances = self.list_instances()
+            .map_err(|e| e.to_string())?;
+
+        instances.into_iter()
+            .find(|i| i.short_id == n)
+            .ok_or_else(|| "No instance found".to_string())
     }
 
     pub fn init_start_instance(
@@ -87,13 +96,13 @@ impl InstanceManager {
         let child = command.spawn()?;
 
         let instance = InstanceInfo {
+            short_id: (self.list_instances()?.len() + 1) as u16,
             id: instance_id,
             pid: child.id(),
             port,
             started_at: chrono::Local::now().to_rfc3339(),
             available_endpoints: endpoints,
             binary_path: cached_binary,
-            label: "".to_string(),
             running: true,
         };
 
@@ -104,8 +113,17 @@ impl InstanceManager {
         Ok(instance)
     }
 
+    /// instance_id can either be u16 or uuid here (same for the others)
     pub fn start_instance(&self, instance_id: &str, endpoints: Option<Vec<String>>) -> Result<InstanceInfo, String> {
-        let mut instance = match self.get_instance(instance_id) {
+        let instance_id = match instance_id.parse() {
+            Ok(n) => match self.id_from_short_id(n) {
+                Ok(n) => n.id,
+                Err(_) => return Err(format!("No instance found with id {}", &instance_id)),
+            },
+            Err(_) => instance_id.to_string(),
+        };
+
+        let mut instance = match self.get_instance(&instance_id) {
             Ok(instance) => {
                 match instance {
                     Some(val) => val,
@@ -120,7 +138,7 @@ impl InstanceManager {
                         instance_id, instance.binary_path));
         }
 
-        let data_dir = self.cache_dir.join("data").join(instance_id);
+        let data_dir = self.cache_dir.join("data").join(&instance_id);
         if !data_dir.exists() {
             fs::create_dir_all(&data_dir).map_err(|e| {
                 format!("Failed to create data directory for {}: {}", instance_id, e)
@@ -170,6 +188,18 @@ impl InstanceManager {
     }
 
     pub fn get_instance(&self, instance_id: &str) -> io::Result<Option<InstanceInfo>> {
+        let instance_id = match instance_id.parse() {
+            Ok(n) => match self.id_from_short_id(n) {
+                Ok(n) => n.id,
+                Err(_) => return Err(
+                    io::Error::new(
+                        io::ErrorKind::Other,
+                        format!("No instance found with id {}", instance_id),
+                    )),
+            },
+            Err(_) => instance_id.to_string(),
+        };
+
         let instances = self.list_instances()?;
         Ok(instances.into_iter().find(|i| i.id == instance_id))
     }
@@ -192,6 +222,14 @@ impl InstanceManager {
     }
 
     pub fn stop_instance(&self, instance_id: &str) -> Result<bool, String> {
+        let instance_id = match instance_id.parse() {
+            Ok(n) => match self.id_from_short_id(n) {
+                Ok(n) => n.id,
+                Err(_) => return Err(format!("No instance found with id {}", &instance_id)),
+            },
+            Err(_) => instance_id.to_string(),
+        };
+
         let mut instances = match self.list_instances() {
             Ok(val) => val,
             Err(e) => return Err(format!("Error occured stopping instnace! {}", e)),
@@ -270,20 +308,15 @@ impl InstanceManager {
         self.save_instances(&instances)
     }
 
-    pub fn set_label(&self, instance_id: &str, label: &str) -> Result<bool, String> {
-        let mut instances = match self.list_instances() {
-            Ok(val) => val,
-            Err(e) => return Err(format!("Error occured stopping instnace! {}", e)),
-        };
-        if let Some(pos) = instances.iter().position(|i| i.id == instance_id) {
-            instances[pos].label = label.to_string();
-            self.save_instances(&instances)?;
-            return Ok(true);
-        }
-        Ok(false)
-    }
-
     pub fn delete_instance(&self, instance_id: &str) -> Result<bool, String> {
+        let instance_id = match instance_id.parse() {
+            Ok(n) => match self.id_from_short_id(n) {
+                Ok(n) => n.id,
+                Err(_) => return Err(format!("No instance found with id {}", &instance_id)),
+            },
+            Err(_) => instance_id.to_string(),
+        };
+
         let mut instances = match self.list_instances() {
             Ok(val) => val,
             Err(e) => return Err(format!("Error occured stopping instnace! {}", e)),

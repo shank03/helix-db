@@ -128,7 +128,20 @@ pub fn check_helix_installation() -> Option<PathBuf> {
 pub fn print_instance(instance: &InstanceInfo) {
     let rg: bool = instance.running;
     println!(
-        "{} {}{}",
+        "{} {} {}{}",
+        if rg {
+            format!("{}{}{}",
+                "(".green().bold(),
+                instance.short_id.to_string().green().bold(),
+                ")".green().bold(),
+            )
+        } else {
+            format!("{}{}{}",
+                "(".yellow().bold(),
+                instance.short_id.to_string().green().bold(),
+                ")".yellow().bold(),
+            )
+        },
         if rg {
             "Instance ID:".green().bold()
         } else {
@@ -146,7 +159,7 @@ pub fn print_instance(instance: &InstanceInfo) {
         },
     );
 
-    println!("└── Label: {}", instance.label.underline());
+    println!("└── Short ID: {}", instance.short_id.to_string().underline());
     println!("└── Port: {}", instance.port);
     println!("└── Available endpoints:");
 
