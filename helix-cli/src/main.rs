@@ -742,16 +742,16 @@ async fn main() {
         }
 
         CommandType::Version => {
-            let local_cli_version = Version::parse(&format!("v{}", env!("CARGO_PKG_VERSION"))).unwrap();
-
             match check_helix_installation() {
                 Some(_) => {
                     let repo_path = {
                         let home_dir = match dirs::home_dir() {
                             Some(dir) => dir,
                             None => {
-                                println!("helix-cli version: {}", local_cli_version);
-                                println!("helix-db: not installed (could not determine home directory)");
+                                println!("{}",
+                                    "helix-db: not installed (could not determine home directory)"
+                                    .red().bold()
+                                );
                                 return;
                             }
                         };
@@ -759,8 +759,8 @@ async fn main() {
                     };
 
                     match get_crate_version(repo_path) {
-                        Ok(db_version) => {
-                            let local_db_version = match get_cli_version() {
+                        Ok(local_db_version) => {
+                            let local_cli_version = match get_cli_version() {
                                 Ok(val) => val,
                                 Err(e) => {
                                     println!("{} {}",
@@ -775,16 +775,10 @@ async fn main() {
                                 local_cli_version, local_db_version
                             );
                         }
-                        Err(_) => {
-                            println!("helix-cli version: {}", local_cli_version);
-                            println!("helix-db: installed but version could not be determined");
-                        }
+                        Err(_) => println!("helix-db: installed but version could not be determined"),
                     }
                 }
-                None => {
-                    println!("helix-cli version: {}", local_cli_version);
-                    println!("helix-db: not installed (run 'helix install' to install)");
-                }
+                None => println!("helix-db: not installed (run 'helix install' to install)"),
             }
         }
 

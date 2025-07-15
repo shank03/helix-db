@@ -757,7 +757,6 @@ mod tests {
         assert_eq!(tokens.len(), 0);
     }
 
-    /*
     #[test]
     fn test_hybrid_search() {
         let (storage, _temp_dir) = setup_helix_storage();
@@ -783,16 +782,12 @@ mod tests {
         // The result might be an error if vector search is not properly initialized
         // but the function should at least not panic
         match result {
-            Ok(results) => {
-                assert!(results.len() <= limit);
-            }
-            Err(_) => {
-                // Vector search might not be initialized, which is acceptable for this test
-                println!("Vector search not available, which is expected in this test environment");
-            }
+            Ok(results) => assert!(results.len() <= limit),
+            Err(_) => println!("Vector search not available, which is expected in this test environment"),
         }
     }
 
+    /*
     #[test]
     fn test_hybrid_search_alpha_weighting() {
         let (storage, _temp_dir) = setup_helix_storage();

@@ -9,7 +9,7 @@ use crate::{
 
 use heed3::{types::*, Database, Env, RoTxn, RwTxn};
 use serde::{Deserialize, Serialize};
-use std::{borrow::Cow, collections::HashMap};
+use std::{collections::HashMap, thread};
 
 const DB_BM25_INVERTED_INDEX: &str = "bm25_inverted_index"; // term -> list of (doc_id, tf)
 const DB_BM25_DOC_LENGTHS: &str = "bm25_doc_lengths"; // doc_id -> document length
@@ -341,10 +341,10 @@ impl BM25 for HBM25Config {
     }
 }
 
+/*
 pub trait HybridSearch {
     fn hybrid_search(
         &self,
-        txn: &RoTxn,
         query: &str,
         query_vector: &[f64],
         vector_query: Option<&[f32]>,
@@ -356,6 +356,68 @@ pub trait HybridSearch {
 impl HybridSearch for HelixGraphStorage {
     fn hybrid_search(
         &self,
+        query: &str,
+        query_vector: &[f64],
+        vector_query: Option<&[f32]>,
+        alpha: f32,
+        limit: usize,
+    ) -> Result<Vec<(u128, f32)>, GraphError> {
+        let mut combined_scores: HashMap<u128, f32> = HashMap::new();
+
+        let bm25_handle = {
+            thread::spawn(move || -> Result<Vec<(u128, f32)>, GraphError> {
+                let txn = self.graph_env.read_txn()?;
+                match self.bm25.as_ref() {
+                    Some(s) => s.search(&txn, query, limit * 2),
+                    None => Err(GraphError::from("BM25 not enabled!")),
+                }
+            })
+        };
+
+        let vector_handle = {
+            thread::spawn(move || -> Result<Option<Vec<HVector>>, GraphError> {
+                let txn = self.graph_env.read_txn()?;
+                let results = self.vectors.search::<fn(&HVector, &RoTxn) -> bool>(
+                    &txn,
+                    &query_vector,
+                    limit * 2,
+                    None,
+                    false,
+                )?;
+                Ok(Some(results))
+            })
+        };
+
+        let bm25_results = bm25_handle.join().map_err(|_| GraphError::from("THREAD PANIC"))??;
+        let vector_results = vector_handle.join().map_err(|_| GraphError::from("THREAD PANIC"))??;
+
+        // handle BM25 results
+        for (doc_id, score) in bm25_results {
+            combined_scores.insert(doc_id, alpha * score);
+        }
+
+        // handle vector search results
+        if let Some(vector_results) = vector_results {
+            for doc in vector_results {
+                let doc_id = doc.id;
+                let score = doc.distance.unwrap_or(0.0);
+                // combine with existing BM25 score or create new entry
+                combined_scores.entry(doc_id)
+                    .and_modify(|existing_score| *existing_score += (1.0 - alpha) * score as f32)
+                    .or_insert((1.0 - alpha) * score as f32);
+                }
+        }
+
+        // sort by combined score and return top results
+        let mut results: Vec<(u128, f32)> = combined_scores.into_iter().collect();
+        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        results.truncate(limit);
+
+        Ok(results)
+    }
+
+    fn hybrid_search(
+        &self,
         txn: &RoTxn,
         query: &str,
         query_vector: &[f64],
@@ -363,7 +425,7 @@ impl HybridSearch for HelixGraphStorage {
         alpha: f32,
         limit: usize,
     ) -> Result<Vec<(u128, f32)>, GraphError> {
-        let bm25_results = self.bm25.as_ref().unwrap().search(txn, query, limit * 2)?; // get more results for better fusion
+        let bm25_results = self.bm25.as_ref().unwrap().search(txn, query, limit * 2)?;
         let mut combined_scores: HashMap<u128, f32> = HashMap::new();
 
         // Add BM25 scores (weighted by alpha)
@@ -398,6 +460,7 @@ impl HybridSearch for HelixGraphStorage {
         Ok(results)
     }
 }
+*/
 
 pub trait BM25Flatten {
     /// util func to flatten array of strings to a single string
@@ -414,3 +477,4 @@ impl BM25Flatten for HashMap<String, Value> {
             })
     }
 }
+
