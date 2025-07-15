@@ -1,6 +1,6 @@
 use crate::helixc::parser::parser_methods::ParserError;
 use core::fmt;
-use heed3::Error as HeedError;
+
 use sonic_rs::Error as SonicError;
 use std::{net::AddrParseError, str::Utf8Error, string::FromUtf8Error};
 
@@ -27,6 +27,7 @@ pub enum GraphError {
     SliceLengthError,
     ShortestPathNotFound,
     EmbeddingError(String),
+    TableNotFound(&'static str),
 }
 
 impl fmt::Display for GraphError {
@@ -57,12 +58,21 @@ impl fmt::Display for GraphError {
             GraphError::VectorError(msg) => write!(f, "Vector error: {}", msg),
             GraphError::ShortestPathNotFound => write!(f, "Shortest path not found"),
             GraphError::EmbeddingError(msg) => write!(f, "Error while embedding text: {}", msg),
+            GraphError::TableNotFound(msg) => write!(f, "Table not found: {}", msg),
         }
     }
 }
 
-impl From<HeedError> for GraphError {
-    fn from(error: HeedError) -> Self {
+#[cfg(feature = "lmdb")]
+impl From<heed3::Error > for GraphError {
+    fn from(error: heed3::Error ) -> Self {
+        GraphError::StorageError(error.to_string())
+    }
+}
+
+#[cfg(feature = "rocksdb")]
+impl From<rocksdb::Error> for GraphError {
+    fn from(error: rocksdb::Error) -> Self {
         GraphError::StorageError(error.to_string())
     }
 }
@@ -156,8 +166,9 @@ impl fmt::Display for VectorError {
     }
 }
 
-impl From<HeedError> for VectorError {
-    fn from(error: HeedError) -> Self {
+#[cfg(feature = "lmdb")]
+impl From<heed3::Error> for VectorError {
+    fn from(error: heed3::Error) -> Self {
         VectorError::VectorCoreError(format!("heed error: {}", error.to_string()))
     }
 }
