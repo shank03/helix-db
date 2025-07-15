@@ -61,21 +61,4 @@ impl Plugin {
         }
         Ok(acc)
     }
-
-    pub fn add_queries(&self, router: &mut HelixRouter) -> Result<(), Box<dyn Error>> {
-        // SAFETY: If a valid file was opened it will have a get_queries function of this type
-        let get_fn: Symbol<GetQueryFn> = unsafe { self.lib.get(b"get_queries")? };
-
-        let queries = get_fn();
-
-        for (name, func) in queries {
-            let handler = DynHandler {
-                _source: self.lib.clone(),
-                func,
-            };
-            router.add_route("post", &format!("/{name}"), Arc::new(handler));
-        }
-
-        todo!()
-    }
 }

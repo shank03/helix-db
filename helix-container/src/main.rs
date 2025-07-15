@@ -1,7 +1,6 @@
 use helixdb::helix_engine::graph_core::config::Config;
 use helixdb::helix_engine::graph_core::graph_core::{HelixGraphEngine, HelixGraphEngineOpts};
 use helixdb::helix_gateway::mcp::mcp::{MCPHandlerFn, MCPHandlerSubmission};
-use helixdb::helix_gateway::router::dynamic::Plugin;
 use helixdb::helix_gateway::{
     gateway::{GatewayOpts, HelixGateway},
     router::router::{HandlerFn, HandlerSubmission},
@@ -54,10 +53,6 @@ async fn main() {
     println!("Starting route collection...");
     let submissions: Vec<_> = inventory::iter::<HandlerSubmission>.into_iter().collect();
     println!("Found {} submissions", submissions.len());
-
-    // let routes = unsafe { Plugin::open("../target/release/libquery_container.dylib").unwrap() }
-    //     .get_queries()
-    //     .unwrap();
 
     let routes = HashMap::from_iter(
         submissions

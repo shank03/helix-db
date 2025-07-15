@@ -120,7 +120,7 @@ impl HelixRouter {
 
             let qs = plugin.get_queries().unwrap();
 
-            self.routes.write().await.extend(qs);
+            *self.routes.write().await = qs;
 
             response.status = 200;
             return Ok(());
