@@ -1,4 +1,5 @@
-use clap::{Args, Parser, Subcommand, ValueEnum};
+use crate::types::OutputLanguage;
+use clap::{Args, Parser, Subcommand};
 
 pub mod version {
     pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -7,6 +8,13 @@ pub mod version {
 }
 
 use version::{AUTHORS, NAME, VERSION};
+
+#[derive(Debug, Parser)]
+#[clap(name = NAME, version = VERSION, author = AUTHORS)]
+pub struct HelixCli {
+    #[clap(subcommand)]
+    pub command: CommandType,
+}
 
 #[derive(Debug, Subcommand)]
 pub enum CommandType {
@@ -18,6 +26,9 @@ pub enum CommandType {
 
     /// Lint and Compile a Helix project
     Compile(CompileCommand),
+
+    /// Checks the projects schema and queries
+    Check(CheckCommand),
 
     /// Install the Helix core database
     Install(InstallCommand),
@@ -53,8 +64,14 @@ pub enum CommandType {
 #[derive(Debug, Args)]
 #[clap(name = "deploy", about = "Deploy a Helix project")]
 pub struct DeployCommand {
+    #[clap(help = "Redeploy a remote instance of HelixDB")]
+    pub remote: bool,
+
     #[clap(help = "The path to the project")]
     pub path: Option<String>,
+
+    #[clap(help = "Instance id if restarting a running instance")]
+    pub instance: Option<String>,
 
     #[clap(help = "Port to run the instance on")]
     pub port: Option<u16>,
@@ -68,6 +85,16 @@ pub struct CompileCommand {
 
     #[clap(help = "The output path")]
     pub output: Option<String>,
+
+    #[clap(help = "The target language")]
+    pub r#gen: Option<OutputLanguage>,
+}
+
+#[derive(Debug, Args)]
+#[clap(name = "check", about = "Lint a Helix project")]
+pub struct CheckCommand {
+    #[clap(help = "The path to the project")]
+    pub path: Option<String>,
 }
 
 #[derive(Debug, Args)]
