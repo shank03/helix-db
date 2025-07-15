@@ -341,10 +341,9 @@ impl BM25 for HBM25Config {
     }
 }
 
-/*
 pub trait HybridSearch {
     fn hybrid_search(
-        &self,
+        self,
         query: &str,
         query_vector: &[f64],
         vector_query: Option<&[f32]>,
@@ -355,7 +354,7 @@ pub trait HybridSearch {
 
 impl HybridSearch for HelixGraphStorage {
     fn hybrid_search(
-        &self,
+        self,
         query: &str,
         query_vector: &[f64],
         vector_query: Option<&[f32]>,
@@ -364,95 +363,58 @@ impl HybridSearch for HelixGraphStorage {
     ) -> Result<Vec<(u128, f32)>, GraphError> {
         let mut combined_scores: HashMap<u128, f32> = HashMap::new();
 
+        let query_owned = query.to_string();
+        let query_vector_owned = query_vector.to_vec();
+        let vector_query_owned = vector_query.map(|v| v.to_vec());
+
         let bm25_handle = {
+            let graph_env = self.graph_env.clone();
             thread::spawn(move || -> Result<Vec<(u128, f32)>, GraphError> {
-                let txn = self.graph_env.read_txn()?;
+                let txn = graph_env.read_txn()?;
                 match self.bm25.as_ref() {
-                    Some(s) => s.search(&txn, query, limit * 2),
+                    Some(s) => s.search(&txn, &query_owned, limit * 2),
                     None => Err(GraphError::from("BM25 not enabled!")),
                 }
             })
         };
 
         let vector_handle = {
+            let graph_env = self.graph_env.clone();
             thread::spawn(move || -> Result<Option<Vec<HVector>>, GraphError> {
-                let txn = self.graph_env.read_txn()?;
-                let results = self.vectors.search::<fn(&HVector, &RoTxn) -> bool>(
-                    &txn,
-                    &query_vector,
-                    limit * 2,
-                    None,
-                    false,
-                )?;
-                Ok(Some(results))
+                if vector_query_owned.is_some() {
+                    let txn = graph_env.read_txn()?;
+                    let results = self.vectors.search::<fn(&HVector, &RoTxn) -> bool>(
+                        &txn,
+                        &query_vector_owned,
+                        limit * 2,
+                        None,
+                        false,
+                    )?;
+                    Ok(Some(results))
+                } else {
+                    Ok(None)
+                }
             })
         };
 
-        let bm25_results = bm25_handle.join().map_err(|_| GraphError::from("THREAD PANIC"))??;
-        let vector_results = vector_handle.join().map_err(|_| GraphError::from("THREAD PANIC"))??;
+        let bm25_results = bm25_handle.join().map_err(|_| GraphError::from("BM25 thread panicked"))??;
+        let vector_results = vector_handle.join().map_err(|_| GraphError::from("Vector thread panicked"))??;
 
-        // handle BM25 results
+        // TODO: fix the major error
         for (doc_id, score) in bm25_results {
             combined_scores.insert(doc_id, alpha * score);
         }
 
-        // handle vector search results
         if let Some(vector_results) = vector_results {
             for doc in vector_results {
                 let doc_id = doc.id;
                 let score = doc.distance.unwrap_or(0.0);
-                // combine with existing BM25 score or create new entry
                 combined_scores.entry(doc_id)
                     .and_modify(|existing_score| *existing_score += (1.0 - alpha) * score as f32)
                     .or_insert((1.0 - alpha) * score as f32);
                 }
         }
 
-        // sort by combined score and return top results
-        let mut results: Vec<(u128, f32)> = combined_scores.into_iter().collect();
-        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        results.truncate(limit);
-
-        Ok(results)
-    }
-
-    fn hybrid_search(
-        &self,
-        txn: &RoTxn,
-        query: &str,
-        query_vector: &[f64],
-        vector_query: Option<&[f32]>,
-        alpha: f32,
-        limit: usize,
-    ) -> Result<Vec<(u128, f32)>, GraphError> {
-        let bm25_results = self.bm25.as_ref().unwrap().search(txn, query, limit * 2)?;
-        let mut combined_scores: HashMap<u128, f32> = HashMap::new();
-
-        // Add BM25 scores (weighted by alpha)
-        for (doc_id, score) in bm25_results {
-            combined_scores.insert(doc_id, alpha * score);
-        }
-
-        // Add vector similarity scores if provided (weighted by 1-alpha)
-        if let Some(_query_vector) = vector_query {
-            // This would integrate with your existing vector search
-            // For now, we'll just use BM25 scores
-            // You would call your vector similarity search here and combine scores
-            let vector_results = self.vectors.search::<fn(&HVector, &RoTxn) -> bool>(
-                txn,
-                query_vector,
-                limit * 2,
-                None,
-                false,
-            )?;
-            for doc in vector_results {
-                let doc_id = doc.id;
-                let score = doc.distance.unwrap_or(0.0);
-                combined_scores.insert(doc_id, (1.0 - alpha) * score as f32);
-            }
-        }
-
-        // Sort by combined score and return top results
         let mut results: Vec<(u128, f32)> = combined_scores.into_iter().collect();
         results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         results.truncate(limit);
@@ -460,7 +422,6 @@ impl HybridSearch for HelixGraphStorage {
         Ok(results)
     }
 }
-*/
 
 pub trait BM25Flatten {
     /// util func to flatten array of strings to a single string

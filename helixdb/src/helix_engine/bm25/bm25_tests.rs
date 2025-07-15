@@ -163,7 +163,7 @@ mod tests {
         let rtxn = bm25.graph_env.read_txn().unwrap();
         let results = bm25.search(&rtxn, "fox", 10).unwrap();
 
-        println("results: {:?}", results);
+        println!("results: {:?}", results);
 
         // should return documents 1 and 3 (both contain "fox")
         assert_eq!(results.len(), 2);
@@ -760,7 +760,6 @@ mod tests {
     #[test]
     fn test_hybrid_search() {
         let (storage, _temp_dir) = setup_helix_storage();
-        let rtxn = storage.graph_env.read_txn().unwrap();
 
         // Prepare test data
         let query = "machine learning";
@@ -771,7 +770,6 @@ mod tests {
 
         // Test hybrid search (even though it might not return results with empty index)
         let result = storage.hybrid_search(
-            &rtxn,
             query,
             &query_vector,
             vector_query.as_deref(),
