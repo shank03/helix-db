@@ -65,6 +65,7 @@ pub fn handler(args: TokenStream, item: TokenStream) -> TokenStream {
 
             #(#query_stmts)*
 
+            txn.commit().unwrap();
             response.body = sonic_rs::to_vec(&return_vals).unwrap();
 
             Ok(())
@@ -382,6 +383,7 @@ pub fn tool_call(args: TokenStream, input: TokenStream) -> TokenStream {
             #txn_type
             let data: #struct_name = data.data;
             #(#query_stmts)*
+            txn.commit().unwrap();
             #name.into_iter()
         }
     };

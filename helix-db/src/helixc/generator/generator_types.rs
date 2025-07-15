@@ -264,7 +264,7 @@ impl Display for Query {
         }
 
         // commit the transaction
-        writeln!(f, "    txn.commit().unwrap();")?;
+        // writeln!(f, "    txn.commit().unwrap();")?;
 
         // create the return values
         writeln!(
