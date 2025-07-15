@@ -1,25 +1,32 @@
 use crate::{
     helix_engine::{
         graph_core::ops::{
-            in_::in_::{InAdapter, InNodesIterator},
-            in_::in_e::{InEdgesAdapter, InEdgesIterator},
-            out::out::{OutAdapter, OutNodesIterator},
-            out::out_e::{OutEdgesAdapter, OutEdgesIterator},
-            source::add_e::EdgeType,
-            source::e_from_type::EFromType,
-            source::n_from_type::NFromType,
-            tr_val::{Traversable, TraversalVal},
             g::G,
+            in_::{
+                in_::{InAdapter, InNodesIterator},
+                in_e::{InEdgesAdapter, InEdgesIterator},
+            },
+            out::{
+                out::{OutAdapter, OutNodesIterator},
+                out_e::{OutEdgesAdapter, OutEdgesIterator},
+            },
+            source::{add_e::EdgeType, e_from_type::EFromType, n_from_type::NFromType},
+            tr_val::{Traversable, TraversalVal}, vectors::search::SearchVAdapter,
         },
-        storage_core::storage_core::HelixGraphStorage,
         types::GraphError,
+        storage_core::storage_core::HelixGraphStorage,
+        vector_core::vector::HVector,
     },
+    helix_gateway::{
+        embedding_providers::embedding_providers::{get_embedding_model, EmbeddingModel},
+        mcp::mcp::{MCPConnection, McpBackend},
+    },
+    protocol::return_values::ReturnValue,
     utils::label_hash::hash_label,
-    helix_gateway::mcp::mcp::{MCPConnection, McpBackend},
 };
 use heed3::RoTxn;
 use serde::Deserialize;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -80,7 +87,10 @@ impl<'a> ToolCalls<'a> for McpBackend {
             ToolArgs::InEStep { edge_label } => self.in_e_step(connection, &edge_label, txn),
             ToolArgs::NFromType { node_type } => self.n_from_type(&node_type, txn),
             ToolArgs::EFromType { edge_type } => self.e_from_type(&edge_type, txn),
-            ToolArgs::FilterItems { properties, filter_traversals } => self.filter_items(connection, properties, filter_traversals, txn),
+            ToolArgs::FilterItems {
+                properties,
+                filter_traversals,
+            } => self.filter_items(connection, properties, filter_traversals, txn),
             //_ => return Err(GraphError::New(format!("Tool {:?} not found", args))),
         }?;
 
@@ -138,6 +148,12 @@ trait McpTools<'a> {
         connection: &'a MCPConnection,
         properties: Option<Vec<(String, String)>>,
         filter_traversals: Option<Vec<ToolArgs>>,
+        txn: &'a RoTxn,
+    ) -> Result<Vec<TraversalVal>, GraphError>;
+
+    fn search_vector_text(
+        &'a self,
+        query: &'a str,
         txn: &'a RoTxn,
     ) -> Result<Vec<TraversalVal>, GraphError>;
 }
@@ -414,6 +430,25 @@ impl<'a> McpTools<'a> for McpBackend {
         println!("result: {:?}", result);
 
         Ok(result)
+    }
+
+    fn search_vector_text(
+        &'a self,
+        query: &'a str,
+        txn: &'a RoTxn,
+    ) -> Result<Vec<TraversalVal>, GraphError> {
+        let db = Arc::clone(&self.db);
+
+        let model = get_embedding_model(None, None, None)?;
+        let result = model.fetch_embedding(query);
+        let embedding = result.unwrap();
+
+        let res = G::new(Arc::clone(&db), &txn)
+            .search_v::<fn(&HVector, &RoTxn) -> bool>(&embedding, 5, None)
+            .collect_to::<Vec<_>>();
+
+        println!("result: {:?}", res);
+        Ok(res)
     }
 }
 
