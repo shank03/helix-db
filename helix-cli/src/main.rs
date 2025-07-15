@@ -559,11 +559,11 @@ fi
 
             let output = dirs::home_dir()
                 .map(|path| {
-                    path.join(".helix/repo/helix-db/helix-container")
+                    path.join(".helix/repo/helix-db/query-container")
                         .to_string_lossy()
                         .into_owned()
                 })
-                .unwrap_or_else(|| "./.helix/repo/helix-db/helix-container".to_string());
+                .unwrap_or_else(|| "./.helix/repo/helix-db/query-container".to_string());
 
             let files = match check_and_read_files(&path) {
                 Ok(files) if !files.is_empty() => files,
