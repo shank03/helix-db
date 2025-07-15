@@ -241,10 +241,14 @@ impl Display for Query {
                 }
             )?;
         }
-        write!(f, "#[handler({})]\n", match self.is_mut {
-            true => "with_write",
-            false => "with_read",
-        })?; // Handler macro
+        write!(
+            f,
+            "#[handler({})]\n",
+            match self.is_mut {
+                true => "with_write",
+                false => "with_read",
+            }
+        )?; // Handler macro
 
         // prints the function signature
         write!(
@@ -253,23 +257,16 @@ impl Display for Query {
             self.name
         )?;
         write!(f, "{{\n")?;
-        // prints basic query items
-        // writeln!(f, "let mut remapping_vals = RemappingMap::new();")?;
-
-        // writeln!(f, "let db = Arc::clone(&input.graph.storage);")?;
-        // if mut then get write txn
-        // if not then get read txn
-        // if self.is_mut {
-        //     writeln!(f, "let mut txn = db.graph_env.write_txn().unwrap();")?;
-        // } else {
-        //     writeln!(f, "let txn = db.graph_env.read_txn().unwrap();")?;
-        // }
-
+        
         // prints each statement
         for statement in &self.statements {
             write!(f, "    {};\n", statement)?;
         }
 
+        // commit the transaction
+        writeln!(f, "    txn.commit().unwrap();")?;
+
+        // create the return values
         writeln!(
             f,
             "let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();"
@@ -280,15 +277,6 @@ impl Display for Query {
             }
         }
 
-        // commit the transaction
-        // if self.is_mut {
-        // writeln!(f, "    txn.commit().unwrap();")?;
-        // // }/
-        // // closes the handler function
-        // write!(
-        //     f,
-        //     "    response.body = sonic_rs::to_vec(&return_vals).unwrap();\n"
-        // )?;
         write!(f, "}}\n")?;
         write!(f, "    Ok(())\n")?;
         write!(f, "}}\n")
