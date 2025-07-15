@@ -16,18 +16,8 @@ use crate::{
         label_hash::hash_label,
     },
 };
-use heed3::{
-    types::*,
-    Database, DatabaseFlags,
-    Env, EnvOpenOptions,
-    RoTxn, RwTxn,
-    byteorder::BE,
-};
-use std::{
-    collections::HashMap,
-    fs,
-    path::Path,
-};
+use heed3::{byteorder::BE, types::*, Database, DatabaseFlags, Env, EnvOpenOptions, RoTxn, RwTxn};
+use std::{collections::HashMap, fs, path::Path};
 
 // database names for different stores
 const DB_NODES: &str = "nodes"; // for node data (n:)
@@ -38,19 +28,24 @@ const DB_IN_EDGES: &str = "in_edges"; // for incoming edge indices (i:)
 pub type NodeId = u128;
 pub type EdgeId = u128;
 
+pub struct StorageConfig {
+    pub schema: String,
+    pub graphvis_node_label: Option<String>,
+    pub embedding_model: Option<String>,
+}
+
 pub struct HelixGraphStorage {
-    // TODO: maybe make not public?
     pub graph_env: Env,
+
     pub nodes_db: Database<U128<BE>, Bytes>,
     pub edges_db: Database<U128<BE>, Bytes>,
     pub out_edges_db: Database<Bytes, Bytes>,
     pub in_edges_db: Database<Bytes, Bytes>,
     pub secondary_indices: HashMap<String, Database<Bytes, U128<BE>>>,
     pub vectors: VectorCore,
-    pub bm25: HBM25Config,
-    pub schema: String,
-    pub graphvis_node_label: Option<String>,
-    pub embedding_model: Option<String>,
+    pub bm25: Option<HBM25Config>,
+
+    pub storage_config: StorageConfig,
 }
 
 impl HelixGraphStorage {
@@ -144,10 +139,16 @@ impl HelixGraphStorage {
             ),
         )?;
 
-        let bm25 = HBM25Config::new(&graph_env, &mut wtxn)?;
-        let schema = config.schema.unwrap_or("".to_string());
-        let graphvis_node_label = config.graphvis_node_label;
-        let embedding_model = config.embedding_model;
+        let bm25 = config
+            .bm25
+            .then(|| HBM25Config::new(&graph_env, &mut wtxn))
+            .transpose()?;
+
+        let storage_config = StorageConfig::new(
+            config.schema.unwrap_or("".to_string()),
+            config.graphvis_node_label,
+            config.embedding_model,
+        );
 
         wtxn.commit()?;
         Ok(Self {
@@ -159,9 +160,7 @@ impl HelixGraphStorage {
             secondary_indices,
             vectors,
             bm25,
-            schema,
-            graphvis_node_label,
-            embedding_model,
+            storage_config,
         })
     }
 
@@ -241,16 +240,28 @@ impl HelixGraphStorage {
         Ok((edge_id, node_id))
     }
 
-    /// Gets a vector
+    /// Gets a vector from level 0 of HNSW index (because that's where all are stored)
     pub fn get_vector(&self, txn: &RoTxn, id: &u128) -> Result<HVector, GraphError> {
-        // uses level 0 because thats where all vectors are stored
-        let vector = self.vectors.get_vector(txn, *id, 0, true)?;
-        Ok(vector)
+        Ok(self.vectors.get_vector(txn, *id, 0, true)?)
+    }
+}
+
+impl StorageConfig {
+    pub fn new(
+        schema: String,
+        graphvis_node_label: Option<String>,
+        embedding_model: Option<String>,
+    ) -> StorageConfig {
+        Self {
+            schema,
+            graphvis_node_label,
+            embedding_model,
+        }
     }
 }
 
 impl DBMethods for HelixGraphStorage {
-    // Creates a secondary index lmdb db (table) for a given index name
+    /// Creates a secondary index lmdb db (table) for a given index name
     fn create_secondary_index(&mut self, name: &str) -> Result<(), GraphError> {
         let mut wtxn = self.graph_env.write_txn()?;
         let db = self.graph_env.create_database(&mut wtxn, Some(name))?;
@@ -259,7 +270,7 @@ impl DBMethods for HelixGraphStorage {
         Ok(())
     }
 
-    // Drops a secondary index lmdb db (table) for a given index name
+    /// Drops a secondary index lmdb db (table) for a given index name
     fn drop_secondary_index(&mut self, name: &str) -> Result<(), GraphError> {
         let mut wtxn = self.graph_env.write_txn()?;
         let db = self
@@ -279,8 +290,7 @@ impl DBMethods for HelixGraphStorage {
 impl StorageMethods for HelixGraphStorage {
     #[inline(always)]
     fn check_exists(&self, txn: &RoTxn, id: &u128) -> Result<bool, GraphError> {
-        let exists = self.nodes_db.get(txn, Self::node_key(id))?.is_some();
-        Ok(exists)
+        Ok(self.nodes_db.get(txn, Self::node_key(id))?.is_some())
     }
 
     #[inline(always)]
@@ -392,3 +402,4 @@ impl StorageMethods for HelixGraphStorage {
         Ok(())
     }
 }
+

@@ -9,7 +9,7 @@ repository = "https://github.com/HelixDB/helix-db"
 
 [dependencies]
 # HelixDB dependencies
-helix-macros = "0.1.2"
+helix-macros = { path = "../helix-macros" }
 
 # External dependencies
 tokio = { version = "1.44.2", features = ["full"] }

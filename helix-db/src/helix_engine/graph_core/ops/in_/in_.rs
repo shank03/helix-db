@@ -25,7 +25,7 @@ pub struct InNodesIterator<'a, T> {
     >,
     pub storage: Arc<HelixGraphStorage>,
     pub txn: &'a T,
-    pub edge_type: &'a EdgeType,
+    pub edge_type: EdgeType,
 }
 
 impl<'a> Iterator for InNodesIterator<'a, RoTxn<'a>> {
@@ -112,7 +112,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> InAdapter<'a
                         iter,
                         storage: Arc::clone(&db),
                         txn,
-                        edge_type,
+                        edge_type: edge_type.clone(),
                     }),
                     Ok(None) => None,
                     Err(e) => {

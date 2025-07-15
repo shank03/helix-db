@@ -1,5 +1,13 @@
-use crate::helix_engine::graph_core::graph_core::HelixGraphEngine;
-use crate::helix_engine::types::GraphError;
+use crate::{
+    helix_engine::{
+        graph_core::graph_core::HelixGraphEngine,
+        types::GraphError,
+    },
+    helix_gateway::{
+        router::router::HelixRouter,
+        thread_pool::thread_pool::ThreadPool
+    },
+};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 use std::{
@@ -11,8 +19,6 @@ use tokio::{
     net::TcpListener,
     task::JoinHandle,
 };
-
-use crate::helix_gateway::{router::router::HelixRouter, thread_pool::thread_pool::ThreadPool};
 
 pub struct ConnectionHandler {
     pub address: String,
@@ -99,3 +105,4 @@ impl ConnectionHandler {
         Ok(handle)
     }
 }
+

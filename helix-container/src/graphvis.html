@@ -10,35 +10,53 @@
         <title>HelixDB Graphvis</title>
 
         <style type="text/css">
+            :root {
+                --bg-color: #181818;
+                --text-color: #FFFDD0;
+                --overlay-bg: rgba(0, 0, 0, 0.5);
+                --overlay-border: #FFFDD0;
+                --edge-color: #FFFDD0;
+            }
+
+            @media (prefers-color-scheme: light) {
+                :root {
+                    --bg-color: #FFFFFF;
+                    --text-color: #333333;
+                    --overlay-bg: rgba(255, 255, 255, 0.7);
+                    --overlay-border: #333333;
+                    --edge-color: #333333;
+                }
+            }
+
             #mynetwork {
                 width: 100vw;
                 height: 100vh;
-                background-color: #181818;
+                background-color: var(--bg-color);
                 position: fixed;
                 top: 0;
                 left: 0;
-                color: #FFFDD0;
+                color: var(--text-color);
             }
 
             body {
-                background-color: #181818;
-                color: #FFFDD0;
+                background-color: var(--bg-color);
+                color: var(--text-color);
                 margin: 0;
                 overflow: hidden;
             }
 
             h1 {
-                color: #FFFDD0;
+                color: var(--text-color);
             }
 
             #overlay {
                 position: fixed;
                 top: 10px;
                 right: 10px;
-                background-color: rgba(0, 0, 0, 0.5);
-                border: 1px solid #FFFDD0;
+                background-color: var(--overlay-bg);
+                border: 1px solid var(--overlay-border);
                 z-index: 1000;
-                padding: 10px; /* Added padding */
+                padding: 10px;
             }
         </style>
     </head>
