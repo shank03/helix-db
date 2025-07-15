@@ -53,46 +53,6 @@ pub fn find_available_port(start_port: u16) -> Option<u16> {
     None
 }
 
-/// Checks if the path contains a schema.hx and config.hx.json file
-/// Returns a vector of DirEntry objects for all .hx files in the path
-pub fn check_and_read_files(path: &str) -> Result<Vec<DirEntry>, CliError> {
-    if !fs::read_dir(&path)
-        .map_err(CliError::Io)?
-        .any(|file| file.unwrap().file_name() == "schema.hx")
-    {
-        return Err(CliError::from(format!(
-            "{}",
-            "No schema file found".red().bold()
-        )));
-    }
-
-    if !fs::read_dir(&path)
-        .map_err(CliError::Io)?
-        .any(|file| file.unwrap().file_name() == "config.hx.json")
-    {
-        return Err(CliError::from(format!(
-            "{}",
-            "No config.hx.json file found".red().bold()
-        )));
-    }
-
-    let files: Vec<DirEntry> = fs::read_dir(&path)?
-        .filter_map(|entry| entry.ok())
-        .filter(|file| file.file_name().to_string_lossy().ends_with(".hx"))
-        .collect();
-
-    // Check for query files (exclude schema.hx)
-    let has_queries = files.iter().any(|file| file.file_name() != "schema.hx");
-    if !has_queries {
-        return Err(CliError::from(format!(
-            "{}",
-            "No query files (.hx) found".red().bold()
-        )));
-    }
-
-    Ok(files)
-}
-
 /// Generates a Content object from a vector of DirEntry objects
 /// Returns a Content object with the files and source
 ///

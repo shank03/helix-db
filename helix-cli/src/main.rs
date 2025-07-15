@@ -127,7 +127,45 @@ async fn main() {
 
         CommandType::Compile(command) => {}
         CommandType::Install(command) => {}
-        CommandType::Init(command) => {}
+
+        CommandType::Init(command) => {
+            println!("{}", "Initialising Helix project...".bold());
+            let path = match command.path {
+                Some(path) => PathBuf::from(path),
+                None => PathBuf::from(DB_DIR),
+            };
+            let path_str = path.to_str().unwrap();
+
+            let _ = match check_and_read_files(path_str) {
+                Ok(files) if !files.is_empty() => {
+                    println!(
+                        "{} {}",
+                        "Queries already exist in".yellow().bold(),
+                        path_str
+                    );
+                    return;
+                }
+                Ok(_) => {}
+                Err(_) => {}
+            };
+
+            fs::create_dir_all(&path).unwrap();
+
+            let schema_path = path.join("schema.hx");
+            fs::write(&schema_path, DEFAULT_SCHEMA).unwrap();
+
+            let main_path = path.join("queries.hx");
+            fs::write(main_path, DEFAULT_QUERIES).unwrap();
+
+            let config_path = path.join("config.hx.json");
+            fs::write(config_path, Config::init_config()).unwrap();
+
+            println!(
+                "{} {}",
+                "Helix project initialised at".green().bold(),
+                path.display()
+            );
+        }
 
         CommandType::Status => {
             let instance_manager = InstanceManager::new().unwrap();

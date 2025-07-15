@@ -53,50 +53,44 @@ pub enum CommandType {
 #[derive(Debug, Args)]
 #[clap(name = "deploy", about = "Deploy a Helix project")]
 pub struct DeployCommand {
-    #[clap(short, long, help = "The path to the project")]
+    #[clap(help = "The path to the project")]
     pub path: Option<String>,
 
-    #[clap(short, long, help = "The output path")]
-    pub output: Option<String>,
-
-    #[clap(long, help = "Port to run the instance on")]
+    #[clap(help = "Port to run the instance on")]
     pub port: Option<u16>,
 }
 
 #[derive(Debug, Args)]
 #[clap(name = "compile", about = "Compile a Helix project")]
 pub struct CompileCommand {
-    #[clap(short, long, help = "The path to the project")]
+    #[clap(help = "The path to the project")]
     pub path: Option<String>,
 
-    #[clap(short, long, help = "The output path")]
+    #[clap(help = "The output path")]
     pub output: Option<String>,
-
-    #[clap(short, long, help = "The target language")]
-    pub r#gen: Option<OutputLanguage>,
 }
 
 #[derive(Debug, Args)]
 #[clap(name = "install", about = "Install the Helix repo")]
 pub struct InstallCommand {
-    #[clap(long, help = "Install HelixDb on the development branch (considered unstable)")]
+    #[clap(help = "Install HelixDB from the development branch (considered unstable)")]
     pub dev: bool,
 }
 
 #[derive(Debug, Args)]
 #[clap(name = "init", about = "Initialise a new Helix project")]
 pub struct InitCommand {
-    #[clap(short, long, help = "The path to the project")]
+    #[clap(help = "The path to the project")]
     pub path: Option<String>,
 }
 
 #[derive(Debug, Args)]
 #[clap(name = "stop", about = "Stop Helix instances")]
 pub struct StopCommand {
-    #[clap(long, help = "Stop all running instances")]
+    #[clap(help = "Stop all running instances")]
     pub all: bool,
 
-    #[clap(short, long, help = "Instance ID to stop")]
+    #[clap(help = "Instance ID to stop")]
     pub instance: Option<String>,
 }
 
@@ -123,7 +117,7 @@ pub struct VisualizeCommand {
     #[clap(help = "Id of instance to visualize")]
     pub instance: String,
 
-    #[clap(short, long, help = "Give nodes a label based on a property")]
+    #[clap(help = "Give nodes a label based on a property")]
     pub node_prop: Option<String>,
 }
 
