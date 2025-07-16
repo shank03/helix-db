@@ -1,8 +1,8 @@
-use std::{borrow::Cow, ops::Deref};
+use std::{borrow::Cow, collections::HashMap, error::Error, ops::Deref, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 pub enum Format {
     #[default]
     Json,
@@ -15,9 +15,49 @@ impl Format {
         }
     }
 
-    pub fn deserialize<'a, T: Deserialize<'a>>(&self, val: &'a [u8]) -> MaybeOwned<'a, T> {
+    pub fn deserialize<'a, T: Deserialize<'a>>(
+        &self,
+        val: &'a [u8],
+    ) -> Result<MaybeOwned<'a, T>, Box<dyn Error>> {
         match self {
-            Format::Json => MaybeOwned::Owned(sonic_rs::from_slice::<T>(val).unwrap()),
+            Format::Json => Ok(MaybeOwned::Owned(sonic_rs::from_slice::<T>(val)?)),
+        }
+    }
+
+    pub fn from_headers(headers: HashMap<String, String>) -> (Format, Format) {
+        let content_type = headers
+            .iter()
+            .find_map(|(k, v)| {
+                if k.to_ascii_lowercase() == "content-type" {
+                    Some(Format::from_str(v).unwrap_or_default())
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_default();
+
+        let accept = headers
+            .iter()
+            .find_map(|(k, v)| {
+                if k.to_ascii_lowercase() == "accept" {
+                    Some(Format::from_str(v).unwrap_or(content_type))
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(content_type);
+
+        (content_type, accept)
+    }
+}
+
+impl FromStr for Format {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "application/json" => Ok(Format::Json),
+            _ => Err(()),
         }
     }
 }

@@ -6,7 +6,7 @@ use crate::helixc::parser::helix_parser::FieldPrefix;
 use super::{
     traversal_steps::Traversal,
     tsdisplay::ToTypeScript,
-    utils::{write_headers, GenRef, GeneratedType, GeneratedValue},
+    utils::{GenRef, GeneratedType, GeneratedValue, write_headers},
 };
 
 pub struct Source {
@@ -232,16 +232,24 @@ impl Display for Query {
         write!(f, "#[handler]\n")?; // Handler macro
 
         // prints the function signature
-        write!(f, "pub fn {} (input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {{\n", self.name)?;
+        write!(
+            f,
+            "pub fn {} (input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {{\n",
+            self.name
+        )?;
+        writeln!(
+            f,
+            "let (helix_in_fmt, helix_out_fmt) = Format::from_headers(input.request.headers);",
+        )?;
 
         // prints basic query items
         if !self.parameters.is_empty() {
-            write!(
+            writeln!(
                 f,
-                "let data: {}Input = match sonic_rs::from_slice(&input.request.body) {{\n",
-                self.name
+                "let res = helix_in_fmt.deserialize(&input.request.body);\n"
             )?;
-            writeln!(f, "    Ok(data) => data,")?;
+            write!(f, "let data: &{}Input = match res {{\n", self.name)?;
+            writeln!(f, "    Ok(data) => data.deref(),")?;
             writeln!(f, "    Err(err) => return Err(GraphError::from(err)),")?;
             writeln!(f, "}};\n")?;
         }
@@ -278,7 +286,7 @@ impl Display for Query {
         // closes the handler function
         write!(
             f,
-            "    response.body = sonic_rs::to_vec(&return_vals).unwrap();\n"
+            "    response.body = helix_out_fmt.serialize(&return_vals).unwrap().to_owned();\n"
         )?;
         write!(f, "    Ok(())\n")?;
         write!(f, "}}\n")
@@ -493,10 +501,18 @@ impl Display for ReturnValue {
                 )
             }
             ReturnType::NamedExpr(name) => {
-                write!(f, "    return_vals.insert({}.to_string(), ReturnValue::from_traversal_value_array_with_mixin({}.clone(), remapping_vals.borrow_mut()));\n", name, self.value)
+                write!(
+                    f,
+                    "    return_vals.insert({}.to_string(), ReturnValue::from_traversal_value_array_with_mixin({}.clone(), remapping_vals.borrow_mut()));\n",
+                    name, self.value
+                )
             }
             ReturnType::SingleExpr(name) => {
-                write!(f, "    return_vals.insert({}.to_string(), ReturnValue::from_traversal_value_with_mixin({}.clone(), remapping_vals.borrow_mut()));\n", name, self.value)
+                write!(
+                    f,
+                    "    return_vals.insert({}.to_string(), ReturnValue::from_traversal_value_with_mixin({}.clone(), remapping_vals.borrow_mut()));\n",
+                    name, self.value
+                )
             }
             ReturnType::UnnamedExpr => {
                 write!(f, "// need to implement unnamed return value\n todo!()")?;
