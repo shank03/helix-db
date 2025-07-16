@@ -177,6 +177,17 @@ pub enum GeneratedValue {
     Parameter(GenRef<String>),
     Unknown,
 }
+impl GeneratedValue {
+    pub fn inner(&self) -> &GenRef<String> {
+        match self {
+            GeneratedValue::Literal(value) => value,
+            GeneratedValue::Primitive(value) => value,
+            GeneratedValue::Identifier(value) => value,
+            GeneratedValue::Parameter(value) => value,
+            GeneratedValue::Unknown => panic!("Cannot get inner of unknown"),
+        }
+    }
+}
 
 impl Display for GeneratedValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -316,7 +327,7 @@ pub fn write_headers() -> String {
     r#"
 
 use heed3::RoTxn;
-use helix_macros::handler;
+use helix_macros::{handler, tool_call, mcp_handler};
 use helix_db::{
     helix_engine::{
         graph_core::ops::{
@@ -352,6 +363,7 @@ use helix_db::{
     helix_gateway::{
         embedding_providers::embedding_providers::{EmbeddingModel, get_embedding_model},
         router::router::HandlerInput,
+        mcp::mcp::{MCPHandlerSubmission, MCPToolInput, MCPHandler}
     },
     node_matches, props, embed,
     field_remapping, identifier_remapping, 

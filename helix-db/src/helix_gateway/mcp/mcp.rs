@@ -9,7 +9,7 @@ use crate::{
         return_values::ReturnValue,
     },
     utils::id::v6_uuid,
-    helix_gateway::mcp::tools::{ToolArgs, ToolCalls},
+    helix_gateway::mcp::tools::{ToolArgs},
 };
 use helix_macros::mcp_handler;
 use std::{
@@ -123,38 +123,6 @@ impl MCPHandler {
 }
 
 inventory::collect!(MCPHandlerSubmission);
-
-#[mcp_handler]
-pub fn call_tool<'a>(
-    input: &'a mut MCPToolInput,
-    response: &mut Response,
-) -> Result<(), GraphError> {
-    let data: ToolCallRequest = match sonic_rs::from_slice(&input.request.body) {
-        Ok(data) => data,
-        Err(err) => return Err(GraphError::from(err)),
-    };
-
-    let mut connections = input.mcp_connections.lock().unwrap();
-    let mut connection = match connections.remove_connection(&data.connection_id) {
-        Some(conn) => conn,
-        None => return Err(GraphError::Default),
-    };
-    drop(connections);
-    let txn = input.mcp_backend.db.graph_env.read_txn()?;
-
-    let result = input.mcp_backend.call(&txn, &connection, data.tool)?;
-
-    let first = result.first().unwrap_or(&TraversalVal::Empty).clone();
-
-    connection.iter = result.into_iter();
-    let mut connections = input.mcp_connections.lock().unwrap();
-    connections.add_connection(connection);
-    drop(connections);
-
-    response.body = sonic_rs::to_vec(&ReturnValue::from(first)).unwrap();
-
-    Ok(())
-}
 
 #[derive(Deserialize)]
 pub struct InitRequest {

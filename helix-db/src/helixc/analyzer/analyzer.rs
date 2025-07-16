@@ -6,10 +6,7 @@ use crate::{
         generator::{
             bool_op::{BoolOp, Eq, Gt, Gte, Lt, Lte, Neq},
             generator_types::{
-                Assignment as GeneratedAssignment, BoExp, Drop as GeneratedDrop,
-                ForEach as GeneratedForEach, ForLoopInVariable, ForVariable,
-                Parameter as GeneratedParameter, Query as GeneratedQuery, ReturnValue,
-                ReturnValueExpr, Source as GeneratedSource, Statement as GeneratedStatement,
+                Assignment as GeneratedAssignment, BoExp, Drop as GeneratedDrop, ForEach as GeneratedForEach, ForLoopInVariable, ForVariable, Parameter as GeneratedParameter, Query as GeneratedQuery, ReturnType, ReturnValue, ReturnValueExpr, Source as GeneratedSource, Statement as GeneratedStatement
             },
             object_remapping_generation::{
                 ExcludeField, IdentifierRemapping, ObjectRemapping, Remapping, RemappingType,
@@ -384,6 +381,22 @@ impl<'a> Ctx<'a> {
                     );
                 }
             }
+        }
+        if q.is_mcp {
+            if query.return_values.len() != 1 {
+                self.push_query_err(
+                    q,
+                    q.loc.clone(),
+                    "MCP queries can only return a single value as LLM needs to be able to traverse from the result".to_string(),
+                    "add a single return value that is a node, edge, or vector",
+                );
+            } else {
+                // match query.return_values.first().unwrap().return_type {
+                    
+                // }
+            }
+            let return_name = query.return_values.first().unwrap().get_name();
+            query.mcp_handler = Some(return_name);
         }
         self.output.queries.push(query);
     }
@@ -2510,7 +2523,7 @@ impl<'a> Ctx<'a> {
     }
 
     fn validate_object(
-        &mut self,
+        &mut self, 
         cur_ty: &Type,
         tr: &Traversal,
         obj: &'a Object,
@@ -4812,6 +4825,7 @@ enum Type {
     Vector(Option<String>),
     Vectors(Option<String>),
     Scalar(FieldType),
+    Object(HashMap<String, Type>),
     Anonymous(Box<Type>),
     Boolean,
     Unknown,
@@ -4827,6 +4841,7 @@ impl Type {
             Type::Vector(_) => "vector",
             Type::Vectors(_) => "vectors",
             Type::Scalar(_) => "scalar",
+            Type::Object(_) => "object",
             Type::Boolean => "boolean",
             Type::Unknown => "unknown",
             Type::Anonymous(ty) => ty.kind_str(),
@@ -4845,6 +4860,10 @@ impl Type {
             Type::Anonymous(ty) => ty.get_type_name(),
             Type::Boolean => "boolean".to_string(),
             Type::Unknown => "unknown".to_string(),
+            Type::Object(fields) => {
+                let field_names = fields.keys().map(|k| k.clone()).collect::<Vec<_>>();
+                format!("object({})", field_names.join(", "))
+            }
             _ => unreachable!(),
         }
     }

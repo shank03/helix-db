@@ -113,7 +113,7 @@ impl HelixRouter {
                 request,
                 mcp_backend: Arc::clone(&graph_access.mcp_backend.as_ref().unwrap()),
                 mcp_connections: Arc::clone(&graph_access.mcp_connections.as_ref().unwrap()),
-                schema: Some(graph_access.storage.schema.clone()),
+                schema: Some(graph_access.storage.storage_config.schema.clone()),
             };
             return mcp_handler(&mut mcp_input, response);
         };

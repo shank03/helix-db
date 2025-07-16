@@ -21,8 +21,9 @@ pub struct GraphConfig {
 pub struct Config {
     pub vector_config: VectorConfig,
     pub graph_config: GraphConfig,
-    pub db_max_size_gb: Option<usize>, // database in GB
+    pub db_max_size_gb: Option<usize>,
     pub mcp: bool,
+    pub bm25: bool,
     pub schema: Option<String>,
     pub embedding_model: Option<String>,
     pub graphvis_node_label: Option<String>,
@@ -34,6 +35,8 @@ impl Config {
         ef_construction: usize,
         ef_search: usize,
         db_max_size_gb: usize,
+        mcp: bool,
+        bm25: bool,
         schema: Option<String>,
         embedding_model: Option<String>,
         graphvis_node_label: Option<String>,
@@ -48,7 +51,8 @@ impl Config {
                 secondary_indices: None,
             },
             db_max_size_gb: Some(db_max_size_gb),
-            mcp: true,
+            mcp,
+            bm25,
             schema,
             embedding_model,
             graphvis_node_label,
@@ -87,6 +91,7 @@ impl Config {
         },
         "db_max_size_gb": 10,
         "mcp": true,
+        "bm25": true,
         "embedding_model": "text-embedding-ada-002",
         "graphvis_node_label": ""
     }
@@ -112,6 +117,7 @@ impl Default for Config {
             },
             db_max_size_gb: Some(10),
             mcp: true,
+            bm25: true,
             schema: None,
             embedding_model: Some("text-embedding-ada-002".to_string()),
             graphvis_node_label: None,
@@ -127,6 +133,7 @@ impl fmt::Display for Config {
             Graph config => secondary_indicies: {:?}\n
             db_max_size_gb: {:?}\n
             mcp: {:?}\n
+            bm25: {:?}\n
             schema: {:?}\n
             embedding_model: {:?}\n
             graphvis_node_label: {:?}",
@@ -136,6 +143,7 @@ impl fmt::Display for Config {
             self.graph_config.secondary_indices,
             self.db_max_size_gb,
             self.mcp,
+            self.bm25,
             self.schema,
             self.embedding_model,
             self.graphvis_node_label,
