@@ -43,7 +43,6 @@ pub fn handler(args: TokenStream, item: TokenStream) -> TokenStream {
         _ => panic!("Query block not found"),
     };
 
-
     let txn_type = match args.txn_type.to_string().as_str() {
         "with_read" => quote! { let txn = db.graph_env.read_txn().unwrap(); },
         "with_write" => quote! { let mut txn = db.graph_env.write_txn().unwrap(); },
@@ -53,8 +52,10 @@ pub fn handler(args: TokenStream, item: TokenStream) -> TokenStream {
     let expanded = quote! {
         #[allow(non_camel_case_types)]
         #vis #sig {
-            let data: #input_data_name = match sonic_rs::from_slice(&input.request.body) {
-                Ok(data) => data,
+            let (helix_in_fmt, helix_out_fmt) = Format::from_headers(input.request.headers);
+            let res = helix_in_fmt.deserialize(&input.request.body);
+            let data: &#input_data_name = match res {
+                Ok(data) => data.deref(),
                 Err(err) => return Err(GraphError::from(err)),
             };
 
@@ -66,7 +67,7 @@ pub fn handler(args: TokenStream, item: TokenStream) -> TokenStream {
             #(#query_stmts)*
 
             txn.commit().unwrap();
-            response.body = sonic_rs::to_vec(&return_vals).unwrap();
+            response.body = helix_out_fmt.serialize(&return_vals).unwrap().to_owned;
 
             Ok(())
         }

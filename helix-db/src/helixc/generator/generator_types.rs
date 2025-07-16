@@ -257,6 +257,10 @@ impl Display for Query {
             self.name
         )?;
         write!(f, "{{\n")?;
+        writeln!(
+            f,
+            "let (helix_in_fmt, helix_out_fmt) = Format::from_headers(input.request.headers);",
+        )?;
 
         // prints each statement
         for statement in &self.statements {
