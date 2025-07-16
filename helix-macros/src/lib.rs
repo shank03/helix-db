@@ -280,7 +280,6 @@ pub fn tool_calls(_attr: TokenStream, input: TokenStream) -> TokenStream {
                 })
                 .collect();
 
-            println!("method_params: {:?}", method_params);
             let struct_name = quote::format_ident!("{}Data", fn_name);
             let expanded = quote! {
                 #[derive(Debug, Deserialize)]
