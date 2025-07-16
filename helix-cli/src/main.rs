@@ -1418,7 +1418,7 @@ fi
                 );
             }
 
-            let key = github_login().await.unwrap();
+            let (key, user_id) = github_login().await.unwrap();
             println!("{}", "Successfully logged in!".green().bold());
 
             let mut cred_file = OpenOptions::new()
@@ -1429,7 +1429,7 @@ fi
                 .open(cred_path)
                 .unwrap();
 
-            if let Err(e) = cred_file.write_all(&format!("helix_user_key={key}").into_bytes()) {
+            if let Err(e) = cred_file.write_all(&format!("helix_user_id={user_id}\nhelix_user_key={key}").into_bytes()) {
                 println!(
                     "Got error when writing key: {}\nYou're key is: {}",
                     e.to_string().red(),
