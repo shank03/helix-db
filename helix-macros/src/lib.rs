@@ -4,19 +4,72 @@ extern crate syn;
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, ItemFn};
+use syn::{
+    Block, Expr, FnArg, Ident, Item, ItemFn, ItemTrait, Pat, Stmt, Token, TraitItem, Type,
+    parse::{Parse, ParseStream},
+    parse_macro_input,
+};
+
+struct HandlerArgs {
+    txn_type: Ident,
+}
+impl Parse for HandlerArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        Ok(HandlerArgs {
+            txn_type: input.parse()?,
+        })
+    }
+}
 
 #[proc_macro_attribute]
-pub fn handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn handler(args: TokenStream, item: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(item as ItemFn);
+    let args = parse_macro_input!(args as HandlerArgs);
+    let input_fn_block_contents = &input_fn.block.stmts;
     let fn_name = &input_fn.sig.ident;
     let fn_name_str = fn_name.to_string();
+    let vis = &input_fn.vis;
+    let sig = &input_fn.sig;
     println!("fn_name_str: {}", fn_name_str);
     // Create a unique static name for each handler
-    let static_name = quote::format_ident!("__HANDLER_REGISTRATION_{}", fn_name.to_string().to_uppercase());
+    let static_name = quote::format_ident!(
+        "_MAIN_HANDLER_REGISTRATION_{}",
+        fn_name.to_string().to_uppercase()
+    );
+    let input_data_name = quote::format_ident!("{}Input", fn_name);
+
+    let query_stmts = match input_fn_block_contents.first() {
+        Some(Stmt::Expr(Expr::Block(block), _)) => block.block.stmts.clone(),
+        _ => panic!("Query block not found"),
+    };
+
+
+    let txn_type = match args.txn_type.to_string().as_str() {
+        "with_read" => quote! { let txn = db.graph_env.read_txn().unwrap(); },
+        "with_write" => quote! { let mut txn = db.graph_env.write_txn().unwrap(); },
+        _ => panic!("Invalid transaction type: expected 'with_read' or 'with_write'"),
+    };
 
     let expanded = quote! {
-        #input_fn
+        #[allow(non_camel_case_types)]
+        #vis #sig {
+            let data: #input_data_name = match sonic_rs::from_slice(&input.request.body) {
+                Ok(data) => data,
+                Err(err) => return Err(GraphError::from(err)),
+            };
+
+            let mut remapping_vals = RemappingMap::new();
+            let db = Arc::clone(&input.graph.storage);
+            #txn_type
+
+
+            #(#query_stmts)*
+
+            txn.commit().unwrap();
+            response.body = sonic_rs::to_vec(&return_vals).unwrap();
+
+            Ok(())
+        }
 
         #[doc(hidden)]
         #[used]
@@ -41,7 +94,10 @@ pub fn local_handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let fn_name_str = fn_name.to_string();
     println!("fn_name_str: {}", fn_name_str);
     // Create a unique static name for each handler
-    let static_name = quote::format_ident!("__HANDLER_REGISTRATION_{}", fn_name.to_string().to_uppercase());
+    let static_name = quote::format_ident!(
+        "_LOCAL_HANDLER_REGISTRATION_{}",
+        fn_name.to_string().to_uppercase()
+    );
 
     let expanded = quote! {
         #input_fn
@@ -68,7 +124,10 @@ pub fn mcp_handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let fn_name = &input_fn.sig.ident;
     let fn_name_str = fn_name.to_string();
     // Create a unique static name for each handler
-    let static_name = quote::format_ident!("__HANDLER_REGISTRATION_{}", fn_name.to_string().to_uppercase());
+    let static_name = quote::format_ident!(
+        "_MCP_HANDLER_REGISTRATION_{}",
+        fn_name.to_string().to_uppercase()
+    );
 
     let expanded = quote! {
         #input_fn
@@ -90,11 +149,44 @@ pub fn mcp_handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
+pub fn query_mcp_handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input_fn = parse_macro_input!(item as ItemFn);
+    let fn_name = &input_fn.sig.ident;
+    let fn_name_str = fn_name.to_string();
+    // Create a unique static name for each handler
+    let static_name = quote::format_ident!(
+        "_MCP_HANDLER_REGISTRATION_{}",
+        fn_name.to_string().to_uppercase()
+    );
+
+    let expanded = quote! {
+        #input_fn
+
+        #[doc(hidden)]
+        #[used]
+        static #static_name: () = {
+            inventory::submit! {
+                ::helixdb::helix_gateway::mcp::mcp::MCPHandlerSubmission(
+                    ::helixdb::helix_gateway::mcp::mcp::MCPHandler::new(
+                        #fn_name_str,
+                        #fn_name
+                    )
+                )
+            }
+        };
+    };
+    expanded.into()
+}
+
+#[proc_macro_attribute]
 pub fn get_handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(item as ItemFn);
     let fn_name = &input_fn.sig.ident;
     let fn_name_str = fn_name.to_string();
-    let static_name = quote::format_ident!("__GET_HANDLER_REGISTRATION_{}", fn_name.to_string().to_uppercase());
+    let static_name = quote::format_ident!(
+        "__GET_HANDLER_REGISTRATION_{}",
+        fn_name.to_string().to_uppercase()
+    );
 
     let expanded = quote! {
         #input_fn
@@ -131,7 +223,6 @@ pub fn debug_trace(args: TokenStream, input: TokenStream) -> TokenStream {
     let fn_block = &input_fn.block;
     let fn_attrs = &input_fn.attrs;
 
-
     let expanded = quote! {
         #(#fn_attrs)*
         #fn_vis #fn_sig {
@@ -160,3 +251,187 @@ pub fn debug_trace(args: TokenStream, input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
+#[proc_macro_attribute]
+pub fn tool_calls(_attr: TokenStream, input: TokenStream) -> TokenStream {
+    let input_trait = parse_macro_input!(input as ItemTrait);
+    let mut impl_methods = Vec::new();
+
+    for item in input_trait.clone().items {
+        if let TraitItem::Fn(method) = item {
+            let fn_name = &method.sig.ident;
+
+            // Extract method parameters (skip &self and txn)
+            let method_params: Vec<_> = method.sig.inputs.iter().skip(3).collect();
+            let (field_names, struct_fields): (Vec<_>, Vec<_>) = method_params
+                .iter()
+                .filter_map(|param| {
+                    if let FnArg::Typed(pat_type) = param {
+                        let field_name = if let Pat::Ident(pat_ident) = &*pat_type.pat {
+                            &pat_ident.ident
+                        } else {
+                            return None;
+                        };
+
+                        let field_type = &pat_type.ty;
+                        Some((quote! { #field_name }, quote! { #field_name: #field_type }))
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            let struct_name = quote::format_ident!("{}Data", fn_name);
+            let expanded = quote! {
+                #[derive(Debug, Deserialize)]
+                #[allow(non_camel_case_types)]
+                struct #struct_name<'a> {
+                    connection_id: String,
+                    #(#struct_fields),*
+                }
+
+                #[mcp_handler]
+                pub fn #fn_name<'a>(
+                    input: &'a mut MCPToolInput,
+                    response: &mut Response,
+                ) -> Result<(), GraphError> {
+                    let data: #struct_name = match sonic_rs::from_slice(&input.request.body) {
+                        Ok(data) => data,
+                        Err(err) => return Err(GraphError::from(err)),
+                    };
+
+                    let mut connections = input.mcp_connections.lock().unwrap();
+                    let mut connection = match connections.remove_connection(&data.connection_id) {
+                        Some(conn) => conn,
+                        None => return Err(GraphError::Default),
+                    };
+
+                    let txn = input.mcp_backend.db.graph_env.read_txn()?;
+
+
+
+                    let result = input.mcp_backend.#fn_name(&txn, &connection, #(data.#field_names),*)?;
+
+                    let first = result.first().unwrap_or(&TraversalVal::Empty).clone();
+
+                    connection.iter = result.into_iter();
+                    let mut connections = input.mcp_connections.lock().unwrap();
+                    connections.add_connection(connection);
+                    drop(connections);
+
+                    response.body = sonic_rs::to_vec(&ReturnValue::from(first)).unwrap();
+                    Ok(())
+                }
+            };
+
+            impl_methods.push(expanded);
+        }
+    }
+
+    let expanded = quote! {
+        #(#impl_methods)*
+        #input_trait
+    };
+
+    TokenStream::from(expanded)
+}
+
+struct ToolCallArgs {
+    name: Ident,
+    _comma: Token![,],
+    txn_type: Ident,
+}
+impl Parse for ToolCallArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        Ok(ToolCallArgs {
+            name: input.parse()?,
+            _comma: input.parse()?,
+            txn_type: input.parse()?,
+        })
+    }
+}
+
+#[proc_macro_attribute]
+pub fn tool_call(args: TokenStream, input: TokenStream) -> TokenStream {
+    let args = parse_macro_input!(args as ToolCallArgs);
+    let method = parse_macro_input!(input as ItemFn);
+
+    let name = args.name;
+    let txn_type = match args.txn_type.to_string().as_str() {
+        "with_read" => quote! { let txn = db.graph_env.read_txn().unwrap(); },
+        "with_write" => quote! { let mut txn = db.graph_env.write_txn().unwrap(); },
+        _ => panic!("Invalid transaction type: expected 'with_read' or 'with_write'"),
+    };
+
+    let fn_name = &method.sig.ident;
+    let fn_block = &method.block.stmts;
+
+    let struct_name = quote::format_ident!("{}Input", fn_name);
+    let mcp_function_name = quote::format_ident!("{}Mcp", fn_name);
+    let mcp_struct_name = quote::format_ident!("{}McpInput", fn_name);
+
+    let query_stmts = match fn_block.first() {
+        Some(Stmt::Expr(Expr::Block(block), _)) => block.block.stmts.clone(),
+        _ => panic!("Query block not found"),
+    };
+
+    let mcp_query_block = quote! {
+        {
+
+            let mut remapping_vals = RemappingMap::new();
+            let db = Arc::clone(&input.mcp_backend.db);
+            #txn_type
+            let data: #struct_name = data.data;
+            #(#query_stmts)*
+            txn.commit().unwrap();
+            #name.into_iter()
+        }
+    };
+
+    let new_method = quote! {
+
+        #[derive(Deserialize)]
+        #[allow(non_camel_case_types)]
+        struct #mcp_struct_name{
+            connection_id: String,
+            data: #struct_name,
+        }
+
+        #[mcp_handler]
+        pub fn #mcp_function_name<'a>(
+            input: &'a mut MCPToolInput,
+            response: &mut Response,
+        ) -> Result<(), GraphError> {
+            let data: #mcp_struct_name = match sonic_rs::from_slice(&input.request.body) {
+                Ok(data) => data,
+                Err(err) => return Err(GraphError::from(err)),
+            };
+
+            let mut connections = input.mcp_connections.lock().unwrap();
+            let mut connection = match connections.remove_connection(&data.connection_id) {
+                Some(conn) => conn,
+                None => return Err(GraphError::Default),
+            };
+            drop(connections);
+
+            let txn = input.mcp_backend.db.graph_env.read_txn()?;
+
+            let mut result = #mcp_query_block;
+
+            let first = result.next().unwrap_or(TraversalVal::Empty);
+
+            response.body = sonic_rs::to_vec(&ReturnValue::from(first)).unwrap();
+            connection.iter = result.into_iter();
+            let mut connections = input.mcp_connections.lock().unwrap();
+            connections.add_connection(connection);
+            drop(connections);
+            Ok(())
+        }
+    };
+
+    let expanded = quote! {
+        #method
+        #new_method
+    };
+
+    TokenStream::from(expanded)
+}

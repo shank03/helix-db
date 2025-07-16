@@ -12,7 +12,7 @@ use crate::{
 use heed3::PutFlags;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum EdgeType {
     #[serde(rename = "vec")]

@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 helix-db = { path = "../helix-db" }
-helix-macros = "0.1.2"
+helix-macros = { path = "../helix-macros" }
 
 inventory = "0.3.16"
 rand = "0.9.1"

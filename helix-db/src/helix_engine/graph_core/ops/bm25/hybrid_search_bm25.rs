@@ -1,23 +1,24 @@
+/*
 use heed3::RoTxn;
 
 use super::super::tr_val::TraversalVal;
 use crate::helix_engine::{
-    bm25::bm25::BM25,
+    bm25::bm25::{BM25, HybridSearch},
     graph_core::traversal_iter::RoTraversalIterator,
     storage_core::{storage_core::HelixGraphStorage, storage_methods::StorageMethods},
     types::GraphError,
 };
 use std::sync::Arc;
 
-pub struct SearchBM25<'scope, 'inner> {
+pub struct HybridSearchBM25<'scope, 'inner> {
     txn: &'scope RoTxn<'scope>,
     iter: std::vec::IntoIter<(u128, f32)>,
     storage: Arc<HelixGraphStorage>,
     label: &'inner str,
 }
 
-// implementing iterator for SearchBM25
-impl<'scope, 'inner> Iterator for SearchBM25<'scope, 'inner> {
+// implementing iterator for HybridSearchBM25
+impl<'scope, 'inner> Iterator for HybridSearchBM25<'scope, 'inner> {
     type Item = Result<TraversalVal, GraphError>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -35,48 +36,47 @@ impl<'scope, 'inner> Iterator for SearchBM25<'scope, 'inner> {
     }
 }
 
-pub trait SearchBM25Adapter<'a>: Iterator<Item = Result<TraversalVal, GraphError>> {
-    fn search_bm25(
+pub trait HybridSearchBM25Adapter<'a>: Iterator<Item = Result<TraversalVal, GraphError>> {
+    fn hybrid_search_bm25(
         self,
         label: &str,
         query: &str,
+        query_vector: Vec<f64>,
         k: usize,
-    ) -> Result<
-        RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>,
-        GraphError,
-    >;
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>;
 }
 
-impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> SearchBM25Adapter<'a>
+impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> HybridSearchBM25Adapter<'a>
     for RoTraversalIterator<'a, I>
 {
-    fn search_bm25(
+    fn hybrid_search_bm25(
         self,
         label: &str,
         query: &str,
+        query_vector: Vec<f64>,
         k: usize,
-    ) -> Result<
-        RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>,
-        GraphError,
-    > {
-        let results = match self.storage.bm25.as_ref() {
-            Some(s) => match s.search(self.txn, query, k) {
-                Ok(results) => results,
-                Err(e) => return Err(e),
-            },
-            None => return Err(GraphError::from("BM25 not found")),
-        };
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>> {
+        let res = self.storage.hybrid_search(
+            txn,
+            query,
+            query_vector,
+            None,
+            alpha,
+            k
+        )
 
-        let iter = SearchBM25 {
+        let iter = HybridSearchBM25 {
             txn: self.txn,
             iter: results.into_iter(),
             storage: Arc::clone(&self.storage),
             label,
         };
-        Ok(RoTraversalIterator {
+        RoTraversalIterator {
             inner: iter,
             storage: self.storage,
             txn: self.txn,
-        })
+        }
     }
 }
+*/
+

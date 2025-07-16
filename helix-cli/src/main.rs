@@ -663,10 +663,7 @@ fi
                     "version": "0.1.0",
                     "helix_config": config.to_json()
                 });
-                println!("{:#?}", payload);
                 let client = reqwest::Client::new();
-                println!("{}", user_key);
-                println!("{}", &command.cluster);
                 match client
                     .post("http://ec2-184-72-27-116.us-west-1.compute.amazonaws.com:3000/clusters/deploy-queries")
                     .header("x-api-key", user_key) // used to verify user
@@ -1418,7 +1415,7 @@ fi
                 );
             }
 
-            let key = github_login().await.unwrap();
+            let (key, user_id) = github_login().await.unwrap();
             println!("{}", "Successfully logged in!".green().bold());
 
             let mut cred_file = OpenOptions::new()
@@ -1429,7 +1426,7 @@ fi
                 .open(cred_path)
                 .unwrap();
 
-            if let Err(e) = cred_file.write_all(&format!("helix_user_key={key}").into_bytes()) {
+            if let Err(e) = cred_file.write_all(&format!("helix_user_id={user_id}\nhelix_user_key={key}").into_bytes()) {
                 println!(
                     "Got error when writing key: {}\nYou're key is: {}",
                     e.to_string().red(),
