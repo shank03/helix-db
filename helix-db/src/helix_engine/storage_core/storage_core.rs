@@ -60,9 +60,9 @@ impl HelixGraphStorage {
 
         let graph_env = unsafe {
             EnvOpenOptions::new()
-                .map_size(db_size * 1024 * 1024 * 1024) // Sets max size of the database in GB
-                .max_dbs(20) // Sets max number of databases
-                .max_readers(200) // Sets max number of readers
+                .map_size(db_size * 1024 * 1024 * 1024)
+                .max_dbs(20)
+                .max_readers(200)
                 .open(Path::new(path))?
         };
 
@@ -112,7 +112,6 @@ impl HelixGraphStorage {
             .name(DB_IN_EDGES)
             .create(&mut wtxn)?;
 
-        // Creates the secondary indices databases if there are any
         let mut secondary_indices = HashMap::new();
         if let Some(indexes) = config.graph_config.secondary_indices {
             for index in indexes {
@@ -128,7 +127,6 @@ impl HelixGraphStorage {
             }
         }
 
-        // Creates the vector database
         let vectors = VectorCore::new(
             &graph_env,
             &mut wtxn,
