@@ -42,7 +42,7 @@ pub enum CommandType {
     /// Stop Helix instances
     Stop(StopCommand),
 
-    /// Save an instnaces data.mdb file
+    /// Save an instances data.mdb file
     Save(SaveCommand),
 
     /// Delete an instance and all its data
@@ -70,8 +70,8 @@ pub struct DeployCommand {
     #[clap(short, long, help = "The path to the project")]
     pub path: Option<String>,
 
-    #[clap(short, long, help = "Instance id if restarting a running instance")]
-    pub instance: Option<String>,
+    #[clap(short, long, help = "Cluster id if restarting a running instance")]
+    pub cluster: Option<String>,
 
     #[clap(long, help = "Port to run the instance on")]
     pub port: Option<u16>,
@@ -118,14 +118,14 @@ pub struct StopCommand {
     pub all: bool,
 
     #[clap(help = "Instance ID to stop")]
-    pub instance: Option<String>,
+    pub cluster: Option<String>,
 }
 
 #[derive(Debug, Args)]
 #[clap(name = "save", about = "Save an instances data.mdb file")]
 pub struct SaveCommand {
     #[clap(help = "Instance ID to save")]
-    pub instance: String,
+    pub cluster: String,
 
     #[clap(short, long, help = "Where to save the file to")]
     pub output: Option<String>,
@@ -134,14 +134,14 @@ pub struct SaveCommand {
 #[derive(Debug, Args)]
 #[clap(name = "delete", about = "Delete an instance and its saved data")]
 pub struct DeleteCommand {
-    #[clap(help = "Instance ID to delete")]
-    pub instance: String,
+    #[clap(help = "Cluster ID to delete")]
+    pub cluster: String,
 }
 
 #[derive(Debug, Args)]
 #[clap(name = "visualize", about = "Visualize the Helix graph")]
 pub struct VisualizeCommand {
-    #[clap(help = "Id of instance to visualize")]
-    pub instance: String,
+    #[clap(help = "Cluster ID to visualize")]
+    pub cluster: String,
 }
 

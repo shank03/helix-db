@@ -611,6 +611,7 @@ mod tests {
         for (i, props) in nodes.iter().enumerate() {
             let data = props.flatten_bm25();
             bm25.insert_doc(&mut wtxn, i as u128, &data).unwrap();
+            println!("{data:?}");
         }
         wtxn.commit().unwrap();
 

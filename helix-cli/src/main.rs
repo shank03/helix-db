@@ -50,21 +50,21 @@ async fn main() {
 
             if command.path.is_none()
                 && !Path::new(&format!("./{}", DB_DIR)).is_dir()
-                && command.instance.is_none()
+                && command.cluster.is_none()
             {
                 println!("{}", "No path or instance specified!".red().bold());
                 return;
             }
 
             // -- helix start --
-            if command.instance.is_some()
+            if command.cluster.is_some()
                 && command.path.is_none()
                 && !Path::new(&format!("./{}", DB_DIR)).is_dir()
             {
                 let instance_manager = InstanceManager::new().unwrap();
                 let mut sp = Spinner::new(Spinners::Dots9, "Starting Helix instance".into());
 
-                match instance_manager.start_instance(&command.instance.unwrap(), None) {
+                match instance_manager.start_instance(&command.cluster.unwrap(), None) {
                     Ok(instance) => {
                         sp.stop_with_message(format!(
                                 "{}",
@@ -130,10 +130,10 @@ async fn main() {
                     Err(_) => return,
                 };
 
-                if command.instance.is_some() &&
+                if command.cluster.is_some() &&
                     (command.path.is_some() || Path::new(&format!("./{}", DB_DIR)).is_dir())
                 {
-                    match redeploy_helix(command.instance.unwrap(), code) {
+                    match redeploy_helix(command.cluster.unwrap(), code) {
                         Ok(_) => {}
                         Err(_) => return,
                     }
@@ -141,7 +141,7 @@ async fn main() {
                 }
 
                 // -- helix deploy --
-                if command.instance.is_none() &&
+                if command.cluster.is_none() &&
                     (command.path.is_some() || Path::new(&format!("./{}", DB_DIR)).is_dir())
                 {
                     match deploy_helix(port, code, None) {
@@ -151,7 +151,7 @@ async fn main() {
                     return;
                 }
             } else {
-                if let Some(cluster) = command.instance {
+                if let Some(cluster) = command.cluster {
                     match redeploy_helix_remote(cluster, path, files).await {
                         Ok(_) => {}
                         Err(_) => return,
@@ -286,7 +286,6 @@ async fn main() {
             }
         }
 
-        // TODO: error with print out here
         CommandType::Compile(command) => {
             let path = if let Some(p) = &command.path {
                 p
@@ -601,18 +600,17 @@ async fn main() {
                                 }
                             }
                         });
-                    } else if let Some(instance_id) = command.instance {
-                        match instance_manager.stop_instance(&instance_id) {
+                    } else if let Some(cluster_id) = command.cluster {
+                        match instance_manager.stop_instance(&cluster_id) {
                             Ok(false) => {
                                 println!(
                                     "{} {}",
                                     "Instance is not running".yellow().bold(),
-                                    instance_id
+                                    cluster_id
                                 )
                             }
-                            Ok(true) => {
-                                println!("{} {}", "Stopped instance".green().bold(), instance_id)
-                            }
+                            Ok(true) =>
+                                println!("{} {}", "Stopped instance".green().bold(), cluster_id),
                             Err(e) => println!("{} {}", "Failed to stop instance:".red().bold(), e),
                         }
                     } else {
@@ -636,7 +634,7 @@ async fn main() {
 
         CommandType::Save(command) => {
             let instance_manager = InstanceManager::new().unwrap();
-            let iid = &command.instance;
+            let iid = &command.cluster;
 
             match instance_manager.get_instance(iid) {
                 Ok(Some(_)) => println!("{}", "Helix instance found!".green().bold()),
@@ -677,7 +675,7 @@ async fn main() {
 
         CommandType::Delete(command) => {
             let instance_manager = InstanceManager::new().unwrap();
-            let iid = &command.instance;
+            let iid = &command.cluster;
 
             match instance_manager.get_instance(iid) {
                 Ok(Some(_)) => println!("{}", "Helix instance found!".green().bold()),
@@ -782,7 +780,7 @@ async fn main() {
 
         CommandType::Visualize(command) => {
             let instance_manager = InstanceManager::new().unwrap();
-            let iid = &command.instance;
+            let iid = &command.cluster;
 
             match instance_manager.get_instance(iid) {
                 Ok(Some(instance)) => {
@@ -868,3 +866,4 @@ async fn main() {
         }
     }
 }
+
