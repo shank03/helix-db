@@ -86,8 +86,8 @@ async fn redeploy_handler(State(state): State<AppState>) -> Result<Json<DeployRe
 async fn perform_deployment(state: &AppState) -> Result<(), AdminError> {
     // rename old binary
     let mv_result = Command::new("mv")
-        .arg("helix")
-        .arg("helix_old")
+        .arg("/root/.helix/bin/helix-container")
+        .arg("/root/.helix/bin/helix-container_old")
         .output()
         .map_err(|e| AdminError::CommandError("Failed to backup old binary".to_string(), e))?;
 
@@ -102,9 +102,9 @@ async fn perform_deployment(state: &AppState) -> Result<(), AdminError> {
     let response = state
         .s3_client
         .get_object()
-        .bucket("helix-build")
+        .bucket("helix-user-builds")
         .key(format!(
-            "{}/{}/helix/latest",
+            "{}/{}/helix-container/latest",
             state.user_id, state.cluster_id
         ))
         .send()
@@ -112,7 +112,7 @@ async fn perform_deployment(state: &AppState) -> Result<(), AdminError> {
         .map_err(|e| AdminError::S3DownloadError("Failed to download binary from S3".to_string(), e))?;
 
     // create binary file or overwrite if it exists
-    let mut file = File::create("helix")
+    let mut file = File::create("/root/.helix/bin/helix-container")
         .map_err(|e| AdminError::FileError("Failed to create new binary file".to_string(), e))?;
     
     let body = response
@@ -130,7 +130,7 @@ async fn perform_deployment(state: &AppState) -> Result<(), AdminError> {
     let chmod_result = Command::new("sudo")
         .arg("chmod")
         .arg("+x")
-        .arg("helix")
+        .arg("/root/.helix/bin/helix-container")
         .output()
         .map_err(|e| AdminError::CommandError("Failed to set binary permissions".to_string(), e))?;
 
@@ -169,8 +169,8 @@ async fn perform_deployment(state: &AppState) -> Result<(), AdminError> {
         tracing::warn!("Service failed to start, reverting to old binary");
         
         let revert_result = Command::new("mv")
-            .arg("helix_old")
-            .arg("helix")
+            .arg("/root/.helix/bin/helix-container_old")
+            .arg("/root/.helix/bin/helix-container")
             .output();
 
         if let Err(e) = revert_result {
@@ -194,7 +194,7 @@ async fn perform_deployment(state: &AppState) -> Result<(), AdminError> {
     } else {
         // delete old binary
         let rm_result = Command::new("rm")
-            .arg("helix_old")
+            .arg("/root/.helix/bin/helix-container_old")
             .output();
 
         if let Err(e) = rm_result {
