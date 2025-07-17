@@ -69,23 +69,23 @@ pub struct Embedding {
 #[derive(Serialize, Deserialize)]
 pub struct hnswsearchInput {
 
-pub query: Vec<f64>,
-pub k: i32
+    pub query: Vec<f64>,
+    pub k: i32
 }
 #[handler]
 pub fn hnswsearch (input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
-let data: hnswsearchInput = match sonic_rs::from_slice(&input.request.body) {
-    Ok(data) => data,
-    Err(err) => return Err(GraphError::from(err)),
-};
+    let data: hnswsearchInput = match sonic_rs::from_slice(&input.request.body) {
+        Ok(data) => data,
+        Err(err) => return Err(GraphError::from(err)),
+    };
 
-let mut remapping_vals = RemappingMap::new();
-let db = Arc::clone(&input.graph.storage);
-let txn = db.graph_env.read_txn().unwrap();
+    let mut remapping_vals = RemappingMap::new();
+    let db = Arc::clone(&input.graph.storage);
+    let txn = db.graph_env.read_txn().unwrap();
     let res = G::new(Arc::clone(&db), &txn)
-.search_v::<fn(&HVector, &RoTxn) -> bool>(&data.query, data.k as usize, None).collect_to::<Vec<_>>();
-let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
-        return_vals.insert("res".to_string(), ReturnValue::from_traversal_value_array_with_mixin(res.clone().clone(), remapping_vals.borrow_mut()));
+        .search_v::<fn(&HVector, &RoTxn) -> bool>(&data.query, data.k as usize, None).collect_to::<Vec<_>>();
+    let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
+    return_vals.insert("res".to_string(), ReturnValue::from_traversal_value_array_with_mixin(res.clone().clone(), remapping_vals.borrow_mut()));
 
     txn.commit().unwrap();
     response.body = sonic_rs::to_vec(&return_vals).unwrap();
@@ -95,22 +95,22 @@ let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
 #[derive(Serialize, Deserialize)]
 pub struct hnswinsertInput {
 
-pub vector: Vec<f64>
+    pub vector: Vec<f64>
 }
 #[handler]
 pub fn hnswinsert (input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
-let data: hnswinsertInput = match sonic_rs::from_slice(&input.request.body) {
-    Ok(data) => data,
-    Err(err) => return Err(GraphError::from(err)),
-};
+    let data: hnswinsertInput = match sonic_rs::from_slice(&input.request.body) {
+        Ok(data) => data,
+        Err(err) => return Err(GraphError::from(err)),
+    };
 
-let mut remapping_vals = RemappingMap::new();
-let db = Arc::clone(&input.graph.storage);
-let mut txn = db.graph_env.write_txn().unwrap();
+    let mut remapping_vals = RemappingMap::new();
+    let db = Arc::clone(&input.graph.storage);
+    let mut txn = db.graph_env.write_txn().unwrap();
     G::new_mut(Arc::clone(&db), &mut txn)
-.insert_v::<fn(&HVector, &RoTxn) -> bool>(&data.vector, "Embedding", None).collect_to_obj();
-let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
-        return_vals.insert("Success".to_string(), ReturnValue::from(Value::from("Success")));
+        .insert_v::<fn(&HVector, &RoTxn) -> bool>(&data.vector, "Embedding", None).collect_to_obj();
+    let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
+    return_vals.insert("Success".to_string(), ReturnValue::from(Value::from("Success")));
 
     txn.commit().unwrap();
     response.body = sonic_rs::to_vec(&return_vals).unwrap();

@@ -9,7 +9,8 @@ use crate::{
 
 use heed3::{types::*, Database, Env, RoTxn, RwTxn};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, thread};
+use std::collections::HashMap;
+use tokio::task;
 
 const DB_BM25_INVERTED_INDEX: &str = "bm25_inverted_index"; // term -> list of (doc_id, tf)
 const DB_BM25_DOC_LENGTHS: &str = "bm25_doc_lengths"; // doc_id -> document length
@@ -342,22 +343,20 @@ impl BM25 for HBM25Config {
 }
 
 pub trait HybridSearch {
-    fn hybrid_search(
+    async fn hybrid_search(
         self,
         query: &str,
         query_vector: &[f64],
-        vector_query: Option<&[f32]>,
         alpha: f32,
         limit: usize,
     ) -> Result<Vec<(u128, f32)>, GraphError>;
 }
 
 impl HybridSearch for HelixGraphStorage {
-    fn hybrid_search(
+    async fn hybrid_search(
         self,
         query: &str,
         query_vector: &[f64],
-        vector_query: Option<&[f32]>,
         alpha: f32,
         limit: usize,
     ) -> Result<Vec<(u128, f32)>, GraphError> {
@@ -365,47 +364,45 @@ impl HybridSearch for HelixGraphStorage {
 
         let query_owned = query.to_string();
         let query_vector_owned = query_vector.to_vec();
-        let vector_query_owned = vector_query.map(|v| v.to_vec());
 
-        let bm25_handle = {
-            let graph_env = self.graph_env.clone();
-            thread::spawn(move || -> Result<Vec<(u128, f32)>, GraphError> {
-                let txn = graph_env.read_txn()?;
+        let graph_env_bm25 = self.graph_env.clone();
+        let graph_env_vector = self.graph_env.clone();
+
+        let bm25_handle = task::spawn(async move {
+            task::spawn_blocking(move || -> Result<Vec<(u128, f32)>, GraphError> {
+                let txn = graph_env_bm25.read_txn()?;
                 match self.bm25.as_ref() {
                     Some(s) => s.search(&txn, &query_owned, limit * 2),
                     None => Err(GraphError::from("BM25 not enabled!")),
                 }
-            })
-        };
+            }).await
+            .map_err(|_| GraphError::from("BM25 task panicked"))?
+        });
 
-        let vector_handle = {
-            let graph_env = self.graph_env.clone();
-            thread::spawn(move || -> Result<Option<Vec<HVector>>, GraphError> {
-                if vector_query_owned.is_some() {
-                    let txn = graph_env.read_txn()?;
-                    let results = self.vectors.search::<fn(&HVector, &RoTxn) -> bool>(
-                        &txn,
-                        &query_vector_owned,
-                        limit * 2,
-                        None,
-                        false,
-                    )?;
-                    Ok(Some(results))
-                } else {
-                    Ok(None)
-                }
-            })
-        };
+        let vector_handle = task::spawn(async move {
+            task::spawn_blocking(move || -> Result<Option<Vec<HVector>>, GraphError> {
+                let txn = graph_env_vector.read_txn()?;
+                let results = self.vectors.search::<fn(&HVector, &RoTxn) -> bool>(
+                    &txn,
+                    &query_vector_owned,
+                    limit * 2,
+                    None,
+                    false,
+                )?;
+                Ok(Some(results))
+            }).await
+            .map_err(|_| GraphError::from("Vector task panicked"))?
+        });
 
-        let bm25_results = bm25_handle.join().map_err(|_| GraphError::from("BM25 thread panicked"))??;
-        let vector_results = vector_handle.join().map_err(|_| GraphError::from("Vector thread panicked"))??;
+        let (bm25_results, vector_results) =
+            tokio::try_join!(bm25_handle, vector_handle).unwrap(); // TODO: no unwrap here would be
 
         // TODO: fix the major error
-        for (doc_id, score) in bm25_results {
+        for (doc_id, score) in bm25_results? {
             combined_scores.insert(doc_id, alpha * score);
         }
 
-        if let Some(vector_results) = vector_results {
+        if let Some(vector_results) = vector_results? {
             for doc in vector_results {
                 let doc_id = doc.id;
                 let score = doc.distance.unwrap_or(0.0);

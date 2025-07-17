@@ -53,21 +53,21 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> HybridSearchBM25A
         self,
         label: &str,
         query: &str,
-        query_vector: Vec<f64>,
+        query_vector: &Vec<f64>,
         k: usize,
     ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>> {
-        let res = self.storage.hybrid_search(
-            txn,
+        // check bm25 enabled
+
+        let results = self.storage.hybrid_search(
             query,
             query_vector,
-            None,
-            alpha,
-            k
-        )
+            0.5,
+            k,
+        );
 
         let iter = HybridSearchBM25 {
             txn: self.txn,
-            iter: results.into_iter(),
+            iter: results,
             storage: Arc::clone(&self.storage),
             label,
         };

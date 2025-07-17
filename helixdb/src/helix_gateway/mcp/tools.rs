@@ -12,6 +12,7 @@ use crate::{
             },
             source::{add_e::EdgeType, e_from_type::EFromType, n_from_type::NFromType},
             tr_val::{Traversable, TraversalVal}, vectors::search::SearchVAdapter,
+            bm25::search_bm25::SearchBM25Adapter,
         },
         types::GraphError,
         storage_core::storage_core::HelixGraphStorage,
@@ -21,12 +22,11 @@ use crate::{
         embedding_providers::embedding_providers::{get_embedding_model, EmbeddingModel},
         mcp::mcp::{MCPConnection, McpBackend},
     },
-    protocol::return_values::ReturnValue,
     utils::label_hash::hash_label,
 };
 use heed3::RoTxn;
 use serde::Deserialize;
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -151,6 +151,15 @@ trait McpTools<'a> {
         txn: &'a RoTxn,
     ) -> Result<Vec<TraversalVal>, GraphError>;
 
+    /// BM25
+    fn search_keyword(
+        &'a self,
+        query: &'a str,
+        limit: usize,
+        txn: &'a RoTxn,
+    ) -> Result<Vec<TraversalVal>, GraphError>;
+
+    /// HNSW Search with built int embedding model
     fn search_vector_text(
         &'a self,
         query: &'a str,
@@ -432,6 +441,21 @@ impl<'a> McpTools<'a> for McpBackend {
         Ok(result)
     }
 
+    fn search_keyword(
+        &'a self,
+        query: &'a str,
+        limit: usize,
+        txn: &'a RoTxn,
+    ) -> Result<Vec<TraversalVal>, GraphError> {
+        let db = Arc::clone(&self.db);
+
+        let results = G::new(db, &txn)
+            .search_bm25("mcp search", query, limit)?
+            .collect_to::<Vec<_>>();
+
+        Ok(results)
+    }
+
     fn search_vector_text(
         &'a self,
         query: &'a str,
@@ -443,7 +467,7 @@ impl<'a> McpTools<'a> for McpBackend {
         let result = model.fetch_embedding(query);
         let embedding = result.unwrap();
 
-        let res = G::new(Arc::clone(&db), &txn)
+        let res = G::new(db, &txn)
             .search_v::<fn(&HVector, &RoTxn) -> bool>(&embedding, 5, None)
             .collect_to::<Vec<_>>();
 

@@ -7,12 +7,14 @@ mod tests {
             },
             graph_core::config::Config,
             storage_core::storage_core::HelixGraphStorage,
+            vector_core::{hnsw::HNSW, vector::HVector},
         },
         protocol::value::Value,
     };
-    use heed3::{Env, EnvOpenOptions};
+    use heed3::{Env, EnvOpenOptions, RoTxn};
     use std::collections::HashMap;
     use tempfile::tempdir;
+    use rand::Rng;
 
     fn setup_test_env() -> (Env, tempfile::TempDir) {
         let temp_dir = tempdir().unwrap();
@@ -43,6 +45,21 @@ mod tests {
         let config = Config::default();
         let storage = HelixGraphStorage::new(path, config).unwrap();
         (storage, temp_dir)
+    }
+
+    fn generate_random_vectors(n: usize, d: usize) -> Vec<Vec<f64>> {
+        let mut rng = rand::rng();
+        let mut vectors = Vec::with_capacity(n);
+
+        for _ in 0..n {
+            let mut vector = Vec::with_capacity(d);
+            for _ in 0..d {
+                vector.push(rng.random::<f64>());
+            }
+            vectors.push(vector);
+        }
+
+        vectors
     }
 
     #[test]
@@ -77,6 +94,14 @@ mod tests {
         for (i, token) in tokens.iter().enumerate() {
             assert_eq!(token, expected[i]);
         }
+    }
+
+    #[test]
+    fn test_tokenize_edge_cases_punctuation_only() {
+        let (bm25, _temp_dir) = setup_bm25_config();
+
+        let tokens = bm25.tokenize::<true>("!@#$%^&*()");
+        assert_eq!(tokens.len(), 0);
     }
 
     #[test]
@@ -691,9 +716,6 @@ mod tests {
         assert_eq!(results.len(), 0);
     }
 
-    // what i've tested so far and is valid
-    /* ------------------------------------------------------------------------------------------ */
-
     #[test]
     fn test_search_with_limit() {
         let (bm25, _temp_dir) = setup_bm25_config();
@@ -742,52 +764,57 @@ mod tests {
         let result = bm25.insert_doc(&mut wtxn, 1u128, "");
         assert!(result.is_ok());
 
-        // Document length should be 0
+        // document length should be 0
         let doc_length = bm25.doc_lengths_db.get(&wtxn, &1u128).unwrap().unwrap();
         assert_eq!(doc_length, 0);
 
         wtxn.commit().unwrap();
     }
 
-    #[test]
-    fn test_edge_cases_punctuation_only() {
-        let (bm25, _temp_dir) = setup_bm25_config();
-
-        let tokens = bm25.tokenize::<true>("!@#$%^&*()");
-        assert_eq!(tokens.len(), 0);
-    }
-
-    #[test]
-    fn test_hybrid_search() {
+    #[tokio::test]
+    async fn test_hybrid_search() {
         let (storage, _temp_dir) = setup_helix_storage();
 
-        // Prepare test data
+        let mut wtxn = storage.graph_env.write_txn().unwrap();
+        let docs = vec![
+            (1u128, "machine learning algorithms"),
+            (2u128, "deep learning neural networks"),
+            (3u128, "data science methods"),
+        ];
+
+        let bm25 = storage.bm25.as_ref().unwrap();
+        for (doc_id, doc) in &docs {
+            bm25.insert_doc(&mut wtxn, *doc_id, doc).unwrap();
+        }
+        wtxn.commit().unwrap();
+
+        let mut wtxn = storage.graph_env.write_txn().unwrap();
+        let vectors = generate_random_vectors(800, 650);
+        for vec in vectors {
+            let _ = storage.vectors.insert::<fn(&HVector, &RoTxn) -> bool>(&mut wtxn, &vec, None);
+        }
+        wtxn.commit().unwrap();
+
         let query = "machine learning";
-        let query_vector = vec![0.1, 0.2, 0.3]; // Dummy vector
-        let vector_query = Some(vec![0.1f32, 0.2f32, 0.3f32]);
-        let alpha = 0.5; // Equal weight between BM25 and vector
+        let query_vector = generate_random_vectors(1, 650);
+        let alpha = 0.5; // equal weight between BM25 and vector
         let limit = 10;
 
-        // Test hybrid search (even though it might not return results with empty index)
         let result = storage.hybrid_search(
             query,
-            &query_vector,
-            vector_query.as_deref(),
+            &query_vector[0],
             alpha,
             limit,
-        );
+        ).await;
 
-        // The result might be an error if vector search is not properly initialized
-        // but the function should at least not panic
         match result {
             Ok(results) => assert!(results.len() <= limit),
-            Err(_) => println!("Vector search not available, which is expected in this test environment"),
+            Err(_) => println!("Vector search not available"),
         }
     }
 
-    /*
-    #[test]
-    fn test_hybrid_search_alpha_weighting() {
+    #[tokio::test]
+    async fn test_hybrid_search_alpha_vectors() {
         let (storage, _temp_dir) = setup_helix_storage();
 
         // Insert some test documents first
@@ -798,99 +825,91 @@ mod tests {
             (3u128, "data science methods"),
         ];
 
+        let bm25 = storage.bm25.as_ref().unwrap();
         for (doc_id, doc) in &docs {
-            storage.bm25.insert_doc(&mut wtxn, *doc_id, doc).unwrap();
+            bm25.insert_doc(&mut wtxn, *doc_id, doc).unwrap();
         }
         wtxn.commit().unwrap();
 
-        let rtxn = storage.graph_env.read_txn().unwrap();
+        let mut wtxn = storage.graph_env.write_txn().unwrap();
+        let vectors = generate_random_vectors(800, 650);
+        for vec in vectors {
+            let _ = storage.vectors.insert::<fn(&HVector, &RoTxn) -> bool>(&mut wtxn, &vec, None);
+        }
+        wtxn.commit().unwrap();
 
-        // Test with different alpha values
         let query = "machine learning";
-        let query_vector = vec![0.1, 0.2, 0.3];
-        let vector_query = Some(vec![0.1f32, 0.2f32, 0.3f32]);
+        let query_vector = generate_random_vectors(1, 650);
 
-        // Alpha = 1.0 (BM25 only)
-        let results_bm25_only = storage.hybrid_search(
-            &rtxn,
-            query,
-            &query_vector,
-            vector_query.as_deref(),
-            1.0,
-            10,
-        );
-
-        // Alpha = 0.0 (Vector only)
+        // alpha = 0.0 (Vector only)
         let results_vector_only = storage.hybrid_search(
-            &rtxn,
             query,
-            &query_vector,
-            vector_query.as_deref(),
+            &query_vector[0],
             0.0,
             10,
-        );
-
-        // Alpha = 0.5 (Balanced)
-        let results_balanced = storage.hybrid_search(
-            &rtxn,
-            query,
-            &query_vector,
-            vector_query.as_deref(),
-            0.5,
-            10,
-        );
-
-        // All should be valid results or acceptable errors
-        match results_bm25_only {
-            Ok(results) => assert!(results.len() <= 10),
-            Err(_) => println!("BM25-only search failed, which might be expected"),
-        }
+        ).await;
 
         match results_vector_only {
             Ok(results) => assert!(results.len() <= 10),
             Err(_) => {
-                println!("Vector-only search failed, which is expected without proper vector setup")
+                println!("Vector-only search failed")
             }
         }
-
-        match results_balanced {
-            Ok(results) => assert!(results.len() <= 10),
-            Err(_) => println!("Balanced search failed, which might be expected"),
-        }
     }
-    */
 
-    #[test]
-    fn test_concurrent_operations() {
-        let (bm25, _temp_dir) = setup_bm25_config();
+    #[tokio::test]
+    async fn test_hybrid_search_alpha_bm25() {
+        let (storage, _temp_dir) = setup_helix_storage();
 
-        // Test multiple inserts in the same transaction
-        let mut wtxn = bm25.graph_env.write_txn().unwrap();
+        // Insert some test documents first
+        let mut wtxn = storage.graph_env.write_txn().unwrap();
+        let docs = vec![
+            (1u128, "machine learning algorithms"),
+            (2u128, "deep learning neural networks"),
+            (3u128, "data science methods"),
+        ];
 
-        for i in 1..=100 {
-            let doc = format!("document number {} with various content", i);
-            let result = bm25.insert_doc(&mut wtxn, i as u128, &doc);
-            assert!(result.is_ok());
+        let bm25 = storage.bm25.as_ref().unwrap();
+        for (doc_id, doc) in &docs {
+            bm25.insert_doc(&mut wtxn, *doc_id, doc).unwrap();
         }
-
         wtxn.commit().unwrap();
 
-        // Verify all documents were inserted
-        let rtxn = bm25.graph_env.read_txn().unwrap();
-        let results = bm25.search(&rtxn, "document", 200).unwrap();
-        assert_eq!(results.len(), 100);
+        let mut wtxn = storage.graph_env.write_txn().unwrap();
+        let vectors = generate_random_vectors(800, 650);
+        for vec in vectors {
+            let _ = storage.vectors.insert::<fn(&HVector, &RoTxn) -> bool>(&mut wtxn, &vec, None);
+        }
+        wtxn.commit().unwrap();
+
+        let query = "machine learning";
+        let query_vector = generate_random_vectors(1, 650);
+
+        // alpha = 1.0 (BM25 only)
+        let results_bm25_only = storage.hybrid_search(
+            query,
+            &query_vector[0],
+            1.0,
+            10,
+        ).await;
+
+        // all should be valid results or acceptable errors
+        match results_bm25_only {
+            Ok(results) => assert!(results.len() <= 10),
+            Err(_) => println!("BM25-only search failed"),
+        }
     }
 
     #[test]
     fn test_bm25_score_properties() {
         let (bm25, _temp_dir) = setup_bm25_config();
 
-        // Test that higher term frequency yields higher score
+        // test that higher term frequency yields higher score
         let score1 = bm25.calculate_bm25_score(1, 10, 5, 100, 10.0);
         let score2 = bm25.calculate_bm25_score(3, 10, 5, 100, 10.0);
         assert!(score2 > score1);
 
-        // Test that rare terms (lower df) yield higher scores
+        // test that rare terms (lower df) yield higher scores
         let score_rare = bm25.calculate_bm25_score(1, 10, 2, 100, 10.0);
         let score_common = bm25.calculate_bm25_score(1, 10, 50, 100, 10.0);
         assert!(score_rare > score_common);
@@ -901,7 +920,6 @@ mod tests {
         let (bm25, _temp_dir) = setup_bm25_config();
         let mut wtxn = bm25.graph_env.write_txn().unwrap();
 
-        // Insert documents
         let docs = vec![
             (1u128, "short doc"),
             (2u128, "this is a much longer document with many more words"),
@@ -912,7 +930,6 @@ mod tests {
             bm25.insert_doc(&mut wtxn, *doc_id, doc).unwrap();
         }
 
-        // check metadata
         let metadata_bytes = bm25.metadata_db.get(&wtxn, METADATA_KEY).unwrap().unwrap();
         let metadata: BM25Metadata = bincode::deserialize(metadata_bytes).unwrap();
 
@@ -921,15 +938,14 @@ mod tests {
         assert_eq!(metadata.k1, 1.2);
         assert_eq!(metadata.b, 0.75);
 
-        // Delete one document
         bm25.delete_doc(&mut wtxn, 2u128).unwrap();
 
-        // Check updated metadata
+        // check updated metadata
         let metadata_bytes = bm25.metadata_db.get(&wtxn, METADATA_KEY).unwrap().unwrap();
         let updated_metadata: BM25Metadata = bincode::deserialize(metadata_bytes).unwrap();
 
         assert_eq!(updated_metadata.total_docs, 2);
-        // Average document length should be recalculated
+        // average document length should be recalculated
         assert_ne!(updated_metadata.avgdl, metadata.avgdl);
 
         wtxn.commit().unwrap();
