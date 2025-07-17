@@ -9,13 +9,14 @@ use crate::{
 
 use heed3::{types::*, Database, Env, RoTxn, RwTxn};
 use serde::{Deserialize, Serialize};
-use std::{borrow::Cow, collections::HashMap};
+use std::collections::HashMap;
+use tokio::task;
 
 const DB_BM25_INVERTED_INDEX: &str = "bm25_inverted_index"; // term -> list of (doc_id, tf)
 const DB_BM25_DOC_LENGTHS: &str = "bm25_doc_lengths"; // doc_id -> document length
 const DB_BM25_TERM_FREQUENCIES: &str = "bm25_term_frequencies"; // term -> document frequency
 const DB_BM25_METADATA: &str = "bm25_metadata"; // stores total docs, avgdl, etc.
-const METADATA_KEY: &[u8] = b"metadata";
+pub const METADATA_KEY: &[u8] = b"metadata";
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct BM25Metadata {
@@ -33,7 +34,7 @@ pub struct PostingListEntry {
 }
 
 pub trait BM25 {
-    fn tokenize<const SHOULD_FILTER: bool>(&self, text: &str) -> Vec<Cow<'_, str>>;
+    fn tokenize<const SHOULD_FILTER: bool>(&self, text: &str) -> Vec<String>;
 
     fn insert_doc(&self, txn: &mut RwTxn, doc_id: u128, doc: &str) -> Result<(), GraphError>;
 
@@ -41,13 +42,14 @@ pub trait BM25 {
 
     fn update_doc(&self, txn: &mut RwTxn, doc_id: u128, doc: &str) -> Result<(), GraphError>;
 
+    /// Calculate the BM25 score for a single term of a query (no sum)
     fn calculate_bm25_score(
         &self,
-        tf: u32,
-        doc_len: u32,
-        df: u32,
-        total_docs: u64,
-        avgdl: f64,
+        tf: u32,         // term frequency
+        doc_len: u32,    // document length
+        df: u32,         // document frequency
+        total_docs: u64, // total documents
+        avgdl: f64,      // average document length
     ) -> f32;
 
     fn search(
@@ -79,10 +81,10 @@ impl HBM25Config {
 
         let doc_lengths_db: Database<U128<heed3::byteorder::BE>, U32<heed3::byteorder::BE>> =
             graph_env
-                .database_options()
-                .types::<U128<heed3::byteorder::BE>, U32<heed3::byteorder::BE>>()
-                .name(DB_BM25_DOC_LENGTHS)
-                .create(wtxn)?;
+            .database_options()
+            .types::<U128<heed3::byteorder::BE>, U32<heed3::byteorder::BE>>()
+            .name(DB_BM25_DOC_LENGTHS)
+            .create(wtxn)?;
 
         let term_frequencies_db: Database<Bytes, U32<heed3::byteorder::BE>> = graph_env
             .database_options()
@@ -110,12 +112,11 @@ impl HBM25Config {
 
 impl BM25 for HBM25Config {
     /// Converts text to lowercase, removes non-alphanumeric chars, splits into words
-    fn tokenize<const SHOULD_FILTER: bool>(&self, text: &str) -> Vec<Cow<'_, str>> {
+    fn tokenize<const SHOULD_FILTER: bool>(&self, text: &str) -> Vec<String> {
         text.to_lowercase()
-            .replace(|c: char| !c.is_alphanumeric(), " ")
-            .split_whitespace()
-            .filter(|s| !SHOULD_FILTER || s.len() > 2)
-            .map(|s| Cow::Owned(s.to_string()))
+            .split(|c: char| !c.is_alphanumeric())
+            .filter(|s| !s.is_empty())
+            .filter_map(|s| (!SHOULD_FILTER || s.len() > 2).then_some(s.to_string()))
             .collect()
     }
 
@@ -125,7 +126,7 @@ impl BM25 for HBM25Config {
         let tokens = self.tokenize::<true>(doc);
         let doc_length = tokens.len() as u32;
 
-        let mut term_counts: HashMap<Cow<'_, str>, u32> = HashMap::new();
+        let mut term_counts: HashMap<String, u32> = HashMap::new();
         for token in tokens {
             *term_counts.entry(token).or_insert(0) += 1;
         }
@@ -148,7 +149,7 @@ impl BM25 for HBM25Config {
             let current_df = self.term_frequencies_db.get(txn, term_bytes)?.unwrap_or(0);
             self.term_frequencies_db
                 .put(txn, term_bytes, &(current_df + 1))?;
-        }
+            }
 
         let mut metadata = if let Some(data) = self.metadata_db.get(txn, METADATA_KEY)? {
             bincode::deserialize::<BM25Metadata>(data)?
@@ -265,9 +266,9 @@ impl BM25 for HBM25Config {
         let df = df.max(1) as f64;
         let total_docs = total_docs.max(1) as f64;
 
-        // calculate IDF: log((N - df + 0.5) / (df + 0.5))
+        // calculate IDF: ln((N - df + 0.5) / (df + 0.5) + 1)
         // this can be negative when df is high relative to N, which is mathematically correct
-        let idf = ((total_docs - df + 0.5) / (df + 0.5)).ln();
+        let idf = (((total_docs - df + 0.5) / (df + 0.5)) + 1.0).ln();
 
         // ensure avgdl is not zero
         let avgdl = if avgdl > 0.0 { avgdl } else { doc_len as f64 };
@@ -275,14 +276,11 @@ impl BM25 for HBM25Config {
         // calculate BM25 score
         let tf = tf as f64;
         let doc_len = doc_len as f64;
-        let tf_component =
-            (tf * (self.k1 + 1.0)) / (tf + self.k1 * (1.0 - self.b + self.b * (doc_len / avgdl)));
+        let tf_component = (tf * (self.k1 + 1.0))
+            / (tf + self.k1 * (1.0 - self.b + self.b * (doc_len.abs() / avgdl)));
 
         let score = (idf * tf_component) as f32;
 
-        // the score can be negative when IDF is negative (term appears in most documents)
-        // this is mathematically correct - such terms have low discriminative power
-        // but documents with higher tf should still score higher than those with lower tf
         score
     }
 
@@ -345,56 +343,75 @@ impl BM25 for HBM25Config {
 }
 
 pub trait HybridSearch {
+    /// Search both hnsw index and bm25 docs
     fn hybrid_search(
-        &self,
-        txn: &RoTxn,
+        self,
         query: &str,
         query_vector: &[f64],
-        vector_query: Option<&[f32]>,
         alpha: f32,
         limit: usize,
-    ) -> Result<Vec<(u128, f32)>, GraphError>;
+    ) -> impl std::future::Future<Output = Result<Vec<(u128, f32)>, GraphError>> + Send;
 }
 
 impl HybridSearch for HelixGraphStorage {
-    fn hybrid_search(
-        &self,
-        txn: &RoTxn,
+    async fn hybrid_search(
+        self,
         query: &str,
         query_vector: &[f64],
-        vector_query: Option<&[f32]>,
         alpha: f32,
         limit: usize,
     ) -> Result<Vec<(u128, f32)>, GraphError> {
-        let bm25_results = self.bm25.as_ref().unwrap().search(txn, query, limit * 2)?; // get more results for better fusion
-        let mut combined_scores: HashMap<u128, f32> = HashMap::new();
+        let query_owned = query.to_string();
+        let query_vector_owned = query_vector.to_vec();
 
-        // Add BM25 scores (weighted by alpha)
-        for (doc_id, score) in bm25_results {
-            combined_scores.insert(doc_id, alpha * score);
-        }
+        let graph_env_bm25 = self.graph_env.clone();
+        let graph_env_vector = self.graph_env.clone();
 
-        // Add vector similarity scores if provided (weighted by 1-alpha)
-        if let Some(_query_vector) = vector_query {
-            // This would integrate with your existing vector search
-            // For now, we'll just use BM25 scores
-            // You would call your vector similarity search here and combine scores
-            let vector_results = self.vectors.search::<fn(&HVector, &RoTxn) -> bool>(
-                txn,
-                query_vector,
+        let bm25_handle = task::spawn_blocking(move || -> Result<Vec<(u128, f32)>, GraphError> {
+            let txn = graph_env_bm25.read_txn()?;
+            match self.bm25.as_ref() {
+                Some(s) => s.search(&txn, &query_owned, limit * 2),
+                None => Err(GraphError::from("BM25 not enabled!")),
+            }
+        });
+
+        let vector_handle = task::spawn_blocking(move || -> Result<Option<Vec<HVector>>, GraphError> {
+            let txn = graph_env_vector.read_txn()?;
+            let results = self.vectors.search::<fn(&HVector, &RoTxn) -> bool>(
+                &txn,
+                &query_vector_owned,
                 limit * 2,
                 None,
                 false,
             )?;
+            Ok(Some(results))
+        });
+
+        let (bm25_results, vector_results) = match tokio::try_join!(bm25_handle, vector_handle) {
+            Ok((a, b)) => (a, b),
+            Err(e) => return Err(GraphError::from(e.to_string())),
+        };
+
+        let mut combined_scores: HashMap<u128, f32> = HashMap::new();
+
+        for (doc_id, score) in bm25_results? {
+            combined_scores.insert(doc_id, alpha * score);
+        }
+
+        // correct_score = alpha * bm25_score + (1.0 - alpha) * vector_score
+        if let Some(vector_results) = vector_results? {
             for doc in vector_results {
                 let doc_id = doc.id;
                 let score = doc.distance.unwrap_or(0.0);
-                combined_scores.insert(doc_id, (1.0 - alpha) * score as f32);
-            }
+                let similarity = (1.0 / (1.0 + score)) as f32;
+                combined_scores
+                    .entry(doc_id)
+                    .and_modify(|existing_score| *existing_score += (1.0 - alpha) * similarity)
+                    .or_insert((1.0 - alpha) * score as f32);
+                }
         }
 
-        // Sort by combined score and return top results
-        let mut results: Vec<(u128, f32)> = combined_scores.into_iter().collect();
+        let mut results = combined_scores.into_iter().collect::<Vec<(u128, f32)>>();
         results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         results.truncate(limit);
 
@@ -403,17 +420,19 @@ impl HybridSearch for HelixGraphStorage {
 }
 
 pub trait BM25Flatten {
+    /// util func to flatten array of strings to a single string
     fn flatten_bm25(&self) -> String;
 }
 
 impl BM25Flatten for HashMap<String, Value> {
     fn flatten_bm25(&self) -> String {
-        let mut s = String::with_capacity(self.len() * 2);
-        for (k, v) in self.iter() {
-            s.push_str(&k);
-            s.push_str(&v.to_string());
-        }
-        s
+        self.iter()
+            .fold(String::with_capacity(self.len() * 4), |mut s, (k, v)| {
+                s.push_str(k);
+                s.push_str(" ");
+                s.push_str(&v.to_string());
+                s
+            })
     }
 }
 

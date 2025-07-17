@@ -1,7 +1,4 @@
-use super::{
-    utils::find_available_port,
-    types::CliError,
-};
+use super::utils::find_available_port;
 use helix_db::utils::styled_string::StyledString;
 use std::{
     fs::{self, File, OpenOptions},
@@ -15,13 +12,13 @@ use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct InstanceInfo {
+    pub short_id: u16,
     pub id: String,
     pub pid: u32,
     pub port: u16,
     pub started_at: String,
     pub available_endpoints: Vec<String>,
     pub binary_path: PathBuf,
-    pub label: String,
     pub running: bool,
 }
 
@@ -46,6 +43,15 @@ impl InstanceManager {
             cache_dir,
             logs_dir,
         })
+    }
+
+    fn id_from_short_id(&self, n: u16) -> Result<InstanceInfo, String> {
+        let instances = self.list_instances()
+            .map_err(|e| e.to_string())?;
+
+        instances.into_iter()
+            .find(|i| i.short_id == n)
+            .ok_or_else(|| "No instance found".to_string())
     }
 
     pub fn init_start_instance(
@@ -90,13 +96,13 @@ impl InstanceManager {
         let child = command.spawn()?;
 
         let instance = InstanceInfo {
+            short_id: (self.list_instances()?.len() + 1) as u16,
             id: instance_id,
             pid: child.id(),
             port,
             started_at: chrono::Local::now().to_rfc3339(),
             available_endpoints: endpoints,
             binary_path: cached_binary,
-            label: "".to_string(),
             running: true,
         };
 
@@ -107,21 +113,35 @@ impl InstanceManager {
         Ok(instance)
     }
 
-    pub fn start_instance(&self, instance_id: &str, endpoints: Option<Vec<String>>) -> Result<InstanceInfo, CliError> {
-        let mut instance = match self.get_instance(instance_id)? {
-            Some(instance) => instance,
-            None => return Err(CliError::New(format!("No instance found with id {}", instance_id)))
+    /// instance_id can either be u16 or uuid here (same for the others)
+    pub fn start_instance(&self, instance_id: &str, endpoints: Option<Vec<String>>) -> Result<InstanceInfo, String> {
+        let instance_id = match instance_id.parse() {
+            Ok(n) => match self.id_from_short_id(n) {
+                Ok(n) => n.id,
+                Err(_) => return Err(format!("No instance found with id {}", &instance_id)),
+            },
+            Err(_) => instance_id.to_string(),
+        };
+
+        let mut instance = match self.get_instance(&instance_id) {
+            Ok(instance) => {
+                match instance {
+                    Some(val) => val,
+                    None => return Err(format!("No instance found with id {}", instance_id)),
+                }
+            }
+            Err(e) => return Err(format!("Error occured getting instance {}", e)),
         };
 
         if !instance.binary_path.exists() {
-            return Err(CliError::New(format!("Binary not found for instance {}: {:?}",
-                        instance_id, instance.binary_path)));
+            return Err(format!("Binary not found for instance {}: {:?}",
+                        instance_id, instance.binary_path));
         }
 
-        let data_dir = self.cache_dir.join("data").join(instance_id);
+        let data_dir = self.cache_dir.join("data").join(&instance_id);
         if !data_dir.exists() {
             fs::create_dir_all(&data_dir).map_err(|e| {
-                CliError::New(format!("Failed to create data directory for {}: {}", instance_id, e))
+                format!("Failed to create data directory for {}: {}", instance_id, e)
             })?;
         }
 
@@ -131,12 +151,12 @@ impl InstanceManager {
             .append(true)
             .create(true)
             .open(log_file)
-            .map_err(|e| CliError::New(format!("Failed to open log file: {}", e)))?;
+            .map_err(|e| format!("Failed to open log file: {}", e))?;
 
         let port = match find_available_port(instance.port) {
             Some(port) => port,
             None => {
-                return Err(CliError::New(format!("{}", "Could not find an available port!".red().bold())));
+                return Err(format!("{}", "Could not find an available port!".red().bold()));
             }
         };
         instance.port = port;
@@ -148,12 +168,12 @@ impl InstanceManager {
             .env("HELIX_DATA_DIR", data_dir.to_str().unwrap())
             .env("HELIX_PORT", instance.port.to_string())
             .stdout(Stdio::from(log_file.try_clone().map_err(|e| {
-                CliError::New(format!("Failed to clone log file: {}", e))
+                format!("Failed to clone log file: {}", e)
             })?))
         .stderr(Stdio::from(log_file));
 
         let child = command.spawn().map_err(|e| {
-            CliError::New(format!("Failed to spawn process for {}: {}", instance_id, e))
+            format!("Failed to spawn process for {}: {}", instance_id, e)
         })?;
 
         instance.pid = child.id();
@@ -168,6 +188,18 @@ impl InstanceManager {
     }
 
     pub fn get_instance(&self, instance_id: &str) -> io::Result<Option<InstanceInfo>> {
+        let instance_id = match instance_id.parse() {
+            Ok(n) => match self.id_from_short_id(n) {
+                Ok(n) => n.id,
+                Err(_) => return Err(
+                    io::Error::new(
+                        io::ErrorKind::Other,
+                        format!("No instance found with id {}", instance_id),
+                    )),
+            },
+            Err(_) => instance_id.to_string(),
+        };
+
         let instances = self.list_instances()?;
         Ok(instances.into_iter().find(|i| i.id == instance_id))
     }
@@ -189,8 +221,19 @@ impl InstanceManager {
         Ok(instances)
     }
 
-    pub fn stop_instance(&self, instance_id: &str) -> Result<bool, CliError> {
-        let mut instances = self.list_instances()?;
+    pub fn stop_instance(&self, instance_id: &str) -> Result<bool, String> {
+        let instance_id = match instance_id.parse() {
+            Ok(n) => match self.id_from_short_id(n) {
+                Ok(n) => n.id,
+                Err(_) => return Err(format!("No instance found with id {}", &instance_id)),
+            },
+            Err(_) => instance_id.to_string(),
+        };
+
+        let mut instances = match self.list_instances() {
+            Ok(val) => val,
+            Err(e) => return Err(format!("Error occured stopping instnace! {}", e)),
+        };
         if let Some(pos) = instances.iter().position(|i| i.id == instance_id) {
             if !instances[pos].running {
                 return Ok(false);
@@ -216,8 +259,11 @@ impl InstanceManager {
         Ok(false)
     }
 
-    pub fn running_instances(&self) -> Result<bool, CliError> {
-        let instances = self.list_instances()?;
+    pub fn running_instances(&self) -> Result<bool, String> {
+        let instances = match self.list_instances() {
+            Ok(val) => val,
+            Err(e) => return Err(format!("Error occured listing instnaces! {}", e)),
+        };
         for instance in instances {
             if instance.running {
                 return Ok(true);
@@ -227,20 +273,32 @@ impl InstanceManager {
         Ok(false)
     }
 
-    fn save_instances(&self, instances: &[InstanceInfo]) -> Result<(), CliError> {
-        let contents = sonic_rs::to_string(instances)?;
-        let mut file = OpenOptions::new()
+    fn save_instances(&self, instances: &[InstanceInfo]) -> Result<(), String> {
+        let contents = match sonic_rs::to_string(instances) {
+            Ok(s) => s,
+            Err(e) => return Err(format!("Failed to serialize instances: {}", e)),
+        };
+        let mut file = match OpenOptions::new()
             .write(true)
             .create(true)
             .truncate(true)
-            .open(&self.instances_file)?;
-        file.write_all(contents.as_bytes())?;
+            .open(&self.instances_file)
+            {
+                Ok(f) => f,
+                Err(e) => return Err(format!("Failed to open file: {}", e)),
+            };
+        match file.write_all(contents.as_bytes()) {
+            Ok(_) => (),
+            Err(e) => return Err(format!("Failed to write to file: {}", e)),
+        };
         Ok(())
     }
 
-    fn update_instance(&self, updated_instance: &InstanceInfo) -> Result<(), CliError> {
-        let mut instances = self.list_instances()?;
-
+    fn update_instance(&self, updated_instance: &InstanceInfo) -> Result<(), String> {
+        let mut instances = match self.list_instances() {
+            Ok(val) => val,
+            Err(e) => return Err(format!("Error occured stopping instnace! {}", e)),
+        };
         if let Some(pos) = instances.iter().position(|i| i.id == updated_instance.id) {
             instances[pos] = updated_instance.clone();
         } else {
@@ -250,18 +308,19 @@ impl InstanceManager {
         self.save_instances(&instances)
     }
 
-    pub fn set_label(&self, instance_id: &str, label: &str) -> Result<bool, CliError> {
-        let mut instances = self.list_instances()?;
-        if let Some(pos) = instances.iter().position(|i| i.id == instance_id) {
-            instances[pos].label = label.to_string();
-            self.save_instances(&instances)?;
-            return Ok(true);
-        }
-        Ok(false)
-    }
+    pub fn delete_instance(&self, instance_id: &str) -> Result<bool, String> {
+        let instance_id = match instance_id.parse() {
+            Ok(n) => match self.id_from_short_id(n) {
+                Ok(n) => n.id,
+                Err(_) => return Err(format!("No instance found with id {}", &instance_id)),
+            },
+            Err(_) => instance_id.to_string(),
+        };
 
-    pub fn delete_instance(&self, instance_id: &str) -> Result<bool, CliError> {
-        let mut instances = self.list_instances()?;
+        let mut instances = match self.list_instances() {
+            Ok(val) => val,
+            Err(e) => return Err(format!("Error occured stopping instnace! {}", e)),
+        };
         if let Some(pos) = instances.iter().position(|i| i.id == instance_id) {
             instances.remove(pos);
             self.save_instances(&instances)?;

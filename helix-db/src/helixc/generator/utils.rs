@@ -373,6 +373,7 @@ use helix_db::{
         response::Response,
         return_values::ReturnValue,
         value::Value,
+        format::Format,
     },
     utils::{
         count::Count,

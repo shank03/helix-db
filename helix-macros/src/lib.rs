@@ -43,7 +43,6 @@ pub fn handler(args: TokenStream, item: TokenStream) -> TokenStream {
         _ => panic!("Query block not found"),
     };
 
-
     let txn_type = match args.txn_type.to_string().as_str() {
         "with_read" => quote! { let txn = db.graph_env.read_txn().unwrap(); },
         "with_write" => quote! { let mut txn = db.graph_env.write_txn().unwrap(); },
@@ -53,10 +52,8 @@ pub fn handler(args: TokenStream, item: TokenStream) -> TokenStream {
     let expanded = quote! {
         #[allow(non_camel_case_types)]
         #vis #sig {
-            let data: #input_data_name = match sonic_rs::from_slice(&input.request.body) {
-                Ok(data) => data,
-                Err(err) => return Err(GraphError::from(err)),
-            };
+            let (helix_in_fmt, helix_out_fmt) = Format::from_headers(&input.request.headers);
+            let data = &*helix_in_fmt.deserialize::<#input_data_name>(&input.request.body)?;
 
             let mut remapping_vals = RemappingMap::new();
             let db = Arc::clone(&input.graph.storage);
@@ -66,7 +63,7 @@ pub fn handler(args: TokenStream, item: TokenStream) -> TokenStream {
             #(#query_stmts)*
 
             txn.commit().unwrap();
-            response.body = sonic_rs::to_vec(&return_vals).unwrap();
+            response.value = Some((helix_out_fmt, return_vals));
 
             Ok(())
         }

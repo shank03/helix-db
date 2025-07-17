@@ -104,7 +104,7 @@ impl G {
     ///
     /// * `storage` - An owned Arc of the storage for the traversal
     /// * `txn` - A reference to the transaction for the traversal
-    /// * `items` - A vector of traversal values to start the traversal from        
+    /// * `items` - A vector of traversal values to start the traversal from
     ///
     /// # Example
     ///
@@ -126,3 +126,4 @@ impl G {
         }
     }
 }
+

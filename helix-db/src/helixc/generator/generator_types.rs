@@ -257,7 +257,7 @@ impl Display for Query {
             self.name
         )?;
         write!(f, "{{\n")?;
-        
+
         // prints each statement
         for statement in &self.statements {
             write!(f, "    {};\n", statement)?;
