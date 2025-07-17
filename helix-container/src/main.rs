@@ -1,7 +1,7 @@
-use helixdb::helix_engine::graph_core::config::Config;
-use helixdb::helix_engine::graph_core::graph_core::{HelixGraphEngine, HelixGraphEngineOpts};
-use helixdb::helix_gateway::mcp::mcp::{MCPHandlerFn, MCPHandlerSubmission};
-use helixdb::helix_gateway::{
+use helix_db::helix_engine::graph_core::config::Config;
+use helix_db::helix_engine::graph_core::graph_core::{HelixGraphEngine, HelixGraphEngineOpts};
+use helix_db::helix_gateway::mcp::mcp::{MCPHandlerFn, MCPHandlerSubmission};
+use helix_db::helix_gateway::{
     gateway::{GatewayOpts, HelixGateway},
     router::router::{HandlerFn, HandlerSubmission},
 };
@@ -72,26 +72,24 @@ async fn main() {
     .collect();
 
     // collect GET routes
-    let get_routes: HashMap<(String, String), HandlerFn> = inventory::iter::<HandlerSubmission>
-        .into_iter()
-        .map(|submission| {
-            println!("Processing GET submission for handler: {}", submission.0.name);
-            let handler = &submission.0;
-            let func: HandlerFn = Arc::new(move |input, response| (handler.func)(input, response));
-            (
-                (
-                    "GET".to_string(),
-                    format!("/get/{}", handler.name.to_string()),
-                ),
-                func,
-            )
-        })
-    .collect();
+    // let get_routes: HashMap<(String, String), HandlerFn> = inventory::iter::<HandlerSubmission>
+    //     .into_iter()
+    //     .map(|submission| {
+    //         println!("Processing GET submission for handler: {}", submission.0.name);
+    //         let handler = &submission.0;
+    //         let func: HandlerFn = Arc::new(move |input, response| (handler.func)(input, response));
+    //         (
+    //             (
+    //                 "GET".to_string(),
+    //                 format!("/get/{}", handler.name.to_string()),
+    //             ),
+    //             func,
+    //         )
+    //     })
+    // .collect();
 
-    let routes: HashMap<(String, String), HandlerFn> = post_routes.into_iter()
-        .chain(get_routes)
-        .collect();
-
+    let routes: HashMap<(String, String), HandlerFn> = post_routes;
+    
     let mcp_submissions: Vec<_> = inventory::iter::<MCPHandlerSubmission>
         .into_iter()
         .collect();

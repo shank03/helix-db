@@ -1,10 +1,11 @@
 [workspace]
 members = [
-    "helixdb",
+    "helix-db",
     "helix-container",
-    "proc_macros",
+    "helix-macros",
     "helix-cli",
     "hbuild_redeploy",
+    "hql-tests"
 ]
 resolver = "2"
 

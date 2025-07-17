@@ -1,5 +1,10 @@
 use super::utils::find_available_port;
 use helixdb::utils::styled_string::StyledString;
+use super::{
+    utils::find_available_port,
+    types::CliError,
+};
+use helix_db::utils::styled_string::StyledString;
 use std::{
     fs::{self, File, OpenOptions},
     io::{self, Read, Write},

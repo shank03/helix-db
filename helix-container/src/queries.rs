@@ -1,5 +1,3 @@
-
-
 use heed3::RoTxn;
 use proc_macros::handler;
 use helixdb::{
