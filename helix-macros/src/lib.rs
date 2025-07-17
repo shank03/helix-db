@@ -278,15 +278,24 @@ pub fn tool_calls(_attr: TokenStream, input: TokenStream) -> TokenStream {
                 .collect();
 
             let struct_name = quote::format_ident!("{}Data", fn_name);
+            let mcp_struct_name = quote::format_ident!("{}McpInput", fn_name);
             let expanded = quote! {
+
                 #[derive(Debug, Deserialize)]
                 #[allow(non_camel_case_types)]
-                struct #struct_name<'a> {
-                    connection_id: String,
+                pub struct #mcp_struct_name {
                     #(#struct_fields),*
                 }
 
+                #[derive(Debug, Deserialize)]
+                #[allow(non_camel_case_types)]
+                struct #struct_name {
+                    connection_id: String,
+                    data: #mcp_struct_name,
+                }
+
                 #[mcp_handler]
+                #[allow(non_camel_case_types)]
                 pub fn #fn_name<'a>(
                     input: &'a mut MCPToolInput,
                     response: &mut Response,
@@ -301,12 +310,11 @@ pub fn tool_calls(_attr: TokenStream, input: TokenStream) -> TokenStream {
                         Some(conn) => conn,
                         None => return Err(GraphError::Default),
                     };
+                    drop(connections);
 
                     let txn = input.mcp_backend.db.graph_env.read_txn()?;
 
-
-
-                    let result = input.mcp_backend.#fn_name(&txn, &connection, #(data.#field_names),*)?;
+                    let result = input.mcp_backend.#fn_name(&txn, &connection, #(data.data.#field_names),*)?;
 
                     let first = result.first().unwrap_or(&TraversalVal::Empty).clone();
 
@@ -394,6 +402,7 @@ pub fn tool_call(args: TokenStream, input: TokenStream) -> TokenStream {
         }
 
         #[mcp_handler]
+        #[allow(non_camel_case_types)]
         pub fn #mcp_function_name<'a>(
             input: &'a mut MCPToolInput,
             response: &mut Response,
@@ -409,8 +418,6 @@ pub fn tool_call(args: TokenStream, input: TokenStream) -> TokenStream {
                 None => return Err(GraphError::Default),
             };
             drop(connections);
-
-            let txn = input.mcp_backend.db.graph_env.read_txn()?;
 
             let mut result = #mcp_query_block;
 

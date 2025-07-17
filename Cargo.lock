@@ -1796,7 +1796,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "hbuild_redploy"
+name = "hbuild_redeploy"
 version = "0.1.0"
 dependencies = [
  "anyhow",

@@ -2369,7 +2369,6 @@ impl HelixParser {
                 value: FieldValueType::Fields(self.parse_field_additions(value_pair)?),
             },
             Rule::string_literal => {
-                println!("string_literal: {:?}", value_pair);
                 FieldValue {
                     loc: value_pair.loc(),
                     value: FieldValueType::Literal(Value::String(
