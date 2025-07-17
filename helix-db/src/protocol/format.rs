@@ -7,19 +7,28 @@ use tokio::io::BufWriter;
 
 use crate::helix_engine::types::GraphError;
 
+/// This enum represents the formats that input or output values of HelixDB can be represented as
+/// It also includes tooling to facilitate copy or zero-copy formats
 #[derive(Debug, Default, Clone, Copy)]
 pub enum Format {
+    /// JSON (JavaScript Object Notation)
+    /// The current implementation uses sonic_rs
     #[default]
     Json,
 }
 
 impl Format {
+    /// Serialize the value to bytes.
+    /// If using a zero-copy format it will return a Cow::Borrowed, with a lifetime corresponding to the value
+    /// Otherwise it returns a Cow::Owned
     pub fn serialize<T: Serialize>(self, val: &T) -> Cow<[u8]> {
         match self {
             Format::Json => sonic_rs::to_string(val).unwrap().into_bytes().into(),
         }
     }
 
+    /// Serialize the value to the supplied async writer.
+    /// This will use an underlying async implementation if possible, otherwise it will buffer it
     pub async fn serialize_to_async<T: Serialize>(
         self,
         val: &T,
@@ -34,6 +43,9 @@ impl Format {
         Ok(())
     }
 
+    /// Deserialize the provided value
+    /// Returns a MaybeOwned::Borrowed if using a zero-copy format
+    /// or a MaybeOwned::Owned otherwise
     pub fn deserialize<'a, T: Deserialize<'a>>(
         self,
         val: &'a [u8],
@@ -46,6 +58,7 @@ impl Format {
         }
     }
 
+    /// Parse Content-Type and Accept headers from a hashmap
     pub fn from_headers(headers: &HashMap<String, String>) -> (Format, Format) {
         let content_type = headers
             .iter()
@@ -84,6 +97,8 @@ impl FromStr for Format {
     }
 }
 
+/// A wrapper for a value which might be owned or borrowed
+/// The key difference from Cow, is that this doesn't require the value to implement Clone
 pub enum MaybeOwned<'a, T> {
     Owned(T),
     Borrowed(&'a T),
