@@ -1,6 +1,5 @@
 pub mod connection;
 pub mod embedding_providers;
-pub mod format;
 pub mod gateway;
 pub mod mcp;
 pub mod router;

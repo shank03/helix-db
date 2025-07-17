@@ -67,7 +67,7 @@ pub fn handler(args: TokenStream, item: TokenStream) -> TokenStream {
             #(#query_stmts)*
 
             txn.commit().unwrap();
-            response.body = helix_out_fmt.serialize(&return_vals).unwrap().to_owned;
+            response.value = (helix_out_fmt, return_vals);
 
             Ok(())
         }
