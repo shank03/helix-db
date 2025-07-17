@@ -1343,7 +1343,7 @@ fn test_update_node() {
         .collect_to::<Vec<_>>();
     assert_eq!(updated_users.len(), 1);
     assert_eq!(
-        updated_users[0].check_property("name").unwrap().to_string(),
+        updated_users[0].check_property("name").unwrap().into_owned().to_string(),
         "john"
     );
 }
