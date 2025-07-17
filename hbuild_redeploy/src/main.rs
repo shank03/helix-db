@@ -84,10 +84,51 @@ async fn redeploy_handler(State(state): State<AppState>) -> Result<Json<DeployRe
 }
 
 async fn perform_deployment(state: &AppState) -> Result<(), AdminError> {
+    // First, stop the service to prevent "text file busy" errors
+    let stop_result = Command::new("sudo")
+        .arg("systemctl")
+        .arg("stop")
+        .arg("helix")
+        .output()
+        .map_err(|e| AdminError::CommandError("Failed to stop service".to_string(), e))?;
+
+    if !stop_result.status.success() {
+        tracing::warn!("Failed to stop service, continuing anyway");
+    }
+
+    // Wait for the process to actually exit by checking if it's still running
+    let mut attempts = 0;
+    loop {
+        let ps_result = Command::new("pgrep")
+            .arg("-f")
+            .arg("helix-container")
+            .output();
+        
+        match ps_result {
+            Ok(output) => {
+                if output.stdout.is_empty() {
+                    // No process found, it has exited
+                    break;
+                }
+                if attempts >= 10 {
+                    tracing::warn!("Process still running after 10 seconds, proceeding anyway");
+                    break;
+                }
+                tracing::info!("Waiting for helix-container process to exit... (attempt {})", attempts + 1);
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                attempts += 1;
+            }
+            Err(_) => {
+                // pgrep failed, assume process is not running
+                break;
+            }
+        }
+    }
+
     // rename old binary
     let mv_result = Command::new("mv")
-        .arg("helix")
-        .arg("helix_old")
+        .arg("/root/.helix/bin/helix-container")
+        .arg("/root/.helix/bin/helix-container_old")
         .output()
         .map_err(|e| AdminError::CommandError("Failed to backup old binary".to_string(), e))?;
 
@@ -98,22 +139,24 @@ async fn perform_deployment(state: &AppState) -> Result<(), AdminError> {
         ));
     }
 
+    println!("pulling binary from s3: {}/{}/helix-container/latest", state.user_id, state.cluster_id);
     // pull binary from s3
     let response = state
         .s3_client
         .get_object()
-        .bucket("helix-build")
+        .bucket("helix-user-builds")
         .key(format!(
-            "{}/{}/helix/latest",
+            "{}/{}/helix-container/latest",
             state.user_id, state.cluster_id
         ))
         .send()
         .await
         .map_err(|e| AdminError::S3DownloadError("Failed to download binary from S3".to_string(), e))?;
 
-    // create binary file or overwrite if it exists
-    let mut file = File::create("helix")
-        .map_err(|e| AdminError::FileError("Failed to create new binary file".to_string(), e))?;
+    // Download to temporary file first to avoid "text file busy" issues
+    let temp_path = "/root/.helix/bin/helix-container.tmp";
+    let mut file = File::create(temp_path)
+        .map_err(|e| AdminError::FileError("Failed to create temporary binary file".to_string(), e))?;
     
     let body = response
         .body
@@ -124,13 +167,16 @@ async fn perform_deployment(state: &AppState) -> Result<(), AdminError> {
         .to_vec();
     
     file.write_all(&body)
-        .map_err(|e| AdminError::FileError("Failed to write binary file".to_string(), e))?;
+        .map_err(|e| AdminError::FileError("Failed to write temporary binary file".to_string(), e))?;
+    
+    // Close the file handle
+    drop(file);
 
-    // set permissions
+    // set permissions on temporary file
     let chmod_result = Command::new("sudo")
         .arg("chmod")
         .arg("+x")
-        .arg("helix")
+        .arg(temp_path)
         .output()
         .map_err(|e| AdminError::CommandError("Failed to set binary permissions".to_string(), e))?;
 
@@ -141,18 +187,32 @@ async fn perform_deployment(state: &AppState) -> Result<(), AdminError> {
         ));
     }
 
-    // restart systemd service
-    let restart_result = Command::new("sudo")
+    // Atomically move the temporary file to the final location
+    let mv_new_result = Command::new("mv")
+        .arg(temp_path)
+        .arg("/root/.helix/bin/helix-container")
+        .output()
+        .map_err(|e| AdminError::CommandError("Failed to move new binary into place".to_string(), e))?;
+
+    if !mv_new_result.status.success() {
+        return Err(AdminError::CommandError(
+            "Failed to move new binary into place".to_string(),
+            std::io::Error::new(std::io::ErrorKind::Other, "mv command failed"),
+        ));
+    }
+
+    // start systemd service
+    let start_result = Command::new("sudo")
         .arg("systemctl")
-        .arg("restart")
+        .arg("start")
         .arg("helix")
         .output()
-        .map_err(|e| AdminError::CommandError("Failed to restart service".to_string(), e))?;
+        .map_err(|e| AdminError::CommandError("Failed to start service".to_string(), e))?;
 
-    if !restart_result.status.success() {
+    if !start_result.status.success() {
         return Err(AdminError::CommandError(
-            "Failed to restart service".to_string(),
-            std::io::Error::new(std::io::ErrorKind::Other, "systemctl restart failed"),
+            "Failed to start service".to_string(),
+            std::io::Error::new(std::io::ErrorKind::Other, "systemctl start failed"),
         ));
     }
 
@@ -168,23 +228,29 @@ async fn perform_deployment(state: &AppState) -> Result<(), AdminError> {
     if !status_result.status.success() {
         tracing::warn!("Service failed to start, reverting to old binary");
         
+        // Clean up temporary file if it still exists
+        let _ = Command::new("rm")
+            .arg("-f")
+            .arg("/root/.helix/bin/helix-container.tmp")
+            .output();
+        
         let revert_result = Command::new("mv")
-            .arg("helix_old")
-            .arg("helix")
+            .arg("/root/.helix/bin/helix-container_old")
+            .arg("/root/.helix/bin/helix-container")
             .output();
 
         if let Err(e) = revert_result {
             tracing::error!("Failed to revert binary: {:?}", e);
         }
 
-        let restart_old_result = Command::new("sudo")
+        let start_old_result = Command::new("sudo")
             .arg("systemctl")
-            .arg("restart")
+            .arg("start")
             .arg("helix")
             .output();
 
-        if let Err(e) = restart_old_result {
-            tracing::error!("Failed to restart with old binary: {:?}", e);
+        if let Err(e) = start_old_result {
+            tracing::error!("Failed to start with old binary: {:?}", e);
         }
 
         return Err(AdminError::CommandError(
@@ -194,12 +260,18 @@ async fn perform_deployment(state: &AppState) -> Result<(), AdminError> {
     } else {
         // delete old binary
         let rm_result = Command::new("rm")
-            .arg("helix_old")
+            .arg("/root/.helix/bin/helix-container_old")
             .output();
 
         if let Err(e) = rm_result {
             tracing::warn!("Failed to delete old binary: {:?}", e);
         }
+
+        // Clean up temporary file if it still exists
+        let _ = Command::new("rm")
+            .arg("-f")
+            .arg("/root/.helix/bin/helix-container.tmp")
+            .output();
         
         tracing::info!("Deployment completed successfully");
     }
