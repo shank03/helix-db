@@ -221,3 +221,15 @@ impl From<DefaultValue> for GeneratedValue {
         }
     }
 }
+
+
+// pub trait HelixHashMapExt {
+//     fn has_field(&self, field: &str) -> bool;
+// }
+
+// impl HelixHashMapExt for HashMap<String, FieldType> {
+//     fn has_field(&self, field: &str) -> bool {
+//         if 
+//         self.contains_key(field) 
+//     }
+// }
