@@ -1,4 +1,5 @@
 use crate::{
+    debug_println,
     helix_engine::{
         graph_core::ops::{
             g::G,
@@ -29,6 +30,9 @@ use crate::{
     protocol::{
         response::Response,
         return_values::ReturnValue,
+    helix_gateway::mcp::mcp::{
+        MCPConnection, MCPHandler, MCPHandlerSubmission,
+        MCPToolInput, McpBackend
     },
     utils::label_hash::hash_label,
 };
@@ -180,7 +184,7 @@ impl<'a> McpTools<'a> for McpBackend {
             .flatten();
 
         let result = iter.take(100).collect();
-        println!("result: {:?}", result);
+        debug_println!("result: {:?}", result);
         result
     }
 
@@ -219,7 +223,7 @@ impl<'a> McpTools<'a> for McpBackend {
             .flatten();
 
         let result = iter.take(100).collect();
-        println!("result: {:?}", result);
+        debug_println!("result: {:?}", result);
         result
     }
 
@@ -260,7 +264,7 @@ impl<'a> McpTools<'a> for McpBackend {
             .flatten();
 
         let result = iter.take(100).collect();
-        println!("result: {:?}", result);
+        debug_println!("result: {:?}", result);
         result
     }
 
@@ -290,7 +294,7 @@ impl<'a> McpTools<'a> for McpBackend {
                     }),
                     Ok(None) => None,
                     Err(e) => {
-                        println!("{} Error getting out edges: {:?}", line!(), e);
+                        debug_println!("{} Error getting out edges: {:?}", line!(), e);
                         // return Err(e);
                         None
                     }
@@ -299,7 +303,7 @@ impl<'a> McpTools<'a> for McpBackend {
             .flatten();
 
         let result = iter.take(100).collect();
-        println!("result: {:?}", result);
+        debug_println!("result: {:?}", result);
         result
     }
 
@@ -317,7 +321,7 @@ impl<'a> McpTools<'a> for McpBackend {
         };
 
         let result = iter.take(100).collect::<Result<Vec<_>, _>>();
-        println!("result: {:?}", result);
+        debug_println!("result: {:?}", result);
         result
     }
 
@@ -335,7 +339,7 @@ impl<'a> McpTools<'a> for McpBackend {
         };
 
         let result = iter.take(100).collect::<Result<Vec<_>, _>>();
-        println!("result: {:?}", result);
+        debug_println!("result: {:?}", result);
         result
     }
 
@@ -349,9 +353,9 @@ impl<'a> McpTools<'a> for McpBackend {
     ) -> Result<Vec<TraversalVal>, GraphError> {
         let db = Arc::clone(&self.db);
 
-        println!("properties: {:?}", properties);
-        println!("filter_traversals: {:?}", filter_traversals);
-        println!("connection: {:?}", connection.iter);
+        debug_println!("properties: {:?}", properties);
+        debug_println!("filter_traversals: {:?}", filter_traversals);
+        debug_println!("connection: {:?}", connection.iter);
 
         let iter = match properties {
             Some(properties) => {
@@ -370,7 +374,7 @@ impl<'a> McpTools<'a> for McpBackend {
             None => connection.iter.clone().collect::<Vec<_>>(),
         };
 
-        println!("iter: {:?}", iter);
+        debug_println!("iter: {:?}", iter);
 
         let result = iter
             .clone()
@@ -404,7 +408,7 @@ impl<'a> McpTools<'a> for McpBackend {
             })
             .collect::<Vec<_>>();
 
-        println!("result: {:?}", result);
+        debug_println!("result: {:?}", result);
 
         Ok(result)
     }
