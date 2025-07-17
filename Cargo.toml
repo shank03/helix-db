@@ -1,13 +1,12 @@
 [workspace]
 members = [
-    "helixdb",
+    "helix-db",
     "helix-container",
-    "get_routes",
-    "debug_trace",
+    "helix-macros",
     "helix-cli",
-    "hbuild",
-    "hbuild_redploy",
+    "hbuild_redeploy",
     "query-container",
+    "hql-tests",
 ]
 resolver = "2"
 

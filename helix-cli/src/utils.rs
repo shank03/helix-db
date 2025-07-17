@@ -1,8 +1,6 @@
-use crate::{
-    instance_manager::InstanceInfo,
-    types::*,
-};
-use helixdb::{
+use crate::{instance_manager::InstanceInfo, types::*};
+use futures_util::StreamExt;
+use helix_db::{
     helixc::{
         analyzer::analyzer::analyze,
         generator::{generator_types::Source as GeneratedSource, tsdisplay::ToTypeScript},
@@ -10,17 +8,25 @@ use helixdb::{
     },
     utils::styled_string::StyledString,
 };
+use reqwest::Client;
+use serde::Deserialize;
+use serde_json::Value as JsonValue;
 use std::{
     error::Error,
     fs::{self, DirEntry, File},
     io::{ErrorKind, Write},
     net::{SocketAddr, TcpListener},
     path::{Path, PathBuf},
-    process::{Stdio, Command},
+    process::{Command, Stdio},
+};
+use tokio_tungstenite::{
+    connect_async,
+    tungstenite::{
+        Message,
+        protocol::{CloseFrame, frame::coding::CloseCode},
+    },
 };
 use toml::Value;
-use reqwest::blocking::Client;
-use serde_json::Value as JsonValue;
 
 pub const DB_DIR: &str = "helixdb-cfg/";
 
@@ -164,6 +170,8 @@ pub fn find_available_port(start_port: u16) -> Option<u16> {
     None
 }
 
+/// Checks if the path contains a schema.hx and config.hx.json file
+/// Returns a vector of DirEntry objects for all .hx files in the path
 pub fn check_and_read_files(path: &str) -> Result<Vec<DirEntry>, CliError> {
     if !fs::read_dir(&path)
         .map_err(CliError::Io)?
@@ -202,27 +210,14 @@ pub fn check_and_read_files(path: &str) -> Result<Vec<DirEntry>, CliError> {
     Ok(files)
 }
 
-pub fn to_snake_case(s: &str) -> String {
-    let mut result = String::with_capacity(s.len());
-    let mut prev_is_uppercase = false;
-
-    for (i, c) in s.chars().enumerate() {
-        if c.is_uppercase() {
-            if i > 0 && !prev_is_uppercase {
-                result.push('_');
-            }
-            result.push(c.to_lowercase().next().unwrap());
-            prev_is_uppercase = true;
-        } else {
-            result.push(c);
-            prev_is_uppercase = false;
-        }
-    }
-    result
-}
-
-fn generate_content(files: &Vec<DirEntry>) -> Result<Content, CliError> {
-    let files = files
+/// Generates a Content object from a vector of DirEntry objects
+/// Returns a Content object with the files and source
+///
+/// This essentially makes a full string of all of the files while having a separate vector of the individual files
+///
+/// This could be changed in the future but keeps the option open for being able to access the files separately or all at once
+pub fn generate_content(files: &Vec<DirEntry>) -> Result<Content, CliError> {
+    let files: Vec<HxFile> = files
         .iter()
         .map(|file| {
             let name = file.path().to_string_lossy().into_owned();
@@ -231,15 +226,21 @@ fn generate_content(files: &Vec<DirEntry>) -> Result<Content, CliError> {
         })
         .collect();
 
-    let content = Content {
-        content: String::new(),
+    let content = files
+        .clone()
+        .iter()
+        .map(|file| file.content.clone())
+        .collect::<Vec<String>>()
+        .join("\n");
+
+    Ok(Content {
+        content,
         files,
         source: Source::default(),
-    };
-
-    Ok(content)
+    })
 }
 
+/// Uses the helix parser to parse the content into a Source object
 fn parse_content(content: &Content) -> Result<Source, CliError> {
     let source = match HelixParser::parse_source(&content) {
         Ok(source) => source,
@@ -251,6 +252,8 @@ fn parse_content(content: &Content) -> Result<Source, CliError> {
     Ok(source)
 }
 
+/// Runs the static analyzer on the parsed source to catch errors and generate diagnostics if any.
+/// Otherwise returns the generated source object which is an IR used to transpile the queries to rust.
 fn analyze_source(source: Source) -> Result<GeneratedSource, CliError> {
     let (diagnostics, source) = analyze(&source);
     if !diagnostics.is_empty() {
@@ -264,6 +267,12 @@ fn analyze_source(source: Source) -> Result<GeneratedSource, CliError> {
     Ok(source)
 }
 
+/// Generates a Content and GeneratedSource object from a vector of DirEntry objects
+/// Returns a tuple of the Content and GeneratedSource objects
+///
+/// This function is the main entry point for generating the Content and GeneratedSource objects
+///
+/// It first generates the content from the files, then parses the content into a Source object, and then analyzes the source to catch errors and generate diagnostics if any.
 pub fn generate(files: &Vec<DirEntry>) -> Result<(Content, GeneratedSource), CliError> {
     let mut content = generate_content(&files)?;
     content.source = parse_content(&content)?;
@@ -339,8 +348,10 @@ pub fn get_crate_version<P: AsRef<Path>>(path: P) -> Result<Version, String> {
     Ok(vers)
 }
 
-pub fn get_remote_helix_version() -> Result<Version, Box<dyn Error>> {
-    let client = Client::new();
+pub async fn get_remote_helix_version() -> Result<Version, Box<dyn Error>> {
+    let client = Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()?;
 
     let url = "https://api.github.com/repos/HelixDB/helix-db/releases/latest";
 
@@ -348,8 +359,10 @@ pub fn get_remote_helix_version() -> Result<Version, Box<dyn Error>> {
         .get(url)
         .header("User-Agent", "rust")
         .header("Accept", "application/vnd.github+json")
-        .send()?
-        .text()?;
+        .send()
+        .await?
+        .text()
+        .await?;
 
     let json: JsonValue = serde_json::from_str(&response)?;
     let tag_name = json
@@ -370,9 +383,12 @@ pub fn get_n_helix_cli() -> Result<(), Box<dyn Error>> {
             "PATH",
             format!(
                 "{}:{}",
-                std::env::var("HOME").map(|h| format!("{}/.cargo/bin", h)).unwrap_or_default(),
+                std::env::var("HOME")
+                    .map(|h| format!("{}/.cargo/bin", h))
+                    .unwrap_or_default(),
                 std::env::var("PATH").unwrap_or_default()
-            ))
+            ),
+        )
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .status()?;
@@ -388,4 +404,147 @@ pub fn get_n_helix_cli() -> Result<(), Box<dyn Error>> {
 // Spinner::new
 // Spinner::stop_with_message
 // Dots9 style
+
+pub async fn github_login() -> Result<(String, String), Box<dyn Error>> {
+    // TODO: get control server
+    let url = "ws://ec2-184-72-27-116.us-west-1.compute.amazonaws.com:3000/login";
+    let (mut ws_stream, _) = connect_async(url).await?;
+
+    let init_msg: UserCodeMsg = match ws_stream.next().await {
+        Some(Ok(Message::Text(payload))) => sonic_rs::from_str(&payload)?,
+        Some(Ok(m)) => return Err(format!("Unexpected message: {m:?}").into()),
+        Some(Err(e)) => return Err(e.into()),
+        None => return Err("Connection Closed Unexpectedly".into()),
+    };
+
+    println!(
+        "To Login please go \x1b]8;;{}\x1b\\here\x1b]8;;\x1b\\({}),\nand enter the code: {}",
+        init_msg.verification_uri,
+        init_msg.verification_uri,
+        init_msg.user_code.bold()
+    );
+
+    let msg: ApiKeyMsg = match ws_stream.next().await {
+        Some(Ok(Message::Text(payload))) => sonic_rs::from_str(&payload)?,
+        Some(Ok(message)) => {
+            println!("{}", message);
+            return Err(format!("Unexpected message: {message:?}").into());
+        }
+        Some(Ok(Message::Close(Some(CloseFrame {
+            code: CloseCode::Error,
+            reason,
+        })))) => return Err(format!("Error: {reason}").into()),
+        Some(Ok(m)) => return Err(format!("Unexpected message: {m:?}").into()),
+        Some(Err(e)) => return Err(e.into()),
+        None => return Err("Connection Closed Unexpectedly".into()),
+    };
+
+    Ok((msg.key, msg.user_id))
+}
+
+#[derive(Deserialize)]
+struct UserCodeMsg {
+    user_code: String,
+    verification_uri: String,
+}
+
+#[derive(Deserialize)]
+struct ApiKeyMsg {
+    user_id: String,
+    key: String,
+}
+
+/// tries to parse a credential file, returning the key, if any
+pub fn parse_credentials(creds: &String) -> Option<&str> {
+    for line in creds.lines() {
+        if let Some((key, value)) = line.split_once("=")
+            && key.to_lowercase() == "helix_user_key"
+        {
+            return Some(value);
+        }
+    }
+    None
+}
+
+pub async fn check_helix_version() {
+    // Skip version check if helix is not installed to avoid unnecessary errors
+    match check_helix_installation() {
+        Ok(_) => {}
+        Err(_) => {
+            // Don't print error message here - let individual commands handle this
+            return;
+        }
+    };
+
+    let repo_path = {
+        let home_dir = match dirs::home_dir() {
+            Some(dir) => dir,
+            None => {
+                // Silently fail - don't interrupt user workflow
+                return;
+            }
+        };
+        home_dir.join(".helix/repo/helix-db/helix-db")
+    };
+
+    let local_cli_version = match Version::parse(&format!("v{}", env!("CARGO_PKG_VERSION"))) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+    
+    let local_db_version = match get_crate_version(&repo_path) {
+        Ok(version_str) => match Version::parse(&format!("v{}", version_str)) {
+            Ok(v) => v,
+            Err(_) => return,
+        },
+        Err(_) => return,
+    };
+    
+    let remote_helix_version = match get_remote_helix_version().await {
+        Ok(v) => v,
+        Err(_) => {
+            // Silently fail on network errors - don't interrupt user workflow
+            return;
+        }
+    };
+    
+    println!(
+        "helix-cli version: {}, helix-db version: {}, remote helix version: {}",
+        local_cli_version, local_db_version, remote_helix_version
+    );
+
+    if local_db_version < remote_helix_version || local_cli_version < remote_helix_version {
+        println!("{} {} {} {}",
+            "New HelixDB version is available!".yellow().bold(),
+            "Run".yellow().bold(),
+            "helix update".white().bold(),
+            "to install the newest version!".yellow().bold(),
+        );
+    }
+}
+
+pub fn check_cargo_version() -> bool {
+    match Command::new("cargo").arg("--version").output() {
+        Ok(output) => {
+            let version_str = String::from_utf8_lossy(&output.stdout);
+            let version = version_str
+                .split_whitespace()
+                .nth(1)
+                .unwrap_or("0.0.0")
+                .split('-')
+                .next()
+                .unwrap_or("0.0.0");
+            let parts: Vec<u32> = version
+                .split('.')
+                .filter_map(|s| s.parse().ok())
+                .collect();
+            if parts.len() >= 2 {
+                parts[0] >= 1 && parts[1] >= 88
+            } else {
+                false
+            }
+        }
+        Err(_) => false,
+    }
+}
 

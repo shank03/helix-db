@@ -20,6 +20,9 @@ pub enum CommandType {
     /// Demo a Helix project
     Demo,
 
+    /// Open graph vis in default browser
+    Visualize(VisualizeCommand),
+
     /// Deploy a Helix project
     Deploy(DeployCommand),
 
@@ -32,6 +35,8 @@ pub enum CommandType {
     /// Compile a Helix project
     Compile(CompileCommand),
 
+    // /// Configure Helix Credentials
+    // Config(ConfigCommand),
     /// Lint a Helix project
     Check(LintCommand),
 
@@ -53,10 +58,6 @@ pub enum CommandType {
     /// Start a stopped Helix instance
     Start(StartCommand),
 
-    /// Ingest data into Helix
-    #[cfg(feature = "ingestion")]
-    Ingest(IngestCommand),
-
     /// Give an instance a short description
     Label(LabelCommand),
 
@@ -68,6 +69,12 @@ pub enum CommandType {
 
     /// Get the current version of the cli and db
     Version(VersionCommand),
+
+    /// Check login credentials or login with github
+    Login,
+
+    /// Remove login credentials
+    Logout,
 }
 
 #[derive(Debug, Args)]
@@ -100,11 +107,14 @@ pub struct VersionCommand {}
     about = "Re-deploy a Helix project with new queries"
 )]
 pub struct RedeployCommand {
-    #[clap(help = "Existing helix instance ID")]
-    pub instance: String,
+    #[clap(short, long, help = "Existing helix cluster ID")]
+    pub cluster: String,
 
     #[clap(short, long, help = "The path to the project")]
     pub path: Option<String>,
+
+    #[clap(short, long, help = "Remote cluster ID")]
+    pub remote: bool,
 }
 
 #[derive(Debug, Args)]
@@ -117,12 +127,7 @@ pub struct CompileCommand {
     pub output: Option<String>,
 
     #[clap(short, long, help = "The target language")]
-    pub gen: OutputLanguage,
-    // #[clap(short, long, help = "The target platform")]
-    // pub target: Option<String>,
-
-    // #[clap(short, long, help = "Should compile in release mode")]
-    // pub release: bool,
+    pub r#gen: Option<OutputLanguage>,
 }
 
 #[derive(Debug, Args)]
@@ -134,7 +139,13 @@ pub struct LintCommand {
 
 #[derive(Debug, Args)]
 #[clap(name = "install", about = "Install the Helix repo")]
-pub struct InstallCommand {}
+pub struct InstallCommand {
+    #[clap(short, long, help = "Install HelixDb on a specific branch (considered unstable)")]
+    pub branch: Option<String>,
+
+    #[clap(short, long, help = "The path to the project")]
+    pub path: Option<String>,
+}
 
 #[derive(Debug, Args)]
 #[clap(name = "init", about = "Initialise a new Helix project")]
@@ -163,7 +174,7 @@ pub struct StopCommand {
     #[clap(long, help = "Stop all running instances")]
     pub all: bool,
 
-    #[clap(help = "Instance ID to stop")]
+    #[clap(short, long, help = "Instance ID to stop")]
     pub instance: Option<String>,
 }
 
@@ -175,45 +186,13 @@ pub struct StartCommand {
 }
 
 #[derive(Debug, Args)]
-#[clap(name = "ingest", about = "Ingest data into Helix")]
-pub struct IngestCommand {
-    /// Type of database to ingest from ('sqlite' or 'pg')
-    #[clap(short = 't', long = "type", value_parser = ["sqlite", "pg"])]
-    pub db_type: String,
-
-    /// Database connection string or path
-    #[clap(short, long = "db", help = "Database connection string or path")]
-    pub db_url: String,
-
-    /// Helix instance to ingest data into
-    #[clap(
-        short = 'i',
-        long = "instance",
-        help = "Helixdb instance to ingest data into"
-    )]
+#[clap(name = "visualize", about = "Visualize the Helix graph")]
+pub struct VisualizeCommand {
+    #[clap(help = "Id of instance to visualize")]
     pub instance: String,
 
-    /// Batch size for ingestion (only used for PostgreSQL)
-    #[clap(
-        short = 'b',
-        long = "batch",
-        default_value = "1000",
-        help = "Batch size for ingestion"
-    )]
-    pub batch_size: usize,
-
-    /// Output directory for JSONL files
-    #[clap(
-        short = 'o',
-        long = "output",
-        default_value = "./",
-        help = "Output directory for JSONL files"
-    )]
-    pub output_dir: Option<String>,
-
-    /// Use SSL for PostgreSQL
-    #[clap(short = 's', long = "ssl", help = "Use SSL for PostgreSQL")]
-    pub use_ssl: bool,
+    #[clap(short, long, help = "Give nodes a label based on a property")]
+    pub node_prop: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -242,6 +221,11 @@ pub struct DeleteCommand {
     #[clap(help = "Instance ID to delete")]
     pub instance: String,
 }
+
+
+#[derive(Debug, Args)]
+#[clap(name = "config", about = "Configure Helix Credentials")]
+pub struct ConfigCommand {}
 
 #[derive(Debug, Subcommand, Clone, ValueEnum)]
 #[clap(name = "output")]
