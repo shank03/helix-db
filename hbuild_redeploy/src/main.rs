@@ -84,6 +84,18 @@ async fn redeploy_handler(State(state): State<AppState>) -> Result<Json<DeployRe
 }
 
 async fn perform_deployment(state: &AppState) -> Result<(), AdminError> {
+    // First, stop the service to prevent "text file busy" errors
+    let stop_result = Command::new("sudo")
+        .arg("systemctl")
+        .arg("stop")
+        .arg("helix")
+        .output()
+        .map_err(|e| AdminError::CommandError("Failed to stop service".to_string(), e))?;
+
+    if !stop_result.status.success() {
+        tracing::warn!("Failed to stop service, continuing anyway");
+    }
+
     // rename old binary
     let mv_result = Command::new("mv")
         .arg("/root/.helix/bin/helix-container")
@@ -142,18 +154,18 @@ async fn perform_deployment(state: &AppState) -> Result<(), AdminError> {
         ));
     }
 
-    // restart systemd service
-    let restart_result = Command::new("sudo")
+    // start systemd service
+    let start_result = Command::new("sudo")
         .arg("systemctl")
-        .arg("restart")
+        .arg("start")
         .arg("helix")
         .output()
-        .map_err(|e| AdminError::CommandError("Failed to restart service".to_string(), e))?;
+        .map_err(|e| AdminError::CommandError("Failed to start service".to_string(), e))?;
 
-    if !restart_result.status.success() {
+    if !start_result.status.success() {
         return Err(AdminError::CommandError(
-            "Failed to restart service".to_string(),
-            std::io::Error::new(std::io::ErrorKind::Other, "systemctl restart failed"),
+            "Failed to start service".to_string(),
+            std::io::Error::new(std::io::ErrorKind::Other, "systemctl start failed"),
         ));
     }
 
@@ -178,14 +190,14 @@ async fn perform_deployment(state: &AppState) -> Result<(), AdminError> {
             tracing::error!("Failed to revert binary: {:?}", e);
         }
 
-        let restart_old_result = Command::new("sudo")
+        let start_old_result = Command::new("sudo")
             .arg("systemctl")
-            .arg("restart")
+            .arg("start")
             .arg("helix")
             .output();
 
-        if let Err(e) = restart_old_result {
-            tracing::error!("Failed to restart with old binary: {:?}", e);
+        if let Err(e) = start_old_result {
+            tracing::error!("Failed to start with old binary: {:?}", e);
         }
 
         return Err(AdminError::CommandError(
