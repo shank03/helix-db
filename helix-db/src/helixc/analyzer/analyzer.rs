@@ -3644,28 +3644,28 @@ impl<'a> Ctx<'a> {
                                 RemappingType::ValueRemapping(ValueRemapping {
                                     variable_name: var_name.to_string(),
                                     field_name: key.clone(),
-                                    value: GenRef::Literal(bo_lit.to_string()), // TODO: Implement
+                                    value: GenRef::Literal(bo_lit.to_string()), 
                                 })
                             }
                             ExpressionType::FloatLiteral(float) => {
                                 RemappingType::ValueRemapping(ValueRemapping {
                                     variable_name: var_name.to_string(),
                                     field_name: key.clone(),
-                                    value: GenRef::Literal(float.to_string()), // TODO: Implement
+                                    value: GenRef::Literal(float.to_string()), 
                                 })
                             }
                             ExpressionType::StringLiteral(string) => {
                                 RemappingType::ValueRemapping(ValueRemapping {
                                     variable_name: var_name.to_string(),
                                     field_name: key.clone(),
-                                    value: GenRef::Literal(string.clone()), // TODO: Implement
+                                    value: GenRef::Literal(string.clone()), 
                                 })
                             }
                             ExpressionType::IntegerLiteral(integer) => {
                                 RemappingType::ValueRemapping(ValueRemapping {
                                     variable_name: var_name.to_string(),
                                     field_name: key.clone(),
-                                    value: GenRef::Literal(integer.to_string()), // TODO: Implement
+                                    value: GenRef::Literal(integer.to_string()), 
                                 })
                             }
                             ExpressionType::Identifier(identifier) => {
@@ -3675,7 +3675,7 @@ impl<'a> Ctx<'a> {
                                         IdentifierRemapping {
                                             variable_name: var_name.to_string(),
                                             field_name: key.clone(),
-                                            identifier_value: identifier.into(), // TODO: Implement
+                                            identifier_value: identifier.into(),
                                         },
                                     );
                                 } else {
