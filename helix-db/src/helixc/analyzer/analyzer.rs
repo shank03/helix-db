@@ -1882,7 +1882,6 @@ impl<'a> Ctx<'a> {
                     let stmt = stmt.unwrap();
                     match stmt {
                         GeneratedStatement::Traversal(tr) => {
-                            println!("TRAVERSAL");
                             gen_traversal
                                 .steps
                                 .push(Separator::Period(GeneratedStep::Where(Where::Ref(
@@ -1892,7 +1891,6 @@ impl<'a> Ctx<'a> {
                                 ))));
                         }
                         GeneratedStatement::BoExp(expr) => {
-                            println!("BOEXP");
                             gen_traversal
                                 .steps
                                 .push(Separator::Period(GeneratedStep::Where(match expr {
