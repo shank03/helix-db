@@ -81,10 +81,10 @@ impl HBM25Config {
 
         let doc_lengths_db: Database<U128<heed3::byteorder::BE>, U32<heed3::byteorder::BE>> =
             graph_env
-                .database_options()
-                .types::<U128<heed3::byteorder::BE>, U32<heed3::byteorder::BE>>()
-                .name(DB_BM25_DOC_LENGTHS)
-                .create(wtxn)?;
+            .database_options()
+            .types::<U128<heed3::byteorder::BE>, U32<heed3::byteorder::BE>>()
+            .name(DB_BM25_DOC_LENGTHS)
+            .create(wtxn)?;
 
         let term_frequencies_db: Database<Bytes, U32<heed3::byteorder::BE>> = graph_env
             .database_options()
@@ -149,7 +149,7 @@ impl BM25 for HBM25Config {
             let current_df = self.term_frequencies_db.get(txn, term_bytes)?.unwrap_or(0);
             self.term_frequencies_db
                 .put(txn, term_bytes, &(current_df + 1))?;
-        }
+            }
 
         let mut metadata = if let Some(data) = self.metadata_db.get(txn, METADATA_KEY)? {
             bincode::deserialize::<BM25Metadata>(data)?
@@ -367,32 +367,24 @@ impl HybridSearch for HelixGraphStorage {
         let graph_env_bm25 = self.graph_env.clone();
         let graph_env_vector = self.graph_env.clone();
 
-        let bm25_handle = task::spawn(async move {
-            task::spawn_blocking(move || -> Result<Vec<(u128, f32)>, GraphError> {
-                let txn = graph_env_bm25.read_txn()?;
-                match self.bm25.as_ref() {
-                    Some(s) => s.search(&txn, &query_owned, limit * 2),
-                    None => Err(GraphError::from("BM25 not enabled!")),
-                }
-            })
-            .await
-            .map_err(|_| GraphError::from("BM25 task panicked"))?
+        let bm25_handle = task::spawn_blocking(move || -> Result<Vec<(u128, f32)>, GraphError> {
+            let txn = graph_env_bm25.read_txn()?;
+            match self.bm25.as_ref() {
+                Some(s) => s.search(&txn, &query_owned, limit * 2),
+                None => Err(GraphError::from("BM25 not enabled!")),
+            }
         });
 
-        let vector_handle = task::spawn(async move {
-            task::spawn_blocking(move || -> Result<Option<Vec<HVector>>, GraphError> {
-                let txn = graph_env_vector.read_txn()?;
-                let results = self.vectors.search::<fn(&HVector, &RoTxn) -> bool>(
-                    &txn,
-                    &query_vector_owned,
-                    limit * 2,
-                    None,
-                    false,
-                )?;
-                Ok(Some(results))
-            })
-            .await
-            .map_err(|_| GraphError::from("Vector task panicked"))?
+        let vector_handle = task::spawn_blocking(move || -> Result<Option<Vec<HVector>>, GraphError> {
+            let txn = graph_env_vector.read_txn()?;
+            let results = self.vectors.search::<fn(&HVector, &RoTxn) -> bool>(
+                &txn,
+                &query_vector_owned,
+                limit * 2,
+                None,
+                false,
+            )?;
+            Ok(Some(results))
         });
 
         let (bm25_results, vector_results) = match tokio::try_join!(bm25_handle, vector_handle) {
@@ -416,7 +408,7 @@ impl HybridSearch for HelixGraphStorage {
                     .entry(doc_id)
                     .and_modify(|existing_score| *existing_score += (1.0 - alpha) * similarity)
                     .or_insert((1.0 - alpha) * score as f32);
-            }
+                }
         }
 
         let mut results: Vec<(u128, f32)> = combined_scores.into_iter().collect();
