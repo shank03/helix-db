@@ -23,8 +23,6 @@ mod utils;
 #[tokio::main]
 async fn main() {
     check_helix_version().await;
-    // TODO: check cargo installed here globally
-    // TODO: check cargo installed here globally
 
     let args = HelixCli::parse();
     match args.command {
