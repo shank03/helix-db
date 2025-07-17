@@ -1866,7 +1866,7 @@ dependencies = [
 
 [[package]]
 name = "helix-cli"
-version = "1.0.115"
+version = "1.0.116"
 dependencies = [
  "chrono",
  "clap",
@@ -1911,7 +1911,7 @@ dependencies = [
 
 [[package]]
 name = "helix-db"
-version = "1.0.115"
+version = "1.0.116"
 dependencies = [
  "bincode",
  "chrono",
@@ -1939,7 +1939,7 @@ dependencies = [
 
 [[package]]
 name = "helix-macros"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "proc-macro2",
  "quote",
