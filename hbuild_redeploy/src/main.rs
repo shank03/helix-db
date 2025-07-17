@@ -98,6 +98,7 @@ async fn perform_deployment(state: &AppState) -> Result<(), AdminError> {
         ));
     }
 
+    println!("pulling binary from s3: {}/{}/helix-container/latest", state.user_id, state.cluster_id);
     // pull binary from s3
     let response = state
         .s3_client
