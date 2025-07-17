@@ -71,8 +71,34 @@ pub const DEFAULT_SCHEMA: &str = r#"// Start building your schema here.
 // see the documentation at https://docs.helix-db.com
 // or checkout our GitHub at https://github.com/HelixDB/helix-db
 
-V::Embedding {
-    vec: [F64]
+N::User {
+    name: String,
+    age: U32,
+    email: String,
+    created_at: Date DEFAULT NOW,
+    updated_at: Date DEFAULT NOW,
+}
+
+N::Post {
+    content: String,
+    created_at: Date DEFAULT NOW,
+    updated_at: Date DEFAULT NOW,
+}
+
+E::Follows {
+    From: User,
+    To: User,
+    Properties: {
+        since: Date DEFAULT NOW,
+    }
+}
+
+E::Created {
+    From: User,
+    To: Post,
+    Properties: {
+        created_at: Date DEFAULT NOW,
+    }
 }
 "#;
 
@@ -95,13 +121,49 @@ pub const DEFAULT_QUERIES: &str = r#"// Start writing your queries here.
 // see the documentation at https://docs.helix-db.com
 // or checkout our GitHub at https://github.com/HelixDB/helix-db
 
-QUERY hnswinsert(vector: [F64]) =>
-    AddV<Embedding>(vector)
-    RETURN "Success"
+QUERY CreateUser(name: String, age: U32, email: String) =>
+    user <- AddN<User>({name: name, age: age, email: email})
+    RETURN user
 
-QUERY hnswsearch(query: [F64], k: I32) =>
-    res <- SearchV<Embedding>(query, k)
-    RETURN res
+
+QUERY CreateFollow(follower_id: ID, followed_id: ID) =>
+    follower <- N<User>(follower_id)
+    followed <- N<User>(followed_id)
+    AddE<Follows>::From(follower)::To(followed) // don't need to specify the `since` property because it has a default value
+    RETURN "success"
+
+
+QUERY CreatePost(user_id: ID, content: String) =>
+    user <- N<User>(user_id)
+    post <- AddN<Post>({content: content})
+    AddE<Created>::From(user)::To(post) // don't need to specify the `created_at` property because it has a default value
+    RETURN post
+
+
+QUERY GetUsers() =>
+    users <- N<User>
+    RETURN users
+
+QUERY GetPosts() =>
+    posts <- N<Post>
+    RETURN posts
+
+QUERY GetPostsByUser(user_id: ID) =>
+    posts <- N<User>(user_id)::Out<Created>
+    RETURN posts
+
+
+QUERY GetFollowedUsers(user_id: ID) =>
+    followed <- N<User>(user_id)::Out<Follows>
+    RETURN followed
+
+QUERY GetFollowedUsersPosts(user_id: ID) =>
+    followers <- N<User>(user_id)::Out<Follows>
+    posts <- followers::Out<Created>::RANGE(0, 40)
+    RETURN posts::{
+        post: _::{content},
+        creatorID: _::In<Created>::ID,
+    }
 "#;
 
 pub fn check_helix_installation() -> Option<PathBuf> {
