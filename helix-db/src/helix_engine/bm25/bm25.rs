@@ -411,7 +411,7 @@ impl HybridSearch for HelixGraphStorage {
                 }
         }
 
-        let mut results: Vec<(u128, f32)> = combined_scores.into_iter().collect();
+        let mut results = combined_scores.into_iter().collect::<Vec<(u128, f32)>>();
         results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         results.truncate(limit);
 
