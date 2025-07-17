@@ -5,6 +5,8 @@ use tokio::io::AsyncWrite;
 use tokio::io::AsyncWriteExt;
 use tokio::io::BufWriter;
 
+use crate::helix_engine::types::GraphError;
+
 #[derive(Debug, Default, Clone, Copy)]
 pub enum Format {
     #[default]
@@ -35,13 +37,16 @@ impl Format {
     pub fn deserialize<'a, T: Deserialize<'a>>(
         self,
         val: &'a [u8],
-    ) -> Result<MaybeOwned<'a, T>, Box<dyn Error>> {
+    ) -> Result<MaybeOwned<'a, T>, GraphError> {
         match self {
-            Format::Json => Ok(MaybeOwned::Owned(sonic_rs::from_slice::<T>(val)?)),
+            Format::Json => Ok(MaybeOwned::Owned(
+                sonic_rs::from_slice::<T>(val)
+                    .map_err(|e| GraphError::DecodeError(e.to_string()))?,
+            )),
         }
     }
 
-    pub fn from_headers(headers: HashMap<String, String>) -> (Format, Format) {
+    pub fn from_headers(headers: &HashMap<String, String>) -> (Format, Format) {
         let content_type = headers
             .iter()
             .find_map(|(k, v)| {

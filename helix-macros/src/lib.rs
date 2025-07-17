@@ -52,12 +52,8 @@ pub fn handler(args: TokenStream, item: TokenStream) -> TokenStream {
     let expanded = quote! {
         #[allow(non_camel_case_types)]
         #vis #sig {
-            let (helix_in_fmt, helix_out_fmt) = Format::from_headers(input.request.headers);
-            let res = helix_in_fmt.deserialize(&input.request.body);
-            let data: &#input_data_name = match res {
-                Ok(data) => data.deref(),
-                Err(err) => return Err(GraphError::from(err)),
-            };
+            let (helix_in_fmt, helix_out_fmt) = Format::from_headers(&input.request.headers);
+            let data = &*helix_in_fmt.deserialize::<#input_data_name>(&input.request.body)?;
 
             let mut remapping_vals = RemappingMap::new();
             let db = Arc::clone(&input.graph.storage);
@@ -67,7 +63,7 @@ pub fn handler(args: TokenStream, item: TokenStream) -> TokenStream {
             #(#query_stmts)*
 
             txn.commit().unwrap();
-            response.value = (helix_out_fmt, return_vals);
+            response.value = Some((helix_out_fmt, return_vals));
 
             Ok(())
         }
