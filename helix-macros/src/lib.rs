@@ -280,7 +280,7 @@ pub fn tool_calls(_attr: TokenStream, input: TokenStream) -> TokenStream {
                 })
                 .collect();
 
-            let struct_name = quote::format_ident!("{}Data", fn_name);
+            let struct_name = quote::format_ident!("{}Input", fn_name);
             let expanded = quote! {
                 #[derive(Debug, Deserialize)]
                 #[allow(non_camel_case_types)]
@@ -306,8 +306,6 @@ pub fn tool_calls(_attr: TokenStream, input: TokenStream) -> TokenStream {
                     };
 
                     let txn = input.mcp_backend.db.graph_env.read_txn()?;
-
-
 
                     let result = input.mcp_backend.#fn_name(&txn, &connection, #(data.#field_names),*)?;
 
@@ -412,8 +410,6 @@ pub fn tool_call(args: TokenStream, input: TokenStream) -> TokenStream {
                 None => return Err(GraphError::Default),
             };
             drop(connections);
-
-            let txn = input.mcp_backend.db.graph_env.read_txn()?;
 
             let mut result = #mcp_query_block;
 
