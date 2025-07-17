@@ -282,6 +282,7 @@ pub fn tool_calls(_attr: TokenStream, input: TokenStream) -> TokenStream {
             let expanded = quote! {
 
                 #[derive(Debug, Deserialize)]
+                #[allow(non_camel_case_types)]
                 pub struct #mcp_struct_name {
                     #(#struct_fields),*
                 }
@@ -294,6 +295,7 @@ pub fn tool_calls(_attr: TokenStream, input: TokenStream) -> TokenStream {
                 }
 
                 #[mcp_handler]
+                #[allow(non_camel_case_types)]
                 pub fn #fn_name<'a>(
                     input: &'a mut MCPToolInput,
                     response: &mut Response,
@@ -400,6 +402,7 @@ pub fn tool_call(args: TokenStream, input: TokenStream) -> TokenStream {
         }
 
         #[mcp_handler]
+        #[allow(non_camel_case_types)]
         pub fn #mcp_function_name<'a>(
             input: &'a mut MCPToolInput,
             response: &mut Response,
