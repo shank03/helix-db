@@ -343,6 +343,7 @@ impl BM25 for HBM25Config {
 }
 
 pub trait HybridSearch {
+    /// Search both hnsw index and bm25 docs
     async fn hybrid_search(
         self,
         query: &str,
@@ -360,8 +361,6 @@ impl HybridSearch for HelixGraphStorage {
         alpha: f32,
         limit: usize,
     ) -> Result<Vec<(u128, f32)>, GraphError> {
-        let mut combined_scores: HashMap<u128, f32> = HashMap::new();
-
         let query_owned = query.to_string();
         let query_vector_owned = query_vector.to_vec();
 
@@ -375,7 +374,8 @@ impl HybridSearch for HelixGraphStorage {
                     Some(s) => s.search(&txn, &query_owned, limit * 2),
                     None => Err(GraphError::from("BM25 not enabled!")),
                 }
-            }).await
+            })
+            .await
             .map_err(|_| GraphError::from("BM25 task panicked"))?
         });
 
@@ -390,26 +390,33 @@ impl HybridSearch for HelixGraphStorage {
                     false,
                 )?;
                 Ok(Some(results))
-            }).await
+            })
+            .await
             .map_err(|_| GraphError::from("Vector task panicked"))?
         });
 
-        let (bm25_results, vector_results) =
-            tokio::try_join!(bm25_handle, vector_handle).unwrap(); // TODO: no unwrap here would be
+        let (bm25_results, vector_results) = match tokio::try_join!(bm25_handle, vector_handle) {
+            Ok((a, b)) => (a, b),
+            Err(e) => return Err(GraphError::from(e.to_string())),
+        };
 
-        // TODO: fix the major error
+        let mut combined_scores: HashMap<u128, f32> = HashMap::new();
+
         for (doc_id, score) in bm25_results? {
             combined_scores.insert(doc_id, alpha * score);
         }
 
+        // correct_score = alpha * bm25_score + (1.0 - alpha) * vector_score
         if let Some(vector_results) = vector_results? {
             for doc in vector_results {
                 let doc_id = doc.id;
                 let score = doc.distance.unwrap_or(0.0);
-                combined_scores.entry(doc_id)
-                    .and_modify(|existing_score| *existing_score += (1.0 - alpha) * score as f32)
+                let similarity = (1.0 / (1.0 + score)) as f32;
+                combined_scores
+                    .entry(doc_id)
+                    .and_modify(|existing_score| *existing_score += (1.0 - alpha) * similarity)
                     .or_insert((1.0 - alpha) * score as f32);
-                }
+            }
         }
 
         let mut results: Vec<(u128, f32)> = combined_scores.into_iter().collect();

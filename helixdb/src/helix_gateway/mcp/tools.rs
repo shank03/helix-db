@@ -346,7 +346,7 @@ impl<'a> McpTools<'a> for McpBackend {
         let db = Arc::clone(&self.db);
 
         let iter = NFromType {
-            iter: db.nodes_db.lazily_decode_data().iter(txn).unwrap(),
+            iter: db.nodes_db.lazily_decode_data().iter(txn)?,
             label: node_type,
         };
 
@@ -363,7 +363,7 @@ impl<'a> McpTools<'a> for McpBackend {
         let db = Arc::clone(&self.db);
 
         let iter = EFromType {
-            iter: db.edges_db.lazily_decode_data().iter(txn).unwrap(),
+            iter: db.edges_db.lazily_decode_data().iter(txn)?,
             label: edge_type,
         };
 
@@ -465,7 +465,7 @@ impl<'a> McpTools<'a> for McpBackend {
 
         let model = get_embedding_model(None, None, None)?;
         let result = model.fetch_embedding(query);
-        let embedding = result.unwrap();
+        let embedding = result?;
 
         let res = G::new(db, &txn)
             .search_v::<fn(&HVector, &RoTxn) -> bool>(&embedding, 5, None)
