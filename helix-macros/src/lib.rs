@@ -311,6 +311,7 @@ pub fn tool_calls(_attr: TokenStream, input: TokenStream) -> TokenStream {
                         Some(conn) => conn,
                         None => return Err(GraphError::Default),
                     };
+                    drop(connections);
 
                     let txn = input.mcp_backend.db.graph_env.read_txn()?;
 
