@@ -19,8 +19,12 @@ pub enum Format {
 
 impl Format {
     /// Serialize the value to bytes.
-    /// If using a zero-copy format it will return a Cow::Borrowed, with a lifetime corresponding to the value
-    /// Otherwise it returns a Cow::Owned
+    /// If using a zero-copy format it will return a Cow::Borrowed, with a lifetime corresponding to the value.
+    /// Otherwise, it returns a Cow::Owned.
+    /// 
+    /// # Panics
+    /// This method will panic if serialization fails. Ensure that the value being serialized
+    /// is compatible with the chosen format to avoid panics.
     pub fn serialize<T: Serialize>(self, val: &T) -> Cow<[u8]> {
         match self {
             Format::Json => sonic_rs::to_string(val).unwrap().into_bytes().into(),
