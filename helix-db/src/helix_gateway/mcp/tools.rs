@@ -30,9 +30,6 @@ use crate::{
     protocol::{
         response::Response,
         return_values::ReturnValue,
-    helix_gateway::mcp::mcp::{
-        MCPConnection, MCPHandler, MCPHandlerSubmission,
-        MCPToolInput, McpBackend
     },
     utils::label_hash::hash_label,
 };
