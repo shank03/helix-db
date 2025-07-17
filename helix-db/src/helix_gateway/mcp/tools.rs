@@ -11,9 +11,9 @@ use crate::{
                 out_e::{OutEdgesAdapter, OutEdgesIterator},
             },
             source::{add_e::EdgeType, e_from_type::EFromType, n_from_type::NFromType},
-            tr_val::{Traversable, TraversalVal}, vectors::search::SearchVAdapter,
+            vectors::search::SearchVAdapter,
             bm25::search_bm25::SearchBM25Adapter,
-            tr_val::{Traversable, TraversalVal},
+            tr_val::{TraversalVal, Traversable},
         },
         types::GraphError,
         storage_core::storage_core::HelixGraphStorage,
@@ -21,17 +21,19 @@ use crate::{
     },
     helix_gateway::{
         embedding_providers::embedding_providers::{get_embedding_model, EmbeddingModel},
-        mcp::mcp::{MCPConnection, McpBackend},
+        mcp::mcp::{
+            MCPConnection, McpBackend,
+            MCPHandler, MCPHandlerSubmission, MCPToolInput
+        },
     },
-    helix_gateway::mcp::mcp::{
-        MCPConnection, MCPHandler, MCPHandlerSubmission, MCPToolInput, McpBackend,
+    protocol::{
+        response::Response,
+        return_values::ReturnValue,
     },
-    protocol::response::Response,
-    protocol::return_values::ReturnValue,
     utils::label_hash::hash_label,
 };
 use heed3::RoTxn;
-use helix_macros::{tool_calls, mcp_handler, tool_call};
+use helix_macros::{tool_calls, mcp_handler};
 use serde::Deserialize;
 use std::{marker::PhantomData, sync::Arc};
 
@@ -63,47 +65,6 @@ pub enum ToolArgs {
         properties: Option<Vec<(String, String)>>,
         filter_traversals: Option<Vec<ToolArgs>>,
     },
-}
-
-<<<<<<< HEAD:helixdb/src/helix_gateway/mcp/tools.rs
-pub(crate) trait ToolCalls<'a> {
-    fn call(
-        &'a self,
-        txn: &'a RoTxn,
-        connection_id: &'a MCPConnection,
-        args: ToolArgs,
-    ) -> Result<Vec<TraversalVal>, GraphError>;
-}
-
-impl<'a> ToolCalls<'a> for McpBackend {
-    fn call(
-        &'a self,
-        txn: &'a RoTxn,
-        connection: &'a MCPConnection,
-        args: ToolArgs,
-    ) -> Result<Vec<TraversalVal>, GraphError> {
-        let result = match args {
-            ToolArgs::OutStep {
-                edge_label,
-                edge_type,
-            } => self.out_step(connection, &edge_label, &edge_type, txn),
-            ToolArgs::OutEStep { edge_label } => self.out_e_step(connection, &edge_label, txn),
-            ToolArgs::InStep {
-                edge_label,
-                edge_type,
-            } => self.in_step(connection, &edge_label, &edge_type, txn),
-            ToolArgs::InEStep { edge_label } => self.in_e_step(connection, &edge_label, txn),
-            ToolArgs::NFromType { node_type } => self.n_from_type(&node_type, txn),
-            ToolArgs::EFromType { edge_type } => self.e_from_type(&edge_type, txn),
-            ToolArgs::FilterItems {
-                properties,
-                filter_traversals,
-            } => self.filter_items(connection, properties, filter_traversals, txn),
-            //_ => return Err(GraphError::New(format!("Tool {:?} not found", args))),
-        }?;
-
-        Ok(result)
-    }
 }
 
 #[tool_calls]
@@ -166,16 +127,18 @@ trait McpTools<'a> {
     /// BM25
     fn search_keyword(
         &'a self,
+        txn: &'a RoTxn,
+        connection: &'a MCPConnection,
         query: &'a str,
         limit: usize,
-        txn: &'a RoTxn,
     ) -> Result<Vec<TraversalVal>, GraphError>;
 
     /// HNSW Search with built int embedding model
     fn search_vector_text(
         &'a self,
-        query: &'a str,
         txn: &'a RoTxn,
+        connection: &'a MCPConnection,
+        query: &'a str,
     ) -> Result<Vec<TraversalVal>, GraphError>;
 }
 
@@ -448,9 +411,10 @@ impl<'a> McpTools<'a> for McpBackend {
 
     fn search_keyword(
         &'a self,
+        txn: &'a RoTxn,
+        _connection: &'a MCPConnection,
         query: &'a str,
         limit: usize,
-        txn: &'a RoTxn,
     ) -> Result<Vec<TraversalVal>, GraphError> {
         let db = Arc::clone(&self.db);
 
@@ -463,8 +427,9 @@ impl<'a> McpTools<'a> for McpBackend {
 
     fn search_vector_text(
         &'a self,
-        query: &'a str,
         txn: &'a RoTxn,
+        _connection: &'a MCPConnection,
+        query: &'a str,
     ) -> Result<Vec<TraversalVal>, GraphError> {
         let db = Arc::clone(&self.db);
 
@@ -480,3 +445,4 @@ impl<'a> McpTools<'a> for McpBackend {
         Ok(res)
     }
 }
+

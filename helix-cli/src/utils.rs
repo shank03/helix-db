@@ -197,9 +197,7 @@ pub fn get_crate_version<P: AsRef<Path>>(path: P) -> Result<Version, String> {
 }
 
 pub async fn get_remote_helix_version() -> Result<Version, Box<dyn Error>> {
-    let client = Client::builder()
-        .timeout(std::time::Duration::from_secs(10))
-        .build()?;
+    let client = Client::new();
 
     let url = "https://api.github.com/repos/HelixDB/helix-db/releases/latest";
 
@@ -222,40 +220,9 @@ pub async fn get_remote_helix_version() -> Result<Version, Box<dyn Error>> {
     Ok(Version::parse(&tag_name)?)
 }
 
-pub fn get_n_helix_cli() -> Result<(), Box<dyn Error>> {
-    // TODO: running this through rust doesn't identify GLIBC so has to compile from source
-    let status = Command::new("sh")
-        .arg("-c")
-        .arg("curl -sSL 'https://install.helix-db.com' | bash")
-        .env(
-            "PATH",
-            format!(
-                "{}:{}",
-                std::env::var("HOME")
-                    .map(|h| format!("{}/.cargo/bin", h))
-                    .unwrap_or_default(),
-                std::env::var("PATH").unwrap_or_default()
-            ),
-        )
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .status()?;
-
-    if !status.success() {
-        return Err(format!("Command failed with status: {}", status).into());
-    }
-
-    Ok(())
-}
-
-// TODO:
-// Spinner::new
-// Spinner::stop_with_message
-// Dots9 style
-
 pub async fn github_login() -> Result<String, Box<dyn Error>> {
     // TODO: get control server
-    let url = "ws://ec2-184-72-27-116.us-west-1.compute.amazonaws.com:3000/login";
+    let url = "ws://127.0.0.1:3000/login";
     let (mut ws_stream, _) = connect_async(url).await?;
 
     let init_msg: UserCodeMsg = match ws_stream.next().await {
@@ -274,10 +241,6 @@ pub async fn github_login() -> Result<String, Box<dyn Error>> {
 
     let msg: ApiKeyMsg = match ws_stream.next().await {
         Some(Ok(Message::Text(payload))) => sonic_rs::from_str(&payload)?,
-        Some(Ok(message)) => {
-            println!("{}", message);
-            return Err(format!("Unexpected message: {message:?}").into());
-        }
         Some(Ok(Message::Close(Some(CloseFrame {
             code: CloseCode::Error,
             reason,
@@ -287,7 +250,7 @@ pub async fn github_login() -> Result<String, Box<dyn Error>> {
         None => return Err("Connection Closed Unexpectedly".into()),
     };
 
-    Ok((msg.key, msg.user_id))
+    Ok(msg.key)
 }
 
 #[derive(Deserialize)]
@@ -298,7 +261,6 @@ struct UserCodeMsg {
 
 #[derive(Deserialize)]
 struct ApiKeyMsg {
-    user_id: String,
     key: String,
 }
 
@@ -315,48 +277,38 @@ pub fn parse_credentials(creds: &String) -> Option<&str> {
 }
 
 pub async fn check_helix_version() {
-    // Skip version check if helix is not installed to avoid unnecessary errors
     match check_helix_installation() {
-        Ok(_) => {}
-        Err(_) => {
-            // Don't print error message here - let individual commands handle this
-            return;
-        }
-    };
+        Some(_) => {}
+        None => return,
+    }
 
     let repo_path = {
         let home_dir = match dirs::home_dir() {
             Some(dir) => dir,
-            None => {
-                // Silently fail - don't interrupt user workflow
-                return;
-            }
+            None => return,
         };
-        home_dir.join(".helix/repo/helix-db/helix-db")
+        home_dir.join(".helix/repo/helix-db/helixdb")
     };
 
     let local_cli_version = match Version::parse(&format!("v{}", env!("CARGO_PKG_VERSION"))) {
+        Ok(value) => value,
+        Err(_) => return,
+    };
 
-    let local_db_version = match get_crate_version(&repo_path) {
-        Ok(version_str) => match Version::parse(&format!("v{}", version_str)) {
-            Ok(v) => v,
-            Err(_) => return,
-        },
+    let crate_version = match get_crate_version(&repo_path) {
+        Ok(value) => value,
+        Err(_) => return,
+    };
+
+    let local_db_version = match Version::parse(&format!("v{}", crate_version)) {
+        Ok(value) => value,
         Err(_) => return,
     };
 
     let remote_helix_version = match get_remote_helix_version().await {
-        Ok(v) => v,
-        Err(_) => {
-            // Silently fail on network errors - don't interrupt user workflow
-            return;
-        }
+        Ok(value) => value,
+        Err(_) => return,
     };
-
-    println!(
-        "helix-cli version: {}, helix-db version: {}, remote helix version: {}",
-        local_cli_version, local_db_version, remote_helix_version
-    );
 
     if local_db_version < remote_helix_version || local_cli_version < remote_helix_version {
         println!("{} {} {} {}",
