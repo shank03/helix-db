@@ -373,6 +373,7 @@ use helix_db::{
         response::Response,
         return_values::ReturnValue,
         value::Value,
+        format::Format,
     },
     utils::{
         count::Count,
@@ -381,8 +382,7 @@ use helix_db::{
         items::{Edge, Node},
     },
 };
-// use sonic_rs::{Deserialize, Serialize};
-use helix_db::helix_gateway::format::Format;
+use sonic_rs::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Instant;
