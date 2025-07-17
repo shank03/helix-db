@@ -1,10 +1,13 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Deref};
 use tokio::io::{AsyncWrite, AsyncWriteExt, Result};
+
+use crate::protocol::{format::Format, return_values::ReturnValue};
 #[derive(Debug)]
 pub struct Response {
     pub status: u16,
     pub headers: HashMap<String, String>,
     pub body: Vec<u8>,
+    pub value: Option<(Format, HashMap<String, ReturnValue>)>,
 }
 
 impl Response {
@@ -18,6 +21,7 @@ impl Response {
             status: 200,
             headers,
             body: Vec::new(),
+            value: None,
         }
     }
 
@@ -64,6 +68,16 @@ impl Response {
             .write_all(format!("HTTP/1.1 {} {}\r\n", self.status, status_message).as_bytes())
             .await?;
 
+        let serialized = self.value.as_ref().map(|(f, v)| f.serialize(v));
+
+        let body = match serialized.as_ref() {
+            Some(s) => {
+                assert!(self.body.is_empty());
+                s.deref()
+            }
+            None => &self.body,
+        };
+
         // Write headers
         for (header, value) in &self.headers {
             writer
@@ -78,11 +92,11 @@ impl Response {
         }
 
         writer
-            .write_all(format!("Content-Length: {}\r\n\r\n", self.body.len()).as_bytes())
+            .write_all(format!("Content-Length: {}\r\n\r\n", body.len()).as_bytes())
             .await?;
 
         // Write body
-        writer.write_all(&self.body).await?;
+        writer.write_all(body).await?;
         writer.flush().await?;
         Ok(())
     }
