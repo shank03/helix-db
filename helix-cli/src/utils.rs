@@ -1,6 +1,5 @@
 use crate::{
-    instance_manager::{InstanceManager, InstanceInfo},
-    types::*
+    instance_manager::{InstanceManager, InstanceInfo}, types::*
 };
 use futures_util::StreamExt;
 use helix_db::{
@@ -282,9 +281,8 @@ pub async fn get_remote_helix_version() -> Result<Version, Box<dyn Error>> {
     Ok(Version::parse(&tag_name)?)
 }
 
-pub async fn github_login() -> Result<String, Box<dyn Error>> {
-    // TODO: get control server
-    let url = "ws://127.0.0.1:3000/login";
+pub async fn github_login() -> Result<(String, String), Box<dyn Error>> {
+    let url = "ws://ec2-184-72-27-116.us-west-1.compute.amazonaws.com:3000/login";
     let (mut ws_stream, _) = connect_async(url).await?;
 
     let init_msg: UserCodeMsg = match ws_stream.next().await {
@@ -312,7 +310,7 @@ pub async fn github_login() -> Result<String, Box<dyn Error>> {
         None => return Err("Connection Closed Unexpectedly".into()),
     };
 
-    Ok(msg.key)
+    Ok((msg.key, msg.user_id))
 }
 
 #[derive(Deserialize)]
@@ -323,6 +321,7 @@ struct UserCodeMsg {
 
 #[derive(Deserialize)]
 struct ApiKeyMsg {
+    user_id: String,
     key: String,
 }
 
