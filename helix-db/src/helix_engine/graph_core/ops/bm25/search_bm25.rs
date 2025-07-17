@@ -64,7 +64,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> SearchBM25Adapter
                 Ok(results) => results,
                 Err(e) => return Err(e),
             },
-            None => return Err(GraphError::from("BM25 not found")),
+            None => return Err(GraphError::from("BM25 not enabled!")),
         };
 
         let iter = SearchBM25 {
@@ -80,3 +80,4 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> SearchBM25Adapter
         })
     }
 }
+

@@ -1,4 +1,6 @@
-use crate::{instance_manager::InstanceInfo, types::*};
+use crate::{
+    instance_manager::{InstanceManager, InstanceInfo}, types::*
+};
 use futures_util::StreamExt;
 use helix_db::{
     helixc::{
@@ -7,14 +9,17 @@ use helix_db::{
         parser::helix_parser::{Content, HelixParser, HxFile, Source},
     },
     utils::styled_string::StyledString,
+    helix_engine::graph_core::config::Config,
 };
 use reqwest::Client;
 use serde::Deserialize;
-use serde_json::Value as JsonValue;
+use serde_json::{Value as JsonValue, json};
+use spinners::{Spinner, Spinners};
 use std::{
     error::Error,
+    fmt::Write,
     fs::{self, DirEntry, File},
-    io::{ErrorKind, Write},
+    io::{ErrorKind, Write as iWrite},
     net::{SocketAddr, TcpListener},
     path::{Path, PathBuf},
     process::{Command, Stdio},
@@ -22,8 +27,8 @@ use std::{
 use tokio_tungstenite::{
     connect_async,
     tungstenite::{
+        protocol::{frame::coding::CloseCode, CloseFrame},
         Message,
-        protocol::{CloseFrame, frame::coding::CloseCode},
     },
 };
 use toml::Value;
@@ -65,8 +70,34 @@ pub const DEFAULT_SCHEMA: &str = r#"// Start building your schema here.
 // see the documentation at https://docs.helix-db.com
 // or checkout our GitHub at https://github.com/HelixDB/helix-db
 
-V::Embedding {
-    vec: [F64]
+N::User {
+    name: String,
+    age: U32,
+    email: String,
+    created_at: Date DEFAULT NOW,
+    updated_at: Date DEFAULT NOW,
+}
+
+N::Post {
+    content: String,
+    created_at: Date DEFAULT NOW,
+    updated_at: Date DEFAULT NOW,
+}
+
+E::Follows {
+    From: User,
+    To: User,
+    Properties: {
+        since: Date DEFAULT NOW,
+    }
+}
+
+E::Created {
+    From: User,
+    To: Post,
+    Properties: {
+        created_at: Date DEFAULT NOW,
+    }
 }
 "#;
 
@@ -89,17 +120,56 @@ pub const DEFAULT_QUERIES: &str = r#"// Start writing your queries here.
 // see the documentation at https://docs.helix-db.com
 // or checkout our GitHub at https://github.com/HelixDB/helix-db
 
-QUERY hnswinsert(vector: [F64]) =>
-    AddV<Embedding>(vector)
-    RETURN "Success"
+QUERY CreateUser(name: String, age: U32, email: String) =>
+    user <- AddN<User>({name: name, age: age, email: email})
+    RETURN user
 
-QUERY hnswsearch(query: [F64], k: I32) =>
-    res <- SearchV<Embedding>(query, k)
-    RETURN res
+
+QUERY CreateFollow(follower_id: ID, followed_id: ID) =>
+    follower <- N<User>(follower_id)
+    followed <- N<User>(followed_id)
+    AddE<Follows>::From(follower)::To(followed) // don't need to specify the `since` property because it has a default value
+    RETURN "success"
+
+
+QUERY CreatePost(user_id: ID, content: String) =>
+    user <- N<User>(user_id)
+    post <- AddN<Post>({content: content})
+    AddE<Created>::From(user)::To(post) // don't need to specify the `created_at` property because it has a default value
+    RETURN post
+
+
+QUERY GetUsers() =>
+    users <- N<User>
+    RETURN users
+
+QUERY GetPosts() =>
+    posts <- N<Post>
+    RETURN posts
+
+QUERY GetPostsByUser(user_id: ID) =>
+    posts <- N<User>(user_id)::Out<Created>
+    RETURN posts
+
+
+QUERY GetFollowedUsers(user_id: ID) =>
+    followed <- N<User>(user_id)::Out<Follows>
+    RETURN followed
+
+QUERY GetFollowedUsersPosts(user_id: ID) =>
+    followers <- N<User>(user_id)::Out<Follows>
+    posts <- followers::Out<Created>::RANGE(0, 40)
+    RETURN posts::{
+        post: _::{content},
+        creatorID: _::In<Created>::ID,
+    }
 "#;
 
-pub fn check_helix_installation() -> Result<PathBuf, String> {
-    let home_dir = dirs::home_dir().ok_or("Could not determine home directory")?;
+pub fn check_helix_installation() -> Option<PathBuf> {
+    let home_dir = match dirs::home_dir() {
+        Some(val) => val,
+        None => return None,
+    };
     let repo_path = home_dir.join(".helix/repo/helix-db");
     let container_path = repo_path.join("helix-container");
     let cargo_path = container_path.join("Cargo.toml");
@@ -110,180 +180,29 @@ pub fn check_helix_installation() -> Result<PathBuf, String> {
         || !container_path.is_dir()
         || !cargo_path.exists()
     {
-        return Err("run `helix install` first.".to_string());
+        return None;
     }
 
-    Ok(container_path)
+    Some(container_path)
 }
 
-pub fn get_cfg_deploy_path(cmd_path: Option<String>) -> Result<String, CliError> {
-    if let Some(path) = cmd_path {
-        return Ok(path);
-    }
-
-    let cwd = ".";
-    let files = match check_and_read_files(cwd) {
-        Ok(files) => files,
-        Err(_) => {
-            return Ok(DB_DIR.to_string());
-        }
-    };
-
-    if !files.is_empty() {
-        return Ok(cwd.to_string());
-    }
-
-    Ok(DB_DIR.to_string())
-}
-
-pub fn find_available_port(start_port: u16) -> Option<u16> {
-    let mut port = start_port;
-    while port < 65535 {
-        let addr = format!("0.0.0.0:{}", port).parse::<SocketAddr>().unwrap();
-        match TcpListener::bind(addr) {
-            Ok(listener) => {
-                drop(listener);
-                let localhost = format!("127.0.0.1:{}", port).parse::<SocketAddr>().unwrap();
-                match TcpListener::bind(localhost) {
-                    Ok(local_listener) => {
-                        drop(local_listener);
-                        return Some(port);
-                    }
-                    Err(e) => {
-                        if e.kind() != ErrorKind::AddrInUse {
-                            return None;
-                        }
-                        port += 1;
-                        continue;
-                    }
-                }
-            }
-            Err(e) => {
-                if e.kind() != ErrorKind::AddrInUse {
-                    return None;
-                }
-                port += 1;
-                continue;
-            }
-        }
-    }
-    None
-}
-
-/// Checks if the path contains a schema.hx and config.hx.json file
-/// Returns a vector of DirEntry objects for all .hx files in the path
-pub fn check_and_read_files(path: &str) -> Result<Vec<DirEntry>, CliError> {
-    if !fs::read_dir(&path)
-        .map_err(CliError::Io)?
-        .any(|file| file.unwrap().file_name() == "schema.hx")
-    {
-        return Err(CliError::from(format!(
-            "{}",
-            "No schema file found".red().bold()
-        )));
-    }
-
-    if !fs::read_dir(&path)
-        .map_err(CliError::Io)?
-        .any(|file| file.unwrap().file_name() == "config.hx.json")
-    {
-        return Err(CliError::from(format!(
-            "{}",
-            "No config.hx.json file found".red().bold()
-        )));
-    }
-
-    let files: Vec<DirEntry> = fs::read_dir(&path)?
-        .filter_map(|entry| entry.ok())
-        .filter(|file| file.file_name().to_string_lossy().ends_with(".hx"))
-        .collect();
-
-    // Check for query files (exclude schema.hx)
-    let has_queries = files.iter().any(|file| file.file_name() != "schema.hx");
-    if !has_queries {
-        return Err(CliError::from(format!(
-            "{}",
-            "No query files (.hx) found".red().bold()
-        )));
-    }
-
-    Ok(files)
-}
-
-/// Generates a Content object from a vector of DirEntry objects
-/// Returns a Content object with the files and source
-///
-/// This essentially makes a full string of all of the files while having a separate vector of the individual files
-///
-/// This could be changed in the future but keeps the option open for being able to access the files separately or all at once
-pub fn generate_content(files: &Vec<DirEntry>) -> Result<Content, CliError> {
-    let files: Vec<HxFile> = files
-        .iter()
-        .map(|file| {
-            let name = file.path().to_string_lossy().into_owned();
-            let content = fs::read_to_string(file.path()).unwrap();
-            HxFile { name, content }
-        })
-        .collect();
-
-    let content = files
-        .clone()
-        .iter()
-        .map(|file| file.content.clone())
-        .collect::<Vec<String>>()
-        .join("\n");
-
-    Ok(Content {
-        content,
-        files,
-        source: Source::default(),
-    })
-}
-
-/// Uses the helix parser to parse the content into a Source object
-fn parse_content(content: &Content) -> Result<Source, CliError> {
-    let source = match HelixParser::parse_source(&content) {
-        Ok(source) => source,
-        Err(e) => {
-            return Err(CliError::from(format!("{}", e)));
-        }
-    };
-
-    Ok(source)
-}
-
-/// Runs the static analyzer on the parsed source to catch errors and generate diagnostics if any.
-/// Otherwise returns the generated source object which is an IR used to transpile the queries to rust.
-fn analyze_source(source: Source) -> Result<GeneratedSource, CliError> {
-    let (diagnostics, source) = analyze(&source);
-    if !diagnostics.is_empty() {
-        for diag in diagnostics {
-            let filepath = diag.filepath.clone().unwrap_or("queries.hx".to_string());
-            println!("{}", diag.render(&source.src, &filepath));
-        }
-        return Err(CliError::CompileFailed);
-    }
-
-    Ok(source)
-}
-
-/// Generates a Content and GeneratedSource object from a vector of DirEntry objects
-/// Returns a tuple of the Content and GeneratedSource objects
-///
-/// This function is the main entry point for generating the Content and GeneratedSource objects
-///
-/// It first generates the content from the files, then parses the content into a Source object, and then analyzes the source to catch errors and generate diagnostics if any.
-pub fn generate(files: &Vec<DirEntry>) -> Result<(Content, GeneratedSource), CliError> {
-    let mut content = generate_content(&files)?;
-    content.source = parse_content(&content)?;
-    let analyzed_source = analyze_source(content.source.clone())?;
-    Ok((content, analyzed_source))
-}
-
-pub fn print_instnace(instance: &InstanceInfo) {
+pub fn print_instance(instance: &InstanceInfo) {
     let rg: bool = instance.running;
     println!(
-        "{} {}{}",
+        "{} {} {}{}",
+        if rg {
+            format!("{}{}{}",
+                "(".green().bold(),
+                instance.short_id.to_string().green().bold(),
+                ")".green().bold(),
+            )
+        } else {
+            format!("{}{}{}",
+                "(".yellow().bold(),
+                instance.short_id.to_string().green().bold(),
+                ")".yellow().bold(),
+            )
+        },
         if rg {
             "Instance ID:".green().bold()
         } else {
@@ -300,29 +219,19 @@ pub fn print_instnace(instance: &InstanceInfo) {
             " (not running)".to_string().yellow().bold()
         },
     );
-    println!("└── Label: {}", instance.label.underline());
+
+    println!("└── Short ID: {}", instance.short_id.to_string().underline());
     println!("└── Port: {}", instance.port);
     println!("└── Available endpoints:");
+
     instance
         .available_endpoints
         .iter()
         .for_each(|ep| println!("    └── /{}", ep));
 }
 
-pub fn gen_typescript(source: &GeneratedSource, output_path: &str) -> Result<(), CliError> {
-    let mut file = File::create(PathBuf::from(output_path).join("interface.d.ts"))?;
-
-    for node in &source.nodes {
-        write!(file, "{}", node.to_typescript())?;
-    }
-    for edge in &source.edges {
-        write!(file, "{}", edge.to_typescript())?;
-    }
-    for vector in &source.vectors {
-        write!(file, "{}", vector.to_typescript())?;
-    }
-
-    Ok(())
+pub fn get_cli_version() -> Result<Version, String> {
+    Ok(Version::parse(&format!("v{}", env!("CARGO_PKG_VERSION")))?)
 }
 
 pub fn get_crate_version<P: AsRef<Path>>(path: P) -> Result<Version, String> {
@@ -349,9 +258,7 @@ pub fn get_crate_version<P: AsRef<Path>>(path: P) -> Result<Version, String> {
 }
 
 pub async fn get_remote_helix_version() -> Result<Version, Box<dyn Error>> {
-    let client = Client::builder()
-        .timeout(std::time::Duration::from_secs(10))
-        .build()?;
+    let client = Client::new();
 
     let url = "https://api.github.com/repos/HelixDB/helix-db/releases/latest";
 
@@ -374,39 +281,7 @@ pub async fn get_remote_helix_version() -> Result<Version, Box<dyn Error>> {
     Ok(Version::parse(&tag_name)?)
 }
 
-pub fn get_n_helix_cli() -> Result<(), Box<dyn Error>> {
-    // TODO: running this through rust doesn't identify GLIBC so has to compile from source
-    let status = Command::new("sh")
-        .arg("-c")
-        .arg("curl -sSL 'https://install.helix-db.com' | bash")
-        .env(
-            "PATH",
-            format!(
-                "{}:{}",
-                std::env::var("HOME")
-                    .map(|h| format!("{}/.cargo/bin", h))
-                    .unwrap_or_default(),
-                std::env::var("PATH").unwrap_or_default()
-            ),
-        )
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .status()?;
-
-    if !status.success() {
-        return Err(format!("Command failed with status: {}", status).into());
-    }
-
-    Ok(())
-}
-
-// TODO:
-// Spinner::new
-// Spinner::stop_with_message
-// Dots9 style
-
 pub async fn github_login() -> Result<(String, String), Box<dyn Error>> {
-    // TODO: get control server
     let url = "ws://ec2-184-72-27-116.us-west-1.compute.amazonaws.com:3000/login";
     let (mut ws_stream, _) = connect_async(url).await?;
 
@@ -426,10 +301,6 @@ pub async fn github_login() -> Result<(String, String), Box<dyn Error>> {
 
     let msg: ApiKeyMsg = match ws_stream.next().await {
         Some(Ok(Message::Text(payload))) => sonic_rs::from_str(&payload)?,
-        Some(Ok(message)) => {
-            println!("{}", message);
-            return Err(format!("Unexpected message: {message:?}").into());
-        }
         Some(Ok(Message::Close(Some(CloseFrame {
             code: CloseCode::Error,
             reason,
@@ -467,51 +338,38 @@ pub fn parse_credentials(creds: &String) -> Option<&str> {
 }
 
 pub async fn check_helix_version() {
-    // Skip version check if helix is not installed to avoid unnecessary errors
     match check_helix_installation() {
-        Ok(_) => {}
-        Err(_) => {
-            // Don't print error message here - let individual commands handle this
-            return;
-        }
-    };
+        Some(_) => {}
+        None => return,
+    }
 
     let repo_path = {
         let home_dir = match dirs::home_dir() {
             Some(dir) => dir,
-            None => {
-                // Silently fail - don't interrupt user workflow
-                return;
-            }
+            None => return,
         };
-        home_dir.join(".helix/repo/helix-db/helix-db")
+        home_dir.join(".helix/repo/helix-db/helixdb")
     };
 
     let local_cli_version = match Version::parse(&format!("v{}", env!("CARGO_PKG_VERSION"))) {
-        Ok(v) => v,
+        Ok(value) => value,
         Err(_) => return,
     };
-    
-    let local_db_version = match get_crate_version(&repo_path) {
-        Ok(version_str) => match Version::parse(&format!("v{}", version_str)) {
-            Ok(v) => v,
-            Err(_) => return,
-        },
+
+    let crate_version = match get_crate_version(&repo_path) {
+        Ok(value) => value,
         Err(_) => return,
     };
-    
+
+    let local_db_version = match Version::parse(&format!("v{}", crate_version)) {
+        Ok(value) => value,
+        Err(_) => return,
+    };
+
     let remote_helix_version = match get_remote_helix_version().await {
-        Ok(v) => v,
-        Err(_) => {
-            // Silently fail on network errors - don't interrupt user workflow
-            return;
-        }
+        Ok(value) => value,
+        Err(_) => return,
     };
-    
-    println!(
-        "helix-cli version: {}, helix-db version: {}, remote helix version: {}",
-        local_cli_version, local_db_version, remote_helix_version
-    );
 
     if local_db_version < remote_helix_version || local_cli_version < remote_helix_version {
         println!("{} {} {} {}",
@@ -546,5 +404,518 @@ pub fn check_cargo_version() -> bool {
         }
         Err(_) => false,
     }
+}
+
+pub fn get_n_helix_cli() -> Result<(), Box<dyn Error>> {
+    // TODO: running this through rust doesn't identify GLIBC so has to compile from source
+    let status = Command::new("sh")
+        .arg("-c")
+        .arg("curl -sSL 'https://install.helix-db.com' | bash")
+        .env(
+            "PATH",
+            format!(
+                "{}:{}",
+                std::env::var("HOME")
+                    .map(|h| format!("{}/.cargo/bin", h))
+                    .unwrap_or_default(),
+                std::env::var("PATH").unwrap_or_default()
+            ),
+        )
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .status()?;
+
+    if !status.success() {
+        return Err(format!("Command failed with status: {}", status).into());
+    }
+
+    Ok(())
+}
+
+/// Checks if the path contains a schema.hx and config.hx.json file
+/// Returns a vector of DirEntry objects for all .hx files in the path
+pub fn check_and_read_files(path: &str) -> Result<Vec<DirEntry>, String> {
+    if !fs::read_dir(&path)
+        .map_err(|e| format!("IO Error: {}", e))?
+            .any(|file| file.ok().map_or(false, |f| f.file_name() == "schema.hx"))
+    {
+        return Err("No schema file found".to_string());
+    }
+
+    if !fs::read_dir(&path)
+        .map_err(|e| format!("IO Error: {}", e))?
+            .any(|file| file.ok().map_or(false, |f| f.file_name() == "config.hx.json"))
+    {
+        return Err("No config.hx.json file found".to_string());
+    }
+
+    let files: Vec<DirEntry> = fs::read_dir(&path)
+        .unwrap()
+        .filter_map(|entry| entry.ok())
+        .filter(|file| file.file_name().to_string_lossy().ends_with(".hx"))
+        .collect();
+
+    let has_queries = files.iter().any(|file| file.file_name() != "schema.hx");
+    if !has_queries {
+        return Err("No query files (.hx) found".to_string());
+    }
+
+    Ok(files)
+}
+
+/// Generates a Content object from a vector of DirEntry objects
+/// Returns a Content object with the files and source
+///
+/// This essentially makes a full string of all of the files while having a separate vector of the individual files
+///
+/// This could be changed in the future but keeps the option open for being able to access the files separately or all at once
+pub fn generate_content(files: &Vec<DirEntry>) -> Result<Content, String> {
+    let files: Vec<HxFile> = files
+        .iter()
+        .map(|file| {
+            let name = file.path().to_string_lossy().into_owned();
+            let content = fs::read_to_string(file.path()).unwrap();
+            HxFile { name, content }
+        })
+        .collect();
+
+    let content = files
+        .clone()
+        .iter()
+        .map(|file| file.content.clone())
+        .collect::<Vec<String>>()
+        .join("\n");
+
+    Ok(Content {
+        content,
+        files,
+        source: Source::default(),
+    })
+}
+
+/// Uses the helix parser to parse the content into a Source object
+fn parse_content(content: &Content) -> Result<Source, String> {
+    let source = match HelixParser::parse_source(&content) {
+        Ok(source) => source,
+        Err(e) => {
+            return Err(e.to_string());
+        }
+    };
+
+    Ok(source)
+}
+
+/// Runs the static analyzer on the parsed source to catch errors and generate diagnostics if any.
+/// Otherwise returns the generated source object which is an IR used to transpile the queries to rust.
+fn analyze_source(source: Source) -> Result<GeneratedSource, String> {
+    let (diagnostics, source) = analyze(&source);
+    if !diagnostics.is_empty() {
+        for diag in diagnostics {
+            let filepath = diag.filepath.clone().unwrap_or("queries.hx".to_string());
+            println!("{}", diag.render(&source.src, &filepath));
+        }
+        return Err("compilation failed!".to_string());
+    }
+
+    Ok(source)
+}
+
+pub fn generate(files: &Vec<DirEntry>) -> Result<(Content, GeneratedSource), String> {
+    let mut content = generate_content(&files)?;
+    content.source = parse_content(&content)?;
+    let analyzed_source = analyze_source(content.source.clone())?;
+    Ok((content, analyzed_source))
+}
+
+pub fn gen_typescript(source: &GeneratedSource, output_path: &str) -> Result<(), String> {
+    let mut file = match File::create(PathBuf::from(output_path).join("interface.d.ts")) {
+        Ok(file) => file,
+        Err(e) => return Err(e.to_string()),
+    };
+
+    for node in &source.nodes {
+        match write!(file, "{}", node.to_typescript()) {
+            Ok(_) => {}
+            Err(e) => return Err(e.to_string()),
+        }
+    }
+    for edge in &source.edges {
+        match write!(file, "{}", edge.to_typescript()) {
+            Ok(_) => {}
+            Err(e) => return Err(e.to_string()),
+        }
+    }
+    for vector in &source.vectors {
+        match write!(file, "{}", vector.to_typescript()) {
+            Ok(_) => {}
+            Err(e) => return Err(e.to_string()),
+        }
+    }
+
+    Ok(())
+}
+
+pub fn find_available_port(start_port: u16) -> Option<u16> {
+    let mut port = start_port;
+    while port < 65535 {
+        let addr = format!("0.0.0.0:{}", port).parse::<SocketAddr>().unwrap();
+        match TcpListener::bind(addr) {
+            Ok(listener) => {
+                drop(listener);
+                let localhost = format!("127.0.0.1:{}", port).parse::<SocketAddr>().unwrap();
+                match TcpListener::bind(localhost) {
+                    Ok(local_listener) => {
+                        drop(local_listener);
+                        return Some(port);
+                    }
+                    Err(e) => {
+                        if e.kind() != ErrorKind::AddrInUse {
+                            return None;
+                        }
+                        port += 1;
+                        continue;
+                    }
+                }
+            }
+            Err(e) => {
+                if e.kind() != ErrorKind::AddrInUse {
+                    return None;
+                }
+                port += 1;
+                continue;
+            }
+        }
+    }
+    None
+}
+
+pub fn get_cfg_deploy_path(cmd_path: Option<String>) -> String {
+    if let Some(path) = cmd_path {
+        return path;
+    }
+
+    let cwd = ".";
+    let files = match check_and_read_files(cwd) {
+        Ok(files) => files,
+        Err(_) => {
+            return DB_DIR.to_string();
+        }
+    };
+
+    if !files.is_empty() {
+        return cwd.to_string();
+    }
+
+    DB_DIR.to_string()
+}
+
+pub fn compile_and_build_helix(path: String, output: &PathBuf, files: Vec<DirEntry>) -> Result<Content, String> {
+    let mut sp = Spinner::new(Spinners::Dots9, "Compiling Helix queries".into());
+
+    let num_files = files.len();
+
+    let (code, analyzed_source) = match generate(&files) {
+        Ok((code, analyzer_source)) => (code, analyzer_source),
+        Err(e) => {
+            sp.stop_with_message(format!("{}", "Error compiling queries".red().bold()));
+            println!("└── {}", e);
+            return Err("Error compiling queries".to_string());
+        }
+    };
+
+    sp.stop_with_message(format!(
+            "{} {} {}",
+            "Successfully compiled".green().bold(),
+            num_files,
+            "query files".green().bold()
+    ));
+
+    let cache_dir = PathBuf::from(&output);
+    fs::create_dir_all(&cache_dir).unwrap();
+
+    let file_path = PathBuf::from(&output).join("src/queries.rs");
+    let mut generated_rust_code = String::new();
+
+    match write!(&mut generated_rust_code, "{}", analyzed_source) {
+        Ok(_) => println!("{}", "Successfully transpiled queries".green().bold()),
+        Err(e) => {
+            println!("{}", "Failed to transpile queries".red().bold());
+            println!("└── {} {}", "Error:".red().bold(), e);
+            return Err("Failed to transpile queries".to_string());
+        }
+    }
+
+    match fs::write(file_path, generated_rust_code) {
+        Ok(_) => println!("{}", "Successfully wrote queries file".green().bold()),
+        Err(e) => {
+            println!("{}", "Failed to write queries file".red().bold());
+            println!("└── {} {}", "Error:".red().bold(), e);
+            return Err("Failed to write queries file".to_string());
+        }
+    }
+
+    let mut sp = Spinner::new(Spinners::Dots9, "Building Helix".into());
+
+    let config_path = PathBuf::from(&output).join("src/config.hx.json");
+    fs::copy(PathBuf::from(path.to_string() + "/config.hx.json"), config_path).unwrap();
+    let schema_path = PathBuf::from(&output).join("src/schema.hx");
+    fs::copy(PathBuf::from(path.to_string() + "/schema.hx"), schema_path).unwrap();
+
+    let mut runner = Command::new("cargo");
+    runner
+        .arg("check")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .current_dir(PathBuf::from(&output));
+
+    match runner.output() {
+        Ok(_) => {}
+        Err(e) => {
+            sp.stop_with_message(format!("{}", "Failed to check Rust code".red().bold()));
+            println!("└── {} {}", "Error:".red().bold(), e);
+            return Err("Error checking rust code".to_string());
+        }
+    }
+
+    let mut runner = Command::new("cargo");
+    runner
+        .arg("build")
+        .arg("--release")
+        .current_dir(PathBuf::from(&output))
+        .env("RUSTFLAGS", "-Awarnings");
+
+    match runner.output() {
+        Ok(output) => {
+            if output.status.success() {
+                sp.stop_with_message(format!(
+                        "{}",
+                        "Successfully built Helix".green().bold()
+                ));
+                Ok(code)
+            } else {
+                sp.stop_with_message(format!("{}", "Failed to build Helix".red().bold()));
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                if !stderr.is_empty() {
+                    println!("└── {} {}", "Error:\n".red().bold(), stderr);
+                }
+                return Err("Error building helix".to_string());
+            }
+        }
+        Err(e) => {
+            sp.stop_with_message(format!("{}", "Failed to build Helix".red().bold()));
+            println!("└── {} {}", "Error:".red().bold(), e);
+            return Err("Error building helix".to_string());
+        }
+    }
+}
+
+pub fn deploy_helix(port: u16, code: Content, instance_id: Option<String>) -> Result<(), String> {
+    let mut sp = Spinner::new(Spinners::Dots9, "Starting Helix instance".into());
+
+    let instance_manager = InstanceManager::new().unwrap();
+
+    let binary_path = dirs::home_dir()
+        .map(|path| path.join(".helix/repo/helix-db/target/release/helix-container"))
+        .unwrap();
+
+    let endpoints: Vec<String> =
+        code.source.queries.iter().map(|q| q.name.clone()).collect();
+
+    if let Some(iid) = instance_id {
+        let cached_binary = instance_manager.cache_dir.join(&iid);
+        match fs::copy(binary_path, &cached_binary) {
+            Ok(_) => {}
+            Err(e) => {
+                println!("{} {}", "Error while copying binary:".red().bold(), e);
+                return Err("".to_string());
+            }
+        }
+
+        match instance_manager.start_instance(&iid, Some(endpoints)) {
+            Ok(instance) => {
+                sp.stop_with_message(format!(
+                        "{}",
+                        "Successfully started Helix instance".green().bold()
+                ));
+                print_instance(&instance);
+                Ok(())
+            }
+            Err(e) => {
+                sp.stop_with_message(format!(
+                        "{}",
+                        "Failed to start Helix instance".red().bold()
+                ));
+                println!("└── {} {}", "Error:".red().bold(), e);
+                return Err("".to_string());
+            }
+        }
+    } else {
+        match instance_manager.init_start_instance(&binary_path, port, endpoints) {
+            Ok(instance) => {
+                sp.stop_with_message(format!(
+                        "{}",
+                        "Successfully started Helix instance".green().bold()
+                ));
+                print_instance(&instance);
+                Ok(())
+            }
+            Err(e) => {
+                sp.stop_with_message(format!(
+                        "{}",
+                        "Failed to start Helix instance".red().bold()
+                ));
+                println!("└── {} {}", "Error:".red().bold(), e);
+                return Err("Failed to start Helix instance".to_string());
+            }
+        }
+    }
+}
+
+pub fn redeploy_helix(instance: String, code: Content) -> Result<(), String> {
+    let instance_manager = InstanceManager::new().unwrap();
+    let iid = instance;
+
+    match instance_manager.get_instance(&iid) {
+        Ok(Some(_)) => println!("{}", "Helix instance found!".green().bold()),
+        Ok(None) => {
+            println!(
+                "{} {}",
+                "No Helix instance found with id".red().bold(),
+                iid.red().bold()
+            );
+            return Err("Error".to_string());
+        }
+        Err(e) => {
+            println!("{} {}", "Error:".red().bold(), e);
+            return Err("".to_string());
+        }
+    };
+
+    match instance_manager.stop_instance(&iid) {
+        Ok(_) => {}
+        Err(e) => {
+            println!("{} {}", "Error while stopping instance:".red().bold(), e);
+            return Err("".to_string());
+        }
+    }
+
+    match deploy_helix(0, code, Some(iid)) {
+        Ok(_) => return Ok(()),
+        Err(e) => return Err(e.to_string()),
+    }
+}
+
+pub async fn redeploy_helix_remote(
+    cluster: String,
+    path: String,
+    files: Vec<DirEntry>
+) -> Result<(), String> {
+    let mut sp = Spinner::new(Spinners::Dots9, "Uploading queries to remote db".into());
+
+    let content = match generate_content(&files) {
+        Ok(content) => content,
+        Err(e) => {
+            sp.stop_with_message(format!(
+                    "{}",
+                    "Error generating content".red().bold()
+            ));
+            println!("└── {}", e);
+            return Err("".to_string());
+        }
+    };
+
+    // get config from ~/.helix/credentials
+    let home_dir = std::env::var("HOME").unwrap_or("~/".to_string());
+    let config_path = &format!("{}/.helix", home_dir);
+    let config_path = Path::new(config_path);
+    let config_path = config_path.join("credentials");
+    if !config_path.exists() {
+        sp.stop_with_message(format!("{}", "No credentials found".yellow().bold()));
+        println!(
+            "{}",
+            "Please run `helix config` to set your credentials"
+            .yellow()
+            .bold()
+        );
+        return Err("".to_string());
+    }
+
+    // TODO: probable could make this more secure
+    // reads credentials from ~/.helix/credentials
+    let config = fs::read_to_string(config_path).unwrap();
+    let user_id = config
+        .split("helix_user_id=")
+        .nth(1)
+        .unwrap()
+        .split("\n")
+        .nth(0)
+        .unwrap();
+    let user_key = config
+        .split("helix_user_key=")
+        .nth(1)
+        .unwrap()
+        .split("\n")
+        .nth(0)
+        .unwrap();
+
+    // read config.hx.json
+    let config = match Config::from_files(
+        PathBuf::from(path.clone()).join("config.hx.json"),
+        PathBuf::from(path.clone()).join("schema.hx"),
+    ) {
+        Ok(config) => config,
+        Err(e) => {
+            println!("Error loading config: {}", e);
+            sp.stop_with_message(format!("{}", "Error loading config".red().bold()));
+            return Err("".to_string());
+        }
+    };
+
+    // upload queries to central server
+    let payload = json!({
+        "user_id": user_id,
+        "queries": content.files,
+        "cluster_id": cluster,
+        "version": "0.1.0",
+        "helix_config": config.to_json()
+    });
+    println!("{:#?}", payload);
+    let client = reqwest::Client::new();
+    println!("{}", user_key);
+    println!("{}", &cluster);
+    match client
+        .post("http://ec2-184-72-27-116.us-west-1.compute.amazonaws.com:3000/clusters/deploy-queries")
+        .header("x-api-key", user_key) // used to verify user
+        .header("x-cluster-id", &cluster) // used to verify instance with user
+        .header("Content-Type", "application/json")
+        .body(sonic_rs::to_string(&payload).unwrap())
+        .send()
+        .await
+    {
+        Ok(response) => {
+            if response.status().is_success() {
+                sp.stop_with_message(format!(
+                        "{}",
+                        "Queries uploaded to remote db".green().bold()
+                ));
+            } else {
+                sp.stop_with_message(format!(
+                        "{}",
+                        "Error uploading queries to remote db".red().bold()
+                ));
+                println!("└── {}", response.text().await.unwrap());
+            return Err("".to_string());
+            }
+        }
+        Err(e) => {
+            sp.stop_with_message(format!(
+                    "{}",
+                    "Error uploading queries to remote db".red().bold()
+            ));
+            println!("└── {}", e);
+            return Err("".to_string());
+        }
+    };
+    Ok(())
 }
 
