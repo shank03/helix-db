@@ -344,13 +344,13 @@ impl BM25 for HBM25Config {
 
 pub trait HybridSearch {
     /// Search both hnsw index and bm25 docs
-    async fn hybrid_search(
+    fn hybrid_search(
         self,
         query: &str,
         query_vector: &[f64],
         alpha: f32,
         limit: usize,
-    ) -> Result<Vec<(u128, f32)>, GraphError>;
+    ) -> impl std::future::Future<Output = Result<Vec<(u128, f32)>, GraphError>> + Send;
 }
 
 impl HybridSearch for HelixGraphStorage {

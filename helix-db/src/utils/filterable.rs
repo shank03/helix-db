@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap};
 
 use crate::{
     helix_engine::types::GraphError,
@@ -46,7 +46,7 @@ pub trait Filterable {
 
     fn properties_ref(&self) -> &Option<HashMap<String, Value>>;
 
-    fn check_property(&self, key: &str) -> Result<&Value, GraphError>;
+    fn check_property(&self, key: &str) -> Result<Cow<'_,Value>, GraphError>;
 
     fn find_property<'a>(
         &'a self,
@@ -123,18 +123,22 @@ impl Filterable for Node {
     }
 
     #[inline(always)]
-    fn check_property(&self, key: &str) -> Result<&Value, GraphError> {
-        match &self.properties {
-            Some(properties) => properties
-                .get(key)
-                .ok_or(GraphError::ConversionError(format!(
+    fn check_property(&self, key: &str) -> Result<Cow<'_,Value>, GraphError> {
+        match key {
+            "id" => Ok(Cow::Owned(Value::from(self.id))),
+            "label" => Ok(Cow::Owned(Value::from(self.label.to_string()))),
+            _ =>  match &self.properties {
+                Some(properties) => properties
+                    .get(key)
+                    .ok_or(GraphError::ConversionError(format!(
+                        "Property {} not found",
+                        key
+                    ))).map(|v| Cow::Borrowed(v)),
+                None => Err(GraphError::ConversionError(format!(
                     "Property {} not found",
                     key
                 ))),
-            None => Err(GraphError::ConversionError(format!(
-                "Property {} not found",
-                key
-            ))),
+            },
         }
     }
 
@@ -225,21 +229,27 @@ impl Filterable for Edge {
     }
 
     #[inline(always)]
-    fn check_property(&self, key: &str) -> Result<&Value, GraphError> {
-        match &self.properties {
-            Some(properties) => properties
-                .get(key)
-                .ok_or(GraphError::ConversionError(format!(
+    fn check_property(&self, key: &str) -> Result<Cow<'_,Value>, GraphError> {
+        match key {
+            "id" => Ok(Cow::Owned(Value::from(self.id))),
+            "label" => Ok(Cow::Owned(Value::from(self.label.to_string()))),
+            "from_node" => Ok(Cow::Owned(Value::from(self.from_node))),
+            "to_node" => Ok(Cow::Owned(Value::from(self.to_node))),
+            _ =>  match &self.properties {
+                Some(properties) => properties
+                    .get(key)
+                    .ok_or(GraphError::ConversionError(format!(
+                        "Property {} not found",
+                        key
+                    ))).map(|v| Cow::Borrowed(v)),
+                None => Err(GraphError::ConversionError(format!(
                     "Property {} not found",
                     key
                 ))),
-            None => Err(GraphError::ConversionError(format!(
-                "Property {} not found",
-                key
-            ))),
+            }
         }
-    }
-
+    }   
+    
     #[inline(always)]
     fn find_property<'a>(
         &'a self,

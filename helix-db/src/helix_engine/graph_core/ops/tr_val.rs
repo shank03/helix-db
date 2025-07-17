@@ -7,7 +7,7 @@ use crate::{
         items::{Edge, Node},
     },
 };
-use std::hash::Hash;
+use std::{borrow::Cow, hash::Hash};
 
 #[derive(Clone, Debug)]
 pub enum TraversalVal {
@@ -68,7 +68,7 @@ impl IntoIterator for TraversalVal {
 pub trait Traversable {
     fn id(&self) -> u128;
     fn label(&self) -> String;
-    fn check_property(&self, prop: &str) -> Result<&Value, GraphError>;
+    fn check_property(&self, prop: &str) -> Result<Cow<'_,Value>, GraphError>;
     fn uuid(&self) -> String;
 }
 
@@ -105,7 +105,7 @@ impl Traversable for TraversalVal {
         }
     }
 
-    fn check_property(&self, prop: &str) -> Result<&Value, GraphError> {
+    fn check_property(&self, prop: &str) -> Result<Cow<'_,Value>, GraphError> {
         match self {
             TraversalVal::Node(node) => node.check_property(prop),
             TraversalVal::Edge(edge) => edge.check_property(prop),
@@ -132,7 +132,7 @@ impl Traversable for Vec<TraversalVal> {
         self[0].label()
     }
 
-    fn check_property(&self, prop: &str) -> Result<&Value, GraphError> {
+    fn check_property(&self, prop: &str) -> Result<Cow<'_,Value>, GraphError> {
         if self.is_empty() {
             return Err(GraphError::ConversionError(format!(
                 "Invalid traversal value"

@@ -1,10 +1,10 @@
-use crate::helix_engine::{
+use crate::{helix_engine::{
     graph_core::{
         ops::tr_val::TraversalVal,
         traversal_iter::{RoTraversalIterator, RwTraversalIterator},
     },
     types::GraphError,
-};
+}, utils::filterable::Filterable};
 
 pub struct PropsIterator<'a, I> {
     iter: I,
@@ -20,36 +20,17 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.iter.next() {
-            Some(Ok(TraversalVal::Node(node))) => match node.properties {
-                Some(prop) => {
-                    let prop = prop.get(self.prop);
-                    match prop {
-                        Some(prop) => Some(Ok(TraversalVal::Value(prop.clone()))),
-                        None => None,
-                    }
-                }
-                None => None,
+            Some(Ok(TraversalVal::Node(node))) => match node.check_property(self.prop) {
+                Ok(prop) => Some(Ok(TraversalVal::Value(prop.into_owned()))),
+                Err(e) => Some(Err(e)),
             },
-            Some(Ok(TraversalVal::Edge(edge))) => match edge.properties {
-                Some(prop) => {
-                    let prop = prop.get(self.prop);
-                    println!("prop: {:?}", prop);
-                    match prop {
-                        Some(prop) => Some(Ok(TraversalVal::Value(prop.clone()))),
-                        None => None,
-                    }
-                }
-                None => None,
+            Some(Ok(TraversalVal::Edge(edge))) => match edge.check_property(self.prop) {
+                Ok(prop) => Some(Ok(TraversalVal::Value(prop.into_owned()))),
+                Err(e) => Some(Err(e)),
             },
-            Some(Ok(TraversalVal::Vector(vec))) => match vec.properties {
-                Some(prop) => {
-                    let prop = prop.get(self.prop);
-                    match prop {
-                        Some(prop) => Some(Ok(TraversalVal::Value(prop.clone()))),
-                        None => None,
-                    }
-                }
-                None => None,
+            Some(Ok(TraversalVal::Vector(vec))) => match vec.check_property(self.prop) {
+                Ok(prop) => Some(Ok(TraversalVal::Value(prop.into_owned()))),
+                Err(e) => Some(Err(e)),
             },
             _ => None,
         }

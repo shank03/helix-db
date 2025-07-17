@@ -181,16 +181,17 @@ pub mod macros {
             $(
                 let field_to_exclude_remapping = Remapping::new(
                     true,
-                    Some($field_to_exclude.to_string()),
+                    None,
                     None,
                 );
                 $remapping_vals.insert(
                     $var_name.id(),
                     ResponseRemapping::new(
                         HashMap::from([($field_to_exclude.to_string(), field_to_exclude_remapping)]),
-                        false,
+                        true,
                     ),
                 );
+                println!("inserting remapping: {:?}", $remapping_vals.borrow_mut());
             )*
                 Ok::<TraversalVal, GraphError>($var_name)
         }};
@@ -212,7 +213,7 @@ pub mod macros {
                 false,
                 Some($identifier_value.to_string()),
                 Some(ReturnValue::from(value)),
-            );
+            );-
             $remapping_vals.insert(
                 $var_name.id(),
                 ResponseRemapping::new(
