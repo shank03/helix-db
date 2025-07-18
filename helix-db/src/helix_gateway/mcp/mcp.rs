@@ -198,7 +198,7 @@ pub fn collect<'a>(input: &'a mut MCPToolInput, response: &mut Response) -> Resu
 
     let (start, end) = match data.range {
         Some(range) => (range.start, range.end),
-        None => (0, 100),
+        None => (0, 10),
     };
 
     let values = connection

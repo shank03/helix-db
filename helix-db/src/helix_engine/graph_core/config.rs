@@ -129,25 +129,35 @@ impl fmt::Display for Config {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "Vector config => m: {:?}, ef_construction: {:?}, ef_search: {:?}\n
-            Graph config => secondary_indicies: {:?}\n
-            db_max_size_gb: {:?}\n
-            mcp: {:?}\n
-            bm25: {:?}\n
-            schema: {:?}\n
-            embedding_model: {:?}\n
-            graphvis_node_label: {:?}",
-            self.vector_config.m,
-            self.vector_config.ef_construction,
-            self.vector_config.ef_search,
-            self.graph_config.secondary_indices,
-            self.db_max_size_gb,
-            self.mcp,
-            self.bm25,
-            self.schema,
-            self.embedding_model,
-            self.graphvis_node_label,
-        )
+            "pub fn config() -> Option<Config> {{"
+        )?;
+        write!(f, "return Some(Config {{")?;
+        write!(f, "vector_config: VectorConfig {{")?;
+        write!(f, "m: Some({}),", self.vector_config.m.unwrap_or(16))?;
+        write!(f, "ef_construction: Some({}),", self.vector_config.ef_construction.unwrap_or(128))?;
+        write!(f, "ef_search: Some({}),", self.vector_config.ef_search.unwrap_or(768))?;
+        write!(f, "}},")?;
+        write!(f, "graph_config: GraphConfig {{")?;
+        write!(f, "secondary_indices: {},", match &self.graph_config.secondary_indices {
+            Some(indices) => format!("Some(vec![{}])", indices.iter().map(|s| format!("\"{}\"", s)).collect::<Vec<_>>().join(", ")),
+            None => "None".to_string(),
+        })?;
+        write!(f, "}},")?;
+        write!(f, "db_max_size_gb: Some({}),", self.db_max_size_gb.unwrap_or(10))?;
+        write!(f, "mcp: {},", self.mcp)?;
+        write!(f, "bm25: {},", self.bm25)?;
+        write!(f, "schema: None,")?;
+        write!(f, "embedding_model: {},", match &self.embedding_model {
+            Some(model) => format!("Some(\"{}\".to_string())", model),
+            None => "None".to_string(),
+        })?;
+        write!(f, "graphvis_node_label: {},", match &self.graphvis_node_label {
+            Some(label) => format!("Some(\"{}\".to_string())", label),
+            None => "None".to_string(),
+        })?;
+        write!(f, "}})")?;
+        write!(f, "}}")?;
+        Ok(())
     }
 }
 

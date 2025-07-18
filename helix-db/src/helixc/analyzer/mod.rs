@@ -1,8 +1,9 @@
 pub mod analyzer;
-pub mod pretty;
+pub mod diagnostic;
+pub mod error_codes;
+pub mod errors;
 pub mod fix;
+pub mod methods;
+pub mod pretty;
 pub mod types;
-
-#[cfg(test)]
-mod analyzer_tests;
-
+pub mod utils;

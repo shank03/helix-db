@@ -57,36 +57,47 @@ pub trait RangeAdapter<'a>: Iterator {
     /// ```rust
     /// let traversal = G::new(storage, &txn).range(0, 10);
     /// ```
-    fn range(
+    fn range<N, K>(
         self,
-        start: usize,
-        end: usize,
+        start: N,
+        end: K,
     ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>
     where
         Self: Sized + Iterator,
-        Self::Item: Send;
+        Self::Item: Send,
+        N: TryInto<usize>,
+        K: TryInto<usize>,
+        N::Error: std::fmt::Debug,
+        K::Error: std::fmt::Debug;
 }
 
 impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> RangeAdapter<'a>
     for RoTraversalIterator<'a, I>
 {   
     #[inline(always)]
-    fn range(
+    fn range<N, K>(
         self,
-        start: usize,
-        end: usize,
+        start: N,
+        end: K,
     ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>
     where
         Self: Sized + Iterator,
         Self::Item: Send,
+        N: TryInto<usize>,
+        K: TryInto<usize>,
+        N::Error: std::fmt::Debug,
+        K::Error: std::fmt::Debug,
     {
         {
+            let start_usize = start.try_into().expect("Start index must be non-negative and fit in usize");
+            let end_usize = end.try_into().expect("End index must be non-negative and fit in usize");
+            
             RoTraversalIterator {
                 inner: Range {
                     iter: self.inner,
                     curr_idx: 0,
-                    start,
-                    end,
+                    start: start_usize,
+                    end: end_usize,
                 },
                 storage: Arc::clone(&self.storage),
                 txn: self.txn,

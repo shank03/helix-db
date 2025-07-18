@@ -321,7 +321,7 @@ async fn main() {
                 return;
             }
 
-            let analyzed_source = match generate(&files) {
+            let analyzed_source = match generate(&files, &path) {
                 Ok((_, analyzed_source)) => analyzed_source,
                 Err(e) => {
                     sp.stop_with_message(format!("{}", e.to_string().red().bold()));
@@ -399,7 +399,7 @@ async fn main() {
                 return;
             }
 
-            match generate(&files) {
+            match generate(&files, &path) {
                 Ok(_) => {}
                 Err(e) => {
                     sp.stop_with_message(format!("{}", "Failed to generate queries".red().bold()));
