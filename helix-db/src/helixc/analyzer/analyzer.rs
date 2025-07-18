@@ -1291,7 +1291,10 @@ impl<'a> Ctx<'a> {
                                 gen_traversal
                                     .steps
                                     .push(Separator::Period(GeneratedStep::Where(match expr {
-                                        BoExp::Exists(tr) => Where::Exists(WhereExists { tr }),
+                                        BoExp::Exists(mut tr) => {
+                                            tr.should_collect = ShouldCollect::No;
+                                            Where::Ref(WhereRef { expr: BoExp::Exists(tr) })
+                                        }
                                         _ => Where::Ref(WhereRef { expr }),
                                     })));
                             }
@@ -1894,7 +1897,10 @@ impl<'a> Ctx<'a> {
                             gen_traversal
                                 .steps
                                 .push(Separator::Period(GeneratedStep::Where(match expr {
-                                    BoExp::Exists(tr) => Where::Exists(WhereExists { tr }),
+                                    BoExp::Exists(mut tr) => {
+                                        tr.should_collect = ShouldCollect::No;
+                                        Where::Ref(WhereRef { expr: BoExp::Exists(tr) })
+                                    }
                                     _ => Where::Ref(WhereRef { expr }),
                                 })));
                         }
@@ -4622,7 +4628,7 @@ impl<'a> Ctx<'a> {
                                     .push(Separator::Period(GeneratedStep::Where(match expr {
                                         BoExp::Exists(mut tr) => {
                                             tr.should_collect = ShouldCollect::No;
-                                            Where::Exists(WhereExists { tr })
+                                            Where::Ref(WhereRef { expr: BoExp::Exists(tr) })
                                         }
                                         _ => Where::Ref(WhereRef { expr }),
                                     })));
