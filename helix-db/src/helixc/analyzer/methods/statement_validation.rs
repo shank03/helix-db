@@ -1,56 +1,21 @@
 //! Semantic analyzer for Helix‑QL.
 
-use crate::{
-    helix_engine::graph_core::ops::source::add_e::EdgeType,
-    helixc::{
-        analyzer::{
-            analyzer::Ctx,
-            diagnostic::Diagnostic,
-            errors::{push_query_err, push_query_err_with_fix, push_query_warn, push_schema_err},
-            methods::{
-                infer_expr_type::infer_expr_type,
-                query_validation::check_query,
-                schema_methods::{build_field_lookups, check_schema},
-            },
-            types::Type,
-            utils::{
-                gen_id_access_or_param, gen_identifier_or_param, is_valid_identifier, type_in_scope,
-            },
-        },
-        generator::{
-            bool_op::{BoolOp, Eq, Gt, Gte, Lt, Lte, Neq},
-            generator_types::{
-                Assignment as GeneratedAssignment, BoExp, Drop as GeneratedDrop,
-                ForEach as GeneratedForEach, ForLoopInVariable, ForVariable,
-                Parameter as GeneratedParameter, Query as GeneratedQuery, ReturnType, ReturnValue,
-                ReturnValueExpr, Source as GeneratedSource, Statement as GeneratedStatement,
-            },
-            object_remapping_generation::{
-                ExcludeField, IdentifierRemapping, ObjectRemapping, Remapping, RemappingType,
-                TraversalRemapping, ValueRemapping,
-            },
-            source_steps::{
-                AddE, AddN, AddV, EFromID, EFromType, NFromID, NFromIndex, NFromType, SearchBM25,
-                SearchVector as GeneratedSearchVector, SourceStep,
-            },
-            traversal_steps::{
-                In as GeneratedIn, InE as GeneratedInE, OrderBy, Out as GeneratedOut,
-                OutE as GeneratedOutE, Range, SearchVectorStep,
-                ShortestPath as GeneratedShortestPath, ShouldCollect, Step as GeneratedStep,
-                Traversal as GeneratedTraversal, TraversalType, Where, WhereExists, WhereRef,
-            },
-            utils::{GenRef, GeneratedValue, Order, Separator, VecData},
-        },
-        parser::{helix_parser::*, location::Loc},
+use crate::helixc::{
+    analyzer::{
+        analyzer::Ctx, errors::push_query_err, methods::infer_expr_type::infer_expr_type,
+        types::Type, utils::is_valid_identifier,
     },
-    protocol::{date::Date, value::Value},
-    utils::styled_string::StyledString,
+    generator::{
+        generator_types::{
+            Assignment as GeneratedAssignment, Drop as GeneratedDrop, ForEach as GeneratedForEach,
+            ForLoopInVariable, ForVariable, Query as GeneratedQuery,
+            Statement as GeneratedStatement,
+        },
+        utils::GenRef,
+    },
+    parser::helix_parser::*,
 };
-use std::{
-    borrow::Cow,
-    collections::{HashMap, HashSet},
-    convert::Infallible,
-};
+use std::collections::HashMap;
 
 pub(crate) fn walk_statements<'a>(
     ctx: &mut Ctx<'a>,
@@ -72,7 +37,7 @@ pub(crate) fn walk_statements<'a>(
                 );
             }
 
-            let (rhs_ty, stmt) = infer_expr_type(ctx, &assign.value, scope, q, None, Some(query));
+            let (rhs_ty, stmt) = infer_expr_type(ctx, &assign.value, scope, q, None, query);
             scope.insert(assign.variable.as_str(), rhs_ty);
             assert!(stmt.is_some(), "Assignment statement should be generated");
 
@@ -84,7 +49,7 @@ pub(crate) fn walk_statements<'a>(
         }
 
         Drop(expr) => {
-            let (_, stmt) = infer_expr_type(ctx, expr, scope, q, None, Some(query));
+            let (_, stmt) = infer_expr_type(ctx, expr, scope, q, None, query);
             assert!(stmt.is_some());
             query.is_mut = true;
             if let Some(GeneratedStatement::Traversal(tr)) = stmt {
@@ -95,7 +60,7 @@ pub(crate) fn walk_statements<'a>(
         }
 
         Expression(expr) => {
-            let (_, stmt) = infer_expr_type(ctx, expr, scope, q, None, Some(query));
+            let (_, stmt) = infer_expr_type(ctx, expr, scope, q, None, query);
             stmt
         }
 
@@ -116,32 +81,6 @@ pub(crate) fn walk_statements<'a>(
             // find param from fl.in_variable
             let param = q.parameters.iter().find(|p| p.name.1 == fl.in_variable.1);
 
-            let fl_in_var_ty = match param {
-                Some(param) => {
-                    for_loop_in_variable =
-                        ForLoopInVariable::Parameter(GenRef::Std(fl.in_variable.1.clone()));
-                    Type::from(param.param_type.1.clone())
-                }
-                None => match scope.get(fl.in_variable.1.as_str()) {
-                    Some(fl_in_var_ty) => {
-                        is_valid_identifier(ctx, q, fl.loc.clone(), fl.in_variable.1.as_str());
-
-                        for_loop_in_variable =
-                            ForLoopInVariable::Identifier(GenRef::Std(fl.in_variable.1.clone()));
-                        fl_in_var_ty.clone()
-                    }
-                    None => {
-                        push_query_err(
-                            ctx,
-                            q,
-                            fl.loc.clone(),
-                            format!("`{}` is not a parameter", fl.in_variable.1),
-                            "add a parameter to the query",
-                        );
-                        Type::Unknown
-                    }
-                },
-            };
             let mut for_variable: ForVariable = ForVariable::Empty;
 
             match &fl.variable {
@@ -161,7 +100,7 @@ pub(crate) fn walk_statements<'a>(
                     //     ForVariable::ObjectDestructure(vec![GenRef::Std(name.clone())]);
                     unreachable!()
                 }
-                ForLoopVars::ObjectDestructuring { fields, loc } => {
+                ForLoopVars::ObjectDestructuring { fields, loc: _ } => {
                     // TODO: check if fields are valid
                     match &param {
                         Some(p) => {
@@ -273,11 +212,6 @@ pub(crate) fn walk_statements<'a>(
                 statements: statements,
             });
             Some(stmt)
-        }
-
-        _ => {
-            /* SearchVector handled above; others TBD */
-            None
         }
     }
 }

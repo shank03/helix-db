@@ -1,5 +1,4 @@
-use std::fmt::Display;
-
+#[allow(dead_code)]
 pub(crate) enum ErrorCode {
     /// `E101` – `unknown node type`
     E101,
@@ -95,9 +94,12 @@ pub(crate) enum ErrorCode {
     /// `E653` - `inner type of in variable is not an object`
     E653,
 }
+
+#[allow(dead_code)]
 pub(crate) enum WarningCode {
     /// `W101` - `query has no return`
     W101,
 }
 
+#[allow(dead_code)]
 pub(crate) enum InfoCode {}

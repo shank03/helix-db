@@ -1,56 +1,15 @@
 //! Semantic analyzer for Helix‑QL.
-use crate::{
-    helix_engine::graph_core::ops::source::add_e::EdgeType,
-    helixc::{
-        analyzer::{
-            analyzer::Ctx,
-            diagnostic::Diagnostic,
-            errors::{push_query_err, push_query_err_with_fix, push_query_warn, push_schema_err},
-            fix::Fix,
-            methods::{
-                traversal_validation::check_traversal,
-                query_validation::check_query,
-                schema_methods::{build_field_lookups, check_schema},
-            },
-            types::Type,
-            utils::{
-                gen_id_access_or_param, gen_identifier_or_param, is_valid_identifier, type_in_scope,
-            },
-        },
-        generator::{
-            bool_op::{BoolOp, Eq, Gt, Gte, Lt, Lte, Neq},
-            generator_types::{
-                Assignment as GeneratedAssignment, BoExp, Drop as GeneratedDrop,
-                ForEach as GeneratedForEach, ForLoopInVariable, ForVariable,
-                Parameter as GeneratedParameter, Query as GeneratedQuery, ReturnType, ReturnValue,
-                ReturnValueExpr, Source as GeneratedSource, Statement as GeneratedStatement,
-            },
-            object_remapping_generation::{
-                ExcludeField, IdentifierRemapping, ObjectRemapping, Remapping, RemappingType,
-                TraversalRemapping, ValueRemapping,
-            },
-            source_steps::{
-                AddE, AddN, AddV, EFromID, EFromType, NFromID, NFromIndex, NFromType, SearchBM25,
-                SearchVector as GeneratedSearchVector, SourceStep,
-            },
-            traversal_steps::{
-                In as GeneratedIn, InE as GeneratedInE, OrderBy, Out as GeneratedOut,
-                OutE as GeneratedOutE, Range, SearchVectorStep,
-                ShortestPath as GeneratedShortestPath, ShouldCollect, Step as GeneratedStep,
-                Traversal as GeneratedTraversal, TraversalType, Where, WhereExists, WhereRef,
-            },
-            utils::{GenRef, GeneratedValue, Order, Separator, VecData},
-        },
-        parser::{helix_parser::*, location::Loc},
+use crate::helixc::{
+    analyzer::{
+        analyzer::Ctx,
+        errors::{push_query_err, push_query_err_with_fix},
+        fix::Fix,
+        types::Type,
     },
-    protocol::{date::Date, value::Value},
-    utils::styled_string::StyledString,
+    parser::{helix_parser::*, location::Loc},
 };
-use std::{
-    borrow::Cow,
-    collections::{HashMap, HashSet},
-    convert::Infallible,
-};
+use std::{borrow::Cow, collections::HashMap};
+
 pub(crate) fn validate_exclude_fields<'a>(
     ctx: &mut Ctx<'a>,
     ex: &Exclude,

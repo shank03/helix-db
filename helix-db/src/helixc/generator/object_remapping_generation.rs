@@ -121,17 +121,17 @@ impl Display for IdentifierRemapping {
         )
     }
 }
-// pub enum RemappingValue {
-//     Remapping(Remapping),
-//     String(GenRef<String>),
-// }
-// impl Display for RemappingValue {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         write!(f, "{}", self)
-//     }
-// }
 
-// split obj and tr
+#[derive(Clone)]
+pub struct ExistsRemapping {
+    pub variable_name: String,
+    pub remapping: Traversal,
+}
+impl Display for ExistsRemapping {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "exists_remapping!(remapping_vals, {}.clone(), {})", self.variable_name, self.remapping)
+    }
+}
 
 #[derive(Clone)]
 pub struct Remapping {
@@ -195,7 +195,7 @@ pub enum RemappingType {
     TraversalRemapping(TraversalRemapping),
     ValueRemapping(ValueRemapping),
     IdentifierRemapping(IdentifierRemapping),
-    Spread,
+    Exists(ExistsRemapping),
     Empty,
 }
 impl Display for RemappingType {
@@ -208,7 +208,7 @@ impl Display for RemappingType {
             RemappingType::TraversalRemapping(r) => write!(f, "{}", r),
             RemappingType::ValueRemapping(r) => write!(f, "{}", r),
             RemappingType::IdentifierRemapping(r) => write!(f, "{}", r),
-            RemappingType::Spread => write!(f, ""),
+            RemappingType::Exists(r) => write!(f, "{}", r),
             RemappingType::Empty => write!(f, ""),
         }
     }

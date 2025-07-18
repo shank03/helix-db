@@ -31,7 +31,7 @@ pub(crate) fn infer_expr_type<'a>(
     scope: &mut HashMap<&'a str, Type>,
     q: &'a Query,
     parent_ty: Option<Type>,
-    gen_query: Option<&mut GeneratedQuery>,
+    gen_query: &mut GeneratedQuery,
 ) -> (Type, Option<GeneratedStatement>) {
     // TODO: Look at returning statement as well or passing mut query to push to
     use ExpressionType::*;
@@ -201,7 +201,7 @@ pub(crate) fn infer_expr_type<'a>(
                                     }
                                     ValueType::Identifier { value, loc } => {
                                         is_valid_identifier(ctx, q, loc.clone(), value.as_str());
-                                        gen_identifier_or_param(ctx, q, value, true, false)
+                                        gen_identifier_or_param(q, value, true, false)
                                     }
                                     v => {
                                         push_query_err(
@@ -256,9 +256,7 @@ pub(crate) fn infer_expr_type<'a>(
                         traversal_type: TraversalType::Mut,
                         should_collect: ShouldCollect::ToVal,
                     });
-                    if let Some(gen_query) = gen_query {
-                        gen_query.is_mut = true;
-                    }
+                    gen_query.is_mut = true;
                     return (Type::Node(Some(ty.to_string())), Some(stmt));
                 }
             }
@@ -383,7 +381,6 @@ pub(crate) fn infer_expr_type<'a>(
                                                     value.as_str(),
                                                 );
                                                 gen_identifier_or_param(
-                                                    ctx,
                                                     q,
                                                     value.as_str(),
                                                     false,
@@ -413,7 +410,7 @@ pub(crate) fn infer_expr_type<'a>(
                     Some(id) => match id {
                         IdType::Identifier { value, loc } => {
                             is_valid_identifier(ctx, q, loc.clone(), value.as_str());
-                            gen_id_access_or_param(ctx, q, value.as_str())
+                            gen_id_access_or_param(q, value.as_str())
                         }
                         IdType::Literal { value, loc: _ } => {
                             GeneratedValue::Literal(GenRef::Literal(value.clone()))
@@ -435,7 +432,7 @@ pub(crate) fn infer_expr_type<'a>(
                     Some(id) => match id {
                         IdType::Identifier { value, loc } => {
                             is_valid_identifier(ctx, q, loc.clone(), value.as_str());
-                            gen_id_access_or_param(ctx, q, value.as_str())
+                            gen_id_access_or_param(q, value.as_str())
                         }
                         IdType::Literal { value, loc: _ } => {
                             GeneratedValue::Literal(GenRef::Literal(value.clone()))
@@ -466,9 +463,7 @@ pub(crate) fn infer_expr_type<'a>(
                     traversal_type: TraversalType::Mut,
                     should_collect: ShouldCollect::ToVal,
                 });
-                if let Some(gen_query) = gen_query {
-                    gen_query.is_mut = true;
-                }
+                gen_query.is_mut = true;
                 return (Type::Edge(Some(ty.to_string())), Some(stmt));
             }
             push_query_err(
@@ -591,13 +586,7 @@ pub(crate) fn infer_expr_type<'a>(
                                                 loc.clone(),
                                                 value.as_str(),
                                             );
-                                            gen_identifier_or_param(
-                                                ctx,
-                                                q,
-                                                value.as_str(),
-                                                false,
-                                                true,
-                                            )
+                                            gen_identifier_or_param(q, value.as_str(), false, true)
                                         }
                                         v => {
                                             push_query_err(
@@ -630,13 +619,13 @@ pub(crate) fn infer_expr_type<'a>(
                         }
                         VectorData::Identifier(i) => {
                             is_valid_identifier(ctx, q, add.loc.clone(), i.as_str());
-                            let id = gen_identifier_or_param(ctx, q, i.as_str(), true, false);
+                            let id = gen_identifier_or_param(q, i.as_str(), true, false);
                             VecData::Standard(id)
                         }
                         VectorData::Embed(e) => match &e.value {
-                            EvaluatesToString::Identifier(i) => VecData::Embed(
-                                gen_identifier_or_param(ctx, q, i.as_str(), true, false),
-                            ),
+                            EvaluatesToString::Identifier(i) => {
+                                VecData::Embed(gen_identifier_or_param(q, i.as_str(), true, false))
+                            }
                             EvaluatesToString::StringLiteral(s) => {
                                 VecData::Embed(GeneratedValue::Literal(GenRef::Ref(s.clone())))
                             }
@@ -653,9 +642,7 @@ pub(crate) fn infer_expr_type<'a>(
                         traversal_type: TraversalType::Mut,
                         should_collect: ShouldCollect::ToVal,
                     });
-                    if let Some(gen_query) = gen_query {
-                        gen_query.is_mut = true;
-                    }
+                    gen_query.is_mut = true;
                     return (Type::Vector(Some(ty.to_string())), Some(stmt));
                 }
             }
@@ -800,7 +787,7 @@ pub(crate) fn infer_expr_type<'a>(
                         scope,
                         q,
                         Some(Type::Vector(sv.vector_type.clone())),
-                        None,
+                        gen_query,
                     );
                     // Where/boolean ops don't change the element type,
                     // so `cur_ty` stays the same.
@@ -859,7 +846,8 @@ pub(crate) fn infer_expr_type<'a>(
             let exprs = v
                 .iter()
                 .map(|expr| {
-                    let (_, stmt) = infer_expr_type(ctx, expr, scope, q, parent_ty.clone(), None);
+                    let (_, stmt) =
+                        infer_expr_type(ctx, expr, scope, q, parent_ty.clone(), gen_query);
                     assert!(
                         stmt.is_some(),
                         "incorrect stmt should've been caught by `infer_expr_type`"
@@ -890,7 +878,8 @@ pub(crate) fn infer_expr_type<'a>(
             let exprs = v
                 .iter()
                 .map(|expr| {
-                    let (_, stmt) = infer_expr_type(ctx, expr, scope, q, parent_ty.clone(), None);
+                    let (_, stmt) =
+                        infer_expr_type(ctx, expr, scope, q, parent_ty.clone(), gen_query);
                     assert!(
                         stmt.is_some(),
                         "incorrect stmt should've been caught by `infer_expr_type`"

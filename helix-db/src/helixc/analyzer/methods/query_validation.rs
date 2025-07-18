@@ -1,50 +1,25 @@
 //! Semantic analyzer for Helix‑QL.
 
-use crate::{
-    helix_engine::graph_core::ops::source::add_e::EdgeType,
-    helixc::{
-        analyzer::{
-            analyzer::Ctx,
-            diagnostic::Diagnostic,
-            errors::{push_query_err, push_query_err_with_fix, push_query_warn, push_schema_err},
-            methods::{infer_expr_type::infer_expr_type, statement_validation::walk_statements, schema_methods::{build_field_lookups, check_schema}},
-            types::Type,
-            utils::{gen_identifier_or_param, is_valid_identifier},
-        },
-        generator::{
-            bool_op::{BoolOp, Eq, Gt, Gte, Lt, Lte, Neq},
-            generator_types::{
-                Assignment as GeneratedAssignment, BoExp, Drop as GeneratedDrop,
-                ForEach as GeneratedForEach, ForLoopInVariable, ForVariable,
-                Parameter as GeneratedParameter, Query as GeneratedQuery, ReturnType, ReturnValue,
-                ReturnValueExpr, Source as GeneratedSource, Statement as GeneratedStatement,
-            },
-            object_remapping_generation::{
-                ExcludeField, IdentifierRemapping, ObjectRemapping, Remapping, RemappingType,
-                TraversalRemapping, ValueRemapping,
-            },
-            source_steps::{
-                AddE, AddN, AddV, EFromID, EFromType, NFromID, NFromIndex, NFromType, SearchBM25,
-                SearchVector as GeneratedSearchVector, SourceStep,
-            },
-            traversal_steps::{
-                In as GeneratedIn, InE as GeneratedInE, OrderBy, Out as GeneratedOut,
-                OutE as GeneratedOutE, Range, SearchVectorStep,
-                ShortestPath as GeneratedShortestPath, ShouldCollect, Step as GeneratedStep,
-                Traversal as GeneratedTraversal, TraversalType, Where, WhereExists, WhereRef,
-            },
-            utils::{GenRef, GeneratedValue, Order, Separator, VecData},
-        },
-        parser::{helix_parser::*, location::Loc},
+use crate::helixc::{
+    analyzer::{
+        analyzer::Ctx,
+        errors::{push_query_err, push_query_warn},
+        methods::{infer_expr_type::infer_expr_type, statement_validation::walk_statements},
+        types::Type,
+        utils::{gen_identifier_or_param, is_valid_identifier},
     },
-    protocol::{date::Date, value::Value},
-    utils::styled_string::StyledString,
+    generator::{
+        generator_types::{
+            Parameter as GeneratedParameter, Query as GeneratedQuery, ReturnValue, ReturnValueExpr,
+            Statement as GeneratedStatement,
+        },
+        source_steps::SourceStep,
+        traversal_steps::ShouldCollect,
+        utils::{GenRef, GeneratedValue},
+    },
+    parser::{helix_parser::*, location::Loc},
 };
-use std::{
-    borrow::Cow,
-    collections::{HashMap, HashSet},
-    convert::Infallible,
-};
+use std::collections::HashMap;
 
 pub(crate) fn check_query<'a>(ctx: &mut Ctx<'a>, q: &'a Query) {
     let mut query = GeneratedQuery::default();
@@ -110,7 +85,7 @@ pub(crate) fn check_query<'a>(ctx: &mut Ctx<'a>, q: &'a Query) {
         );
     }
     for ret in &q.return_values {
-        let (_, stmt) = infer_expr_type(ctx, ret, &mut scope, q, None, Some(&mut query));
+        let (_, stmt) = infer_expr_type(ctx, ret, &mut scope, q, None, &mut query);
 
         assert!(stmt.is_some(), "RETURN value should be a valid expression");
         match stmt.unwrap() {
@@ -161,7 +136,7 @@ pub(crate) fn check_query<'a>(ctx: &mut Ctx<'a>, q: &'a Query) {
                         Type::Unknown
                     }
                 };
-                let value = gen_identifier_or_param(ctx, q, id.inner().as_str(), false, true);
+                let value = gen_identifier_or_param(q, id.inner().as_str(), false, true);
                 match identifier_end_type {
                     Type::Scalar(_) => {
                         query.return_values.push(ReturnValue::new_named_literal(

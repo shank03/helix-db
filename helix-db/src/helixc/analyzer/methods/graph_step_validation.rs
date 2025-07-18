@@ -4,52 +4,23 @@ use crate::{
     helixc::{
         analyzer::{
             analyzer::Ctx,
-            diagnostic::Diagnostic,
-            errors::{push_query_err, push_query_err_with_fix, push_query_warn, push_schema_err},
-            methods::{
-                traversal_validation::check_traversal,
-                query_validation::check_query,
-                schema_methods::{build_field_lookups, check_schema},
-            },
+            errors::push_query_err,
             types::Type,
-            utils::{
-                gen_id_access_or_param, gen_identifier_or_param, is_valid_identifier, type_in_scope,
-            },
+            utils::{gen_identifier_or_param, is_valid_identifier},
         },
         generator::{
-            bool_op::{BoolOp, Eq, Gt, Gte, Lt, Lte, Neq},
-            generator_types::{
-                Assignment as GeneratedAssignment, BoExp, Drop as GeneratedDrop,
-                ForEach as GeneratedForEach, ForLoopInVariable, ForVariable,
-                Parameter as GeneratedParameter, Query as GeneratedQuery, ReturnType, ReturnValue,
-                ReturnValueExpr, Source as GeneratedSource, Statement as GeneratedStatement,
-            },
-            object_remapping_generation::{
-                ExcludeField, IdentifierRemapping, ObjectRemapping, Remapping, RemappingType,
-                TraversalRemapping, ValueRemapping,
-            },
-            source_steps::{
-                AddE, AddN, AddV, EFromID, EFromType, NFromID, NFromIndex, NFromType, SearchBM25,
-                SearchVector as GeneratedSearchVector, SourceStep,
-            },
             traversal_steps::{
-                In as GeneratedIn, InE as GeneratedInE, OrderBy, Out as GeneratedOut,
-                OutE as GeneratedOutE, Range, SearchVectorStep,
-                ShortestPath as GeneratedShortestPath, ShouldCollect, Step as GeneratedStep,
-                Traversal as GeneratedTraversal, TraversalType, Where, WhereExists, WhereRef,
+                In as GeneratedIn, InE as GeneratedInE, Out as GeneratedOut, OutE as GeneratedOutE,
+                SearchVectorStep, ShortestPath as GeneratedShortestPath, ShouldCollect,
+                Step as GeneratedStep, Traversal as GeneratedTraversal,
             },
-            utils::{GenRef, GeneratedValue, Order, Separator, VecData},
+            utils::{GenRef, GeneratedValue, Separator, VecData},
         },
-        parser::{helix_parser::*, location::Loc},
+        parser::helix_parser::*,
     },
-    protocol::{date::Date, value::Value},
     utils::styled_string::StyledString,
 };
-use std::{
-    borrow::Cow,
-    collections::{HashMap, HashSet},
-    convert::Infallible,
-};
+use std::collections::HashMap;
 
 /// Check that a graph‑navigation step is allowed for the current element
 /// kind and return the post‑step kind.
@@ -499,7 +470,7 @@ pub(crate) fn apply_graph_step<'a>(
                 }
                 Some(VectorData::Embed(e)) => match &e.value {
                     EvaluatesToString::Identifier(i) => {
-                        VecData::Embed(gen_identifier_or_param(ctx, q, &i, true, false))
+                        VecData::Embed(gen_identifier_or_param(q, &i, true, false))
                     }
                     EvaluatesToString::StringLiteral(s) => {
                         VecData::Embed(GeneratedValue::Literal(GenRef::Ref(s.clone())))

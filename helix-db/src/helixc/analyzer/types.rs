@@ -223,6 +223,7 @@ impl From<DefaultValue> for GeneratedValue {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub(crate) enum Type {
     Node(Option<String>),
     Nodes(Option<String>),
@@ -282,6 +283,7 @@ impl Type {
         }
     }
 
+    #[allow(dead_code)]
     /// Same, but returns an owned clone for convenience.
     pub fn cloned_base(&self) -> Type {
         // TODO: never used?
@@ -291,6 +293,7 @@ impl Type {
         }
     }
 
+    #[allow(dead_code)]
     pub fn is_numeric(&self) -> bool {
         match self {
             Type::Scalar(ft) => match ft {

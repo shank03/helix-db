@@ -1,49 +1,10 @@
 //! Semantic analyzer for Helix‑QL.
-use super::{fix::Fix, pretty};
-use crate::{
-    helix_engine::graph_core::ops::source::add_e::EdgeType,
-    helixc::{
-        analyzer::{
-            analyzer::Ctx,
-            diagnostic::Diagnostic,
-            errors::{push_query_err, push_query_err_with_fix, push_query_warn, push_schema_err},
-            methods::schema_methods::{build_field_lookups, check_schema},
-            types::Type,
-        },
-        generator::{
-            bool_op::{BoolOp, Eq, Gt, Gte, Lt, Lte, Neq},
-            generator_types::{
-                Assignment as GeneratedAssignment, BoExp, Drop as GeneratedDrop,
-                ForEach as GeneratedForEach, ForLoopInVariable, ForVariable,
-                Parameter as GeneratedParameter, Query as GeneratedQuery, ReturnType, ReturnValue,
-                ReturnValueExpr, Source as GeneratedSource, Statement as GeneratedStatement,
-            },
-            object_remapping_generation::{
-                ExcludeField, IdentifierRemapping, ObjectRemapping, Remapping, RemappingType,
-                TraversalRemapping, ValueRemapping,
-            },
-            source_steps::{
-                AddE, AddN, AddV, EFromID, EFromType, NFromID, NFromIndex, NFromType, SearchBM25,
-                SearchVector as GeneratedSearchVector, SourceStep,
-            },
-            traversal_steps::{
-                In as GeneratedIn, InE as GeneratedInE, OrderBy, Out as GeneratedOut,
-                OutE as GeneratedOutE, Range, SearchVectorStep,
-                ShortestPath as GeneratedShortestPath, ShouldCollect, Step as GeneratedStep,
-                Traversal as GeneratedTraversal, TraversalType, Where, WhereExists, WhereRef,
-            },
-            utils::{GenRef, GeneratedValue, Order, Separator, VecData},
-        },
-        parser::{helix_parser::*, location::Loc},
-    },
-    protocol::{date::Date, value::Value},
-    utils::styled_string::StyledString,
+use crate::helixc::{
+    analyzer::{analyzer::Ctx, errors::push_query_err, types::Type},
+    generator::utils::{GenRef, GeneratedValue},
+    parser::{helix_parser::*, location::Loc},
 };
-use std::{
-    borrow::Cow,
-    collections::{HashMap, HashSet},
-    convert::Infallible,
-};
+use std::collections::HashMap;
 
 pub(super) fn is_valid_identifier(ctx: &mut Ctx, q: &Query, loc: Loc, name: &str) -> bool {
     match name {
@@ -62,18 +23,17 @@ pub(super) fn is_valid_identifier(ctx: &mut Ctx, q: &Query, loc: Loc, name: &str
     }
 }
 
-pub(super) fn is_param(ctx: &mut Ctx, q: &Query, name: &str) -> bool {
+pub(super) fn is_param(q: &Query, name: &str) -> bool {
     q.parameters.iter().find(|p| p.name.1 == *name).is_some()
 }
 
 pub(super) fn gen_identifier_or_param(
-    ctx: &mut Ctx,
     q: &Query,
     name: &str,
     should_ref: bool,
-    should_clone: bool,
+    _should_clone: bool,
 ) -> GeneratedValue {
-    if is_param(ctx, q, name) {
+    if is_param(q, name) {
         if should_ref {
             GeneratedValue::Parameter(GenRef::Ref(format!("data.{}", name)))
         } else {
@@ -88,8 +48,8 @@ pub(super) fn gen_identifier_or_param(
     }
 }
 
-pub(super) fn gen_id_access_or_param(ctx: &mut Ctx, q: &Query, name: &str) -> GeneratedValue {
-    if is_param(ctx, q, name) {
+pub(super) fn gen_id_access_or_param(q: &Query, name: &str) -> GeneratedValue {
+    if is_param(q, name) {
         GeneratedValue::Parameter(GenRef::DeRef(format!("data.{}", name)))
     } else {
         GeneratedValue::Identifier(GenRef::Std(format!("{}.id()", name.to_string())))
@@ -115,5 +75,53 @@ pub(super) fn type_in_scope(
             );
             None
         }
+    }
+}
+
+pub(super) fn field_exists_on_item_type(
+    ctx: &mut Ctx,
+    q: &Query,
+    item_type: Type,
+    fields: Vec<(&str, &Loc)>,
+) {
+    match item_type {
+        Type::Node(Some(node_type)) => {
+            for (key, loc) in fields {
+                if ctx
+                    .node_fields
+                    .get(node_type.as_str())
+                    .map(|fields| fields.contains_key(key))
+                    .unwrap_or(false)
+                {
+                    push_query_err(
+                        ctx,
+                        q,
+                        loc.clone(),
+                        format!("`{}` is not a field of node `{}`", key, node_type),
+                        "check the schema field names",
+                    );
+                }
+            }
+        }
+        Type::Edge(Some(edge_type)) => {
+            for (key, loc) in fields {
+                if ctx
+                    .edge_fields
+                    .get(edge_type.as_str())
+                    .map(|fields| fields.contains_key(key))
+                    .unwrap_or(false)
+                {
+                    push_query_err(
+                        ctx,
+                        q,
+                        loc.clone(),
+                        format!("`{}` is not a field of node `{}`", key, edge_type),
+                        "check the schema field names",
+                    );
+                }
+            }
+        }
+        Type::Vector(_) => unreachable!("Updating vectors is not supported yet"),
+        _ => unreachable!("shouldve been caught eariler"),
     }
 }
