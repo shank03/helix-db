@@ -2357,15 +2357,112 @@ impl<'a> Ctx<'a> {
 
                 StepType::Range((start, end)) => {
                     let (start, end) = match (&start.expr, &end.expr) {
-                        (ExpressionType::Identifier(i), ExpressionType::Identifier(j)) => (
-                            self.gen_identifier_or_param(q, i.as_str(), false, true),
-                            self.gen_identifier_or_param(q, j.as_str(), false, true),
-                        ),
+                        (ExpressionType::Identifier(i), ExpressionType::Identifier(j)) => {
+                            self.is_valid_identifier(q, start.loc.clone(), i.as_str());
+                            self.is_valid_identifier(q, end.loc.clone(), j.as_str());
+
+                            let ty = self.type_in_scope(q, start.loc.clone(), scope, i.as_str());
+                            match ty {
+                                Some(ty) => {
+                                    if !ty.is_integer() {
+                                        self.push_query_err(
+                                            q,
+                                            start.loc.clone(),
+                                            format!("index of range must be an integer, got {:?}", ty),
+                                            "start and end of range must be integers".to_string(),
+                                        );
+                                         return cur_ty.clone(); // Not sure if this should be here
+                                    }
+                                }
+                                None => {}
+                            };
+                            let ty = self.type_in_scope(q, end.loc.clone(), scope, j.as_str());
+                            match ty {
+                                Some(ty) => {
+                                    if !ty.is_integer() {
+                                        self.push_query_err(
+                                            q,
+                                            end.loc.clone(),
+                                            format!("index of range must be an integer, got {:?}", ty),
+                                            "start and end of range must be integers".to_string(),
+                                        );
+                                        return cur_ty.clone(); // Not sure if this should be here
+                                    }
+                                }
+                                None => {}
+                            }
+                            (
+                                self.gen_identifier_or_param(q, i.as_str(), false, true),
+                                self.gen_identifier_or_param(q, j.as_str(), false, true),
+                            )
+                        }   
                         (ExpressionType::IntegerLiteral(i), ExpressionType::IntegerLiteral(j)) => (
                             GeneratedValue::Primitive(GenRef::Std(i.to_string())),
                             GeneratedValue::Primitive(GenRef::Std(j.to_string())),
                         ),
-                        _ => unreachable!("Cannot reach here"),
+                        (ExpressionType::Identifier(i), ExpressionType::IntegerLiteral(j)) => {
+                            self.is_valid_identifier(q, start.loc.clone(), i.as_str());
+
+                            let ty = self.type_in_scope(q, start.loc.clone(), scope, i.as_str());
+                            match ty {
+                                Some(ty) => {
+                                    if !ty.is_integer() {
+                                        self.push_query_err(
+                                            q,
+                                            start.loc.clone(),
+                                            format!("index of range must be an integer, got {:?}", ty),
+                                            "start and end of range must be integers".to_string(),
+                                        );
+                                        return cur_ty.clone(); // Not sure if this should be here
+                                    }
+                                }
+                                None => {}
+                            }
+
+                            (
+                            self.gen_identifier_or_param(q, i.as_str(), false, true),
+                            GeneratedValue::Primitive(GenRef::Std(j.to_string())),
+                        )
+                    },
+                        (ExpressionType::IntegerLiteral(i), ExpressionType::Identifier(j)) => {
+                            self.is_valid_identifier(q, end.loc.clone(), j.as_str());
+                            let ty = self.type_in_scope(q, end.loc.clone(), scope, j.as_str());
+                            match ty {
+                                Some(ty) => {
+                                    if !ty.is_integer() {
+                                        self.push_query_err(
+                                            q,
+                                            end.loc.clone(),
+                                            format!("index of range must be an integer, got {:?}", ty),
+                                            "start and end of range must be integers".to_string(),
+                                        );
+                                        return cur_ty.clone();
+                                    }
+                                }
+                                None => {}
+                            }
+                            (
+                            GeneratedValue::Primitive(GenRef::Std(i.to_string())),
+                            self.gen_identifier_or_param(q, j.as_str(), false, true),
+                        )},
+                        (ExpressionType::Identifier(_) | ExpressionType::IntegerLiteral(_), other) => {
+                            self.push_query_err(
+                                q,
+                                start.loc.clone(),
+                                format!("{:?} does not resolve to an integer value", other),
+                                "start and end of range must be integers".to_string(),
+                            );
+                            return cur_ty.clone();
+                        }
+                        _ => {
+                            self.push_query_err(
+                                q,
+                                start.loc.clone(),
+                                format!("start and end of range must be integers, got {:?} and {:?}", start, end),
+                                "start and end of range must be integers".to_string(),
+                            );
+                            return cur_ty.clone();
+                        }
                     };
                     gen_traversal
                         .steps
@@ -4871,6 +4968,21 @@ impl<'a> Ctx<'a> {
             GeneratedValue::Identifier(GenRef::Std(format!("{}.id()", name.to_string())))
         }
     }
+
+    fn type_in_scope(&mut self, q: &Query, loc: Loc, scope: &HashMap<&str, Type>, name: &str) -> Option<Type> {
+        match scope.get(name) {
+            Some(ty) => Some(ty.clone()),
+            None => {
+                self.push_query_err(
+                    q,
+                    loc.clone(),
+                    format!("variable named `{}` is not in scope", name),
+                    "declare {} in the current scope or fix the typo".to_string(),
+                );
+                None
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -4939,6 +5051,26 @@ impl Type {
         match self {
             Type::Anonymous(inner) => inner.cloned_base(),
             _ => self.clone(),
+        }
+    }
+
+    fn is_numeric(&self) -> bool {
+        match self {
+            Type::Scalar(ft) => match ft {
+                FieldType::I8 | FieldType::I16 | FieldType::I32 | FieldType::I64 | FieldType::U8 | FieldType::U16 | FieldType::U32 | FieldType::U64 | FieldType::U128 | FieldType::F32 | FieldType::F64 => true,
+            _ => false,
+            }
+            _ => false,
+        }
+    }
+
+    fn is_integer(&self) -> bool {
+        match self {
+            Type::Scalar(ft) => match ft {
+                FieldType::I8 | FieldType::I16 | FieldType::I32 | FieldType::I64 | FieldType::U8 | FieldType::U16 | FieldType::U32 | FieldType::U64 | FieldType::U128 => true,
+                _ => false,
+            }
+            _ => false,
         }
     }
 }
