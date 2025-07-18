@@ -239,6 +239,7 @@ impl<'a> Ctx<'a> {
         for param in &q.parameters {
             if let FieldType::Identifier(ref id) = param.param_type.1 {
                 if self.is_valid_identifier(q, param.param_type.0.clone(), id.as_str()) {
+                    // TODO: add support for edges
                     if !self.node_set.contains(id.as_str()) {
                         push_query_err(self,
                             q,
@@ -272,12 +273,8 @@ impl<'a> Ctx<'a> {
             if statement.is_some() {
                 query.statements.push(statement.unwrap());
             } else {
-                push_query_err(self,
-                    q,
-                    stmt.loc.clone(),
-                    "invalid statement".to_string(),
-                    "add a valid statement",
-                );
+                // given all erroneous statements are caught by the analyzer, this should never happen
+                unreachable!()  
             }
         }
 
@@ -372,14 +369,10 @@ impl<'a> Ctx<'a> {
                     ));
                 }
                 GeneratedStatement::Empty => query.return_values = vec![],
-                _ => {
-                    push_query_err(self,
-                        q,
-                        ret.loc.clone(),
-                        "RETURN value is not a valid expression".to_string(),
-                        "add a valid expression",
-                    );
-                }
+                
+                // given all erroneous statements are caught by the analyzer, this should never happen
+                // all malformed statements (not gramatically correct) should be caught by the parser
+                _ => unreachable!()
             }
         }
         if q.is_mcp {
@@ -1147,7 +1140,7 @@ impl<'a> Ctx<'a> {
                             push_query_err(self,
                                 q,
                                 sv.loc.clone(),
-                                "`SearchVector` must have a limit of vectors to return".to_string(),
+                                "`SearchV` must have a limit of vectors to return".to_string(),
                                 "add a limit",
                             );
                             GeneratedValue::Unknown
@@ -1509,35 +1502,28 @@ impl<'a> Ctx<'a> {
                                 NFromIndex {
                                     index: GenRef::Literal(match *index {
                                         IdType::Identifier { value, loc: _ } => value,
-                                        _ => {
-                                            push_query_err(self,
-                                                q,
-                                                loc.clone(),
-                                                "index type must be an identifier, got literal".to_string(),
-                                                "use an existing identifier from the shema that has been indexed with `INDEX` instead".to_string(),
-                                            );
-                                            String::new()
-                                        }
+                                        // would be caught by the parser
+                                        _ => unreachable!()
                                     }),
-                                    key: GenRef::Ref(match *value {
-                                        ValueType::Identifier { value: i, loc } => {
-                                            if self.is_valid_identifier(q, loc.clone(), i.as_str())
+                                    key: match *value {
+                                        ValueType::Identifier { value, loc } => {
+                                            if self.is_valid_identifier(q, loc.clone(), value.as_str())
                                             {
-                                                if !scope.contains_key(i.as_str()) {
+                                                if !scope.contains_key(value.as_str()) {
                                                     push_query_err(self,
                                                         q,
                                                         loc,
-                                                        format!("variable named `{}` is not in scope", i),
+                                                        format!("variable named `{}` is not in scope", value),
                                                         format!(
                                                             "declare {} in the current scope or fix the typo",
-                                                            i
+                                                            value
                                                         ),
                                                     );
                                                 }
                                             }
-                                            format!("data.{}", i)
+                                            self.gen_identifier_or_param(q, value.as_str(), true, false)
                                         }
-                                        ValueType::Literal { value, loc } => match value {
+                                        ValueType::Literal { value, loc: _ } => GeneratedValue::Primitive(GenRef::Std(match value {
                                             Value::String(s) => format!("\"{}\"", s),
                                             Value::I8(i) => i.to_string(),
                                             Value::I16(i) => i.to_string(),
@@ -1552,9 +1538,9 @@ impl<'a> Ctx<'a> {
                                             Value::F64(i) => i.to_string(),
                                             Value::Boolean(b) => b.to_string(),
                                             _ => unreachable!(),
-                                        },
+                                        })),
                                         _ => unreachable!(),
-                                    }),
+                                    },
                                 },
                             ));
                             gen_traversal.should_collect = ShouldCollect::ToVal;
@@ -1584,7 +1570,7 @@ impl<'a> Ctx<'a> {
                             gen_traversal.should_collect = ShouldCollect::ToVal;
                             Type::Node(Some(node_type.to_string()))
                         }
-                        IdType::Literal { value: s, loc } => {
+                        IdType::Literal { value: s, loc: _ } => {
                             gen_traversal.source_step =
                                 Separator::Period(SourceStep::NFromID(NFromID {
                                     id: GenRef::Ref(s),
@@ -1633,7 +1619,7 @@ impl<'a> Ctx<'a> {
                                 }
                                 GenRef::Std(format!("&data.{}", i))
                             }
-                            IdType::Literal { value: s, loc } => GenRef::Std(s),
+                            IdType::Literal { value: s, loc: _ } => GenRef::Std(s),
                             _ => unreachable!(),
                         },
                         label: GenRef::Literal(edge_type.clone()),
@@ -2464,10 +2450,6 @@ impl<'a> Ctx<'a> {
                     scope.remove(cl.identifier.as_str());
                     // gen_traversal.traversal_type =
                     //     TraversalType::Nested(GenRef::Std(var));
-                }
-
-                _ => {
-                    unreachable!()
                 }
             }
             previous_step = Some(step.clone());
