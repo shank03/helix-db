@@ -1,4 +1,5 @@
-use super::analyzer::{Diagnostic, analyze};
+use super::analyzer::analyze;
+use crate::helixc::analyzer::diagnostic::Diagnostic;
 use crate::helixc::parser::helix_parser::{HelixParser, write_to_temp_file};
 
 /// Convenience helper – parse text and return diagnostics.
@@ -21,8 +22,8 @@ fn reports_unknown_node_in_edge() {
     let diags = run(hx);
     assert!(
         diags
-        .iter()
-        .any(|d| d.message.contains("not a declared node type")),
+            .iter()
+            .any(|d| d.message.contains("not a declared node type")),
         "expected a diagnostic about undeclared node types, got: {:?}",
         diags
     );
@@ -56,14 +57,14 @@ fn flags_invalid_property_access() {
                 n <- u::{age}
                 RETURN n
         "#;
-                let diags = run(hx);
-                assert!(
-                    diags
-                    .iter()
-                    .any(|d| d.message.contains("is not a field of node")),
-                    "expected a diagnostic about invalid property access, got: {:?}",
-                    diags
-                );
+    let diags = run(hx);
+    assert!(
+        diags
+            .iter()
+            .any(|d| d.message.contains("is not a field of node")),
+        "expected a diagnostic about invalid property access, got: {:?}",
+        diags
+    );
 }
 
 #[test]
@@ -75,14 +76,14 @@ fn traversal_step_order_enforced() {
                 e <- N<User>::FromN   // OutN on nodes is illegal (needs Edge)
                 RETURN e
         "#;
-            let diags = run(hx);
-            assert!(
-                diags
-                .iter()
-                .any(|d| d.message.contains("cannot follow a step that returns")),
-                "expected a diagnostic about illegal step ordering, got: {:?}",
-                diags
-            );
+    let diags = run(hx);
+    assert!(
+        diags
+            .iter()
+            .any(|d| d.message.contains("cannot follow a step that returns")),
+        "expected a diagnostic about illegal step ordering, got: {:?}",
+        diags
+    );
 }
 
 #[test]
@@ -101,15 +102,15 @@ fn clean_query_produces_no_diagnostics() {
                 p <- u::Out<Wrote>
                 RETURN p::!{title}::{title}
         "#;
-        let diags = run(hx);
-        for d in diags.iter() {
-            println!("{}", d.render(hx, "query.hx"));
-        }
-        assert!(
-            diags.is_empty(),
-            "expected no diagnostics, got: {:?}",
-            diags
-        );
+    let diags = run(hx);
+    for d in diags.iter() {
+        println!("{}", d.render(hx, "query.hx"));
+    }
+    assert!(
+        diags.is_empty(),
+        "expected no diagnostics, got: {:?}",
+        diags
+    );
 }
 
 #[test]
@@ -131,17 +132,17 @@ fn validates_edge_properties() {
                 n <- e::{invalid_field}
                 RETURN n
         "#;
-                let diags = run(hx);
-                for d in diags.iter() {
-                    println!("{}", d.render(hx, "query.hx"));
-                }
-                assert!(
-                    diags
-                    .iter()
-                    .any(|d| d.message.contains("is not a field of edge")),
-                    "expected a diagnostic about invalid edge property access, got: {:?}",
-                    diags
-                );
+    let diags = run(hx);
+    for d in diags.iter() {
+        println!("{}", d.render(hx, "query.hx"));
+    }
+    assert!(
+        diags
+            .iter()
+            .any(|d| d.message.contains("is not a field of edge")),
+        "expected a diagnostic about invalid edge property access, got: {:?}",
+        diags
+    );
 }
 
 #[test]
@@ -154,17 +155,17 @@ fn validates_node_properties() {
                 n <- N<User>::{invalid_field}
                 RETURN n
         "#;
-                let diags = run(hx);
-                for d in diags.iter() {
-                    println!("{}", d.render(hx, "query.hx"));
-                }
-                assert!(
-                    diags
-                    .iter()
-                    .any(|d| d.message.contains("is not a field of edge")),
-                    "expected a diagnostic about invalid edge property access, got: {:?}",
-                    diags
-                );
+    let diags = run(hx);
+    for d in diags.iter() {
+        println!("{}", d.render(hx, "query.hx"));
+    }
+    assert!(
+        diags
+            .iter()
+            .any(|d| d.message.contains("is not a field of edge")),
+        "expected a diagnostic about invalid edge property access, got: {:?}",
+        diags
+    );
 }
 
 #[test]
@@ -178,17 +179,17 @@ fn validates_vector_properties() {
                 v <- AddV<UserEmbedding>(vec,{content: content})
                 RETURN v
         "#;
-            let diags = run(hx);
-            for d in diags.iter() {
-                println!("{}", d.render(hx, "query.hx"));
-            }
-            assert!(
-                diags
-                .iter()
-                .any(|d| d.message.contains("is not a field of vector")),
-                "expected a diagnostic about invalid vector property access, got: {:?}",
-                diags
-            );
+    let diags = run(hx);
+    for d in diags.iter() {
+        println!("{}", d.render(hx, "query.hx"));
+    }
+    assert!(
+        diags
+            .iter()
+            .any(|d| d.message.contains("is not a field of vector")),
+        "expected a diagnostic about invalid vector property access, got: {:?}",
+        diags
+    );
 }
 
 #[test]
@@ -200,15 +201,15 @@ fn handles_untyped_nodes() {
                 u <- N<User>::{some_field}
                 RETURN n
         "#;
-                let diags = run(hx);
-                for d in diags.iter() {
-                    println!("{}", d.render(hx, "query.hx"));
-                }
-                assert!(
-                    diags.is_empty(),
-                    "expected no diagnostics for untyped node access, got: {:?}",
-                    diags
-                );
+    let diags = run(hx);
+    for d in diags.iter() {
+        println!("{}", d.render(hx, "query.hx"));
+    }
+    assert!(
+        diags.is_empty(),
+        "expected no diagnostics for untyped node access, got: {:?}",
+        diags
+    );
 }
 
 #[test]
@@ -221,17 +222,17 @@ fn respects_excluded_fields() {
                 n <- u::!{name}::{name}
                 RETURN n
         "#;
-                let diags = run(hx);
-                for d in diags.iter() {
-                    println!("{}", d.render(hx, "query.hx"));
-                }
-                assert!(
-                    diags
-                    .iter()
-                    .any(|d| d.message.contains("was previously excluded")),
-                    "expected a diagnostic about accessing excluded field, got: {:?}",
-                    diags
-                );
+    let diags = run(hx);
+    for d in diags.iter() {
+        println!("{}", d.render(hx, "query.hx"));
+    }
+    assert!(
+        diags
+            .iter()
+            .any(|d| d.message.contains("was previously excluded")),
+        "expected a diagnostic about accessing excluded field, got: {:?}",
+        diags
+    );
 }
 
 #[test]
@@ -243,14 +244,14 @@ fn validates_add_node_fields() {
                 n <- AddN<User>({invalid_field: "test"})
                 RETURN n
         "#;
-            let diags = run(hx);
-            assert!(
-                diags
-                .iter()
-                .any(|d| d.message.contains("is not a field of node")),
-                "expected a diagnostic about invalid node field, got: {:?}",
-                diags
-            );
+    let diags = run(hx);
+    assert!(
+        diags
+            .iter()
+            .any(|d| d.message.contains("is not a field of node")),
+        "expected a diagnostic about invalid node field, got: {:?}",
+        diags
+    );
 }
 
 #[test]
@@ -272,14 +273,14 @@ fn validates_add_edge_fields() {
                 e <- AddE<Wrote>({invalid_field: "test"})::To(n1)::From(n2)
                 RETURN e
         "#;
-            let diags = run(hx);
-            assert!(
-                diags
-                .iter()
-                .any(|d| d.message.contains("is not a field of edge")),
-                "expected a diagnostic about invalid edge field, got: {:?}",
-                diags
-            );
+    let diags = run(hx);
+    assert!(
+        diags
+            .iter()
+            .any(|d| d.message.contains("is not a field of edge")),
+        "expected a diagnostic about invalid edge field, got: {:?}",
+        diags
+    );
 }
 
 #[test]
@@ -293,14 +294,14 @@ fn validates_add_vector_fields() {
                 v <- AddV<UserEmbedding>([1.0, 2.0], {invalid_field: "test"})
                 RETURN v
         "#;
-            let diags = run(hx);
-            assert!(
-                diags
-                .iter()
-                .any(|d| d.message.contains("is not a valid vector field")),
-                "expected a diagnostic about invalid vector field, got: {:?}",
-                diags
-            );
+    let diags = run(hx);
+    assert!(
+        diags
+            .iter()
+            .any(|d| d.message.contains("is not a valid vector field")),
+        "expected a diagnostic about invalid vector field, got: {:?}",
+        diags
+    );
 }
 
 #[test]
@@ -312,14 +313,13 @@ fn validate_boolean_comparison() {
                 a <- N<User>::WHERE(_::{name}::EQ(10))
                 RETURN a
         "#;
-            let diags = run(hx);
-            for d in diags.iter() {
-                println!("{}", d.render(hx, "query.hx"));
-            }
-            assert!(
-                diags.is_empty(),
-                "expected no diagnostics, got: {:?}",
-                diags
-            );
+    let diags = run(hx);
+    for d in diags.iter() {
+        println!("{}", d.render(hx, "query.hx"));
+    }
+    assert!(
+        diags.is_empty(),
+        "expected no diagnostics, got: {:?}",
+        diags
+    );
 }
-

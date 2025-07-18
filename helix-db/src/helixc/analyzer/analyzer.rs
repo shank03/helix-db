@@ -3,7 +3,7 @@ use super::{fix::Fix, pretty};
 use crate::{
     helix_engine::graph_core::ops::source::add_e::EdgeType,
     helixc::{
-        generator::{
+        analyzer::{diagnostic::Diagnostic, errors::{push_query_err, push_query_err_with_fix, push_query_warn, push_schema_err}, types::Type}, generator::{
             bool_op::{BoolOp, Eq, Gt, Gte, Lt, Lte, Neq},
             generator_types::{
                 Assignment as GeneratedAssignment, BoExp, Drop as GeneratedDrop,
@@ -26,8 +26,7 @@ use crate::{
                 Traversal as GeneratedTraversal, TraversalType, Where, WhereExists, WhereRef,
             },
             utils::{GenRef, GeneratedValue, Order, Separator, VecData},
-        },
-        parser::{helix_parser::*, location::Loc},
+        }, parser::{helix_parser::*, location::Loc}
     },
     protocol::{date::Date, value::Value},
     utils::styled_string::StyledString,
@@ -38,49 +37,6 @@ use std::{
     convert::Infallible,
 };
 
-/// A single diagnostic to be surfaced to the editor.
-#[derive(Debug, Clone)]
-pub struct Diagnostic {
-    pub location: Loc,
-    pub message: String,
-    pub hint: Option<String>,
-    pub filepath: Option<String>,
-    pub severity: DiagnosticSeverity,
-    pub fix: Option<Fix>,
-}
-
-#[derive(Debug, Clone)]
-pub enum DiagnosticSeverity {
-    Error,
-    Warning,
-    Info,
-    Hint,
-    Empty,
-}
-
-impl Diagnostic {
-    pub fn new(
-        location: Loc,
-        message: impl Into<String>,
-        severity: DiagnosticSeverity,
-        hint: Option<String>,
-        fix: Option<Fix>,
-    ) -> Self {
-        let filepath = location.filepath.clone();
-        Self {
-            location,
-            message: message.into(),
-            hint,
-            fix,
-            filepath,
-            severity,
-        }
-    }
-
-    pub fn render(&self, src: &str, filepath: &str) -> String {
-        pretty::render(self, src, filepath)
-    }
-}
 
 pub fn analyze(src: &Source) -> (Vec<Diagnostic>, GeneratedSource) {
     let mut ctx = Ctx::new(src);
@@ -89,8 +45,9 @@ pub fn analyze(src: &Source) -> (Vec<Diagnostic>, GeneratedSource) {
     (ctx.diagnostics, ctx.output)
 }
 
+
 /// Internal working context shared by all passes.
-struct Ctx<'a> {
+pub(crate) struct Ctx<'a> {
     src: &'a Source,
 
     /// Quick look‑ups
@@ -100,8 +57,8 @@ struct Ctx<'a> {
     node_fields: HashMap<&'a str, HashMap<&'a str, Cow<'a, Field>>>,
     edge_fields: HashMap<&'a str, HashMap<&'a str, Cow<'a, Field>>>,
     vector_fields: HashMap<&'a str, HashMap<&'a str, Cow<'a, Field>>>,
-    diagnostics: Vec<Diagnostic>,
-    output: GeneratedSource,
+    pub(crate) diagnostics: Vec<Diagnostic>,
+    pub(crate) output: GeneratedSource,
 }
 
 impl<'a> Ctx<'a> {
@@ -212,7 +169,7 @@ impl<'a> Ctx<'a> {
             if !self.node_set.contains(edge.from.1.as_str())
                 && !self.vector_set.contains(edge.from.1.as_str())
             {
-                self.push_schema_err(
+                push_schema_err(self, 
                     edge.from.0.clone(),
                     format!("`{}` is not a declared node type", edge.from.1),
                     Some(format!("Declare `N::{}` before this edge", edge.from.1)),
@@ -221,7 +178,7 @@ impl<'a> Ctx<'a> {
             if !self.node_set.contains(edge.to.1.as_str())
                 && !self.vector_set.contains(edge.to.1.as_str())
             {
-                self.push_schema_err(
+                push_schema_err(self, 
                     edge.to.0.clone(),
                     format!("`{}` is not a declared node type", edge.to.1),
                     Some(format!("Declare `N::{}` before this edge", edge.to.1)),
@@ -230,7 +187,7 @@ impl<'a> Ctx<'a> {
             edge.properties.as_ref().map(|v| {
                 v.iter().for_each(|f| {
                     if f.name.to_lowercase() == "id" {
-                        self.push_schema_err(
+                        push_schema_err(self, 
                             f.loc.clone(),
                             format!("`{}` is a reserved field name", f.name),
                             Some("rename the field to something else".to_string()),
@@ -243,7 +200,7 @@ impl<'a> Ctx<'a> {
         for node in &self.src.node_schemas {
             node.fields.iter().for_each(|f| {
                 if f.name.to_lowercase() == "id" {
-                    self.push_schema_err(
+                    push_schema_err(self, 
                         f.loc.clone(),
                         format!("`{}` is a reserved field name", f.name),
                         Some("rename the field to something else".to_string()),
@@ -255,7 +212,7 @@ impl<'a> Ctx<'a> {
         for vector in &self.src.vector_schemas {
             vector.fields.iter().for_each(|f: &Field| {
                 if f.name.to_lowercase() == "id" {
-                    self.push_schema_err(
+                    push_schema_err(self, 
                         f.loc.clone(),
                         format!("`{}` is a reserved field name", f.name),
                         Some("rename the field to something else".to_string()),
@@ -283,7 +240,7 @@ impl<'a> Ctx<'a> {
             if let FieldType::Identifier(ref id) = param.param_type.1 {
                 if self.is_valid_identifier(q, param.param_type.0.clone(), id.as_str()) {
                     if !self.node_set.contains(id.as_str()) {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             param.param_type.0.clone(),
                             format!("unknown type `{}` for parameter `{}`", id, param.name.1),
@@ -315,7 +272,7 @@ impl<'a> Ctx<'a> {
             if statement.is_some() {
                 query.statements.push(statement.unwrap());
             } else {
-                self.push_query_err(
+                push_query_err(self,
                     q,
                     stmt.loc.clone(),
                     "invalid statement".to_string(),
@@ -329,7 +286,7 @@ impl<'a> Ctx<'a> {
         // -------------------------------------------------
         if q.return_values.is_empty() {
             let end = q.loc.end.clone();
-            self.push_query_warn(
+            push_query_warn(self, 
                 q,
                 Loc::new(q.loc.filepath.clone(), end.clone(), end, q.loc.span.clone()),
                 "query has no RETURN clause".to_string(),
@@ -377,7 +334,7 @@ impl<'a> Ctx<'a> {
                     let identifier_end_type = match scope.get(id.inner().as_str()) {
                         Some(t) => t.clone(),
                         None => {
-                            self.push_query_err(
+                            push_query_err(self,
                                 q,
                                 ret.loc.clone(),
                                 format!("variable named `{}` is not in scope", id),
@@ -416,7 +373,7 @@ impl<'a> Ctx<'a> {
                 }
                 GeneratedStatement::Empty => query.return_values = vec![],
                 _ => {
-                    self.push_query_err(
+                    push_query_err(self,
                         q,
                         ret.loc.clone(),
                         "RETURN value is not a valid expression".to_string(),
@@ -427,7 +384,7 @@ impl<'a> Ctx<'a> {
         }
         if q.is_mcp {
             if query.return_values.len() != 1 {
-                self.push_query_err(
+                push_query_err(self,
                     q,
                     q.loc.clone(),
                     "MCP queries can only return a single value as LLM needs to be able to traverse from the result".to_string(),
@@ -447,58 +404,7 @@ impl<'a> Ctx<'a> {
     // -----------------------------------------------------
     // Helpers
     // -----------------------------------------------------
-    fn push_schema_err(&mut self, loc: Loc, msg: String, hint: Option<String>) {
-        self.diagnostics.push(Diagnostic::new(
-            loc,
-            msg,
-            DiagnosticSeverity::Error,
-            hint,
-            None,
-        ));
-    }
-    fn push_query_err(&mut self, q: &Query, loc: Loc, msg: String, hint: impl Into<String>) {
-        self.diagnostics.push(Diagnostic::new(
-            Loc::new(q.loc.filepath.clone(), loc.start, loc.end, loc.span),
-            format!("{} (in QUERY named `{}`)", msg, q.name),
-            DiagnosticSeverity::Error,
-            Some(hint.into()),
-            None,
-        ));
-    }
-
-    fn push_query_err_with_fix(
-        &mut self,
-        q: &Query,
-        loc: Loc,
-        msg: String,
-        hint: impl Into<String>,
-        fix: Fix,
-    ) {
-        self.diagnostics.push(Diagnostic::new(
-            Loc::new(q.loc.filepath.clone(), loc.start, loc.end, loc.span),
-            format!("{} (in QUERY named `{}`)", msg, q.name),
-            DiagnosticSeverity::Error,
-            Some(hint.into()),
-            Some(fix),
-        ));
-    }
-
-    fn push_query_warn(
-        &mut self,
-        q: &Query,
-        loc: Loc,
-        msg: String,
-        hint: impl Into<String>,
-        fix: Option<Fix>,
-    ) {
-        self.diagnostics.push(Diagnostic::new(
-            Loc::new(q.loc.filepath.clone(), loc.start, loc.end, loc.span),
-            format!("{} (in QUERY named `{}`)", msg, q.name),
-            DiagnosticSeverity::Warning,
-            Some(hint.into()),
-            fix,
-        ));
-    }
+   
 
     /// Infer the semantic `Type` of an expression *and* perform all traversal
     ///‑specific validations (property access, field exclusions, step ordering).
@@ -523,7 +429,7 @@ impl<'a> Ctx<'a> {
                     ),
 
                     None => {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             expression.loc.clone(),
                             format!("variable named `{}` is not in scope", name),
@@ -568,7 +474,7 @@ impl<'a> Ctx<'a> {
             AddNode(add) => {
                 if let Some(ref ty) = add.node_type {
                     if !self.node_set.contains(ty.as_str()) {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             add.loc.clone(),
                             format!("`AddN<{}>` refers to unknown node type", ty),
@@ -593,7 +499,7 @@ impl<'a> Ctx<'a> {
                         if let Some(field_set) = field_set {
                             for (field_name, value) in fields {
                                 if !field_set.contains_key(field_name.as_str()) {
-                                    self.push_query_err(
+                                    push_query_err(self,
                                         q,
                                         add.loc.clone(),
                                         format!("`{}` is not a field of node `{}`", field_name, ty),
@@ -605,7 +511,7 @@ impl<'a> Ctx<'a> {
                                         if self.is_valid_identifier(q, loc.clone(), value.as_str())
                                         {
                                             if !scope.contains_key(value.as_str()) {
-                                                self.push_query_err(
+                                                push_query_err(self,
                                                     q,
                                                     loc.clone(),
                                                     format!("`{}` is not in scope", value),
@@ -625,7 +531,7 @@ impl<'a> Ctx<'a> {
                                             .field_type
                                             .clone();
                                         if field_type != *value {
-                                            self.push_query_err(
+                                            push_query_err(self,
                                                  q,
                                                  loc.clone(),
                                                  format!("value `{}` is of type `{}`, which does not match type {} declared in the schema for field `{}` on node type `{}`", value, GenRef::from(value.clone()), field_type, field_name, ty),
@@ -658,7 +564,7 @@ impl<'a> Ctx<'a> {
                                                         GenRef::Literal(date.to_rfc3339()),
                                                     ),
                                                     Err(e) => {
-                                                        self.push_query_err(
+                                                        push_query_err(self,
                                                             q,
                                                             loc.clone(),
                                                             e.to_string(),
@@ -681,7 +587,7 @@ impl<'a> Ctx<'a> {
                                             self.gen_identifier_or_param(q, value, true, false)
                                         }
                                         v => {
-                                            self.push_query_err(
+                                            push_query_err(self,
                                                 q,
                                                 add.loc.clone(),
                                                 format!("`{:?}` is not a valid field value", v),
@@ -739,7 +645,7 @@ impl<'a> Ctx<'a> {
                         return (Type::Node(Some(ty.to_string())), Some(stmt));
                     }
                 }
-                self.push_query_err(
+                push_query_err(self,
                     q,
                     add.loc.clone(),
                     "`AddN` must have a node type".to_string(),
@@ -750,7 +656,7 @@ impl<'a> Ctx<'a> {
             AddEdge(add) => {
                 if let Some(ref ty) = add.edge_type {
                     if !self.edge_map.contains_key(ty.as_str()) {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             add.loc.clone(),
                             format!("`AddE<{}>` refers to unknown edge type", ty),
@@ -766,7 +672,7 @@ impl<'a> Ctx<'a> {
                             if let Some(field_set) = field_set {
                                 for (field_name, value) in fields {
                                     if !field_set.contains_key(field_name.as_str()) {
-                                        self.push_query_err(
+                                        push_query_err(self,
                                             q,
                                             add.loc.clone(),
                                             format!(
@@ -785,7 +691,7 @@ impl<'a> Ctx<'a> {
                                                 value.as_str(),
                                             ) {
                                                 if !scope.contains_key(value.as_str()) {
-                                                    self.push_query_err(
+                                                    push_query_err(self,
                                                         q,
                                                         loc.clone(),
                                                         format!("`{}` is not in scope", value),
@@ -805,7 +711,7 @@ impl<'a> Ctx<'a> {
                                                 .field_type
                                                 .clone();
                                             if field_type != *value {
-                                                self.push_query_err(
+                                                push_query_err(self,
                                                      q,
                                                      loc.clone(),
                                                      format!("value `{}` is of type `{}`, which does not match type {} declared in the schema for field `{}` on node type `{}`", value, GenRef::from(value.clone()), field_type, field_name, ty),
@@ -839,7 +745,7 @@ impl<'a> Ctx<'a> {
                                                                 GenRef::Literal(date.to_rfc3339()),
                                                             ),
                                                             Err(e) => {
-                                                                self.push_query_err(
+                                                                push_query_err(self,
                                                                     q,
                                                                     loc.clone(),
                                                                     e.to_string(),
@@ -862,7 +768,7 @@ impl<'a> Ctx<'a> {
                                                     self.gen_identifier_or_param(q, value.as_str(), false, true)
                                                 }
                                                 v => {
-                                                    self.push_query_err(
+                                                    push_query_err(self,
                                                         q,
                                                         add.loc.clone(),
                                                         format!(
@@ -894,7 +800,7 @@ impl<'a> Ctx<'a> {
                             _ => unreachable!(),
                         },
                         _ => {
-                            self.push_query_err(
+                            push_query_err(self,
                                 q,
                                 add.loc.clone(),
                                 "`AddE` must have a to id".to_string(),
@@ -915,7 +821,7 @@ impl<'a> Ctx<'a> {
                             _ => unreachable!(),
                         },
                         _ => {
-                            self.push_query_err(
+                            push_query_err(self,
                                 q,
                                 add.loc.clone(),
                                 "`AddE` must have a from id".to_string(),
@@ -942,7 +848,7 @@ impl<'a> Ctx<'a> {
                     }
                     return (Type::Edge(Some(ty.to_string())), Some(stmt));
                 }
-                self.push_query_err(
+                push_query_err(self,
                     q,
                     add.loc.clone(),
                     "`AddE` must have an edge type".to_string(),
@@ -953,7 +859,7 @@ impl<'a> Ctx<'a> {
             AddVector(add) => {
                 if let Some(ref ty) = add.vector_type {
                     if !self.vector_set.contains(ty.as_str()) {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             add.loc.clone(),
                             format!("vector type `{}` has not been declared", ty),
@@ -967,7 +873,7 @@ impl<'a> Ctx<'a> {
                             if let Some(field_set) = field_set {
                                 for (field_name, value) in fields {
                                     if !field_set.contains_key(field_name.as_str()) {
-                                        self.push_query_err(
+                                        push_query_err(self,
                                             q,
                                             add.loc.clone(),
                                             format!(
@@ -985,7 +891,7 @@ impl<'a> Ctx<'a> {
                                                 value.as_str(),
                                             ) {
                                                 if !scope.contains_key(value.as_str()) {
-                                                    self.push_query_err(
+                                                    push_query_err(self,
                                                         q,
                                                         loc.clone(),
                                                         format!("`{}` is not in scope", value),
@@ -1005,7 +911,7 @@ impl<'a> Ctx<'a> {
                                                 .field_type
                                                 .clone();
                                             if field_type != *value {
-                                                self.push_query_err(
+                                                push_query_err(self,
                                                      q,
                                                      loc.clone(),
                                                      format!("value `{}` is of type `{}`, which does not match type {} declared in the schema for field `{}` on node type `{}`", value, GenRef::from(value.clone()), field_type, field_name, ty),
@@ -1039,7 +945,7 @@ impl<'a> Ctx<'a> {
                                                             GenRef::Literal(date.to_rfc3339()),
                                                         ),
                                                         Err(e) => {
-                                                            self.push_query_err(
+                                                            push_query_err(self,
                                                                 q,
                                                                 loc.clone(),
                                                                 e.to_string(),
@@ -1067,7 +973,7 @@ impl<'a> Ctx<'a> {
                                                 )
                                             }
                                             v => {
-                                                self.push_query_err(
+                                                push_query_err(self,
                                                     q,
                                                     add.loc.clone(),
                                                     format!("`{:?}` is not a valid field value", v),
@@ -1125,7 +1031,7 @@ impl<'a> Ctx<'a> {
                         return (Type::Vector(Some(ty.to_string())), Some(stmt));
                     }
                 }
-                self.push_query_err(
+                push_query_err(self,
                     q,
                     add.loc.clone(),
                     "`AddV` must have a vector type".to_string(),
@@ -1136,7 +1042,7 @@ impl<'a> Ctx<'a> {
             // BatchAddVector(add) => {
             //     if let Some(ref ty) = add.vector_type {
             //         if !self.vector_set.contains(ty.as_str()) {
-            //             self.push_query_err(
+            //             push_query_err(self,
             //                 q,
             //                 add.loc.clone(),
             //                 format!("vector type `{}` has not been declared", ty),
@@ -1149,7 +1055,7 @@ impl<'a> Ctx<'a> {
             SearchVector(sv) => {
                 if let Some(ref ty) = sv.vector_type {
                     if !self.vector_set.contains(ty.as_str()) {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             sv.loc.clone(),
                             format!("vector type `{}` has not been declared", ty),
@@ -1176,7 +1082,7 @@ impl<'a> Ctx<'a> {
                         } else if let Some(_) = scope.get(i.as_str()) {
                             GeneratedValue::Identifier(GenRef::Ref(i.to_string()))
                         } else {
-                            self.push_query_err(
+                            push_query_err(self,
                                 q,
                                 sv.loc.clone(),
                                 format!("variable named `{}` is not in scope", i),
@@ -1186,7 +1092,7 @@ impl<'a> Ctx<'a> {
                         }
                     }
                     _ => {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             sv.loc.clone(),
                             "`SearchVector` must have a vector data".to_string(),
@@ -1238,7 +1144,7 @@ impl<'a> Ctx<'a> {
                             }
                         }
                         _ => {
-                            self.push_query_err(
+                            push_query_err(self,
                                 q,
                                 sv.loc.clone(),
                                 "`SearchVector` must have a limit of vectors to return".to_string(),
@@ -1248,7 +1154,7 @@ impl<'a> Ctx<'a> {
                         }
                     },
                     None => {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             sv.loc.clone(),
                             "`SearchV` must have a limit of vectors to return".to_string(),
@@ -1400,7 +1306,7 @@ impl<'a> Ctx<'a> {
                 // TODO: look into how best do type checking for type passed in
                 if let Some(ref ty) = bm25_search.type_arg {
                     if !self.node_set.contains(ty.as_str()) {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             bm25_search.loc.clone(),
                             format!("vector type `{}` has not been declared", ty),
@@ -1423,7 +1329,7 @@ impl<'a> Ctx<'a> {
                         } else if let Some(_) = scope.get(i.as_str()) {
                             GeneratedValue::Identifier(GenRef::Ref(i.to_string()))
                         } else {
-                            self.push_query_err(
+                            push_query_err(self,
                                 q,
                                 bm25_search.loc.clone(),
                                 format!("variable named `{}` is not in scope", i),
@@ -1433,7 +1339,7 @@ impl<'a> Ctx<'a> {
                         }
                     }
                     _ => {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             bm25_search.loc.clone(),
                             "`SearchVector` must have a vector data".to_string(),
@@ -1485,7 +1391,7 @@ impl<'a> Ctx<'a> {
                             }
                         }
                         _ => {
-                            self.push_query_err(
+                            push_query_err(self,
                                 q,
                                 bm25_search.loc.clone(),
                                 "`SearchVector` must have a limit of vectors to return".to_string(),
@@ -1495,7 +1401,7 @@ impl<'a> Ctx<'a> {
                         }
                     },
                     None => {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             bm25_search.loc.clone(),
                             "`SearchV` must have a limit of vectors to return".to_string(),
@@ -1543,7 +1449,7 @@ impl<'a> Ctx<'a> {
         let mut cur_ty = match &tr.start {
             StartNode::Node { node_type, ids } => {
                 if !self.node_set.contains(node_type.as_str()) {
-                    self.push_query_err(
+                    push_query_err(self,
                         q,
                         tr.loc.clone(),
                         format!("unknown node type `{}`", node_type),
@@ -1566,7 +1472,7 @@ impl<'a> Ctx<'a> {
                                     {
                                         Some((_, field)) => {
                                             if !field.is_indexed() {
-                                                self.push_query_err(
+                                                push_query_err(self,
                                                     q,
                                                     loc.clone(),
                                                     format!("field `{}` has not been indexed for node type `{}`", index, node_type),
@@ -1577,7 +1483,7 @@ impl<'a> Ctx<'a> {
                                                     *value
                                                 {
                                                     if !field.field_type.eq(value) {
-                                                        self.push_query_err(
+                                                        push_query_err(self,
                                                             q,
                                                             loc.clone(),
                                                             format!("value `{}` is of type `{}`, expected `{}`", value.to_string(), value, field.field_type),
@@ -1588,7 +1494,7 @@ impl<'a> Ctx<'a> {
                                             }
                                         }
                                         None => {
-                                            self.push_query_err(
+                                            push_query_err(self,
                                                 q,
                                                 loc.clone(),
                                                 format!("field `{}` has not been defined and/or indexed for node type `{}`", index, node_type),
@@ -1604,7 +1510,7 @@ impl<'a> Ctx<'a> {
                                     index: GenRef::Literal(match *index {
                                         IdType::Identifier { value, loc: _ } => value,
                                         _ => {
-                                            self.push_query_err(
+                                            push_query_err(self,
                                                 q,
                                                 loc.clone(),
                                                 "index type must be an identifier, got literal".to_string(),
@@ -1618,7 +1524,7 @@ impl<'a> Ctx<'a> {
                                             if self.is_valid_identifier(q, loc.clone(), i.as_str())
                                             {
                                                 if !scope.contains_key(i.as_str()) {
-                                                    self.push_query_err(
+                                                    push_query_err(self,
                                                         q,
                                                         loc,
                                                         format!("variable named `{}` is not in scope", i),
@@ -1658,7 +1564,7 @@ impl<'a> Ctx<'a> {
                         IdType::Identifier { value: i, loc } => {
                             if self.is_valid_identifier(q, loc.clone(), i.as_str()) {
                                 if !scope.contains_key(i.as_str()) {
-                                    self.push_query_err(
+                                    push_query_err(self,
                                         q,
                                         loc.clone(),
                                         format!("variable named `{}` is not in scope", i),
@@ -1700,7 +1606,7 @@ impl<'a> Ctx<'a> {
             }
             StartNode::Edge { edge_type, ids } => {
                 if !self.edge_map.contains_key(edge_type.as_str()) {
-                    self.push_query_err(
+                    push_query_err(self,
                         q,
                         tr.loc.clone(),
                         format!("unknown edge type `{}`", edge_type),
@@ -1714,7 +1620,7 @@ impl<'a> Ctx<'a> {
                             IdType::Identifier { value: i, loc } => {
                                 if self.is_valid_identifier(q, loc.clone(), i.as_str()) {
                                     if !scope.contains_key(i.as_str()) {
-                                        self.push_query_err(
+                                        push_query_err(self,
                                             q,
                                             loc,
                                             format!("variable named `{}` is not in scope", i),
@@ -1748,7 +1654,7 @@ impl<'a> Ctx<'a> {
                 match self.is_valid_identifier(q, tr.loc.clone(), identifier.as_str()) {
                     true => scope.get(identifier.as_str()).cloned().map_or_else(
                         || {
-                            self.push_query_err(
+                            push_query_err(self,
                                 q,
                                 tr.loc.clone(),
                                 format!("variable named `{}` is not in scope", identifier),
@@ -1820,7 +1726,7 @@ impl<'a> Ctx<'a> {
                             && (!matches!(tr.steps[i + 1].step, StepType::Closure(_))
                                 || !matches!(tr.steps[i + 1].step, StepType::Object(_)))))
                     {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             ex.loc.clone(),
                             "exclude is only valid as the last step in a traversal,
@@ -1856,7 +1762,7 @@ impl<'a> Ctx<'a> {
                     // TODO: Fix issue with step count being incorrect (i think its counting each field as a step)
                     // if i != number_of_steps {
                     //     println!("{} {}", i, number_of_steps);
-                    //     self.push_query_err(
+                    //     push_query_err(self,
                     //         q,
                     //         obj.loc.clone(),
                     //         "object is only valid as the last step in a traversal".to_string(),
@@ -1919,7 +1825,7 @@ impl<'a> Ctx<'a> {
                             match self.infer_expr_type(expr, scope, q, Some(cur_ty.clone()), None) {
                                 (Type::Scalar(ft), _) => ft.clone(),
                                 (field_type, _) => {
-                                    self.push_query_err(
+                                    push_query_err(self,
                                         q,
                                         b_op.loc.clone(),
                                         format!("boolean operation `{}` cannot be applied to `{}`", b_op.loc.span, field_type.kind_str()),
@@ -1950,7 +1856,7 @@ impl<'a> Ctx<'a> {
                                     match field_set.get(field_name.as_str()) {
                                         Some(field) => {
                                             if field.field_type != property_type {
-                                                self.push_query_err(
+                                                push_query_err(self,
                                                     q,
                                                     b_op.loc.clone(),
                                                     format!("property `{field_name}` is of type `{}` (from node type `{node_ty}::{{{field_name}}}`), which does not match type of compared value `{}`", field.field_type, property_type),
@@ -1959,7 +1865,7 @@ impl<'a> Ctx<'a> {
                                             }
                                         }
                                         None => {
-                                            self.push_query_err(
+                                            push_query_err(self,
                                                 q,
                                                 b_op.loc.clone(),
                                                 format!(
@@ -1978,7 +1884,7 @@ impl<'a> Ctx<'a> {
                                     match field_set.get(field_name.as_str()) {
                                         Some(field) => {
                                             if field.field_type != property_type {
-                                                self.push_query_err(
+                                                push_query_err(self,
                                                     q,
                                                     b_op.loc.clone(),
                                                     format!("property `{field_name}` is of type `{}` (from edge type `{edge_ty}::{{{field_name}}}`), which does not match type of compared value `{}`", field.field_type, property_type),
@@ -1987,7 +1893,7 @@ impl<'a> Ctx<'a> {
                                             }
                                         }
                                         None => {
-                                            self.push_query_err(
+                                            push_query_err(self,
                                                 q,
                                                 b_op.loc.clone(),
                                                 format!(
@@ -2006,7 +1912,7 @@ impl<'a> Ctx<'a> {
                                     match field_set.get(field_name.as_str()) {
                                         Some(field) => {
                                             if field.field_type != property_type {
-                                                self.push_query_err(
+                                                push_query_err(self,
                                                     q,
                                                     b_op.loc.clone(),
                                                     format!("property `{field_name}` is of type `{}` (from vector type `{sv}::{{{field_name}}}`), which does not match type of compared value `{}`", field.field_type, property_type),
@@ -2015,7 +1921,7 @@ impl<'a> Ctx<'a> {
                                             }
                                         }
                                         None => {
-                                            self.push_query_err(
+                                            push_query_err(self,
                                                 q,
                                                 b_op.loc.clone(),
                                                 format!(
@@ -2029,7 +1935,7 @@ impl<'a> Ctx<'a> {
                                 }
                             }
                             _ => {
-                                self.push_query_err(
+                                push_query_err(self,
                                     q,
                                     b_op.loc.clone(),
                                     "boolean operation can only be applied to scalar values"
@@ -2175,7 +2081,7 @@ impl<'a> Ctx<'a> {
                                 if let Some(field_set) = field_set {
                                     for FieldAddition { key, value, loc } in &update.fields {
                                         if !field_set.contains_key(key.as_str()) {
-                                            self.push_query_err(
+                                            push_query_err(self,
                                                 q,
                                                 loc.clone(),
                                                 format!(
@@ -2195,7 +2101,7 @@ impl<'a> Ctx<'a> {
                                 if let Some(field_set) = field_set {
                                     for FieldAddition { key, value, loc } in &update.fields {
                                         if !field_set.contains_key(key.as_str()) {
-                                            self.push_query_err(
+                                            push_query_err(self,
                                                 q,
                                                 loc.clone(),
                                                 format!(
@@ -2209,7 +2115,7 @@ impl<'a> Ctx<'a> {
                                 }
                             }
                             _ => {
-                                self.push_query_err(
+                                push_query_err(self,
                                     q,
                                     update.loc.clone(),
                                     "update is only valid on nodes or edges".to_string(),
@@ -2225,7 +2131,7 @@ impl<'a> Ctx<'a> {
                                 if let Some(field_set) = field_set {
                                     for FieldAddition { key, value, loc } in &update.fields {
                                         if !field_set.contains_key(key.as_str()) {
-                                            self.push_query_err(
+                                            push_query_err(self,
                                                 q,
                                                 loc.clone(),
                                                 format!(
@@ -2244,7 +2150,7 @@ impl<'a> Ctx<'a> {
                                 if let Some(field_set) = field_set {
                                     for FieldAddition { key, value, loc } in &update.fields {
                                         if !field_set.contains_key(key.as_str()) {
-                                            self.push_query_err(
+                                            push_query_err(self,
                                                 q,
                                                 loc.clone(),
                                                 format!(
@@ -2258,7 +2164,7 @@ impl<'a> Ctx<'a> {
                                 }
                             }
                             _ => {
-                                self.push_query_err(
+                                push_query_err(self,
                                     q,
                                     update.loc.clone(),
                                     "update is only valid on nodes or edges".to_string(),
@@ -2343,7 +2249,7 @@ impl<'a> Ctx<'a> {
                 StepType::AddEdge(add) => {
                     if let Some(ref ty) = add.edge_type {
                         if !self.edge_map.contains_key(ty.as_str()) {
-                            self.push_query_err(
+                            push_query_err(self,
                                 q,
                                 add.loc.clone(),
                                 format!("`AddE<{}>` refers to unknown edge type", ty),
@@ -2365,7 +2271,7 @@ impl<'a> Ctx<'a> {
                             match ty {
                                 Some(ty) => {
                                     if !ty.is_integer() {
-                                        self.push_query_err(
+                                        push_query_err(self,
                                             q,
                                             start.loc.clone(),
                                             format!("index of range must be an integer, got {:?}", ty.get_type_name()),
@@ -2380,7 +2286,7 @@ impl<'a> Ctx<'a> {
                             match ty {
                                 Some(ty) => {
                                     if !ty.is_integer() {
-                                        self.push_query_err(
+                                        push_query_err(self,
                                             q,
                                             end.loc.clone(),
                                             format!("index of range must be an integer, got {:?}", ty.get_type_name()),
@@ -2407,7 +2313,7 @@ impl<'a> Ctx<'a> {
                             match ty {
                                 Some(ty) => {
                                     if !ty.is_integer() {
-                                        self.push_query_err(
+                                        push_query_err(self,
                                             q,
                                             start.loc.clone(),
                                             format!("index of range must be an integer, got {:?}", ty.get_type_name()),
@@ -2430,7 +2336,7 @@ impl<'a> Ctx<'a> {
                             match ty {
                                 Some(ty) => {
                                     if !ty.is_integer() {
-                                        self.push_query_err(
+                                        push_query_err(self,
                                             q,
                                             end.loc.clone(),
                                             format!("index of range must be an integer, got {:?}", ty.get_type_name()),
@@ -2446,7 +2352,7 @@ impl<'a> Ctx<'a> {
                             self.gen_identifier_or_param(q, j.as_str(), false, true),
                         )},
                         (ExpressionType::Identifier(_) | ExpressionType::IntegerLiteral(_), other) => {
-                            self.push_query_err(
+                            push_query_err(self,
                                 q,
                                 start.loc.clone(),
                                 format!("{:?} does not resolve to an integer value", other),
@@ -2455,7 +2361,7 @@ impl<'a> Ctx<'a> {
                             return cur_ty.clone();
                         }
                         _ => {
-                            self.push_query_err(
+                            push_query_err(self,
                                 q,
                                 start.loc.clone(),
                                 format!("start and end of range must be integers, got {:?} and {:?}", start, end),
@@ -2525,7 +2431,7 @@ impl<'a> Ctx<'a> {
                 }
                 StepType::Closure(cl) => {
                     if i != number_of_steps {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             cl.loc.clone(),
                             "closure is only valid as the last step in a traversal".to_string(),
@@ -2589,7 +2495,7 @@ impl<'a> Ctx<'a> {
     ) {
         for (loc, key) in &ex.fields {
             if let Some(loc) = excluded.get(key.as_str()) {
-                self.push_query_err_with_fix(
+                push_query_err_with_fix(self, 
                     q,
                     loc.clone(),
                     format!("field `{}` was previously excluded in this traversal", key),
@@ -2597,7 +2503,7 @@ impl<'a> Ctx<'a> {
                     Fix::new(span.clone(), Some(loc.clone()), None),
                 );
             } else if !field_set.contains_key(key.as_str()) {
-                self.push_query_err(
+                push_query_err(self,
                     q,
                     loc.clone(),
                     format!("`{}` is not a field of {} `{}`", key, type_kind, type_name),
@@ -2661,7 +2567,7 @@ impl<'a> Ctx<'a> {
                 self.validate_exclude(ty, tr, ex, excluded, q);
             }
             _ => {
-                self.push_query_err(
+                push_query_err(self,
                     q,
                     ex.fields[0].0.clone(),
                     "cannot access properties on this type".to_string(),
@@ -2741,7 +2647,7 @@ impl<'a> Ctx<'a> {
                             .push(Separator::Period(GeneratedStep::Remapping(remapping)));
                     } else {
                         // error
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             obj.fields[0].value.loc.clone(),
                             "node object must have at least one field".to_string(),
@@ -2797,7 +2703,7 @@ impl<'a> Ctx<'a> {
                             .push(Separator::Period(GeneratedStep::Remapping(remapping)));
                     } else {
                         // error
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             obj.fields[0].value.loc.clone(),
                             "node object must have at least one field".to_string(),
@@ -2842,7 +2748,7 @@ impl<'a> Ctx<'a> {
                             .push(Separator::Period(GeneratedStep::Remapping(remapping)));
                     } else {
                         // error
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             obj.fields[0].value.loc.clone(),
                             "edge object must have at least one field".to_string(),
@@ -2887,7 +2793,7 @@ impl<'a> Ctx<'a> {
                             .push(Separator::Period(GeneratedStep::Remapping(remapping)));
                     } else {
                         // error
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             obj.fields[0].value.loc.clone(),
                             "edge object must have at least one field".to_string(),
@@ -2942,7 +2848,7 @@ impl<'a> Ctx<'a> {
                             .push(Separator::Period(GeneratedStep::Remapping(remapping)));
                     } else {
                         // error
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             obj.fields[0].value.loc.clone(),
                             "vector object must have at least one field".to_string(),
@@ -2997,7 +2903,7 @@ impl<'a> Ctx<'a> {
                             .push(Separator::Period(GeneratedStep::Remapping(remapping)));
                     } else {
                         // error
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             obj.fields[0].value.loc.clone(),
                             "vector object must have at least one field".to_string(),
@@ -3020,7 +2926,7 @@ impl<'a> Ctx<'a> {
                 );
             }
             _ => {
-                self.push_query_err(
+                push_query_err(self,
                     q,
                     obj.fields[0].value.loc.clone(),
                     "cannot access properties on this type".to_string(),
@@ -3058,7 +2964,7 @@ impl<'a> Ctx<'a> {
                 traversal.should_collect = ShouldCollect::ToVec;
                 let edge = self.edge_map.get(label.as_str());
                 if edge.is_none() {
-                    self.push_query_err(
+                    push_query_err(self,
                         q,
                         gs.loc.clone(),
                         format!("Edge of type `{}` does not exist", label),
@@ -3069,7 +2975,7 @@ impl<'a> Ctx<'a> {
                 match edge.unwrap().from.1 == node_label.clone() {
                     true => Some(Type::Edges(Some(label.to_string()))),
                     false => {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             gs.loc.clone(),
                             format!(
@@ -3097,7 +3003,7 @@ impl<'a> Ctx<'a> {
                 traversal.should_collect = ShouldCollect::ToVec;
                 let edge = self.edge_map.get(label.as_str());
                 if edge.is_none() {
-                    self.push_query_err(
+                    push_query_err(self,
                         q,
                         gs.loc.clone(),
                         format!("Edge of type `{}` does not exist", label),
@@ -3109,7 +3015,7 @@ impl<'a> Ctx<'a> {
                 match edge.unwrap().to.1 == node_label.clone() {
                     true => Some(Type::Edges(Some(label.to_string()))),
                     false => {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             gs.loc.clone(),
                             format!("Edge of type `{}` does not exist", label),
@@ -3139,7 +3045,7 @@ impl<'a> Ctx<'a> {
                         }
                     }
                     None => {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             gs.loc.clone(),
                             format!("Edge of type `{}` does not exist", label),
@@ -3158,7 +3064,7 @@ impl<'a> Ctx<'a> {
                 let edge = self.edge_map.get(label.as_str());
                 // assert!(edge.is_some()); // make sure is caught
                 if edge.is_none() {
-                    self.push_query_err(
+                    push_query_err(self,
                         q,
                         gs.loc.clone(),
                         format!("Edge of type `{}` does not exist", label),
@@ -3177,7 +3083,7 @@ impl<'a> Ctx<'a> {
                         }
                     }
                     false => {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             gs.loc.clone(),
                             format!(
@@ -3205,7 +3111,7 @@ impl<'a> Ctx<'a> {
                         } else if self.vector_set.contains(edge.from.1.as_str()) {
                             EdgeType::Vec
                         } else {
-                            self.push_query_err(
+                            push_query_err(self,
                                 q,
                                 gs.loc.clone(),
                                 format!("Edge of type `{}` does not exist", label),
@@ -3229,7 +3135,7 @@ impl<'a> Ctx<'a> {
                 let edge = self.edge_map.get(label.as_str());
                 // assert!(edge.is_some());
                 if edge.is_none() {
-                    self.push_query_err(
+                    push_query_err(self,
                         q,
                         gs.loc.clone(),
                         format!("Edge of type `{}` does not exist", label),
@@ -3249,7 +3155,7 @@ impl<'a> Ctx<'a> {
                         }
                     }
                     false => {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             gs.loc.clone(),
                             format!(
@@ -3268,7 +3174,7 @@ impl<'a> Ctx<'a> {
                 let new_ty = if let Some(edge_schema) = self.edge_map.get(edge_ty.as_str()) {
                     let node_type = &edge_schema.from.1;
                     if !self.node_set.contains(node_type.as_str()) {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             gs.loc.clone(),
                             format!(
@@ -3296,7 +3202,7 @@ impl<'a> Ctx<'a> {
                 let new_ty = if let Some(edge_schema) = self.edge_map.get(edge_ty.as_str()) {
                     let node_type = &edge_schema.to.1;
                     if !self.node_set.contains(node_type.as_str()) {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             gs.loc.clone(),
                             format!(
@@ -3323,7 +3229,7 @@ impl<'a> Ctx<'a> {
                 let new_ty = if let Some(edge_schema) = self.edge_map.get(edge_ty.as_str()) {
                     let source_type = &edge_schema.from.1;
                     if !self.vector_set.contains(source_type.as_str()) {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             gs.loc.clone(),
                             format!(
@@ -3352,7 +3258,7 @@ impl<'a> Ctx<'a> {
                 let new_ty = if let Some(edge_schema) = self.edge_map.get(edge_ty.as_str()) {
                     let target_type = &edge_schema.to.1;
                     if !self.vector_set.contains(target_type.as_str()) {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             gs.loc.clone(),
                             format!(
@@ -3408,7 +3314,7 @@ impl<'a> Ctx<'a> {
             }
             (SearchVector(sv), Type::Vectors(Some(vector_ty)) | Type::Vector(Some(vector_ty))) => {
                 if !(matches!(cur_ty, Type::Vector(_)) || matches!(cur_ty, Type::Vectors(_))) {
-                    self.push_query_err(
+                    push_query_err(self,
                             q,
                             sv.loc.clone(),
                             format!(
@@ -3420,7 +3326,7 @@ impl<'a> Ctx<'a> {
                 }
                 if let Some(ref ty) = sv.vector_type {
                     if !self.vector_set.contains(ty.as_str()) {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             sv.loc.clone(),
                             format!("vector type `{}` has not been declared", ty),
@@ -3451,7 +3357,7 @@ impl<'a> Ctx<'a> {
                                 i.to_string(),
                             )))
                         } else {
-                            self.push_query_err(
+                            push_query_err(self,
                                 q,
                                 sv.loc.clone(),
                                 format!("variable named `{}` is not in scope", i),
@@ -3469,7 +3375,7 @@ impl<'a> Ctx<'a> {
                         }
                     },
                     _ => {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             sv.loc.clone(),
                             "`SearchVector` must have a vector data".to_string(),
@@ -3520,7 +3426,7 @@ impl<'a> Ctx<'a> {
                             }
                         }
                         _ => {
-                            self.push_query_err(
+                            push_query_err(self,
                                 q,
                                 sv.loc.clone(),
                                 "`SearchVector` must have a limit of vectors to return".to_string(),
@@ -3530,7 +3436,7 @@ impl<'a> Ctx<'a> {
                         }
                     },
                     None => {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             sv.loc.clone(),
                             "`SearchV` must have a limit of vectors to return".to_string(),
@@ -3561,7 +3467,7 @@ impl<'a> Ctx<'a> {
             }
             // Anything else is illegal
             _ => {
-                self.push_query_err(
+                push_query_err(self,
                     q,
                     gs.loc.clone(),
                     format!(
@@ -3656,7 +3562,7 @@ impl<'a> Ctx<'a> {
                                 }
                             }
                             _ => {
-                                // self.push_query_err(
+                                // push_query_err(self,
                                 //     q,
                                 //     value.loc.clone(),
                                 //     "invalid traversal start".to_string(),
@@ -3721,7 +3627,7 @@ impl<'a> Ctx<'a> {
                                         }
                                     }
                                     _ => {
-                                        // self.push_query_err(
+                                        // push_query_err(self,
                                         //     q,
                                         //     value.loc.clone(),
                                         //     "invalid traversal start".to_string(),
@@ -3820,7 +3726,7 @@ impl<'a> Ctx<'a> {
                                             })
                                         }
                                         false => {
-                                            self.push_query_err(
+                                            push_query_err(self,
                                                 q,
                                                 expr.loc.clone(),
                                                 format!(
@@ -3835,7 +3741,7 @@ impl<'a> Ctx<'a> {
                                 }
                             }
                             _ => {
-                                self.push_query_err(
+                                push_query_err(self,
                                     q,
                                     expr.loc.clone(),
                                     "invalid expression".to_string(),
@@ -3901,7 +3807,7 @@ impl<'a> Ctx<'a> {
                                     },
                                 }),
                                 false => {
-                                    self.push_query_err(
+                                    push_query_err(self,
                                         q,
                                         value.loc.clone(),
                                         format!(
@@ -3932,7 +3838,7 @@ impl<'a> Ctx<'a> {
                         })
                     } // object or closure
                     FieldValueType::Empty => {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             obj[0].loc.clone(),
                             "field value is empty".to_string(),
@@ -3965,7 +3871,7 @@ impl<'a> Ctx<'a> {
         match &statement.statement {
             Assignment(assign) => {
                 if scope.contains_key(assign.variable.as_str()) {
-                    self.push_query_err(
+                    push_query_err(self,
                         q,
                         assign.loc.clone(),
                         format!("variable `{}` is already declared", assign.variable),
@@ -3989,7 +3895,7 @@ impl<'a> Ctx<'a> {
             AddNode(add) => {
                 if let Some(ref ty) = add.node_type {
                     if !self.node_set.contains(ty.as_str()) {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             add.loc.clone(),
                             format!("`AddN<{}>` refers to unknown node type", ty),
@@ -4015,7 +3921,7 @@ impl<'a> Ctx<'a> {
                         if let Some(field_set) = field_set {
                             for (field_name, value) in fields {
                                 if !field_set.contains_key(field_name.as_str()) {
-                                    self.push_query_err(
+                                    push_query_err(self,
                                         q,
                                         add.loc.clone(),
                                         format!("`{}` is not a field of node `{}`", field_name, ty),
@@ -4027,7 +3933,7 @@ impl<'a> Ctx<'a> {
                                         if self.is_valid_identifier(q, loc.clone(), value.as_str())
                                         {
                                             if !scope.contains_key(value.as_str()) {
-                                                self.push_query_err(
+                                                push_query_err(self,
                                                     q,
                                                     loc.clone(),
                                                     format!("`{}` is not in scope", value),
@@ -4047,7 +3953,7 @@ impl<'a> Ctx<'a> {
                                             .field_type
                                             .clone();
                                         if field_type != *value {
-                                            self.push_query_err(
+                                            push_query_err(self,
                                                  q,
                                                  loc.clone(),
                                                  format!("value `{}` is of type `{}`, which does not match type {} declared in the schema for field `{}` on node type `{}`", value, GenRef::from(value.clone()), field_type, field_name, ty),
@@ -4080,7 +3986,7 @@ impl<'a> Ctx<'a> {
                                                         GenRef::Literal(date.to_rfc3339()),
                                                     ),
                                                     Err(e) => {
-                                                        self.push_query_err(
+                                                        push_query_err(self,
                                                             q,
                                                             loc.clone(),
                                                             e.to_string(),
@@ -4103,7 +4009,7 @@ impl<'a> Ctx<'a> {
                                             self.gen_identifier_or_param(q, value, true, false)
                                         }
                                         v => {
-                                            self.push_query_err(
+                                            push_query_err(self,
                                                 q,
                                                 add.loc.clone(),
                                                 format!("`{:?}` is not a valid field value", v),
@@ -4160,7 +4066,7 @@ impl<'a> Ctx<'a> {
                         return Some(stmt);
                     }
                 }
-                self.push_query_err(
+                push_query_err(self,
                     q,
                     add.loc.clone(),
                     "`AddN` must have a node type".to_string(),
@@ -4172,7 +4078,7 @@ impl<'a> Ctx<'a> {
             AddEdge(add) => {
                 if let Some(ref ty) = add.edge_type {
                     if !self.edge_map.contains_key(ty.as_str()) {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             add.loc.clone(),
                             format!("`AddE<{}>` refers to unknown edge type", ty),
@@ -4188,7 +4094,7 @@ impl<'a> Ctx<'a> {
                             if let Some(field_set) = field_set {
                                 for (field_name, value) in fields {
                                     if !field_set.contains_key(field_name.as_str()) {
-                                        self.push_query_err(
+                                        push_query_err(self,
                                             q,
                                             add.loc.clone(),
                                             format!(
@@ -4206,7 +4112,7 @@ impl<'a> Ctx<'a> {
                                                 value.as_str(),
                                             ) {
                                                 if !scope.contains_key(value.as_str()) {
-                                                    self.push_query_err(
+                                                    push_query_err(self,
                                                         q,
                                                         loc.clone(),
                                                         format!("`{}` is not in scope", value),
@@ -4226,7 +4132,7 @@ impl<'a> Ctx<'a> {
                                                 .field_type
                                                 .clone();
                                             if field_type != *value {
-                                                self.push_query_err(
+                                                push_query_err(self,
                                                      q,
                                                      loc.clone(),
                                                      format!("value `{}` is of type `{}`, which does not match type {} declared in the schema for field `{}` on node type `{}`", value, GenRef::from(value.clone()), field_type, field_name, ty),
@@ -4260,7 +4166,7 @@ impl<'a> Ctx<'a> {
                                                                 GenRef::Literal(date.to_rfc3339()),
                                                             ),
                                                             Err(e) => {
-                                                                self.push_query_err(
+                                                                push_query_err(self,
                                                                     q,
                                                                     loc.clone(),
                                                                     e.to_string(),
@@ -4283,7 +4189,7 @@ impl<'a> Ctx<'a> {
                                                     self.gen_identifier_or_param(q, value.as_str(), false, true)
                                                 }
                                                 v => {
-                                                    self.push_query_err(
+                                                    push_query_err(self,
                                                         q,
                                                         add.loc.clone(),
                                                         format!(
@@ -4314,7 +4220,7 @@ impl<'a> Ctx<'a> {
                             _ => unreachable!(),
                         },
                         _ => {
-                            self.push_query_err(
+                            push_query_err(self,
                                 q,
                                 add.loc.clone(),
                                 "`AddE` must have a to id".to_string(),
@@ -4335,7 +4241,7 @@ impl<'a> Ctx<'a> {
                             _ => unreachable!(),
                         },
                         _ => {
-                            self.push_query_err(
+                            push_query_err(self,
                                 q,
                                 add.loc.clone(),
                                 "`AddE` must have a from id".to_string(),
@@ -4361,7 +4267,7 @@ impl<'a> Ctx<'a> {
                     // query.statements.push(stmt.clone());
                     return Some(stmt);
                 }
-                self.push_query_err(
+                push_query_err(self,
                     q,
                     add.loc.clone(),
                     "`AddE` must have an edge type".to_string(),
@@ -4373,7 +4279,7 @@ impl<'a> Ctx<'a> {
             AddVector(add) => {
                 if let Some(ref ty) = add.vector_type {
                     if !self.vector_set.contains(ty.as_str()) {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             add.loc.clone(),
                             format!("vector type `{}` has not been declared", ty),
@@ -4387,7 +4293,7 @@ impl<'a> Ctx<'a> {
                             if let Some(field_set) = field_set {
                                 for (field_name, value) in fields {
                                     if !field_set.contains_key(field_name.as_str()) {
-                                        self.push_query_err(
+                                        push_query_err(self,
                                             q,
                                             add.loc.clone(),
                                             format!(
@@ -4405,7 +4311,7 @@ impl<'a> Ctx<'a> {
                                                 value.as_str(),
                                             ) {
                                                 if !scope.contains_key(value.as_str()) {
-                                                    self.push_query_err(
+                                                    push_query_err(self,
                                                         q,
                                                         loc.clone(),
                                                         format!("`{}` is not in scope", value),
@@ -4425,7 +4331,7 @@ impl<'a> Ctx<'a> {
                                                 .field_type
                                                 .clone();
                                             if field_type != *value {
-                                                self.push_query_err(
+                                                push_query_err(self,
                                                      q,
                                                      loc.clone(),
                                                      format!("value `{}` is of type `{}`, which does not match type {} declared in the schema for field `{}` on node type `{}`", value, GenRef::from(value.clone()), field_type, field_name, ty),
@@ -4459,7 +4365,7 @@ impl<'a> Ctx<'a> {
                                                             GenRef::Literal(date.to_rfc3339()),
                                                         ),
                                                         Err(e) => {
-                                                            self.push_query_err(
+                                                            push_query_err(self,
                                                                 q,
                                                                 loc.clone(),
                                                                 e.to_string(),
@@ -4487,7 +4393,7 @@ impl<'a> Ctx<'a> {
                                                 )
                                             }
                                             v => {
-                                                self.push_query_err(
+                                                push_query_err(self,
                                                     q,
                                                     add.loc.clone(),
                                                     format!("`{:?}` is not a valid field value", v),
@@ -4541,7 +4447,7 @@ impl<'a> Ctx<'a> {
                         return Some(stmt);
                     }
                 }
-                self.push_query_err(
+                push_query_err(self,
                     q,
                     add.loc.clone(),
                     "`AddV` must have a vector type".to_string(),
@@ -4552,7 +4458,7 @@ impl<'a> Ctx<'a> {
             BatchAddVector(add) => {
                 if let Some(ref ty) = add.vector_type {
                     if !self.vector_set.contains(ty.as_str()) {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             add.loc.clone(),
                             format!("vector type `{}` has not been declared", ty),
@@ -4581,7 +4487,7 @@ impl<'a> Ctx<'a> {
             SearchVector(sv) => {
                 if let Some(ref ty) = sv.vector_type {
                     if !self.vector_set.contains(ty.as_str()) {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             sv.loc.clone(),
                             format!("vector type `{}` has not been declared", ty),
@@ -4608,7 +4514,7 @@ impl<'a> Ctx<'a> {
                         } else if let Some(_) = scope.get(i.as_str()) {
                             GeneratedValue::Identifier(GenRef::Ref(i.to_string()))
                         } else {
-                            self.push_query_err(
+                            push_query_err(self,
                                 q,
                                 sv.loc.clone(),
                                 format!("variable named `{}` is not in scope", i),
@@ -4618,7 +4524,7 @@ impl<'a> Ctx<'a> {
                         }
                     }
                     _ => {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             sv.loc.clone(),
                             "`SearchVector` must have a vector data".to_string(),
@@ -4670,7 +4576,7 @@ impl<'a> Ctx<'a> {
                             }
                         }
                         _ => {
-                            self.push_query_err(
+                            push_query_err(self,
                                 q,
                                 sv.loc.clone(),
                                 "`SearchVector` must have a limit of vectors to return".to_string(),
@@ -4680,7 +4586,7 @@ impl<'a> Ctx<'a> {
                         }
                     },
                     None => {
-                        self.push_query_err(
+                        push_query_err(self,
                             q,
                             sv.loc.clone(),
                             "`SearchV` must have a limit of vectors to return".to_string(),
@@ -4752,7 +4658,7 @@ impl<'a> Ctx<'a> {
             ForLoop(fl) => {
                 // Ensure the collection exists
                 if !scope.contains_key(fl.in_variable.1.as_str()) {
-                    self.push_query_err(
+                    push_query_err(self,
                         q,
                         fl.loc.clone(),
                         format!("`{}` is not defined in the current scope", fl.in_variable.1),
@@ -4781,7 +4687,7 @@ impl<'a> Ctx<'a> {
                             fl_in_var_ty.clone()
                         }
                         None => {
-                            self.push_query_err(
+                            push_query_err(self,
                                 q,
                                 fl.loc.clone(),
                                 format!("`{}` is not a parameter", fl.in_variable.1),
@@ -4821,7 +4727,7 @@ impl<'a> Ctx<'a> {
                                         FieldType::Object(param_fields) => {
                                             for (field_loc, field_name) in fields {
                                                 if !param_fields.contains_key(field_name.as_str()) {
-                                                    self.push_query_err(
+                                                    push_query_err(self,
                                                                 q,
                                                                 field_loc.clone(),
                                                                 format!("`{}` is not a field of the inner type of `{}`", field_name, fl.in_variable.1),
@@ -4840,7 +4746,7 @@ impl<'a> Ctx<'a> {
                                             );
                                         }
                                         _ => {
-                                            self.push_query_err(
+                                            push_query_err(self,
                                                         q,
                                                         fl.in_variable.0.clone(),
                                                         format!("the inner type of `{}` is not an object", fl.in_variable.1),
@@ -4850,7 +4756,7 @@ impl<'a> Ctx<'a> {
                                     },
 
                                     _ => {
-                                        self.push_query_err(
+                                        push_query_err(self,
                                             q,
                                             fl.in_variable.0.clone(),
                                             format!("`{}` is not an array", fl.in_variable.1),
@@ -4877,7 +4783,7 @@ impl<'a> Ctx<'a> {
                                     );
                                 }
                                 false => {
-                                    self.push_query_err(
+                                    push_query_err(self,
                                         q,
                                         fl.in_variable.0.clone(),
                                         format!(
@@ -4923,7 +4829,7 @@ impl<'a> Ctx<'a> {
         match name {
             "true" | "false" | "NONE" | "String" | "Boolean" | "F32" | "F64" | "I8" | "I16"
             | "I32" | "I64" | "U8" | "U16" | "U32" | "U64" | "U128" | "Uuid" | "Date" => {
-                self.push_query_err(
+                push_query_err(self,
                     q,
                     loc.clone(),
                     format!("`{}` is not a valid identifier", name),
@@ -4973,7 +4879,7 @@ impl<'a> Ctx<'a> {
         match scope.get(name) {
             Some(ty) => Some(ty.clone()),
             None => {
-                self.push_query_err(
+                push_query_err(self,
                     q,
                     loc.clone(),
                     format!("variable named `{}` is not in scope", name),
@@ -4985,104 +4891,3 @@ impl<'a> Ctx<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
-enum Type {
-    Node(Option<String>),
-    Nodes(Option<String>),
-    Edge(Option<String>),
-    Edges(Option<String>),
-    Vector(Option<String>),
-    Vectors(Option<String>),
-    Scalar(FieldType),
-    Object(HashMap<String, Type>),
-    Anonymous(Box<Type>),
-    Boolean,
-    Unknown,
-}
-
-impl Type {
-    fn kind_str(&self) -> &'static str {
-        match self {
-            Type::Node(_) => "node",
-            Type::Nodes(_) => "nodes",
-            Type::Edge(_) => "edge",
-            Type::Edges(_) => "edges",
-            Type::Vector(_) => "vector",
-            Type::Vectors(_) => "vectors",
-            Type::Scalar(_) => "scalar",
-            Type::Object(_) => "object",
-            Type::Boolean => "boolean",
-            Type::Unknown => "unknown",
-            Type::Anonymous(ty) => ty.kind_str(),
-        }
-    }
-
-    fn get_type_name(&self) -> String {
-        match self {
-            Type::Node(Some(name)) => name.clone(),
-            Type::Nodes(Some(name)) => name.clone(),
-            Type::Edge(Some(name)) => name.clone(),
-            Type::Edges(Some(name)) => name.clone(),
-            Type::Vector(Some(name)) => name.clone(),
-            Type::Vectors(Some(name)) => name.clone(),
-            Type::Scalar(ft) => ft.to_string(),
-            Type::Anonymous(ty) => ty.get_type_name(),
-            Type::Boolean => "boolean".to_string(),
-            Type::Unknown => "unknown".to_string(),
-            Type::Object(fields) => {
-                let field_names = fields.keys().map(|k| k.clone()).collect::<Vec<_>>();
-                format!("object({})", field_names.join(", "))
-            }
-            _ => unreachable!(),
-        }
-    }
-
-    /// Recursively strip <code>Anonymous</code> layers and return the base type.
-    fn base(&self) -> &Type {
-        match self {
-            Type::Anonymous(inner) => inner.base(),
-            _ => self,
-        }
-    }
-
-    /// Same, but returns an owned clone for convenience.
-    fn cloned_base(&self) -> Type {
-        // TODO: never used?
-        match self {
-            Type::Anonymous(inner) => inner.cloned_base(),
-            _ => self.clone(),
-        }
-    }
-
-    fn is_numeric(&self) -> bool {
-        match self {
-            Type::Scalar(ft) => match ft {
-                FieldType::I8 | FieldType::I16 | FieldType::I32 | FieldType::I64 | FieldType::U8 | FieldType::U16 | FieldType::U32 | FieldType::U64 | FieldType::U128 | FieldType::F32 | FieldType::F64 => true,
-            _ => false,
-            }
-            _ => false,
-        }
-    }
-
-    fn is_integer(&self) -> bool {
-        match self {
-            Type::Scalar(ft) => match ft {
-                FieldType::I8 | FieldType::I16 | FieldType::I32 | FieldType::I64 | FieldType::U8 | FieldType::U16 | FieldType::U32 | FieldType::U64 | FieldType::U128 => true,
-                _ => false,
-            }
-            _ => false,
-        }
-    }
-}
-
-impl From<FieldType> for Type {
-    fn from(ft: FieldType) -> Self {
-        use FieldType::*;
-        match ft {
-            String | Boolean | F32 | F64 | I8 | I16 | I32 | I64 | U8 | U16 | U32 | U64 | U128
-            | Uuid | Date => Type::Scalar(ft.clone()),
-            Array(inner_ft) => Type::from(*inner_ft),
-            _ => Type::Unknown,
-        }
-    }
-}
