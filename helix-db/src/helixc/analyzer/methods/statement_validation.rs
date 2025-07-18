@@ -17,7 +17,7 @@ use crate::helixc::{
 };
 use std::collections::HashMap;
 
-pub(crate) fn walk_statements<'a>(
+pub(crate) fn validate_statements<'a>(
     ctx: &mut Ctx<'a>,
     scope: &mut HashMap<&'a str, Type>,
     q: &'a Query,
@@ -197,7 +197,7 @@ pub(crate) fn walk_statements<'a>(
             for body_stmt in &fl.statements {
                 // Recursive walk (but without infinite nesting for now)
 
-                let stmt = walk_statements(ctx, scope, q, query, body_stmt);
+                let stmt = validate_statements(ctx, scope, q, query, body_stmt);
                 if stmt.is_some() {
                     statements.push(stmt.unwrap());
                 }

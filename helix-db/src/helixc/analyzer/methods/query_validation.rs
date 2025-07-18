@@ -4,7 +4,7 @@ use crate::helixc::{
     analyzer::{
         analyzer::Ctx,
         errors::{push_query_err, push_query_warn},
-        methods::{infer_expr_type::infer_expr_type, statement_validation::walk_statements},
+        methods::{infer_expr_type::infer_expr_type, statement_validation::validate_statements},
         types::Type,
         utils::{gen_identifier_or_param, is_valid_identifier},
     },
@@ -61,7 +61,7 @@ pub(crate) fn check_query<'a>(ctx: &mut Ctx<'a>, q: &'a Query) {
         );
     }
     for stmt in &q.statements {
-        let statement = walk_statements(ctx, &mut scope, q, &mut query, stmt);
+        let statement = validate_statements(ctx, &mut scope, q, &mut query, stmt);
         if statement.is_some() {
             query.statements.push(statement.unwrap());
         } else {
