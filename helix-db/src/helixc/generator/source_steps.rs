@@ -216,7 +216,7 @@ impl Display for SearchVector {
 #[derive(Clone)]
 pub struct NFromIndex {
     pub index: GenRef<String>,
-    pub key: GenRef<String>,
+    pub key: GeneratedValue,
 }
 
 impl Display for NFromIndex {

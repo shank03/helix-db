@@ -280,40 +280,18 @@ impl Display for InE {
 
 #[derive(Clone)]
 pub enum Where {
-    Exists(WhereExists),
     Ref(WhereRef),
     Mut(WhereMut),
 }
 impl Display for Where {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Where::Exists(ex) => write!(f, "{}", ex),
             Where::Ref(wr) => write!(f, "{}", wr),
             Where::Mut(wm) => write!(f, "{}", wm),
         }
     }
 }
 
-#[deprecated(note = "Use WhereRef instead with a BoExp Exists")]
-#[derive(Clone)]
-pub struct WhereExists {
-    pub tr: Traversal,
-}
-impl Display for WhereExists {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "filter_ref(|val, txn|{{
-                if let Ok(val) = val {{ 
-                    Ok(Exist::exists(&mut {}))
-                }} else {{
-                    Ok(false)
-                }}
-            }})",
-            self.tr
-        )
-    }
-}
 #[derive(Clone)]
 pub struct WhereRef {
     pub expr: BoExp,

@@ -8,7 +8,7 @@
 //!    │       ^^^^ declare `N::Post` above
 //! ```
 
-use super::analyzer::{Diagnostic, DiagnosticSeverity};
+use super::diagnostic::{Diagnostic, DiagnosticSeverity};
 use crate::utils::styled_string::StyledString;
 
 /// Render a single diagnostic plus a code snippet.
@@ -87,7 +87,10 @@ pub fn render(diag: &Diagnostic, src: &str, filepath: &str) -> String {
 
     // Color the vertical bars and line numbers based on severity
     let (line_num_color, vertical_bar) = match diag.severity {
-        DiagnosticSeverity::Error => (format!("{:>2}", diag.location.start.line).red().bold(), "│".red()),
+        DiagnosticSeverity::Error => (
+            format!("{:>2}", diag.location.start.line).red().bold(),
+            "│".red(),
+        ),
         DiagnosticSeverity::Warning => (
             format!("{:>2}", diag.location.start.line).yellow().bold(),
             "│".yellow(),
@@ -164,9 +167,7 @@ pub fn render(diag: &Diagnostic, src: &str, filepath: &str) -> String {
                 format!(
                     "{}{}{}",
                     start_chunk,
-                    format!("{}", to_add.trim_end_matches('\n'))
-                        .green()
-                        .bold(),
+                    format!("{}", to_add.trim_end_matches('\n')).green().bold(),
                     end_chunk
                 )
             ));
@@ -176,4 +177,3 @@ pub fn render(diag: &Diagnostic, src: &str, filepath: &str) -> String {
 
     out
 }
-
