@@ -16,7 +16,13 @@ pub(crate) fn push_schema_err(ctx: &mut Ctx, loc: Loc, msg: String, hint: Option
         None,
     ));
 }
-pub(crate) fn push_query_err(ctx: &mut Ctx, q: &Query, loc: Loc, msg: String, hint: impl Into<String>) {
+pub(crate) fn push_query_err(
+    ctx: &mut Ctx,
+    q: &Query,
+    loc: Loc,
+    msg: String,
+    hint: impl Into<String>,
+) {
     ctx.diagnostics.push(Diagnostic::new(
         Loc::new(q.loc.filepath.clone(), loc.start, loc.end, loc.span),
         format!("{} (in QUERY named `{}`)", msg, q.name),

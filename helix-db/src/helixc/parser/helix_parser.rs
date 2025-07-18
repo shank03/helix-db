@@ -312,13 +312,8 @@ pub struct Statement {
 #[derive(Debug, Clone)]
 pub enum StatementType {
     Assignment(Assignment),
-    AddVector(AddVector),
-    AddNode(AddNode),
-    AddEdge(AddEdge),
+    Expression(Expression),
     Drop(Expression),
-    SearchVector(SearchVector),
-    BatchAddVector(BatchAddVector),
-    BM25Search(BM25Search),
     ForLoop(ForLoop),
 }
 
@@ -1184,34 +1179,16 @@ impl HelixParser {
                     loc: p.loc(),
                     statement: StatementType::Assignment(self.parse_get_statement(p)?),
                 }),
-                Rule::AddN => Ok(Statement {
+                Rule::creation_stmt => Ok(Statement {
                     loc: p.loc(),
-                    statement: StatementType::AddNode(self.parse_add_node(p)?),
+                    statement: StatementType::Expression(self.parse_expression(p)?),
                 }),
-                Rule::AddV => Ok(Statement {
-                    loc: p.loc(),
-                    statement: StatementType::AddVector(self.parse_add_vector(p)?),
-                }),
-                Rule::AddE => Ok(Statement {
-                    loc: p.loc(),
-                    statement: StatementType::AddEdge(self.parse_add_edge(p, false)?),
-                }),
+                
                 Rule::drop => Ok(Statement {
                     loc: p.loc(),
                     statement: StatementType::Drop(self.parse_expression(p)?),
                 }),
-                Rule::BatchAddV => Ok(Statement {
-                    loc: p.loc(),
-                    statement: StatementType::BatchAddVector(self.parse_batch_add_vector(p)?),
-                }),
-                Rule::search_vector => Ok(Statement {
-                    loc: p.loc(),
-                    statement: StatementType::SearchVector(self.parse_search_vector(p)?),
-                }),
-                Rule::bm25_search => Ok(Statement {
-                    loc: p.loc(),
-                    statement: StatementType::BM25Search(self.parse_bm25_search(p)?),
-                }),
+               
                 Rule::for_loop => Ok(Statement {
                     loc: p.loc(),
                     statement: StatementType::ForLoop(self.parse_for_loop(p)?),

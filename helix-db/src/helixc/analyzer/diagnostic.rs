@@ -1,4 +1,7 @@
-use crate::helixc::{analyzer::{fix::Fix, pretty}, parser::location::Loc};
+use crate::helixc::{
+    analyzer::{fix::Fix, pretty},
+    parser::location::Loc,
+};
 
 /// A single diagnostic to be surfaced to the editor.
 #[derive(Debug, Clone)]
@@ -43,4 +46,3 @@ impl Diagnostic {
         pretty::render(self, src, filepath)
     }
 }
-

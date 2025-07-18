@@ -222,8 +222,6 @@ impl From<DefaultValue> for GeneratedValue {
     }
 }
 
-
-
 #[derive(Debug, Clone)]
 pub(crate) enum Type {
     Node(Option<String>),
@@ -296,9 +294,19 @@ impl Type {
     pub fn is_numeric(&self) -> bool {
         match self {
             Type::Scalar(ft) => match ft {
-                FieldType::I8 | FieldType::I16 | FieldType::I32 | FieldType::I64 | FieldType::U8 | FieldType::U16 | FieldType::U32 | FieldType::U64 | FieldType::U128 | FieldType::F32 | FieldType::F64 => true,
-            _ => false,
-            }
+                FieldType::I8
+                | FieldType::I16
+                | FieldType::I32
+                | FieldType::I64
+                | FieldType::U8
+                | FieldType::U16
+                | FieldType::U32
+                | FieldType::U64
+                | FieldType::U128
+                | FieldType::F32
+                | FieldType::F64 => true,
+                _ => false,
+            },
             _ => false,
         }
     }
@@ -306,9 +314,17 @@ impl Type {
     pub fn is_integer(&self) -> bool {
         match self {
             Type::Scalar(ft) => match ft {
-                FieldType::I8 | FieldType::I16 | FieldType::I32 | FieldType::I64 | FieldType::U8 | FieldType::U16 | FieldType::U32 | FieldType::U64 | FieldType::U128 => true,
+                FieldType::I8
+                | FieldType::I16
+                | FieldType::I32
+                | FieldType::I64
+                | FieldType::U8
+                | FieldType::U16
+                | FieldType::U32
+                | FieldType::U64
+                | FieldType::U128 => true,
                 _ => false,
-            }
+            },
             _ => false,
         }
     }

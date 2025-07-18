@@ -94,17 +94,10 @@ pub(crate) enum ErrorCode {
     E652,
     /// `E653` - `inner type of in variable is not an object`
     E653,
-
-
 }
 pub(crate) enum WarningCode {
-    QueryHasNoReturn,
+    /// `W101` - `query has no return`
+    W101,
 }
 
 pub(crate) enum InfoCode {}
-
-// impl Display for ErrorCode {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         match self {}
-//     }
-// }
