@@ -360,7 +360,7 @@ pub struct Expression {
     pub expr: ExpressionType,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum ExpressionType {
     Traversal(Box<Traversal>),
     Identifier(String),
@@ -378,6 +378,28 @@ pub enum ExpressionType {
     SearchVector(SearchVector),
     BM25Search(BM25Search),
     Empty,
+}
+impl Debug for ExpressionType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ExpressionType::Traversal(traversal) => write!(f, "Traversal({:?})", traversal),
+            ExpressionType::Identifier(s) => write!(f, "{}", s),
+            ExpressionType::StringLiteral(s) => write!(f, "{}", s),
+            ExpressionType::IntegerLiteral(i) => write!(f, "{}", i),
+            ExpressionType::FloatLiteral(fl) => write!(f, "{}", fl),
+            ExpressionType::BooleanLiteral(b) => write!(f, "{}", b),
+            ExpressionType::Exists(e) => write!(f, "Exists({:?})", e),
+            ExpressionType::BatchAddVector(bav) => write!(f, "BatchAddVector({:?})", bav),
+            ExpressionType::AddVector(av) => write!(f, "AddVector({:?})", av),
+            ExpressionType::AddNode(an) => write!(f, "AddNode({:?})", an),
+            ExpressionType::AddEdge(ae) => write!(f, "AddEdge({:?})", ae),
+            ExpressionType::And(and) => write!(f, "And({:?})", and),
+            ExpressionType::Or(or) => write!(f, "Or({:?})", or),
+            ExpressionType::SearchVector(sv) => write!(f, "SearchVector({:?})", sv),
+            ExpressionType::BM25Search(bm25) => write!(f, "BM25Search({:?})", bm25),
+            ExpressionType::Empty => write!(f, "Empty"),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -2368,14 +2390,12 @@ impl HelixParser {
                 loc: value_pair.loc(),
                 value: FieldValueType::Fields(self.parse_field_additions(value_pair)?),
             },
-            Rule::string_literal => {
-                FieldValue {
-                    loc: value_pair.loc(),
-                    value: FieldValueType::Literal(Value::String(
-                        self.parse_string_literal(value_pair)?,
-                    )),
-                }
-            }
+            Rule::string_literal => FieldValue {
+                loc: value_pair.loc(),
+                value: FieldValueType::Literal(Value::String(
+                    self.parse_string_literal(value_pair)?,
+                )),
+            },
             Rule::integer => FieldValue {
                 loc: value_pair.loc(),
                 value: FieldValueType::Literal(Value::I32(
