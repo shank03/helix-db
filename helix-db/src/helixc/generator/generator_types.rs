@@ -487,7 +487,7 @@ impl Display for ReturnValue {
             ReturnType::NamedLiteral(name) => {
                 write!(
                     f,
-                    "    return_vals.insert(\"{}\".to_string(), ReturnValue::from(Value::from({})));\n",
+                    "    return_vals.insert({}.to_string(), ReturnValue::from(Value::from({})));\n",
                     name, self.value
                 )
             }
