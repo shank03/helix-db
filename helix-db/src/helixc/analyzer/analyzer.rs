@@ -2368,7 +2368,7 @@ impl<'a> Ctx<'a> {
                                         self.push_query_err(
                                             q,
                                             start.loc.clone(),
-                                            format!("index of range must be an integer, got {:?}", ty),
+                                            format!("index of range must be an integer, got {:?}", ty.get_type_name()),
                                             "start and end of range must be integers".to_string(),
                                         );
                                          return cur_ty.clone(); // Not sure if this should be here
@@ -2383,7 +2383,7 @@ impl<'a> Ctx<'a> {
                                         self.push_query_err(
                                             q,
                                             end.loc.clone(),
-                                            format!("index of range must be an integer, got {:?}", ty),
+                                            format!("index of range must be an integer, got {:?}", ty.get_type_name()),
                                             "start and end of range must be integers".to_string(),
                                         );
                                         return cur_ty.clone(); // Not sure if this should be here
@@ -2410,7 +2410,7 @@ impl<'a> Ctx<'a> {
                                         self.push_query_err(
                                             q,
                                             start.loc.clone(),
-                                            format!("index of range must be an integer, got {:?}", ty),
+                                            format!("index of range must be an integer, got {:?}", ty.get_type_name()),
                                             "start and end of range must be integers".to_string(),
                                         );
                                         return cur_ty.clone(); // Not sure if this should be here
@@ -2433,7 +2433,7 @@ impl<'a> Ctx<'a> {
                                         self.push_query_err(
                                             q,
                                             end.loc.clone(),
-                                            format!("index of range must be an integer, got {:?}", ty),
+                                            format!("index of range must be an integer, got {:?}", ty.get_type_name()),
                                             "start and end of range must be integers".to_string(),
                                         );
                                         return cur_ty.clone();
