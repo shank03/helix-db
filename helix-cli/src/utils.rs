@@ -520,11 +520,19 @@ fn analyze_source(source: Source) -> Result<GeneratedSource, String> {
     Ok(source)
 }
 
-pub fn generate(files: &Vec<DirEntry>) -> Result<(Content, GeneratedSource), String> {
+pub fn generate(files: &Vec<DirEntry>, path: &str) -> Result<(Content, GeneratedSource), String> {
     let mut content = generate_content(&files)?;
     content.source = parse_content(&content)?;
-    let analyzed_source = analyze_source(content.source.clone())?;
+    let mut analyzed_source = analyze_source(content.source.clone())?;
+    analyzed_source.config = read_config(&path)?;
     Ok((content, analyzed_source))
+}
+
+pub fn read_config(path: &str) -> Result<Config, String> {
+    let config_path = PathBuf::from(path).join("config.hx.json");
+    let schema_path = PathBuf::from(path).join("schema.hx");
+    let config = Config::from_files(config_path, schema_path).map_err(|e| e.to_string())?;
+    Ok(config)
 }
 
 pub fn gen_typescript(source: &GeneratedSource, output_path: &str) -> Result<(), String> {
@@ -614,7 +622,7 @@ pub fn compile_and_build_helix(path: String, output: &PathBuf, files: Vec<DirEnt
 
     let num_files = files.len();
 
-    let (code, analyzed_source) = match generate(&files) {
+    let (code, analyzed_source) = match generate(&files, &path) {
         Ok((code, analyzer_source)) => (code, analyzer_source),
         Err(e) => {
             sp.stop_with_message(format!("{}", "Error compiling queries".red().bold()));

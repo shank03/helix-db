@@ -1942,6 +1942,7 @@ dependencies = [
 name = "helix-macros"
 version = "0.1.4"
 dependencies = [
+ "dirs 5.0.1",
  "proc-macro2",
  "quote",
  "syn 2.0.104",
