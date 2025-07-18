@@ -1,4 +1,3 @@
-//! Semantic analyzer for Helix‑QL.
 use crate::helixc::{
     analyzer::{
         analyzer::Ctx,
@@ -10,12 +9,24 @@ use crate::helixc::{
 };
 use std::{borrow::Cow, collections::HashMap};
 
+/// Iterates through the fields to exclude and validates that the exist on the type and have not been excluded previously.
+/// 
+/// # Arguments
+///
+/// * `ctx` - The context of the query
+/// * `ex` - The exclude fields to validate
+/// * `field_set` - The set of fields to validate
+/// * `excluded` - The excluded fields
+/// * `original_query` - The original query
+/// * `type_name` - The name of the type
+/// * `type_kind` - The kind of the type
+/// * `span` - The span of the exclude fields
 pub(crate) fn validate_exclude_fields<'a>(
     ctx: &mut Ctx<'a>,
     ex: &Exclude,
     field_set: &HashMap<&str, Cow<'a, Field>>,
     excluded: &HashMap<&str, Loc>,
-    q: &'a Query,
+    original_query: &'a Query,
     type_name: &str,
     type_kind: &str,
     span: Option<Loc>,
@@ -24,7 +35,7 @@ pub(crate) fn validate_exclude_fields<'a>(
         if let Some(loc) = excluded.get(key.as_str()) {
             push_query_err_with_fix(
                 ctx,
-                q,
+                original_query,
                 loc.clone(),
                 format!("field `{}` was previously excluded in this traversal", key),
                 format!("remove the exclusion of `{}`", key),
@@ -33,7 +44,7 @@ pub(crate) fn validate_exclude_fields<'a>(
         } else if !field_set.contains_key(key.as_str()) {
             push_query_err(
                 ctx,
-                q,
+                original_query,
                 loc.clone(),
                 format!("`{}` is not a field of {} `{}`", key, type_kind, type_name),
                 "check the schema field names",
@@ -42,13 +53,23 @@ pub(crate) fn validate_exclude_fields<'a>(
     }
 }
 
+/// Validates the exclude fields for a given type
+/// 
+/// # Arguments
+///
+/// * `ctx` - The context of the query
+/// * `cur_ty` - The current type of the traversal
+/// * `tr` - The traversal to validate
+/// * `ex` - The exclude fields to validate
+/// * `excluded` - The excluded fields
+/// * `original_query` - The original query
 pub(crate) fn validate_exclude<'a>(
     ctx: &mut Ctx<'a>,
     cur_ty: &Type,
     tr: &Traversal,
     ex: &Exclude,
     excluded: &HashMap<&str, Loc>,
-    q: &'a Query,
+    original_query: &'a Query,
 ) {
     match &cur_ty {
         Type::Nodes(Some(node_ty)) | Type::Node(Some(node_ty)) => {
@@ -58,7 +79,7 @@ pub(crate) fn validate_exclude<'a>(
                     ex,
                     &field_set,
                     &excluded,
-                    q,
+                    original_query,
                     node_ty,
                     "node",
                     Some(tr.loc.clone()),
@@ -66,14 +87,13 @@ pub(crate) fn validate_exclude<'a>(
             }
         }
         Type::Edges(Some(edge_ty)) | Type::Edge(Some(edge_ty)) => {
-            // for (key, val) in &obj.fields {
             if let Some(field_set) = ctx.edge_fields.get(edge_ty.as_str()).cloned() {
                 validate_exclude_fields(
                     ctx,
                     ex,
                     &field_set,
                     &excluded,
-                    q,
+                    original_query,
                     edge_ty,
                     "edge",
                     Some(tr.loc.clone()),
@@ -81,14 +101,13 @@ pub(crate) fn validate_exclude<'a>(
             }
         }
         Type::Vectors(Some(vector_ty)) | Type::Vector(Some(vector_ty)) => {
-            // Vectors only have 'id' and 'embedding' fields
             if let Some(fields) = ctx.vector_fields.get(vector_ty.as_str()).cloned() {
                 validate_exclude_fields(
                     ctx,
                     ex,
                     &fields,
                     &excluded,
-                    q,
+                    original_query,
                     vector_ty,
                     "vector",
                     Some(tr.loc.clone()),
@@ -96,12 +115,13 @@ pub(crate) fn validate_exclude<'a>(
             }
         }
         Type::Anonymous(ty) => {
-            validate_exclude(ctx, ty, tr, ex, excluded, q);
+            // validates the exclude on the inner type of the anonymous type
+            validate_exclude(ctx, ty, tr, ex, excluded, original_query);
         }
         _ => {
             push_query_err(
                 ctx,
-                q,
+                original_query,
                 ex.fields[0].0.clone(),
                 "cannot access properties on this type".to_string(),
                 "exclude is only valid on nodes, edges and vectors",

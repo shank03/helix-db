@@ -5,7 +5,7 @@ extern crate syn;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
-    Block, Expr, FnArg, Ident, Item, ItemFn, ItemTrait, Pat, Stmt, Token, TraitItem, Type,
+    Expr, FnArg, Ident, ItemFn, ItemTrait, Pat, Stmt, Token, TraitItem,
     parse::{Parse, ParseStream},
     parse_macro_input,
 };

@@ -30,14 +30,19 @@ use crate::{
 };
 use std::collections::HashMap;
 
-// -----------------------------------------------------
-// Traversal‑specific checks
-// -----------------------------------------------------
-pub(crate) fn check_traversal<'a>(
+/// Validates the traversal and returns the end type of the traversal
+///
+/// This method also builds the generated traversal (`gen_traversal`) as it analyzes the traversal
+///
+/// - `gen_query`: is used to set the query to being a mutating query if necessary. 
+///                This is then used to determine the transaction type to use.
+/// 
+/// - `parent_ty`: is used with anonymous traversals to keep track of the parent type that the anonymous traversal is nested in.
+pub(crate) fn validate_traversal<'a>(
     ctx: &mut Ctx<'a>,
     tr: &'a Traversal,
     scope: &mut HashMap<&'a str, Type>,
-    q: &'a Query,
+    original_query: &'a Query,
     parent_ty: Option<Type>,
     gen_traversal: &mut GeneratedTraversal,
     gen_query: &mut GeneratedQuery,
@@ -48,7 +53,7 @@ pub(crate) fn check_traversal<'a>(
             if !ctx.node_set.contains(node_type.as_str()) {
                 push_query_err(
                     ctx,
-                    q,
+                    original_query,
                     tr.loc.clone(),
                     format!("unknown node type `{}`", node_type),
                     format!("declare N::{} in the schema first", node_type),
@@ -59,7 +64,7 @@ pub(crate) fn check_traversal<'a>(
                 // check id exists in scope
                 match ids[0].clone() {
                     IdType::ByIndex { index, value, loc } => {
-                        is_valid_identifier(ctx, q, loc.clone(), index.to_string().as_str());
+                        is_valid_identifier(ctx, original_query, loc.clone(), index.to_string().as_str());
                         let corresponding_field = ctx.node_fields.get(node_type.as_str()).cloned();
                         match corresponding_field {
                             Some(node_fields) => {
@@ -71,7 +76,7 @@ pub(crate) fn check_traversal<'a>(
                                         if !field.is_indexed() {
                                             push_query_err(
                                                 ctx,
-                                                q,
+                                                original_query,
                                                 loc.clone(),
                                                 format!(
                                                     "field `{}` has not been indexed for node type `{}`",
@@ -89,7 +94,7 @@ pub(crate) fn check_traversal<'a>(
                                                 if !field.field_type.eq(value) {
                                                     push_query_err(
                                                         ctx,
-                                                        q,
+                                                        original_query,
                                                         loc.clone(),
                                                         format!(
                                                             "value `{}` is of type `{}`, expected `{}`",
@@ -109,7 +114,7 @@ pub(crate) fn check_traversal<'a>(
                                     None => {
                                         push_query_err(
                                             ctx,
-                                            q,
+                                            original_query,
                                             loc.clone(),
                                             format!(
                                                 "field `{}` has not been defined and/or indexed for node type `{}`",
@@ -134,12 +139,12 @@ pub(crate) fn check_traversal<'a>(
                                 }),
                                 key: match *value {
                                     ValueType::Identifier { value, loc } => {
-                                        if is_valid_identifier(ctx, q, loc.clone(), value.as_str())
+                                        if is_valid_identifier(ctx, original_query, loc.clone(), value.as_str())
                                         {
                                             if !scope.contains_key(value.as_str()) {
                                                 push_query_err(
                                                     ctx,
-                                                    q,
+                                                    original_query,
                                                     loc,
                                                     format!(
                                                         "variable named `{}` is not in scope",
@@ -152,7 +157,7 @@ pub(crate) fn check_traversal<'a>(
                                                 );
                                             }
                                         }
-                                        gen_identifier_or_param(q, value.as_str(), true, false)
+                                        gen_identifier_or_param(original_query, value.as_str(), true, false)
                                     }
                                     ValueType::Literal { value, loc: _ } => {
                                         GeneratedValue::Primitive(GenRef::Std(match value {
@@ -181,11 +186,11 @@ pub(crate) fn check_traversal<'a>(
                         Type::Node(Some(node_type.to_string()))
                     }
                     IdType::Identifier { value: i, loc } => {
-                        if is_valid_identifier(ctx, q, loc.clone(), i.as_str()) {
+                        if is_valid_identifier(ctx, original_query, loc.clone(), i.as_str()) {
                             if !scope.contains_key(i.as_str()) {
                                 push_query_err(
                                     ctx,
-                                    q,
+                                    original_query,
                                     loc.clone(),
                                     format!("variable named `{}` is not in scope", i),
                                     format!("declare {} in the current scope or fix the typo", i),
@@ -224,7 +229,7 @@ pub(crate) fn check_traversal<'a>(
             if !ctx.edge_map.contains_key(edge_type.as_str()) {
                 push_query_err(
                     ctx,
-                    q,
+                    original_query,
                     tr.loc.clone(),
                     format!("unknown edge type `{}`", edge_type),
                     format!("declare E::{} in the schema first", edge_type),
@@ -235,11 +240,11 @@ pub(crate) fn check_traversal<'a>(
                 gen_traversal.source_step = Separator::Period(SourceStep::EFromID(EFromID {
                     id: match ids[0].clone() {
                         IdType::Identifier { value: i, loc } => {
-                            if is_valid_identifier(ctx, q, loc.clone(), i.as_str()) {
+                            if is_valid_identifier(ctx, original_query, loc.clone(), i.as_str()) {
                                 if !scope.contains_key(i.as_str()) {
                                     push_query_err(
                                         ctx,
-                                        q,
+                                        original_query,
                                         loc,
                                         format!("variable named `{}` is not in scope", i),
                                         format!(
@@ -268,12 +273,12 @@ pub(crate) fn check_traversal<'a>(
         }
 
         StartNode::Identifier(identifier) => {
-            match is_valid_identifier(ctx, q, tr.loc.clone(), identifier.as_str()) {
+            match is_valid_identifier(ctx, original_query, tr.loc.clone(), identifier.as_str()) {
                 true => scope.get(identifier.as_str()).cloned().map_or_else(
                     || {
                         push_query_err(
                             ctx,
-                            q,
+                            original_query,
                             tr.loc.clone(),
                             format!("variable named `{}` is not in scope", identifier),
                             format!(
@@ -317,7 +322,7 @@ pub(crate) fn check_traversal<'a>(
         let step = &graph_step.step;
         match step {
             StepType::Node(gs) | StepType::Edge(gs) => {
-                match apply_graph_step(ctx, &gs, &cur_ty, q, gen_traversal, scope) {
+                match apply_graph_step(ctx, &gs, &cur_ty, original_query, gen_traversal, scope) {
                     Some(new_ty) => {
                         cur_ty = new_ty;
                     }
@@ -345,7 +350,7 @@ pub(crate) fn check_traversal<'a>(
                 {
                     push_query_err(
                         ctx,
-                        q,
+                        original_query,
                         ex.loc.clone(),
                         "exclude is only valid as the last step in a traversal,
                             or as the step before an object remapping or closure"
@@ -355,7 +360,7 @@ pub(crate) fn check_traversal<'a>(
                             .to_string(),
                     );
                 }
-                validate_exclude(ctx, &cur_ty, tr, ex, &excluded, q);
+                validate_exclude(ctx, &cur_ty, tr, ex, &excluded, original_query);
                 for (_, key) in &ex.fields {
                     excluded.insert(key.as_str(), ex.loc.clone());
                 }
@@ -381,7 +386,7 @@ pub(crate) fn check_traversal<'a>(
                 // if i != number_of_steps {
                 //     println!("{} {}", i, number_of_steps);
                 //     push_query_err(ctx,
-                //         q,
+                //         original_query,
                 //         obj.loc.clone(),
                 //         "object is only valid as the last step in a traversal".to_string(),
                 //         "move the object to the end of the traversal",
@@ -393,7 +398,7 @@ pub(crate) fn check_traversal<'a>(
                     tr,
                     obj,
                     &excluded,
-                    q,
+                    original_query,
                     gen_traversal,
                     gen_query,
                     scope,
@@ -403,7 +408,7 @@ pub(crate) fn check_traversal<'a>(
 
             StepType::Where(expr) => {
                 let (_, stmt) =
-                    infer_expr_type(ctx, expr, scope, q, Some(cur_ty.clone()), gen_query);
+                    infer_expr_type(ctx, expr, scope, original_query, Some(cur_ty.clone()), gen_query);
                 // Where/boolean ops don't change the element type,
                 // so `cur_ty` stays the same.
                 assert!(stmt.is_some());
@@ -443,13 +448,13 @@ pub(crate) fn check_traversal<'a>(
                     | BooleanOpType::GreaterThan(expr)
                     | BooleanOpType::Equal(expr)
                     | BooleanOpType::NotEqual(expr) => {
-                        match infer_expr_type(ctx, expr, scope, q, Some(cur_ty.clone()), gen_query)
+                        match infer_expr_type(ctx, expr, scope, original_query, Some(cur_ty.clone()), gen_query)
                         {
                             (Type::Scalar(ft), _) => ft.clone(),
                             (field_type, _) => {
                                 push_query_err(
                                     ctx,
-                                    q,
+                                    original_query,
                                     b_op.loc.clone(),
                                     format!(
                                         "boolean operation `{}` cannot be applied to `{}`",
@@ -476,7 +481,7 @@ pub(crate) fn check_traversal<'a>(
                     _ => None,
                 };
                 if let Some(FieldValueType::Identifier(field_name)) = &field_name {
-                    is_valid_identifier(ctx, q, b_op.loc.clone(), field_name.as_str());
+                    is_valid_identifier(ctx, original_query, b_op.loc.clone(), field_name.as_str());
                     match &cur_ty {
                         Type::Nodes(Some(node_ty)) | Type::Node(Some(node_ty)) => {
                             let field_set = ctx.node_fields.get(node_ty.as_str()).cloned();
@@ -485,7 +490,7 @@ pub(crate) fn check_traversal<'a>(
                                     Some(field) => {
                                         if field.field_type != property_type {
                                             push_query_err(ctx,
-                                                    q,
+                                                    original_query,
                                                     b_op.loc.clone(),
                                                     format!("property `{field_name}` is of type `{}` (from node type `{node_ty}::{{{field_name}}}`), which does not match type of compared value `{}`", field.field_type, property_type),
                                                     "make sure comparison value is of the same type as the property".to_string(),
@@ -495,7 +500,7 @@ pub(crate) fn check_traversal<'a>(
                                     None => {
                                         push_query_err(
                                             ctx,
-                                            q,
+                                            original_query,
                                             b_op.loc.clone(),
                                             format!(
                                                 "`{}` is not a field of {} `{}`",
@@ -514,7 +519,7 @@ pub(crate) fn check_traversal<'a>(
                                     Some(field) => {
                                         if field.field_type != property_type {
                                             push_query_err(ctx,
-                                                    q,
+                                                    original_query,
                                                     b_op.loc.clone(),
                                                     format!("property `{field_name}` is of type `{}` (from edge type `{edge_ty}::{{{field_name}}}`), which does not match type of compared value `{}`", field.field_type, property_type),
                                                     "make sure comparison value is of the same type as the property".to_string(),
@@ -524,7 +529,7 @@ pub(crate) fn check_traversal<'a>(
                                     None => {
                                         push_query_err(
                                             ctx,
-                                            q,
+                                            original_query,
                                             b_op.loc.clone(),
                                             format!(
                                                 "`{}` is not a field of {} `{}`",
@@ -543,7 +548,7 @@ pub(crate) fn check_traversal<'a>(
                                     Some(field) => {
                                         if field.field_type != property_type {
                                             push_query_err(ctx,
-                                                    q,
+                                                    original_query,
                                                     b_op.loc.clone(),
                                                     format!("property `{field_name}` is of type `{}` (from vector type `{sv}::{{{field_name}}}`), which does not match type of compared value `{}`", field.field_type, property_type),
                                                     "make sure comparison value is of the same type as the property".to_string(),
@@ -553,7 +558,7 @@ pub(crate) fn check_traversal<'a>(
                                     None => {
                                         push_query_err(
                                             ctx,
-                                            q,
+                                            original_query,
                                             b_op.loc.clone(),
                                             format!(
                                                 "`{}` is not a field of {} `{}`",
@@ -568,7 +573,7 @@ pub(crate) fn check_traversal<'a>(
                         _ => {
                             push_query_err(
                                 ctx,
-                                q,
+                                original_query,
                                 b_op.loc.clone(),
                                 "boolean operation can only be applied to scalar values"
                                     .to_string(),
@@ -593,8 +598,8 @@ pub(crate) fn check_traversal<'a>(
                                 GeneratedValue::Primitive(GenRef::Std(f.to_string()))
                             }
                             ExpressionType::Identifier(i) => {
-                                is_valid_identifier(ctx, q, expr.loc.clone(), i.as_str());
-                                gen_identifier_or_param(q, i.as_str(), false, true)
+                                is_valid_identifier(ctx, original_query, expr.loc.clone(), i.as_str());
+                                gen_identifier_or_param(original_query, i.as_str(), false, true)
                             }
                             _ => unreachable!("Cannot reach here"),
                         };
@@ -609,8 +614,8 @@ pub(crate) fn check_traversal<'a>(
                                 GeneratedValue::Primitive(GenRef::Std(f.to_string()))
                             }
                             ExpressionType::Identifier(i) => {
-                                is_valid_identifier(ctx, q, expr.loc.clone(), i.as_str());
-                                gen_identifier_or_param(q, i.as_str(), false, true)
+                                is_valid_identifier(ctx, original_query, expr.loc.clone(), i.as_str());
+                                gen_identifier_or_param(original_query, i.as_str(), false, true)
                             }
                             _ => unreachable!("Cannot reach here"),
                         };
@@ -625,8 +630,8 @@ pub(crate) fn check_traversal<'a>(
                                 GeneratedValue::Primitive(GenRef::Std(f.to_string()))
                             }
                             ExpressionType::Identifier(i) => {
-                                is_valid_identifier(ctx, q, expr.loc.clone(), i.as_str());
-                                gen_identifier_or_param(q, i.as_str(), false, true)
+                                is_valid_identifier(ctx, original_query, expr.loc.clone(), i.as_str());
+                                gen_identifier_or_param(original_query, i.as_str(), false, true)
                             }
                             _ => unreachable!("Cannot reach here"),
                         };
@@ -641,8 +646,8 @@ pub(crate) fn check_traversal<'a>(
                                 GeneratedValue::Primitive(GenRef::Std(f.to_string()))
                             }
                             ExpressionType::Identifier(i) => {
-                                is_valid_identifier(ctx, q, expr.loc.clone(), i.as_str());
-                                gen_identifier_or_param(q, i.as_str(), false, true)
+                                is_valid_identifier(ctx, original_query, expr.loc.clone(), i.as_str());
+                                gen_identifier_or_param(original_query, i.as_str(), false, true)
                             }
                             _ => unreachable!("Cannot reach here"),
                         };
@@ -663,8 +668,8 @@ pub(crate) fn check_traversal<'a>(
                                 GeneratedValue::Primitive(GenRef::Literal(s.to_string()))
                             }
                             ExpressionType::Identifier(i) => {
-                                is_valid_identifier(ctx, q, expr.loc.clone(), i.as_str());
-                                gen_identifier_or_param(q, i.as_str(), false, true)
+                                is_valid_identifier(ctx, original_query, expr.loc.clone(), i.as_str());
+                                gen_identifier_or_param(original_query, i.as_str(), false, true)
                             }
                             _ => unreachable!("Cannot reach here"),
                         };
@@ -685,8 +690,8 @@ pub(crate) fn check_traversal<'a>(
                                 GeneratedValue::Primitive(GenRef::Literal(s.to_string()))
                             }
                             ExpressionType::Identifier(i) => {
-                                is_valid_identifier(ctx, q, expr.loc.clone(), i.as_str());
-                                gen_identifier_or_param(q, i.as_str(), false, true)
+                                is_valid_identifier(ctx, original_query, expr.loc.clone(), i.as_str());
+                                gen_identifier_or_param(original_query, i.as_str(), false, true)
                             }
                             _ => unreachable!("Cannot reach here"),
                         };
@@ -711,7 +716,7 @@ pub(crate) fn check_traversal<'a>(
                             let node_type = gs.get_item_type().unwrap();
                             field_exists_on_item_type(
                                 ctx,
-                                q,
+                                original_query,
                                 Type::Node(Some(node_type.clone())),
                                 update
                                     .fields
@@ -725,7 +730,7 @@ pub(crate) fn check_traversal<'a>(
                             let edge_type = gs.get_item_type().unwrap();
                             field_exists_on_item_type(
                                 ctx,
-                                q,
+                                original_query,
                                 Type::Edge(Some(edge_type)),
                                 update
                                     .fields
@@ -737,7 +742,7 @@ pub(crate) fn check_traversal<'a>(
                         _ => {
                             push_query_err(
                                 ctx,
-                                q,
+                                original_query,
                                 update.loc.clone(),
                                 "update is only valid on nodes or edges".to_string(),
                                 "update is only valid on nodes or edges".to_string(),
@@ -749,7 +754,7 @@ pub(crate) fn check_traversal<'a>(
                         StartNode::Node { node_type, .. } => {
                             field_exists_on_item_type(
                                 ctx,
-                                q,
+                                original_query,
                                 Type::Node(Some(node_type.clone())),
                                 update
                                     .fields
@@ -761,7 +766,7 @@ pub(crate) fn check_traversal<'a>(
                         StartNode::Edge { edge_type, .. } => {
                             field_exists_on_item_type(
                                 ctx,
-                                q,
+                                original_query,
                                 Type::Edge(Some(edge_type.clone())),
                                 update
                                     .fields
@@ -773,7 +778,7 @@ pub(crate) fn check_traversal<'a>(
                         _ => {
                             push_query_err(
                                 ctx,
-                                q,
+                                original_query,
                                 update.loc.clone(),
                                 "update is only valid on nodes or edges".to_string(),
                                 "update is only valid on nodes or edges".to_string(),
@@ -793,11 +798,11 @@ pub(crate) fn check_traversal<'a>(
                                     FieldValueType::Identifier(i) => {
                                         is_valid_identifier(
                                             ctx,
-                                            q,
+                                            original_query,
                                             field.value.loc.clone(),
                                             i.as_str(),
                                         );
-                                        gen_identifier_or_param(q, i.as_str(), true, true)
+                                        gen_identifier_or_param(original_query, i.as_str(), true, true)
                                     }
                                     FieldValueType::Literal(l) => match l {
                                         Value::String(s) => {
@@ -809,8 +814,8 @@ pub(crate) fn check_traversal<'a>(
                                     },
                                     FieldValueType::Expression(e) => match &e.expr {
                                         ExpressionType::Identifier(i) => {
-                                            is_valid_identifier(ctx, q, e.loc.clone(), i.as_str());
-                                            gen_identifier_or_param(q, i.as_str(), true, true)
+                                            is_valid_identifier(ctx, original_query, e.loc.clone(), i.as_str());
+                                            gen_identifier_or_param(original_query, i.as_str(), true, true)
                                         }
                                         ExpressionType::StringLiteral(i) => {
                                             GeneratedValue::Primitive(GenRef::Std(i.to_string()))
@@ -845,7 +850,7 @@ pub(crate) fn check_traversal<'a>(
                     if !ctx.edge_map.contains_key(ty.as_str()) {
                         push_query_err(
                             ctx,
-                            q,
+                            original_query,
                             add.loc.clone(),
                             format!("`AddE<{}>` refers to unknown edge type", ty),
                             "declare the edge schema first",
@@ -859,16 +864,16 @@ pub(crate) fn check_traversal<'a>(
             StepType::Range((start, end)) => {
                 let (start, end) = match (&start.expr, &end.expr) {
                     (ExpressionType::Identifier(i), ExpressionType::Identifier(j)) => {
-                        is_valid_identifier(ctx, q, start.loc.clone(), i.as_str());
-                        is_valid_identifier(ctx, q, end.loc.clone(), j.as_str());
+                        is_valid_identifier(ctx, original_query, start.loc.clone(), i.as_str());
+                        is_valid_identifier(ctx, original_query, end.loc.clone(), j.as_str());
 
-                        let ty = type_in_scope(ctx, q, start.loc.clone(), scope, i.as_str());
+                        let ty = type_in_scope(ctx, original_query, start.loc.clone(), scope, i.as_str());
                         match ty {
                             Some(ty) => {
                                 if !ty.is_integer() {
                                     push_query_err(
                                         ctx,
-                                        q,
+                                        original_query,
                                         start.loc.clone(),
                                         format!(
                                             "index of range must be an integer, got {:?}",
@@ -881,13 +886,13 @@ pub(crate) fn check_traversal<'a>(
                             }
                             None => {}
                         };
-                        let ty = type_in_scope(ctx, q, end.loc.clone(), scope, j.as_str());
+                        let ty = type_in_scope(ctx, original_query, end.loc.clone(), scope, j.as_str());
                         match ty {
                             Some(ty) => {
                                 if !ty.is_integer() {
                                     push_query_err(
                                         ctx,
-                                        q,
+                                        original_query,
                                         end.loc.clone(),
                                         format!(
                                             "index of range must be an integer, got {:?}",
@@ -901,8 +906,8 @@ pub(crate) fn check_traversal<'a>(
                             None => {}
                         }
                         (
-                            gen_identifier_or_param(q, i.as_str(), false, true),
-                            gen_identifier_or_param(q, j.as_str(), false, true),
+                            gen_identifier_or_param(original_query, i.as_str(), false, true),
+                            gen_identifier_or_param(original_query, j.as_str(), false, true),
                         )
                     }
                     (ExpressionType::IntegerLiteral(i), ExpressionType::IntegerLiteral(j)) => (
@@ -910,15 +915,15 @@ pub(crate) fn check_traversal<'a>(
                         GeneratedValue::Primitive(GenRef::Std(j.to_string())),
                     ),
                     (ExpressionType::Identifier(i), ExpressionType::IntegerLiteral(j)) => {
-                        is_valid_identifier(ctx, q, start.loc.clone(), i.as_str());
+                        is_valid_identifier(ctx, original_query, start.loc.clone(), i.as_str());
 
-                        let ty = type_in_scope(ctx, q, start.loc.clone(), scope, i.as_str());
+                        let ty = type_in_scope(ctx, original_query, start.loc.clone(), scope, i.as_str());
                         match ty {
                             Some(ty) => {
                                 if !ty.is_integer() {
                                     push_query_err(
                                         ctx,
-                                        q,
+                                        original_query,
                                         start.loc.clone(),
                                         format!(
                                             "index of range must be an integer, got {:?}",
@@ -933,19 +938,19 @@ pub(crate) fn check_traversal<'a>(
                         }
 
                         (
-                            gen_identifier_or_param(q, i.as_str(), false, true),
+                            gen_identifier_or_param(original_query, i.as_str(), false, true),
                             GeneratedValue::Primitive(GenRef::Std(j.to_string())),
                         )
                     }
                     (ExpressionType::IntegerLiteral(i), ExpressionType::Identifier(j)) => {
-                        is_valid_identifier(ctx, q, end.loc.clone(), j.as_str());
-                        let ty = type_in_scope(ctx, q, end.loc.clone(), scope, j.as_str());
+                        is_valid_identifier(ctx, original_query, end.loc.clone(), j.as_str());
+                        let ty = type_in_scope(ctx, original_query, end.loc.clone(), scope, j.as_str());
                         match ty {
                             Some(ty) => {
                                 if !ty.is_integer() {
                                     push_query_err(
                                         ctx,
-                                        q,
+                                        original_query,
                                         end.loc.clone(),
                                         format!(
                                             "index of range must be an integer, got {:?}",
@@ -960,13 +965,13 @@ pub(crate) fn check_traversal<'a>(
                         }
                         (
                             GeneratedValue::Primitive(GenRef::Std(i.to_string())),
-                            gen_identifier_or_param(q, j.as_str(), false, true),
+                            gen_identifier_or_param(original_query, j.as_str(), false, true),
                         )
                     }
                     (ExpressionType::Identifier(_) | ExpressionType::IntegerLiteral(_), other) => {
                         push_query_err(
                             ctx,
-                            q,
+                            original_query,
                             start.loc.clone(),
                             format!("{:?} does not resolve to an integer value", other),
                             "start and end of range must be integers".to_string(),
@@ -976,7 +981,7 @@ pub(crate) fn check_traversal<'a>(
                     _ => {
                         push_query_err(
                             ctx,
-                            q,
+                            original_query,
                             start.loc.clone(),
                             format!(
                                 "start and end of range must be integers, got {:?} and {:?}",
@@ -997,7 +1002,7 @@ pub(crate) fn check_traversal<'a>(
             StepType::OrderByAsc(expr) => {
                 // verify property access
                 let (_, stmt) =
-                    infer_expr_type(ctx, expr, scope, q, Some(cur_ty.clone()), gen_query);
+                    infer_expr_type(ctx, expr, scope, original_query, Some(cur_ty.clone()), gen_query);
 
                 assert!(stmt.is_some());
                 match stmt.unwrap() {
@@ -1023,7 +1028,7 @@ pub(crate) fn check_traversal<'a>(
             StepType::OrderByDesc(expr) => {
                 // verify property access
                 let (_, stmt) =
-                    infer_expr_type(ctx, expr, scope, q, Some(cur_ty.clone()), gen_query);
+                    infer_expr_type(ctx, expr, scope, original_query, Some(cur_ty.clone()), gen_query);
 
                 assert!(stmt.is_some());
                 match stmt.unwrap() {
@@ -1050,7 +1055,7 @@ pub(crate) fn check_traversal<'a>(
                 if i != number_of_steps {
                     push_query_err(
                         ctx,
-                        q,
+                        original_query,
                         cl.loc.clone(),
                         "closure is only valid as the last step in a traversal".to_string(),
                         "move the closure to the end of the traversal",
@@ -1065,7 +1070,7 @@ pub(crate) fn check_traversal<'a>(
                     tr,
                     obj,
                     &excluded,
-                    q,
+                    original_query,
                     gen_traversal,
                     gen_query,
                     scope,

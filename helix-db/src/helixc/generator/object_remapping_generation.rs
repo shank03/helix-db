@@ -135,6 +135,7 @@ impl Display for ExistsRemapping {
 
 #[derive(Clone)]
 pub struct Remapping {
+    /// Whether the remapping is within another remapping
     pub is_inner: bool,
     pub should_spread: bool,
     pub variable_name: String,

@@ -6,13 +6,13 @@ use crate::helixc::{
 };
 use std::collections::HashMap;
 
-pub(super) fn is_valid_identifier(ctx: &mut Ctx, q: &Query, loc: Loc, name: &str) -> bool {
+pub(super) fn is_valid_identifier(ctx: &mut Ctx, original_query: &Query, loc: Loc, name: &str) -> bool {
     match name {
         "true" | "false" | "NONE" | "String" | "Boolean" | "F32" | "F64" | "I8" | "I16" | "I32"
         | "I64" | "U8" | "U16" | "U32" | "U64" | "U128" | "Uuid" | "Date" => {
             push_query_err(
                 ctx,
-                q,
+                original_query,
                 loc.clone(),
                 format!("`{}` is not a valid identifier", name),
                 "use a valid identifier",
@@ -28,12 +28,12 @@ pub(super) fn is_param(q: &Query, name: &str) -> bool {
 }
 
 pub(super) fn gen_identifier_or_param(
-    q: &Query,
+    original_query: &Query,
     name: &str,
     should_ref: bool,
     _should_clone: bool,
 ) -> GeneratedValue {
-    if is_param(q, name) {
+    if is_param(original_query, name) {
         if should_ref {
             GeneratedValue::Parameter(GenRef::Ref(format!("data.{}", name)))
         } else {
@@ -48,8 +48,8 @@ pub(super) fn gen_identifier_or_param(
     }
 }
 
-pub(super) fn gen_id_access_or_param(q: &Query, name: &str) -> GeneratedValue {
-    if is_param(q, name) {
+pub(super) fn gen_id_access_or_param(original_query: &Query, name: &str) -> GeneratedValue {
+    if is_param(original_query, name) {
         GeneratedValue::Parameter(GenRef::DeRef(format!("data.{}", name)))
     } else {
         GeneratedValue::Identifier(GenRef::Std(format!("{}.id()", name.to_string())))
@@ -58,7 +58,7 @@ pub(super) fn gen_id_access_or_param(q: &Query, name: &str) -> GeneratedValue {
 
 pub(super) fn type_in_scope(
     ctx: &mut Ctx,
-    q: &Query,
+    original_query: &Query,
     loc: Loc,
     scope: &HashMap<&str, Type>,
     name: &str,
@@ -68,7 +68,7 @@ pub(super) fn type_in_scope(
         None => {
             push_query_err(
                 ctx,
-                q,
+                original_query,
                 loc.clone(),
                 format!("variable named `{}` is not in scope", name),
                 "declare {} in the current scope or fix the typo".to_string(),
@@ -80,7 +80,7 @@ pub(super) fn type_in_scope(
 
 pub(super) fn field_exists_on_item_type(
     ctx: &mut Ctx,
-    q: &Query,
+    original_query: &Query,
     item_type: Type,
     fields: Vec<(&str, &Loc)>,
 ) {
@@ -95,7 +95,7 @@ pub(super) fn field_exists_on_item_type(
                 {
                     push_query_err(
                         ctx,
-                        q,
+                        original_query,
                         loc.clone(),
                         format!("`{}` is not a field of node `{}`", key, node_type),
                         "check the schema field names",
@@ -113,7 +113,7 @@ pub(super) fn field_exists_on_item_type(
                 {
                     push_query_err(
                         ctx,
-                        q,
+                        original_query,
                         loc.clone(),
                         format!("`{}` is not a field of node `{}`", key, edge_type),
                         "check the schema field names",

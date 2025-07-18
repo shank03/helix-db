@@ -24,11 +24,24 @@ use std::collections::HashMap;
 
 /// Check that a graph‑navigation step is allowed for the current element
 /// kind and return the post‑step kind.
+/// 
+/// # Arguments
+///
+/// * `ctx` - The context of the query
+/// * `gs` - The graph step to apply
+/// * `cur_ty` - The current type of the traversal
+/// * `original_query` - The original query
+/// * `traversal` - The generated traversal
+/// * `scope` - The scope of the query
+///
+/// # Returns
+///
+/// * `Option<Type>` - The resulting type of applying the graph step
 pub(crate) fn apply_graph_step<'a>(
     ctx: &mut Ctx<'a>,
     gs: &'a GraphStep,
     cur_ty: &Type,
-    q: &'a Query,
+    original_query: &'a Query,
     traversal: &mut GeneratedTraversal,
     scope: &mut HashMap<&'a str, Type>,
 ) -> Option<Type> {
@@ -52,7 +65,7 @@ pub(crate) fn apply_graph_step<'a>(
             if edge.is_none() {
                 push_query_err(
                     ctx,
-                    q,
+                    original_query,
                     gs.loc.clone(),
                     format!("Edge of type `{}` does not exist", label),
                     "check the schema for valid edge types",
@@ -64,7 +77,7 @@ pub(crate) fn apply_graph_step<'a>(
                 false => {
                     push_query_err(
                         ctx,
-                        q,
+                        original_query,
                         gs.loc.clone(),
                         format!(
                             "Edge of type `{}` exists but it is not a valid outgoing edge type for node of type `{}`",
@@ -93,7 +106,7 @@ pub(crate) fn apply_graph_step<'a>(
             if edge.is_none() {
                 push_query_err(
                     ctx,
-                    q,
+                    original_query,
                     gs.loc.clone(),
                     format!("Edge of type `{}` does not exist", label),
                     "check the schema for valid edge types",
@@ -106,7 +119,7 @@ pub(crate) fn apply_graph_step<'a>(
                 false => {
                     push_query_err(
                         ctx,
-                        q,
+                        original_query,
                         gs.loc.clone(),
                         format!("Edge of type `{}` does not exist", label),
                         "check the schema for valid edge types",
@@ -137,7 +150,7 @@ pub(crate) fn apply_graph_step<'a>(
                 None => {
                     push_query_err(
                         ctx,
-                        q,
+                        original_query,
                         gs.loc.clone(),
                         format!("Edge of type `{}` does not exist", label),
                         "check the schema for valid edge types",
@@ -157,7 +170,7 @@ pub(crate) fn apply_graph_step<'a>(
             if edge.is_none() {
                 push_query_err(
                     ctx,
-                    q,
+                    original_query,
                     gs.loc.clone(),
                     format!("Edge of type `{}` does not exist", label),
                     "check the schema for valid edge types",
@@ -177,7 +190,7 @@ pub(crate) fn apply_graph_step<'a>(
                 false => {
                     push_query_err(
                         ctx,
-                        q,
+                        original_query,
                         gs.loc.clone(),
                         format!(
                             "Edge of type `{}` exists but it is not a valid outgoing edge type for node of type `{}`",
@@ -206,7 +219,7 @@ pub(crate) fn apply_graph_step<'a>(
                     } else {
                         push_query_err(
                             ctx,
-                            q,
+                            original_query,
                             gs.loc.clone(),
                             format!("Edge of type `{}` does not exist", label),
                             "check the schema for valid edge types",
@@ -231,7 +244,7 @@ pub(crate) fn apply_graph_step<'a>(
             if edge.is_none() {
                 push_query_err(
                     ctx,
-                    q,
+                    original_query,
                     gs.loc.clone(),
                     format!("Edge of type `{}` does not exist", label),
                     "check the schema for valid edge types",
@@ -252,7 +265,7 @@ pub(crate) fn apply_graph_step<'a>(
                 false => {
                     push_query_err(
                         ctx,
-                        q,
+                        original_query,
                         gs.loc.clone(),
                         format!(
                             "Edge of type `{}` exists but it is not a valid incoming edge type for node of type `{}`",
@@ -272,7 +285,7 @@ pub(crate) fn apply_graph_step<'a>(
                 if !ctx.node_set.contains(node_type.as_str()) {
                     push_query_err(
                         ctx,
-                        q,
+                        original_query,
                         gs.loc.clone(),
                         format!(
                             "edge type `{}` does not have a node type as its `From` source",
@@ -301,7 +314,7 @@ pub(crate) fn apply_graph_step<'a>(
                 if !ctx.node_set.contains(node_type.as_str()) {
                     push_query_err(
                         ctx,
-                        q,
+                        original_query,
                         gs.loc.clone(),
                         format!(
                             "edge type `{}` does not have a node type as its `To` target",
@@ -329,7 +342,7 @@ pub(crate) fn apply_graph_step<'a>(
                 if !ctx.vector_set.contains(source_type.as_str()) {
                     push_query_err(
                         ctx,
-                        q,
+                        original_query,
                         gs.loc.clone(),
                         format!(
                             "edge type `{}` does not have a vector type as its `From` source",
@@ -359,7 +372,7 @@ pub(crate) fn apply_graph_step<'a>(
                 if !ctx.vector_set.contains(target_type.as_str()) {
                     push_query_err(
                         ctx,
-                        q,
+                        original_query,
                         gs.loc.clone(),
                         format!(
                             "edge type `{}` does not have a vector type as its `To` target",
@@ -416,7 +429,7 @@ pub(crate) fn apply_graph_step<'a>(
             if !(matches!(cur_ty, Type::Vector(_)) || matches!(cur_ty, Type::Vectors(_))) {
                 push_query_err(
                     ctx,
-                    q,
+                    original_query,
                     sv.loc.clone(),
                     format!(
                         "`SearchVector` must be used on a vector type, got `{}`, which is of type `{}`",
@@ -430,7 +443,7 @@ pub(crate) fn apply_graph_step<'a>(
                 if !ctx.vector_set.contains(ty.as_str()) {
                     push_query_err(
                         ctx,
-                        q,
+                        original_query,
                         sv.loc.clone(),
                         format!("vector type `{}` has not been declared", ty),
                         format!("add a `V::{}` schema first", ty),
@@ -448,9 +461,9 @@ pub(crate) fn apply_graph_step<'a>(
                     ))))
                 }
                 Some(VectorData::Identifier(i)) => {
-                    is_valid_identifier(ctx, q, sv.loc.clone(), i.as_str());
+                    is_valid_identifier(ctx, original_query, sv.loc.clone(), i.as_str());
                     // if is in params then use data.
-                    if let Some(_) = q.parameters.iter().find(|p| p.name.1 == *i) {
+                    if let Some(_) = original_query.parameters.iter().find(|p| p.name.1 == *i) {
                         VecData::Standard(GeneratedValue::Identifier(GenRef::Ref(format!(
                             "data.{}",
                             i.to_string()
@@ -460,7 +473,7 @@ pub(crate) fn apply_graph_step<'a>(
                     } else {
                         push_query_err(
                             ctx,
-                            q,
+                            original_query,
                             sv.loc.clone(),
                             format!("variable named `{}` is not in scope", i),
                             "declare {} in the current scope or fix the typo",
@@ -470,7 +483,7 @@ pub(crate) fn apply_graph_step<'a>(
                 }
                 Some(VectorData::Embed(e)) => match &e.value {
                     EvaluatesToString::Identifier(i) => {
-                        VecData::Embed(gen_identifier_or_param(q, &i, true, false))
+                        VecData::Embed(gen_identifier_or_param(original_query, &i, true, false))
                     }
                     EvaluatesToString::StringLiteral(s) => {
                         VecData::Embed(GeneratedValue::Literal(GenRef::Ref(s.clone())))
@@ -479,7 +492,7 @@ pub(crate) fn apply_graph_step<'a>(
                 _ => {
                     push_query_err(
                         ctx,
-                        q,
+                        original_query,
                         sv.loc.clone(),
                         "`SearchVector` must have a vector data".to_string(),
                         "add a vector data",
@@ -517,9 +530,9 @@ pub(crate) fn apply_graph_step<'a>(
                         GeneratedValue::Primitive(GenRef::Std(i.to_string()))
                     }
                     EvaluatesToNumberType::Identifier(i) => {
-                        is_valid_identifier(ctx, q, sv.loc.clone(), i.as_str());
+                        is_valid_identifier(ctx, original_query, sv.loc.clone(), i.as_str());
                         // is param
-                        if let Some(_) = q.parameters.iter().find(|p| p.name.1 == *i) {
+                        if let Some(_) = original_query.parameters.iter().find(|p| p.name.1 == *i) {
                             GeneratedValue::Identifier(GenRef::Std(format!("data.{} as usize", i)))
                         } else {
                             GeneratedValue::Identifier(GenRef::Std(i.to_string()))
@@ -528,7 +541,7 @@ pub(crate) fn apply_graph_step<'a>(
                     _ => {
                         push_query_err(
                             ctx,
-                            q,
+                            original_query,
                             sv.loc.clone(),
                             "`SearchVector` must have a limit of vectors to return".to_string(),
                             "add a limit",
@@ -539,7 +552,7 @@ pub(crate) fn apply_graph_step<'a>(
                 None => {
                     push_query_err(
                         ctx,
-                        q,
+                        original_query,
                         sv.loc.clone(),
                         "`SearchV` must have a limit of vectors to return".to_string(),
                         "add a limit",
@@ -571,7 +584,7 @@ pub(crate) fn apply_graph_step<'a>(
         _ => {
             push_query_err(
                 ctx,
-                q,
+                original_query,
                 gs.loc.clone(),
                 format!(
                     "traversal step `{}` cannot follow a step that returns {}",

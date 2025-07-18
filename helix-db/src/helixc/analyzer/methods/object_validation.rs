@@ -3,7 +3,7 @@ use crate::helixc::{
     analyzer::{
         analyzer::Ctx,
         errors::push_query_err,
-        methods::{infer_expr_type::infer_expr_type, traversal_validation::check_traversal},
+        methods::{infer_expr_type::infer_expr_type, traversal_validation::validate_traversal},
         types::Type,
         utils::is_valid_identifier,
     },
@@ -23,13 +23,27 @@ use crate::helixc::{
 };
 use std::{borrow::Cow, collections::HashMap};
 
+/// Validates the object step (e.g. `::{ name }`)
+///
+/// # Arguments
+///
+/// * `ctx` - The context of the query
+/// * `cur_ty` - The current type of the traversal
+/// * `tr` - The traversal to validate
+/// * `obj` - The object to validate
+/// * `excluded` - The excluded fields
+/// * `original_query` - The original query
+/// * `gen_traversal` - The generated traversal
+/// * `gen_query` - The generated query
+/// * `scope` - The scope of the query
+/// * `var_name` - The name of the variable that the property access is on if any 
 pub(crate) fn validate_object<'a>(
     ctx: &mut Ctx<'a>,
     cur_ty: &Type,
     tr: &Traversal,
     obj: &'a Object,
     excluded: &HashMap<&str, Loc>,
-    q: &'a Query,
+    original_query: &'a Query,
     gen_traversal: &mut GeneratedTraversal,
     gen_query: &mut GeneratedQuery,
     scope: &mut HashMap<&'a str, Type>,
@@ -40,7 +54,7 @@ pub(crate) fn validate_object<'a>(
             validate_property_access(
                 ctx,
                 obj,
-                q,
+                original_query,
                 gen_query,
                 scope,
                 var_name,
@@ -53,7 +67,7 @@ pub(crate) fn validate_object<'a>(
             validate_property_access(
                 ctx,
                 obj,
-                q,
+                original_query,
                 gen_query,
                 scope,
                 var_name,
@@ -66,7 +80,7 @@ pub(crate) fn validate_object<'a>(
             validate_property_access(
                 ctx,
                 obj,
-                q,
+                original_query,
                 gen_query,
                 scope,
                 var_name,
@@ -82,7 +96,7 @@ pub(crate) fn validate_object<'a>(
                 tr,
                 obj,
                 excluded,
-                q,
+                original_query,
                 gen_traversal,
                 gen_query,
                 scope,
@@ -92,7 +106,7 @@ pub(crate) fn validate_object<'a>(
         _ => {
             push_query_err(
                 ctx,
-                q,
+                original_query,
                 obj.fields[0].value.loc.clone(),
                 "cannot access properties on this type".to_string(),
                 "property access is only valid on nodes, edges and vectors",
@@ -101,10 +115,26 @@ pub(crate) fn validate_object<'a>(
     }
 }
 
+/// Parses the object remapping
+/// 
+/// # Arguments
+///
+/// * `ctx` - The context of the query
+/// * `obj` - The object to parse
+/// * `original_query` - The original query
+/// * `gen_query` - The generated query
+/// * `is_inner` - Whether the remapping is within another remapping
+/// * `scope` - The scope of the query
+/// * `var_name` - The name of the variable that the property access is on if any 
+/// * `parent_ty` - The type of the parent of the object remapping
+/// 
+/// # Returns
+///
+/// * `Remapping` - A struct representing the object remapping
 pub(crate) fn parse_object_remapping<'a>(
     ctx: &mut Ctx<'a>,
     obj: &'a Vec<FieldAddition>,
-    q: &'a Query,
+    original_query: &'a Query,
     gen_query: &mut GeneratedQuery,
     is_inner: bool,
     scope: &mut HashMap<&'a str, Type>,
@@ -118,11 +148,11 @@ pub(crate) fn parse_object_remapping<'a>(
             // if the field value is a traversal then it is a TraversalRemapping
             FieldValueType::Traversal(traversal) => {
                 let mut inner_traversal = GeneratedTraversal::default();
-                check_traversal(
+                validate_traversal(
                     ctx,
                     &traversal,
                     scope,
-                    q,
+                    original_query,
                     Some(parent_ty.clone()),
                     &mut inner_traversal,
                     gen_query,
@@ -168,11 +198,11 @@ pub(crate) fn parse_object_remapping<'a>(
             FieldValueType::Expression(expr) => match &expr.expr {
                 ExpressionType::Traversal(traversal) => {
                     let mut inner_traversal = GeneratedTraversal::default();
-                    check_traversal(
+                    validate_traversal(
                         ctx,
                         &traversal,
                         scope,
-                        q,
+                        original_query,
                         Some(parent_ty.clone()),
                         &mut inner_traversal,
                         gen_query,
@@ -199,8 +229,14 @@ pub(crate) fn parse_object_remapping<'a>(
                     })
                 }
                 ExpressionType::Exists(expr) => {
-                    let (_, stmt) =
-                        infer_expr_type(ctx, expr, scope, q, Some(parent_ty.clone()), gen_query);
+                    let (_, stmt) = infer_expr_type(
+                        ctx,
+                        expr,
+                        scope,
+                        original_query,
+                        Some(parent_ty.clone()),
+                        gen_query,
+                    );
                     assert!(stmt.is_some());
                     assert!(matches!(stmt, Some(Statement::Traversal(_))));
                     let expr = match stmt.unwrap() {
@@ -245,7 +281,12 @@ pub(crate) fn parse_object_remapping<'a>(
                     })
                 }
                 ExpressionType::Identifier(identifier) => {
-                    is_valid_identifier(ctx, q, value.loc.clone(), identifier.as_str());
+                    is_valid_identifier(
+                        ctx,
+                        original_query,
+                        value.loc.clone(),
+                        identifier.as_str(),
+                    );
                     if scope.contains_key(identifier.as_str()) {
                         RemappingType::IdentifierRemapping(IdentifierRemapping {
                             variable_name: var_name.to_string(),
@@ -295,7 +336,7 @@ pub(crate) fn parse_object_remapping<'a>(
                             false => {
                                 push_query_err(
                                     ctx,
-                                    q,
+                                    original_query,
                                     expr.loc.clone(),
                                     format!(
                                         "`{}` is not a field of type `{}` or is not a variable in scope",
@@ -312,7 +353,7 @@ pub(crate) fn parse_object_remapping<'a>(
                 _ => {
                     push_query_err(
                         ctx,
-                        q,
+                        original_query,
                         expr.loc.clone(),
                         "invalid expression".to_string(),
                         "invalid expression".to_string(),
@@ -329,7 +370,7 @@ pub(crate) fn parse_object_remapping<'a>(
                 })
             }
             FieldValueType::Identifier(identifier) => {
-                is_valid_identifier(ctx, q, value.loc.clone(), identifier.as_str());
+                is_valid_identifier(ctx, original_query, value.loc.clone(), identifier.as_str());
                 if scope.contains_key(identifier.as_str()) {
                     RemappingType::IdentifierRemapping(IdentifierRemapping {
                         variable_name: var_name.to_string(),
@@ -379,7 +420,7 @@ pub(crate) fn parse_object_remapping<'a>(
                         false => {
                             push_query_err(
                                 ctx,
-                                q,
+                                original_query,
                                 value.loc.clone(),
                                 format!(
                                     "`{}` is not a field of type `{}` or is not a variable in scope",
@@ -397,7 +438,7 @@ pub(crate) fn parse_object_remapping<'a>(
                 let remapping = parse_object_remapping(
                     ctx,
                     &fields,
-                    q,
+                    original_query,
                     gen_query,
                     true,
                     scope,
@@ -413,7 +454,7 @@ pub(crate) fn parse_object_remapping<'a>(
             FieldValueType::Empty => {
                 push_query_err(
                     ctx,
-                    q,
+                    original_query,
                     obj[0].loc.clone(),
                     "field value is empty".to_string(),
                     "field value must be a literal, identifier, traversal,or object".to_string(),
@@ -433,10 +474,23 @@ pub(crate) fn parse_object_remapping<'a>(
     }
 }
 
+/// Validates the property access
+/// 
+/// # Arguments
+///
+/// * `ctx` - The context of the query
+/// * `obj` - The object to validate
+/// * `original_query` - The original query
+/// * `gen_query` - The generated query
+/// * `scope` - The scope of the query
+/// * `var_name` - The name of the variable that the property access is on if any 
+/// * `gen_traversal` - The generated traversal
+/// * `cur_ty` - The current type of the traversal
+/// * `fields` - The fields of the object
 fn validate_property_access<'a>(
     ctx: &mut Ctx<'a>,
     obj: &'a Object,
-    q: &'a Query,
+    original_query: &'a Query,
     gen_query: &mut GeneratedQuery,
     scope: &mut HashMap<&'a str, Type>,
     var_name: Option<&str>,
@@ -453,7 +507,12 @@ fn validate_property_access<'a>(
             {
                 match &obj.fields[0].value.value {
                     FieldValueType::Identifier(lit) => {
-                        is_valid_identifier(ctx, q, obj.fields[0].value.loc.clone(), lit.as_str());
+                        is_valid_identifier(
+                            ctx,
+                            original_query,
+                            obj.fields[0].value.loc.clone(),
+                            lit.as_str(),
+                        );
                         gen_traversal
                             .steps
                             .push(Separator::Period(GeneratedStep::PropertyFetch(
@@ -480,7 +539,7 @@ fn validate_property_access<'a>(
                     Some(var_name) => parse_object_remapping(
                         ctx,
                         &obj.fields,
-                        q,
+                        original_query,
                         gen_query,
                         false,
                         scope,
@@ -490,7 +549,7 @@ fn validate_property_access<'a>(
                     None => parse_object_remapping(
                         ctx,
                         &obj.fields,
-                        q,
+                        original_query,
                         gen_query,
                         false,
                         scope,
@@ -506,7 +565,7 @@ fn validate_property_access<'a>(
                 // error
                 push_query_err(
                     ctx,
-                    q,
+                    original_query,
                     obj.fields[0].value.loc.clone(),
                     "object must have at least one field".to_string(),
                     "object must have at least one field".to_string(),

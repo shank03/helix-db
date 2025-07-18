@@ -3,7 +3,7 @@ use crate::helixc::{
     analyzer::{
         diagnostic::Diagnostic,
         methods::{
-            query_validation::check_query,
+            query_validation::validate_query,
             schema_methods::{build_field_lookups, check_schema},
         },
     },
@@ -71,7 +71,7 @@ impl<'a> Ctx<'a> {
     // ---------- Pass #2: queries -------------------------
     pub(super) fn check_queries(&mut self) {
         for q in &self.src.queries {
-            check_query(self, q);
+            validate_query(self, q);
         }
     }
 }

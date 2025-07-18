@@ -21,20 +21,20 @@ use crate::helixc::{
 };
 use std::collections::HashMap;
 
-pub(crate) fn check_query<'a>(ctx: &mut Ctx<'a>, q: &'a Query) {
+pub(crate) fn validate_query<'a>(ctx: &mut Ctx<'a>, original_query: &'a Query) {
     let mut query = GeneratedQuery::default();
-    query.name = q.name.clone();
+    query.name = original_query.name.clone();
     // -------------------------------------------------
     // Parameter validation
     // -------------------------------------------------
-    for param in &q.parameters {
+    for param in &original_query.parameters {
         if let FieldType::Identifier(ref id) = param.param_type.1 {
-            if is_valid_identifier(ctx, q, param.param_type.0.clone(), id.as_str()) {
+            if is_valid_identifier(ctx, original_query, param.param_type.0.clone(), id.as_str()) {
                 // TODO: add support for edges
                 if !ctx.node_set.contains(id.as_str()) {
                     push_query_err(
                         ctx,
-                        q,
+                        original_query,
                         param.param_type.0.clone(),
                         format!("unknown type `{}` for parameter `{}`", id, param.name.1),
                         "declare or use a matching schema object or use a primitive type",
@@ -54,14 +54,14 @@ pub(crate) fn check_query<'a>(ctx: &mut Ctx<'a>, q: &'a Query) {
     // Statement‑by‑statement walk
     // -------------------------------------------------
     let mut scope: HashMap<&str, Type> = HashMap::new();
-    for param in &q.parameters {
+    for param in &original_query.parameters {
         scope.insert(
             param.name.1.as_str(),
             Type::from(param.param_type.1.clone()),
         );
     }
-    for stmt in &q.statements {
-        let statement = validate_statements(ctx, &mut scope, q, &mut query, stmt);
+    for stmt in &original_query.statements {
+        let statement = validate_statements(ctx, &mut scope, original_query, &mut query, stmt);
         if statement.is_some() {
             query.statements.push(statement.unwrap());
         } else {
@@ -73,26 +73,26 @@ pub(crate) fn check_query<'a>(ctx: &mut Ctx<'a>, q: &'a Query) {
     // -------------------------------------------------
     // Validate RETURN expressions
     // -------------------------------------------------
-    if q.return_values.is_empty() {
-        let end = q.loc.end.clone();
+    if original_query.return_values.is_empty() {
+        let end = original_query.loc.end.clone();
         push_query_warn(
             ctx,
-            q,
-            Loc::new(q.loc.filepath.clone(), end.clone(), end, q.loc.span.clone()),
+            original_query,
+            Loc::new(original_query.loc.filepath.clone(), end.clone(), end, original_query.loc.span.clone()),
             "query has no RETURN clause".to_string(),
             "add `RETURN <expr>` at the end",
             None,
         );
     }
-    for ret in &q.return_values {
-        let (_, stmt) = infer_expr_type(ctx, ret, &mut scope, q, None, &mut query);
+    for ret in &original_query.return_values {
+        let (_, stmt) = infer_expr_type(ctx, ret, &mut scope, original_query, None, &mut query);
 
         assert!(stmt.is_some(), "RETURN value should be a valid expression");
         match stmt.unwrap() {
             GeneratedStatement::Traversal(traversal) => {
                 match &traversal.source_step.inner() {
                     SourceStep::Identifier(v) => {
-                        is_valid_identifier(ctx, q, ret.loc.clone(), v.inner().as_str());
+                        is_valid_identifier(ctx, original_query, ret.loc.clone(), v.inner().as_str());
 
                         // if is single object, need to handle it as a single object
                         // if is array, need to handle it as an array
@@ -122,13 +122,13 @@ pub(crate) fn check_query<'a>(ctx: &mut Ctx<'a>, q: &'a Query) {
                 }
             }
             GeneratedStatement::Identifier(id) => {
-                is_valid_identifier(ctx, q, ret.loc.clone(), id.inner().as_str());
+                is_valid_identifier(ctx, original_query, ret.loc.clone(), id.inner().as_str());
                 let identifier_end_type = match scope.get(id.inner().as_str()) {
                     Some(t) => t.clone(),
                     None => {
                         push_query_err(
                             ctx,
-                            q,
+                            original_query,
                             ret.loc.clone(),
                             format!("variable named `{}` is not in scope", id),
                             "declare it earlier or fix the typo",
@@ -136,7 +136,7 @@ pub(crate) fn check_query<'a>(ctx: &mut Ctx<'a>, q: &'a Query) {
                         Type::Unknown
                     }
                 };
-                let value = gen_identifier_or_param(q, id.inner().as_str(), false, true);
+                let value = gen_identifier_or_param(original_query, id.inner().as_str(), false, true);
                 match identifier_end_type {
                     Type::Scalar(_) => {
                         query.return_values.push(ReturnValue::new_named_literal(
@@ -171,11 +171,11 @@ pub(crate) fn check_query<'a>(ctx: &mut Ctx<'a>, q: &'a Query) {
             _ => unreachable!(),
         }
     }
-    if q.is_mcp {
+    if original_query.is_mcp {
         if query.return_values.len() != 1 {
             push_query_err(ctx,
-                q,
-                q.loc.clone(),
+                original_query,
+                original_query.loc.clone(),
                 "MCP queries can only return a single value as LLM needs to be able to traverse from the result".to_string(),
                 "add a single return value that is a node, edge, or vector",
             );

@@ -17,10 +17,23 @@ use crate::helixc::{
 };
 use std::collections::HashMap;
 
+/// Validates the statements in the query used at the highest level to generate each statement in the query
+/// 
+/// # Arguments
+///
+/// * `ctx` - The context of the query
+/// * `scope` - The scope of the query
+/// * `original_query` - The original query
+/// * `query` - The generated query
+/// * `statement` - The statement to validate
+///
+/// # Returns
+///
+/// * `Option<GeneratedStatement>` - The validated statement to generate rust code for 
 pub(crate) fn validate_statements<'a>(
     ctx: &mut Ctx<'a>,
     scope: &mut HashMap<&'a str, Type>,
-    q: &'a Query,
+    original_query: &'a Query,
     query: &mut GeneratedQuery,
     statement: &'a Statement,
 ) -> Option<GeneratedStatement> {
@@ -30,14 +43,14 @@ pub(crate) fn validate_statements<'a>(
             if scope.contains_key(assign.variable.as_str()) {
                 push_query_err(
                     ctx,
-                    q,
+                    original_query,
                     assign.loc.clone(),
                     format!("variable `{}` is already declared", assign.variable),
                     "rename the new variable or remove the previous definition",
                 );
             }
 
-            let (rhs_ty, stmt) = infer_expr_type(ctx, &assign.value, scope, q, None, query);
+            let (rhs_ty, stmt) = infer_expr_type(ctx, &assign.value, scope, original_query, None, query);
             scope.insert(assign.variable.as_str(), rhs_ty);
             assert!(stmt.is_some(), "Assignment statement should be generated");
 
@@ -49,7 +62,7 @@ pub(crate) fn validate_statements<'a>(
         }
 
         Drop(expr) => {
-            let (_, stmt) = infer_expr_type(ctx, expr, scope, q, None, query);
+            let (_, stmt) = infer_expr_type(ctx, expr, scope, original_query, None, query);
             assert!(stmt.is_some());
             query.is_mut = true;
             if let Some(GeneratedStatement::Traversal(tr)) = stmt {
@@ -60,7 +73,7 @@ pub(crate) fn validate_statements<'a>(
         }
 
         Expression(expr) => {
-            let (_, stmt) = infer_expr_type(ctx, expr, scope, q, None, query);
+            let (_, stmt) = infer_expr_type(ctx, expr, scope, original_query, None, query);
             stmt
         }
 
@@ -69,7 +82,7 @@ pub(crate) fn validate_statements<'a>(
             if !scope.contains_key(fl.in_variable.1.as_str()) {
                 push_query_err(
                     ctx,
-                    q,
+                    original_query,
                     fl.loc.clone(),
                     format!("`{}` is not defined in the current scope", fl.in_variable.1),
                     "add a statement assigning it before the loop",
@@ -79,13 +92,13 @@ pub(crate) fn validate_statements<'a>(
             let mut body_scope = HashMap::new();
             let mut for_loop_in_variable: ForLoopInVariable = ForLoopInVariable::Empty;
             // find param from fl.in_variable
-            let param = q.parameters.iter().find(|p| p.name.1 == fl.in_variable.1);
+            let param = original_query.parameters.iter().find(|p| p.name.1 == fl.in_variable.1);
 
             let mut for_variable: ForVariable = ForVariable::Empty;
 
             match &fl.variable {
                 ForLoopVars::Identifier { name, loc: _ } => {
-                    is_valid_identifier(ctx, q, fl.loc.clone(), name.as_str());
+                    is_valid_identifier(ctx, original_query, fl.loc.clone(), name.as_str());
                     body_scope.insert(name.as_str(), Type::Unknown);
                     scope.insert(name.as_str(), Type::Unknown);
                     for_variable = ForVariable::Identifier(GenRef::Std(name.clone()));
@@ -113,7 +126,7 @@ pub(crate) fn validate_statements<'a>(
                                             if !param_fields.contains_key(field_name.as_str()) {
                                                 push_query_err(
                                                     ctx,
-                                                    q,
+                                                    original_query,
                                                     field_loc.clone(),
                                                     format!(
                                                         "`{}` is not a field of the inner type of `{}`",
@@ -138,7 +151,7 @@ pub(crate) fn validate_statements<'a>(
                                     _ => {
                                         push_query_err(
                                             ctx,
-                                            q,
+                                            original_query,
                                             fl.in_variable.0.clone(),
                                             format!(
                                                 "the inner type of `{}` is not an object",
@@ -152,7 +165,7 @@ pub(crate) fn validate_statements<'a>(
                                 _ => {
                                     push_query_err(
                                         ctx,
-                                        q,
+                                        original_query,
                                         fl.in_variable.0.clone(),
                                         format!("`{}` is not an array", fl.in_variable.1),
                                         "object destructuring only works with arrays of objects",
@@ -180,7 +193,7 @@ pub(crate) fn validate_statements<'a>(
                             false => {
                                 push_query_err(
                                     ctx,
-                                    q,
+                                    original_query,
                                     fl.in_variable.0.clone(),
                                     format!(
                                         "`{}` is not defined in the current scope",
@@ -197,7 +210,7 @@ pub(crate) fn validate_statements<'a>(
             for body_stmt in &fl.statements {
                 // Recursive walk (but without infinite nesting for now)
 
-                let stmt = validate_statements(ctx, scope, q, query, body_stmt);
+                let stmt = validate_statements(ctx, scope, original_query, query, body_stmt);
                 if stmt.is_some() {
                     statements.push(stmt.unwrap());
                 }
