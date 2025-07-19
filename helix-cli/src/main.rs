@@ -21,7 +21,7 @@ mod types;
 mod utils;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), ()> {
     check_helix_version().await;
 
     let args = HelixCli::parse();
@@ -31,9 +31,9 @@ async fn main() {
                 Ok(_) => {}
                 Err(_) => {
                     println!("{}", "Cargo is not installed".red().bold());
-                    return;
+                    return Err(());
                 }
-            }
+            };
 
             match check_helix_installation() {
                 Some(_) => {}
@@ -44,7 +44,7 @@ async fn main() {
                             .red()
                             .bold()
                     );
-                    return;
+                    return Err(());
                 }
             };
 
@@ -53,7 +53,7 @@ async fn main() {
                 && command.cluster.is_none()
             {
                 println!("{}", "No path or instance specified!".red().bold());
-                return;
+                return Err(());
             }
 
             // -- helix start --
@@ -75,9 +75,10 @@ async fn main() {
                     Err(e) => {
                         sp.stop_with_message(format!("{}", "Failed to start instance".red().bold()));
                         println!("└── {} {}", "Error:".red().bold(), e);
+                        return Err(());
                     }
                 }
-                return;
+                return Ok(());
             }
 
             let output = dirs::home_dir()
@@ -107,7 +108,7 @@ async fn main() {
                         "No available ports found starting from".red().bold(),
                         start_port
                     );
-                    return;
+                    return Err(());
                 }
             };
 
@@ -116,18 +117,18 @@ async fn main() {
                 Ok(files) if !files.is_empty() => files,
                 Ok(_) => {
                     println!("{}", "No queries found, nothing to compile".red().bold());
-                    return;
+                    return Err(());
                 }
                 Err(e) => {
                     println!("{} {}", "Error:".red().bold(), e);
-                    return;
+                    return Err(());
                 }
             };
 
             if !command.remote {
                 let code = match compile_and_build_helix(path, &output, files) {
                     Ok(code) => code,
-                    Err(_) => return,
+                    Err(_) => return Err(()),
                 };
 
                 if command.cluster.is_some() &&
@@ -135,9 +136,9 @@ async fn main() {
                 {
                     match redeploy_helix(command.cluster.unwrap(), code) {
                         Ok(_) => {}
-                        Err(_) => return,
+                        Err(_) => return Err(()),
                     }
-                    return;
+                    return Err(());
                 }
 
                 // -- helix deploy --
@@ -146,22 +147,22 @@ async fn main() {
                 {
                     match deploy_helix(port, code, None) {
                         Ok(_) => {}
-                        Err(_) => return,
+                        Err(_) => return Err(()),
                     }
-                    return;
+                    return Err(());
                 }
             } else {
                 if let Some(cluster) = command.cluster {
                     match redeploy_helix_remote(cluster, path, files).await {
                         Ok(_) => {}
-                        Err(_) => return,
+                        Err(_) => return Err(()),
                     }
                 } else {
                     println!("{}",
                         "Need to pass in a cluster id when redeploying a remote instance!"
                         .red().bold()
                     );
-                    return;
+                    return Err(());
                 }
             }
         }
@@ -176,7 +177,7 @@ async fn main() {
                         .red()
                         .bold()
                     );
-                    return;
+                    return Err(());
                 }
             };
 
@@ -185,7 +186,7 @@ async fn main() {
                     Some(dir) => dir,
                     None => {
                         println!("{}", "Could not determine home directory".red().bold());
-                        return;
+                        return Err(());
                     }
                 };
                 home_dir.join(".helix/repo/helix-db/helixdb")
@@ -207,7 +208,7 @@ async fn main() {
                         "Failed fetching the local cli version".red().bold(),
                         e
                     );
-                    return;
+                    return Err(());
                 }
             };
             let local_helix_version = match get_crate_version(&repo_path) {
@@ -217,7 +218,7 @@ async fn main() {
                         "Failed fetching the local db version".red().bold(),
                         e
                     );
-                    return;
+                    return Err(());
                 }
             };
             let remote_helix_version = get_remote_helix_version().await.unwrap();
@@ -246,7 +247,7 @@ async fn main() {
                             .bold(),
                             e
                         );
-                        return;
+                        return Err(());
                     }
                 }
 
@@ -261,7 +262,7 @@ async fn main() {
                             "Error while pulling new helix-db version:".red().bold(),
                             e
                         );
-                        return;
+                        return Err(());
                     }
                 }
 
@@ -278,7 +279,7 @@ async fn main() {
                             "Error while installing new helix-cli version:".red().bold(),
                             e
                         );
-                        return;
+                        return Err(());
                     }
                 }
             } else {
@@ -309,7 +310,7 @@ async fn main() {
                 Err(e) => {
                     sp.stop_with_message(format!("{}", "Failed to read files".red().bold()));
                     println!("└── {}", e);
-                    return;
+                    return Err(());
                 }
             };
 
@@ -318,14 +319,14 @@ async fn main() {
                     "{}",
                     "No queries found, nothing to compile".red().bold()
                 ));
-                return;
+                return Err(());
             }
 
             let analyzed_source = match generate(&files, &path) {
                 Ok((_, analyzed_source)) => analyzed_source,
                 Err(e) => {
                     sp.stop_with_message(format!("{}", e.to_string().red().bold()));
-                    return;
+                    return Err(());
                 }
             };
 
@@ -335,7 +336,7 @@ async fn main() {
                     Err(e) => {
                         println!("{} {}", "Failed to write typescript types".red().bold(), e);
                         println!("└── {} {}", "Error:".red().bold(), e);
-                        return;
+                        return Err(());
                     }
                 };
             }
@@ -350,7 +351,7 @@ async fn main() {
                 Err(e) => {
                     println!("{}", "Failed to transpile queries".red().bold());
                     println!("└── {} {}", "Error:".red().bold(), e);
-                    return;
+                    return Err(());
                 }
             }
 
@@ -363,7 +364,7 @@ async fn main() {
                 Err(e) => {
                     println!("{} {}", "Failed to write queries file".red().bold(), e);
                     println!("└── {} {}", "Error:".red().bold(), e);
-                    return;
+                    return Err(());
                 }
             }
         }
@@ -387,7 +388,7 @@ async fn main() {
                 Err(e) => {
                     sp.stop_with_message(format!("{}", "Error checking files".red().bold()));
                     println!("└── {}", e);
-                    return;
+                    return Err(());
                 }
             };
 
@@ -396,7 +397,7 @@ async fn main() {
                     "{}",
                     "No queries found, nothing to compile".red().bold()
                 ));
-                return;
+                return Err(());
             }
 
             match generate(&files, &path) {
@@ -404,7 +405,7 @@ async fn main() {
                 Err(e) => {
                     sp.stop_with_message(format!("{}", "Failed to generate queries".red().bold()));
                     println!("└── {}", e);
-                    return;
+                    return Err(());
                 }
             }
 
@@ -421,7 +422,7 @@ async fn main() {
                 Ok(_) => {}
                 Err(_) => {
                     println!("{}", "Cargo is not installed".red().bold());
-                    return;
+                    return Err(());
                 }
             }
 
@@ -429,7 +430,7 @@ async fn main() {
                 Ok(_) => {}
                 Err(_) => {
                     println!("{}", "Git is not installed".red().bold());
-                    return;
+                    return Err(());
                 }
             }
 
@@ -439,7 +440,7 @@ async fn main() {
                         Some(dir) => dir,
                         None => {
                             println!("{}", "Could not determine home directory".red().bold());
-                            return;
+                            return Err(());
                         }
                 };
                 home_dir.join(".helix/repo")
@@ -458,7 +459,7 @@ async fn main() {
                         .yellow()
                         .bold(),
                 );
-                return;
+                return Err(());
             }
 
             match fs::create_dir_all(&repo_path) {
@@ -471,7 +472,7 @@ async fn main() {
                     println!("{}", "Failed to create directory structure".red().bold());
                     println!("|");
                     println!("└── {}", e);
-                    return;
+                    return Err(());
                 }
             }
 
@@ -508,7 +509,7 @@ async fn main() {
                     println!("{}", "Failed to install Helix repo".red().bold());
                     println!("|");
                     println!("└── {}", e);
-                    return;
+                    return Err(());
                 }
             }
         }
@@ -528,7 +529,7 @@ async fn main() {
                         "Queries already exist in".yellow().bold(),
                         path_str
                     );
-                    return;
+                    return Err(());
                 }
                 Ok(_) => {}
                 Err(_) => {}
@@ -558,7 +559,7 @@ async fn main() {
                 Ok(instances) => {
                     if instances.is_empty() {
                         println!("{}", "No running Helix instances".yellow().bold());
-                        return;
+                        return Err(());
                     }
                     for instance in instances {
                         print_instance(&instance);
@@ -575,7 +576,7 @@ async fn main() {
                 Ok(instances) => {
                     if !instance_manager.running_instances().unwrap() {
                         println!("{}", "No running Helix instances".bold());
-                        return;
+                        return Err(());
                     }
                     if command.all {
                         println!("{}", "Stopping all running Helix instances".bold());
@@ -644,11 +645,11 @@ async fn main() {
                         "No Helix instance found with id".red().bold(),
                         iid.red().bold()
                     );
-                    return;
+                    return Err(());
                 }
                 Err(e) => {
                     println!("{} {}", "Error:".red().bold(), e);
-                    return;
+                    return Err(());
                 }
             }
 
@@ -685,11 +686,11 @@ async fn main() {
                         "No Helix instance found with id".red().bold(),
                         iid.red().bold()
                     );
-                    return;
+                    return Err(());
                 }
                 Err(e) => {
                     println!("{} {}", "Error:".red().bold(), e);
-                    return;
+                    return Err(());
                 }
             }
 
@@ -748,7 +749,7 @@ async fn main() {
                                     "helix-db: not installed (could not determine home directory)"
                                     .red().bold()
                                 );
-                                return;
+                                return Err(());
                             }
                         };
                         home_dir.join(".helix/repo/helix-db/helix-db")
@@ -763,7 +764,7 @@ async fn main() {
                                         "Error while fetching the local cli version!".red().bold(),
                                         e
                                     );
-                                    return;
+                                    return Err(());
                                 }
                             };
                             println!(
@@ -795,7 +796,7 @@ async fn main() {
                             "Failed to open graph visualizer for instance".red().bold(),
                             iid.red().bold()
                         );
-                        return;
+                        return Err(());
                     }
                 }
                 Ok(None) => {
@@ -804,11 +805,11 @@ async fn main() {
                         "No Helix instance found with id".red().bold(),
                         iid.red().bold()
                     );
-                    return;
+                    return Err(());
                 }
                 Err(e) => {
                     println!("{} {}", "Error:".red().bold(), e);
-                    return;
+                    return Err(());
                 }
             };
         }
@@ -865,5 +866,7 @@ async fn main() {
             }
         }
     }
+
+    Ok(())
 }
 
