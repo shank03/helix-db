@@ -5,25 +5,43 @@ use std::{
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct VectorConfig {
     pub m: Option<usize>,
     pub ef_construction: Option<usize>,
     pub ef_search: Option<usize>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+impl Default for VectorConfig {
+    fn default() -> Self {
+        Self {
+            m: Some(16),
+            ef_construction: Some(128),
+            ef_search: Some(768),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GraphConfig {
     pub secondary_indices: Option<Vec<String>>,
 }
 
+impl Default for GraphConfig {
+    fn default() -> Self {
+        Self {
+            secondary_indices: None,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
-    pub vector_config: VectorConfig,
-    pub graph_config: GraphConfig,
+    pub vector_config: Option<VectorConfig>,
+    pub graph_config: Option<GraphConfig>,
     pub db_max_size_gb: Option<usize>,
-    pub mcp: bool,
-    pub bm25: bool,
+    pub mcp: Option<bool>,
+    pub bm25: Option<bool>,
     pub schema: Option<String>,
     pub embedding_model: Option<String>,
     pub graphvis_node_label: Option<String>,
@@ -42,17 +60,17 @@ impl Config {
         graphvis_node_label: Option<String>,
     ) -> Self {
         Self {
-            vector_config: VectorConfig {
+            vector_config: Some(VectorConfig {
                 m: Some(m),
                 ef_construction: Some(ef_construction),
                 ef_search: Some(ef_search),
-            },
-            graph_config: GraphConfig {
+            }),
+            graph_config: Some(GraphConfig {
                 secondary_indices: None,
-            },
+            }),
             db_max_size_gb: Some(db_max_size_gb),
-            mcp,
-            bm25,
+            mcp: Some(mcp),
+            bm25: Some(bm25),
             schema,
             embedding_model,
             graphvis_node_label,
@@ -102,22 +120,46 @@ impl Config {
     pub fn to_json(&self) -> String {
         sonic_rs::to_string_pretty(self).unwrap()
     }
+
+    pub fn get_vector_config(&self) -> VectorConfig {
+        self.vector_config.clone().unwrap_or(VectorConfig::default())
+    }
+
+    pub fn get_graph_config(&self) -> GraphConfig {
+        self.graph_config.clone().unwrap_or(GraphConfig::default())
+    }
+
+    pub fn get_db_max_size_gb(&self) -> usize {
+        self.db_max_size_gb.unwrap_or(10)
+    }
+
+    pub fn get_mcp(&self) -> bool {
+        self.mcp.unwrap_or(true)
+    }
+
+    pub fn get_bm25(&self) -> bool {
+        self.bm25.unwrap_or(true)
+    }
+
+    pub fn get_schema(&self) -> Option<String> {
+        self.schema.clone()
+    }
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
-            vector_config: VectorConfig {
+            vector_config: Some(VectorConfig {
                 m: Some(16),
                 ef_construction: Some(128),
                 ef_search: Some(768),
-            },
-            graph_config: GraphConfig {
+            }),
+            graph_config: Some(GraphConfig {
                 secondary_indices: None,
-            },
+            }),
             db_max_size_gb: Some(10),
-            mcp: true,
-            bm25: true,
+            mcp: Some(true),
+            bm25: Some(true),
             schema: None,
             embedding_model: Some("text-embedding-ada-002".to_string()),
             graphvis_node_label: None,
@@ -132,20 +174,20 @@ impl fmt::Display for Config {
             "pub fn config() -> Option<Config> {{"
         )?;
         write!(f, "return Some(Config {{")?;
-        write!(f, "vector_config: VectorConfig {{")?;
-        write!(f, "m: Some({}),", self.vector_config.m.unwrap_or(16))?;
-        write!(f, "ef_construction: Some({}),", self.vector_config.ef_construction.unwrap_or(128))?;
-        write!(f, "ef_search: Some({}),", self.vector_config.ef_search.unwrap_or(768))?;
-        write!(f, "}},")?;
-        write!(f, "graph_config: GraphConfig {{")?;
-        write!(f, "secondary_indices: {},", match &self.graph_config.secondary_indices {
+        write!(f, "vector_config: Some(VectorConfig {{")?;
+        write!(f, "m: Some({}),", self.vector_config.as_ref().unwrap().m.unwrap_or(16))?;
+        write!(f, "ef_construction: Some({}),", self.vector_config.as_ref().unwrap().ef_construction.unwrap_or(128))?;
+        write!(f, "ef_search: Some({}),", self.vector_config.as_ref().unwrap().ef_search.unwrap_or(768))?;
+        write!(f, "}}),")?;
+        write!(f, "graph_config: Some(GraphConfig {{")?;
+        write!(f, "secondary_indices: {},", match &self.graph_config.as_ref().unwrap().secondary_indices {
             Some(indices) => format!("Some(vec![{}])", indices.iter().map(|s| format!("\"{}\"", s)).collect::<Vec<_>>().join(", ")),
             None => "None".to_string(),
         })?;
-        write!(f, "}},")?;
+        write!(f, "}}),")?;
         write!(f, "db_max_size_gb: Some({}),", self.db_max_size_gb.unwrap_or(10))?;
-        write!(f, "mcp: {},", self.mcp)?;
-        write!(f, "bm25: {},", self.bm25)?;
+        write!(f, "mcp: Some({}),", self.mcp.unwrap_or(true))?;
+        write!(f, "bm25: Some({}),", self.bm25.unwrap_or(true))?;
         write!(f, "schema: None,")?;
         write!(f, "embedding_model: {},", match &self.embedding_model {
             Some(model) => format!("Some(\"{}\".to_string())", model),
