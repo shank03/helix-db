@@ -10,7 +10,7 @@ use crate::{
             types::Type,
             utils::{
                 field_exists_on_item_type, gen_identifier_or_param, is_valid_identifier,
-                type_in_scope,
+                type_in_scope, Variable,
             },
         },
         generator::{
@@ -1074,7 +1074,7 @@ pub(crate) fn validate_traversal<'a>(
                     gen_traversal,
                     gen_query,
                     scope,
-                    Some(&cl.identifier),
+                    Some(Variable::new(cl.identifier.clone(), cur_ty.clone())),
                 );
 
                 // gen_traversal

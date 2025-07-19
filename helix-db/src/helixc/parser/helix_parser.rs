@@ -2499,6 +2499,7 @@ impl HelixParser {
         let mut should_spread = false;
         for p in pair.clone().into_inner() {
             if p.as_rule() == Rule::spread_object {
+                println!("spread_object");
                 should_spread = true;
                 continue;
             }

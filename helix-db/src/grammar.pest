@@ -194,8 +194,7 @@ NEQ             = { "NEQ" ~ "(" ~ (evaluates_to_anything | anonymous_traversal) 
 // ---------------------------------------------------------------------
 // Object access and remapping steps
 // ---------------------------------------------------------------------
-object_step   = { "{" ~ ((mapping_field ~ ("," ~ mapping_field)* ~ ","?) |
-(mapping_field ~ ("," ~ mapping_field)* ~ ","?)? ~ spread_object)  ~ "}" }
+object_step   = { "{" ~ ((mapping_field ~ ("," ~ mapping_field)* ~ "," ~ spread_object ~ ","?) | (mapping_field ~ ("," ~ mapping_field)* ~ ","?) ) ~ "}" }
 exclude_field = { "!" ~ "{" ~ identifier ~ ("," ~ identifier)* ~ ("," ~ spread_object)? ~ "}" }
 closure_step  = { "|" ~ identifier ~ "|" ~ object_step }
 spread_object = { ".." ~ ","?}
