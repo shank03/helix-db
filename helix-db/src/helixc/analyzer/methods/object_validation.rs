@@ -145,7 +145,6 @@ pub(crate) fn parse_object_remapping<'a>(
     let mut remappings = Vec::with_capacity(obj.len());
 
     for FieldAddition { key, value, .. } in obj {
-        println!("key: {:?}, value: {:?}", key, value);
         let remapping: RemappingType = match &value.value {
             // if the field value is a traversal then it is a TraversalRemapping
             FieldValueType::Traversal(traversal) => {
