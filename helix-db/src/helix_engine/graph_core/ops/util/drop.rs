@@ -1,5 +1,9 @@
 use crate::helix_engine::{
-    bm25::bm25::BM25, graph_core::ops::tr_val::TraversalVal, storage_core::{storage_core::HelixGraphStorage, storage_methods::StorageMethods}, types::GraphError
+    bm25::bm25::BM25,
+    graph_core::ops::tr_val::TraversalVal,
+    storage_core::{storage_core::HelixGraphStorage, storage_methods::StorageMethods},
+    types::GraphError,
+    vector_core::hnsw::HNSW,
 };
 use heed3::RwTxn;
 use std::{fmt::Debug, sync::Arc};
@@ -36,7 +40,12 @@ where
                         Ok(_) => Ok(()),
                         Err(e) => return Err(e),
                     },
-                    TraversalVal::Vector(_) => Ok(()),
+                    TraversalVal::Vector(vector) => {
+                        match storage.vectors.delete(txn, vector.id, vector.level) {
+                            Ok(_) => Ok(()),
+                            Err(e) => return Err(e.into()),
+                        }
+                    }
                     _ => {
                         return Err(GraphError::ConversionError(format!(
                             "Incorrect Type: {:?}",
@@ -47,4 +56,3 @@ where
             })
     }
 }
-

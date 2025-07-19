@@ -1,12 +1,10 @@
 use heed3::RoTxn;
 
 use super::super::tr_val::TraversalVal;
-use crate::{
-    helix_engine::{
-        graph_core::traversal_iter::RoTraversalIterator,
-        types::{GraphError, VectorError},
-        vector_core::{hnsw::HNSW, vector::HVector},
-    },
+use crate::helix_engine::{
+    graph_core::traversal_iter::RoTraversalIterator,
+    types::{GraphError, VectorError},
+    vector_core::{hnsw::HNSW, vector::HVector},
 };
 use helix_macros::debug_trace;
 use std::iter::once;
@@ -84,6 +82,11 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> SearchVAdapt
                 let error = GraphError::VectorError("invalid vector dimensions!".to_string());
                 once(Err(error)).collect::<Vec<_>>().into_iter()
             }
+            Err(VectorError::VectorAlreadyDeleted(id)) => {
+                let error =
+                    GraphError::VectorError(format!("vector already deleted for id {}", id));
+                once(Err(error)).collect::<Vec<_>>().into_iter()
+            }
             .collect::<Vec<_>>()
             .into_iter(),
         };
@@ -97,4 +100,3 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> SearchVAdapt
         }
     }
 }
-

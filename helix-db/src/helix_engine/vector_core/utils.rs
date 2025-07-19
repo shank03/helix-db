@@ -1,0 +1,124 @@
+use std::{cmp::Ordering, collections::BinaryHeap};
+
+use heed3::RoTxn;
+
+#[derive(PartialEq)]
+pub(super) struct Candidate {
+    pub id: u128,
+    pub distance: f64,
+}
+
+impl Eq for Candidate {}
+
+impl PartialOrd for Candidate {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        other.distance.partial_cmp(&self.distance)
+    }
+}
+
+impl Ord for Candidate {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap_or(Ordering::Equal)
+    }
+}
+
+pub(super) trait HeapOps<T> {
+    /// Extend the heap with another heap
+    /// Used because using `.extend()` does not keep the order
+    fn extend_inord(&mut self, other: BinaryHeap<T>)
+    where
+        T: Ord;
+
+    /// Take the top k elements from the heap
+    /// Used because using `.iter()` does not keep the order
+    fn take_inord(&mut self, k: usize) -> BinaryHeap<T>
+    where
+        T: Ord;
+
+    /// Take the top k elements from the heap and return a vector
+    fn to_vec(&mut self, k: usize) -> Vec<T>
+    where
+        T: Ord;
+
+    /// Get the maximum element from the heap
+    fn get_max(&self) -> Option<&T>
+    where
+        T: Ord;
+
+    fn to_vec_with_filter<F, const IS_DELETED: bool>(&mut self, k: usize, filter: Option<&[F]>, txn: &RoTxn) -> Vec<T>
+    where
+        T: Ord,
+        F: Fn(&T, &RoTxn) -> bool;
+}
+
+impl<T> HeapOps<T> for BinaryHeap<T> {
+    #[inline(always)]
+    fn extend_inord(&mut self, mut other: BinaryHeap<T>)
+    where
+        T: Ord,
+    {
+        self.reserve(other.len());
+        for item in other.drain() {
+            self.push(item);
+        }
+    }
+
+    #[inline(always)]
+    fn take_inord(&mut self, k: usize) -> BinaryHeap<T>
+    where
+        T: Ord,
+    {
+        let mut result = BinaryHeap::with_capacity(k);
+        for _ in 0..k {
+            if let Some(item) = self.pop() {
+                result.push(item);
+            } else {
+                break;
+            }
+        }
+        result
+    }
+
+    #[inline(always)]
+    fn to_vec(&mut self, k: usize) -> Vec<T>
+    where
+        T: Ord,
+    {
+        let mut result = Vec::with_capacity(k);
+        for _ in 0..k {
+            if let Some(item) = self.pop() {
+                result.push(item);
+            } else {
+                break;
+            }
+        }
+        result
+    }
+
+    #[inline(always)]
+    fn get_max(&self) -> Option<&T>
+    where
+        T: Ord,
+    {
+        self.iter().max()
+    }
+
+    #[inline(always)]
+    fn to_vec_with_filter<F, const IS_DELETED: bool>(&mut self, k: usize, filter: Option<&[F]>, txn: &RoTxn) -> Vec<T>
+    where
+        T: Ord,
+        F: Fn(&T, &RoTxn) -> bool,
+    {
+        let mut result = Vec::with_capacity(k);
+        for _ in 0..k {
+            // while pop check filters and pop until one passes
+            while let Some(item) = self.pop() {
+                if !IS_DELETED && (filter.is_none() || filter.unwrap().iter().all(|f| f(&item, txn))) {
+                    result.push(item);
+                    break;
+                }
+            }
+        }
+        result
+    }
+}

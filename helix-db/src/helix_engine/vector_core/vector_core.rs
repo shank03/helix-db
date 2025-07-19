@@ -1,18 +1,22 @@
 use crate::helix_engine::{
     types::VectorError,
-    vector_core::{hnsw::HNSW, vector::HVector},
+    vector_core::{
+        hnsw::HNSW,
+        utils::{Candidate, HeapOps},
+        vector::HVector,
+    },
 };
 use crate::protocol::value::Value;
 use heed3::{
-    types::{Bytes, Unit},
     Database, Env, RoTxn, RwTxn,
+    types::{Bytes, Unit},
 };
 use itertools::Itertools;
 use rand::prelude::Rng;
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
-    collections::{BinaryHeap, HashSet},
+    collections::{BinaryHeap, HashMap, HashSet},
 };
 
 const DB_VECTORS: &str = "vectors"; // for vector data (v:)
@@ -41,127 +45,6 @@ impl HNSWConfig {
             m_l: 1.0 / (m as f64).ln(),
             ef: ef.unwrap_or(768),
         }
-    }
-}
-
-#[derive(PartialEq)]
-struct Candidate {
-    id: u128,
-    distance: f64,
-}
-
-impl Eq for Candidate {}
-
-impl PartialOrd for Candidate {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        other.distance.partial_cmp(&self.distance)
-    }
-}
-
-impl Ord for Candidate {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap_or(Ordering::Equal)
-    }
-}
-
-pub trait HeapOps<T> {
-    /// Extend the heap with another heap
-    /// Used because using `.extend()` does not keep the order
-    fn extend_inord(&mut self, other: BinaryHeap<T>)
-    where
-        T: Ord;
-
-    /// Take the top k elements from the heap
-    /// Used because using `.iter()` does not keep the order
-    fn take_inord(&mut self, k: usize) -> BinaryHeap<T>
-    where
-        T: Ord;
-
-    /// Take the top k elements from the heap and return a vector
-    fn to_vec(&mut self, k: usize) -> Vec<T>
-    where
-        T: Ord;
-
-    /// Get the maximum element from the heap
-    fn get_max(&self) -> Option<&T>
-    where
-        T: Ord;
-
-    fn to_vec_with_filter<F>(&mut self, k: usize, filter: Option<&[F]>, txn: &RoTxn) -> Vec<T>
-    where
-        T: Ord,
-        F: Fn(&T, &RoTxn) -> bool;
-}
-
-impl<T> HeapOps<T> for BinaryHeap<T> {
-    #[inline(always)]
-    fn extend_inord(&mut self, mut other: BinaryHeap<T>)
-    where
-        T: Ord,
-    {
-        self.reserve(other.len());
-        for item in other.drain() {
-            self.push(item);
-        }
-    }
-
-    #[inline(always)]
-    fn take_inord(&mut self, k: usize) -> BinaryHeap<T>
-    where
-        T: Ord,
-    {
-        let mut result = BinaryHeap::with_capacity(k);
-        for _ in 0..k {
-            if let Some(item) = self.pop() {
-                result.push(item);
-            } else {
-                break;
-            }
-        }
-        result
-    }
-
-    #[inline(always)]
-    fn to_vec(&mut self, k: usize) -> Vec<T>
-    where
-        T: Ord,
-    {
-        let mut result = Vec::with_capacity(k);
-        for _ in 0..k {
-            if let Some(item) = self.pop() {
-                result.push(item);
-            } else {
-                break;
-            }
-        }
-        result
-    }
-
-    #[inline(always)]
-    fn get_max(&self) -> Option<&T>
-    where
-        T: Ord,
-    {
-        self.iter().max()
-    }
-
-    #[inline(always)]
-    fn to_vec_with_filter<F>(&mut self, k: usize, filter: Option<&[F]>, txn: &RoTxn) -> Vec<T>
-    where
-        T: Ord,
-        F: Fn(&T, &RoTxn) -> bool,
-    {
-        let mut result = Vec::with_capacity(k);
-        for _ in 0..k {
-            // while pop check filters and pop until one passes
-            while let Some(item) = self.pop() {
-                if filter.is_none() || filter.unwrap().iter().all(|f| f(&item, txn)) {
-                    result.push(item);
-                    break;
-                }
-            }
-        }
-        result
     }
 }
 
@@ -533,7 +416,7 @@ impl HNSW for VectorCore {
             },
         )?;
 
-        let mut results = candidates.to_vec_with_filter(k, filter, txn);
+        let mut results = candidates.to_vec_with_filter::<F, true>(k, filter, txn);
 
         for result in results.iter_mut() {
             result.properties = match self
@@ -621,7 +504,8 @@ impl HNSW for VectorCore {
             self.set_entry_point(txn, &query)?;
         }
 
-        if let Some(fields) = fields {
+        if let Some(mut fields) = fields {
+            fields.push(("is_deleted".to_string(), Value::Boolean(false)));
             self.vector_data_db.put(
                 txn,
                 &query.get_id().to_be_bytes(),
@@ -629,6 +513,29 @@ impl HNSW for VectorCore {
             )?;
         }
         Ok(query)
+    }
+
+    fn delete(&self, txn: &mut RwTxn, id: u128, level: usize) -> Result<(), VectorError> {
+        let key = Self::vector_key(id, level);
+        let properties: Option<HashMap<String, Value>> =
+            match self.vector_data_db.get(txn, &id.to_be_bytes())? {
+                Some(bytes) => Some(bincode::deserialize(&bytes).map_err(VectorError::from)?),
+                None => None,
+            };
+
+        if let Some(mut properties) = properties {
+            if let Some(is_deleted) = properties.get("is_deleted") {
+                if let Value::Boolean(is_deleted) = is_deleted {
+                    if *is_deleted {
+                        return Err(VectorError::VectorAlreadyDeleted(id.to_string()));
+                    }
+                }
+            }
+            properties.insert("is_deleted".to_string(), Value::Boolean(true));
+            self.vector_data_db
+                .put(txn, &key, &bincode::serialize(&properties)?)?;
+        }
+        Ok(())
     }
 
     fn get_all_vectors(

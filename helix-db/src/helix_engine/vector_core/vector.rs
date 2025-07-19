@@ -23,7 +23,7 @@ pub struct HVector {
     /// The id of the HVector
     pub id: u128,
     /// Whether the HVector is deleted (will be used for soft deletes)
-    pub is_deleted: bool,
+    // pub is_deleted: bool,
     /// The level of the HVector
     pub level: usize,
     /// The distance of the HVector
@@ -50,9 +50,9 @@ impl Debug for HVector {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{{ \nid: {},\nis_deleted: {},\nlevel: {},\ndistance: {:?},\ndata: {:?},\nproperties: {:#?} }}",
+            "{{ \nid: {},\nlevel: {},\ndistance: {:?},\ndata: {:?},\nproperties: {:#?} }}",
             uuid::Uuid::from_u128(self.id).to_string(),
-            self.is_deleted,
+            // self.is_deleted,
             self.level,
             self.distance,
             self.data,
@@ -67,7 +67,7 @@ impl HVector {
         let id = v6_uuid();
         HVector {
             id,
-            is_deleted: false,
+            // is_deleted: false,
             level: 0,
             data,
             distance: None,
@@ -80,7 +80,7 @@ impl HVector {
         let id = v6_uuid();
         HVector {
             id,
-            is_deleted: false,
+            // is_deleted: false,
             level,
             data,
             distance: None,
@@ -134,7 +134,7 @@ impl HVector {
 
         Ok(HVector {
             id,
-            is_deleted: false,
+            // is_deleted: false,
             level,
             data,
             distance: None,
