@@ -2,7 +2,7 @@ use super::storage_methods::DBMethods;
 use crate::{
     helix_engine::{
         bm25::bm25::HBM25Config,
-        graph_core::config::Config,
+        graph_core::config::{Config, GraphConfig},
         storage_core::storage_methods::StorageMethods,
         types::GraphError,
         vector_core::{
@@ -16,7 +16,7 @@ use crate::{
         label_hash::hash_label,
     },
 };
-use heed3::{byteorder::BE, types::*, Database, DatabaseFlags, Env, EnvOpenOptions, RoTxn, RwTxn};
+use heed3::{Database, DatabaseFlags, Env, EnvOpenOptions, RoTxn, RwTxn, byteorder::BE, types::*};
 use std::{collections::HashMap, fs, path::Path};
 
 // database names for different stores
@@ -113,7 +113,7 @@ impl HelixGraphStorage {
             .create(&mut wtxn)?;
 
         let mut secondary_indices = HashMap::new();
-        if let Some(indexes) = config.graph_config.secondary_indices {
+        if let Some(indexes) = config.get_graph_config().secondary_indices {
             for index in indexes {
                 secondary_indices.insert(
                     index.clone(),
@@ -127,18 +127,19 @@ impl HelixGraphStorage {
             }
         }
 
+        let vector_config = config.get_vector_config();
         let vectors = VectorCore::new(
             &graph_env,
             &mut wtxn,
             HNSWConfig::new(
-                config.vector_config.m,
-                config.vector_config.ef_construction,
-                config.vector_config.ef_search,
+                vector_config.m,
+                vector_config.ef_construction,
+                vector_config.ef_search,
             ),
         )?;
 
         let bm25 = config
-            .bm25
+            .get_bm25()
             .then(|| HBM25Config::new(&graph_env, &mut wtxn))
             .transpose()?;
 
@@ -400,4 +401,3 @@ impl StorageMethods for HelixGraphStorage {
         Ok(())
     }
 }
-
