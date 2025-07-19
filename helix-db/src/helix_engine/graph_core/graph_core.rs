@@ -40,7 +40,7 @@ impl HelixGraphEngine {
             Err(err) => return Err(err),
         };
 
-        let (mcp_backend, mcp_connections) = if should_use_mcp {
+        let (mcp_backend, mcp_connections) = if should_use_mcp.unwrap_or(false) {
             let mcp_backend = Arc::new(McpBackend::new(storage.clone()));
             let mcp_connections = Arc::new(Mutex::new(McpConnections::new()));
             (Some(mcp_backend), Some(mcp_connections))
