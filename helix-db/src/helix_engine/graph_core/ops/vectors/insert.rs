@@ -57,12 +57,13 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> InsertVAdapte
         let fields = match fields {
             Some(mut fields) => {
                 fields.push((String::from("label"), Value::String(label.to_string())));
+                fields.push((String::from("is_deleted"), Value::Boolean(false)));
                 Some(fields)
             }
-            None => Some(vec![(
-                    String::from("label"),
-                    Value::String(label.to_string()),
-            )]),
+            None => Some(vec![
+                (String::from("label"), Value::String(label.to_string())),
+                (String::from("is_deleted"), Value::Boolean(false)),
+            ]),
         };
         let vector = self.storage.vectors.insert::<F>(self.txn, &query, fields);
 
@@ -106,4 +107,3 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> InsertVAdapte
         }
     }
 }
-

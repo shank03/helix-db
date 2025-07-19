@@ -2,6 +2,8 @@ use std::{cmp::Ordering, collections::BinaryHeap};
 
 use heed3::RoTxn;
 
+use crate::{protocol::value::Value, utils::filterable::Filterable};
+
 #[derive(PartialEq)]
 pub(super) struct Candidate {
     pub id: u128,
@@ -45,9 +47,14 @@ pub(super) trait HeapOps<T> {
     where
         T: Ord;
 
-    fn to_vec_with_filter<F, const IS_DELETED: bool>(&mut self, k: usize, filter: Option<&[F]>, txn: &RoTxn) -> Vec<T>
+    fn to_vec_with_filter<F, const SHOULD_CHECK_DELETED: bool>(
+        &mut self,
+        k: usize,
+        filter: Option<&[F]>,
+        txn: &RoTxn,
+    ) -> Vec<T>
     where
-        T: Ord,
+        T: Ord + Filterable,
         F: Fn(&T, &RoTxn) -> bool;
 }
 
@@ -104,16 +111,30 @@ impl<T> HeapOps<T> for BinaryHeap<T> {
     }
 
     #[inline(always)]
-    fn to_vec_with_filter<F, const IS_DELETED: bool>(&mut self, k: usize, filter: Option<&[F]>, txn: &RoTxn) -> Vec<T>
+    fn to_vec_with_filter<F, const SHOULD_CHECK_DELETED: bool>(
+        &mut self,
+        k: usize,
+        filter: Option<&[F]>,
+        txn: &RoTxn,
+    ) -> Vec<T>
     where
-        T: Ord,
+        T: Ord + Filterable,
         F: Fn(&T, &RoTxn) -> bool,
     {
         let mut result = Vec::with_capacity(k);
         for _ in 0..k {
             // while pop check filters and pop until one passes
             while let Some(item) = self.pop() {
-                if !IS_DELETED && (filter.is_none() || filter.unwrap().iter().all(|f| f(&item, txn))) {
+                if SHOULD_CHECK_DELETED {
+                    if let Ok(is_deleted) = item.check_property("is_deleted") {
+                        if let Value::Boolean(is_deleted) = is_deleted.as_ref() {
+                            if *is_deleted {
+                                continue;
+                            }
+                        }
+                    }
+                }
+                if filter.is_none() || filter.unwrap().iter().all(|f| f(&item, txn)) {
                     result.push(item);
                     break;
                 }

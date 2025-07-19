@@ -21,7 +21,6 @@ where
         storage: Arc<HelixGraphStorage>,
         txn: &mut RwTxn,
     ) -> Result<(), GraphError> {
-        println!("Dropping traversal {:?}", iter);
         iter.into_iter()
             .try_for_each(|item| -> Result<(), GraphError> {
                 match item {
@@ -40,12 +39,10 @@ where
                         Ok(_) => Ok(()),
                         Err(e) => return Err(e),
                     },
-                    TraversalVal::Vector(vector) => {
-                        match storage.vectors.delete(txn, vector.id, vector.level) {
-                            Ok(_) => Ok(()),
-                            Err(e) => return Err(e.into()),
-                        }
-                    }
+                    TraversalVal::Vector(vector) => match storage.vectors.delete(txn, vector.id) {
+                        Ok(_) => Ok(()),
+                        Err(e) => return Err(e.into()),
+                    },
                     _ => {
                         return Err(GraphError::ConversionError(format!(
                             "Incorrect Type: {:?}",

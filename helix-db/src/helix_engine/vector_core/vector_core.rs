@@ -504,8 +504,7 @@ impl HNSW for VectorCore {
             self.set_entry_point(txn, &query)?;
         }
 
-        if let Some(mut fields) = fields {
-            fields.push(("is_deleted".to_string(), Value::Boolean(false)));
+        if let Some(fields) = fields {
             self.vector_data_db.put(
                 txn,
                 &query.get_id().to_be_bytes(),
@@ -515,14 +514,14 @@ impl HNSW for VectorCore {
         Ok(query)
     }
 
-    fn delete(&self, txn: &mut RwTxn, id: u128, level: usize) -> Result<(), VectorError> {
-        let key = Self::vector_key(id, level);
+    fn delete(&self, txn: &mut RwTxn, id: u128) -> Result<(), VectorError> {
         let properties: Option<HashMap<String, Value>> =
             match self.vector_data_db.get(txn, &id.to_be_bytes())? {
                 Some(bytes) => Some(bincode::deserialize(&bytes).map_err(VectorError::from)?),
                 None => None,
             };
 
+        println!("properties: {:?}", properties);
         if let Some(mut properties) = properties {
             if let Some(is_deleted) = properties.get("is_deleted") {
                 if let Value::Boolean(is_deleted) = is_deleted {
@@ -532,8 +531,9 @@ impl HNSW for VectorCore {
                 }
             }
             properties.insert("is_deleted".to_string(), Value::Boolean(true));
+            println!("properties: {:?}", properties);
             self.vector_data_db
-                .put(txn, &key, &bincode::serialize(&properties)?)?;
+                .put(txn, &id.to_be_bytes(), &bincode::serialize(&properties)?)?;
         }
         Ok(())
     }

@@ -67,12 +67,10 @@ pub trait HNSW
     ///
     /// * `txn` - The transaction to use
     /// * `id` - The id of the vector
-    /// * `level` - Which level to delete the vector from
     fn delete(
         &self,
         txn: &mut RwTxn,
         id: u128,
-        level: usize,
     ) -> Result<(), VectorError>;
 
     /// Get specific vector based on id and level
