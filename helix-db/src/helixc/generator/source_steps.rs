@@ -185,7 +185,7 @@ impl Display for SourceStep {
 
 #[derive(Clone)]
 pub struct SearchVector {
-    pub vec: GeneratedValue,
+    pub vec: VecData,
     pub k: GeneratedValue,
     pub pre_filter: Option<Vec<BoExp>>,
 }

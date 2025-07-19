@@ -1183,12 +1183,15 @@ impl HelixParser {
                     loc: p.loc(),
                     statement: StatementType::Expression(self.parse_expression(p)?),
                 }),
-                
-                Rule::drop => Ok(Statement {
-                    loc: p.loc(),
-                    statement: StatementType::Drop(self.parse_expression(p)?),
-                }),
-               
+
+                Rule::drop => {
+                    let inner = p.into_inner().next().unwrap();
+                    Ok(Statement {
+                        loc: inner.loc(),
+                        statement: StatementType::Drop(self.parse_expression(inner)?),
+                    })
+                }
+
                 Rule::for_loop => Ok(Statement {
                     loc: p.loc(),
                     statement: StatementType::ForLoop(self.parse_for_loop(p)?),
@@ -2496,6 +2499,7 @@ impl HelixParser {
         let mut should_spread = false;
         for p in pair.clone().into_inner() {
             if p.as_rule() == Rule::spread_object {
+                println!("spread_object");
                 should_spread = true;
                 continue;
             }

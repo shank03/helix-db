@@ -6,7 +6,9 @@ use crate::{
             errors::push_query_err,
             methods::traversal_validation::validate_traversal,
             types::Type,
-            utils::{gen_id_access_or_param, gen_identifier_or_param, is_valid_identifier},
+            utils::{
+                gen_id_access_or_param, gen_identifier_or_param, is_valid_identifier, type_in_scope,
+            },
         },
         generator::{
             generator_types::{BoExp, Query as GeneratedQuery, Statement as GeneratedStatement},
@@ -24,7 +26,6 @@ use crate::{
     protocol::date::Date,
 };
 use std::collections::HashMap;
-
 
 /// Infer the end type of an expression and returns the statement to generate from the expression
 ///
@@ -94,8 +95,15 @@ pub(crate) fn infer_expr_type<'a>(
 
         Traversal(tr) => {
             let mut gen_traversal = GeneratedTraversal::default();
-            let final_ty =
-                validate_traversal(ctx, tr, scope, original_query, parent_ty, &mut gen_traversal, gen_query);
+            let final_ty = validate_traversal(
+                ctx,
+                tr,
+                scope,
+                original_query,
+                parent_ty,
+                &mut gen_traversal,
+                gen_query,
+            );
             // push query
             let stmt = GeneratedStatement::Traversal(gen_traversal);
 
@@ -145,7 +153,12 @@ pub(crate) fn infer_expr_type<'a>(
                             }
                             match value {
                                 ValueType::Identifier { value, loc } => {
-                                    if is_valid_identifier(ctx, original_query, loc.clone(), value.as_str()) {
+                                    if is_valid_identifier(
+                                        ctx,
+                                        original_query,
+                                        loc.clone(),
+                                        value.as_str(),
+                                    ) {
                                         if !scope.contains_key(value.as_str()) {
                                             push_query_err(
                                                 ctx,
@@ -217,7 +230,12 @@ pub(crate) fn infer_expr_type<'a>(
                                         }
                                     }
                                     ValueType::Identifier { value, loc } => {
-                                        is_valid_identifier(ctx, original_query, loc.clone(), value.as_str());
+                                        is_valid_identifier(
+                                            ctx,
+                                            original_query,
+                                            loc.clone(),
+                                            value.as_str(),
+                                        );
                                         gen_identifier_or_param(original_query, value, true, false)
                                     }
                                     v => {
@@ -317,8 +335,12 @@ pub(crate) fn infer_expr_type<'a>(
 
                                 match value {
                                     ValueType::Identifier { value, loc } => {
-                                        if is_valid_identifier(ctx, original_query, loc.clone(), value.as_str())
-                                        {
+                                        if is_valid_identifier(
+                                            ctx,
+                                            original_query,
+                                            loc.clone(),
+                                            value.as_str(),
+                                        ) {
                                             if !scope.contains_key(value.as_str()) {
                                                 push_query_err(
                                                     ctx,
@@ -523,8 +545,12 @@ pub(crate) fn infer_expr_type<'a>(
                                 }
                                 match value {
                                     ValueType::Identifier { value, loc } => {
-                                        if is_valid_identifier(ctx, original_query, loc.clone(), value.as_str())
-                                        {
+                                        if is_valid_identifier(
+                                            ctx,
+                                            original_query,
+                                            loc.clone(),
+                                            value.as_str(),
+                                        ) {
                                             if !scope.contains_key(value.as_str()) {
                                                 push_query_err(
                                                     ctx,
@@ -603,7 +629,12 @@ pub(crate) fn infer_expr_type<'a>(
                                                 loc.clone(),
                                                 value.as_str(),
                                             );
-                                            gen_identifier_or_param(original_query, value.as_str(), false, true)
+                                            gen_identifier_or_param(
+                                                original_query,
+                                                value.as_str(),
+                                                false,
+                                                true,
+                                            )
                                         }
                                         v => {
                                             push_query_err(
@@ -636,13 +667,14 @@ pub(crate) fn infer_expr_type<'a>(
                         }
                         VectorData::Identifier(i) => {
                             is_valid_identifier(ctx, original_query, add.loc.clone(), i.as_str());
-                            let id = gen_identifier_or_param(original_query, i.as_str(), true, false);
+                            let id =
+                                gen_identifier_or_param(original_query, i.as_str(), true, false);
                             VecData::Standard(id)
                         }
                         VectorData::Embed(e) => match &e.value {
-                            EvaluatesToString::Identifier(i) => {
-                                VecData::Embed(gen_identifier_or_param(original_query, i.as_str(), true, false))
-                            }
+                            EvaluatesToString::Identifier(i) => VecData::Embed(
+                                gen_identifier_or_param(original_query, i.as_str(), true, false),
+                            ),
                             EvaluatesToString::StringLiteral(s) => {
                                 VecData::Embed(GeneratedValue::Literal(GenRef::Ref(s.clone())))
                             }
@@ -697,30 +729,35 @@ pub(crate) fn infer_expr_type<'a>(
                     );
                 }
             }
-            let vec = match &sv.data {
-                Some(VectorData::Vector(v)) => GeneratedValue::Literal(GenRef::Ref(format!(
-                    "[{}]",
-                    v.iter()
-                        .map(|f| f.to_string())
-                        .collect::<Vec<String>>()
-                        .join(",")
-                ))),
+            let vec: VecData = match &sv.data {
+                Some(VectorData::Vector(v)) => {
+                    VecData::Standard(GeneratedValue::Literal(GenRef::Ref(format!(
+                        "[{}]",
+                        v.iter()
+                            .map(|f| f.to_string())
+                            .collect::<Vec<String>>()
+                            .join(",")
+                    ))))
+                }
                 Some(VectorData::Identifier(i)) => {
                     is_valid_identifier(ctx, original_query, sv.loc.clone(), i.as_str());
                     // if is in params then use data.
-                    if let Some(_) = original_query.parameters.iter().find(|p| p.name.1 == *i) {
-                        GeneratedValue::Identifier(GenRef::Ref(format!("data.{}", i.to_string())))
-                    } else if let Some(_) = scope.get(i.as_str()) {
-                        GeneratedValue::Identifier(GenRef::Ref(i.to_string()))
-                    } else {
-                        push_query_err(
-                            ctx,
-                            original_query,
-                            sv.loc.clone(),
-                            format!("variable named `{}` is not in scope", i),
-                            "declare {} in the current scope or fix the typo",
-                        );
-                        GeneratedValue::Unknown
+                    let _ = type_in_scope(ctx, original_query, sv.loc.clone(), scope, i.as_str());
+                    VecData::Standard(gen_identifier_or_param(
+                        original_query,
+                        i.as_str(),
+                        true,
+                        false,
+                    ))
+                }
+                Some(VectorData::Embed(e)) => {
+                    match &e.value {
+                        EvaluatesToString::Identifier(i) => VecData::Embed(
+                            gen_identifier_or_param(original_query, i.as_str(), true, false),
+                        ),
+                        EvaluatesToString::StringLiteral(s) => {
+                            VecData::Embed(GeneratedValue::Literal(GenRef::Ref(s.clone())))
+                        }
                     }
                 }
                 _ => {
@@ -731,7 +768,7 @@ pub(crate) fn infer_expr_type<'a>(
                         "`SearchVector` must have a vector data".to_string(),
                         "add a vector data",
                     );
-                    GeneratedValue::Unknown
+                    VecData::Unknown
                 }
             };
             let k = match &sv.k {
@@ -863,8 +900,14 @@ pub(crate) fn infer_expr_type<'a>(
             let exprs = v
                 .iter()
                 .map(|expr| {
-                    let (_, stmt) =
-                        infer_expr_type(ctx, expr, scope, original_query, parent_ty.clone(), gen_query);
+                    let (_, stmt) = infer_expr_type(
+                        ctx,
+                        expr,
+                        scope,
+                        original_query,
+                        parent_ty.clone(),
+                        gen_query,
+                    );
                     assert!(
                         stmt.is_some(),
                         "incorrect stmt should've been caught by `infer_expr_type`"
@@ -895,8 +938,14 @@ pub(crate) fn infer_expr_type<'a>(
             let exprs = v
                 .iter()
                 .map(|expr| {
-                    let (_, stmt) =
-                        infer_expr_type(ctx, expr, scope, original_query, parent_ty.clone(), gen_query);
+                    let (_, stmt) = infer_expr_type(
+                        ctx,
+                        expr,
+                        scope,
+                        original_query,
+                        parent_ty.clone(),
+                        gen_query,
+                    );
                     assert!(
                         stmt.is_some(),
                         "incorrect stmt should've been caught by `infer_expr_type`"
@@ -1013,7 +1062,12 @@ pub(crate) fn infer_expr_type<'a>(
                         GeneratedValue::Primitive(GenRef::Std(i.to_string()))
                     }
                     EvaluatesToNumberType::Identifier(i) => {
-                        is_valid_identifier(ctx, original_query, bm25_search.loc.clone(), i.as_str());
+                        is_valid_identifier(
+                            ctx,
+                            original_query,
+                            bm25_search.loc.clone(),
+                            i.as_str(),
+                        );
                         // is param
                         if let Some(_) = original_query.parameters.iter().find(|p| p.name.1 == *i) {
                             GeneratedValue::Identifier(GenRef::Std(format!("data.{} as usize", i)))

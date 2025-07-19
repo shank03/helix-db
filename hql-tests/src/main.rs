@@ -572,6 +572,8 @@ async fn process_file_parallel(
         .output()
         .context("Failed to execute helix compile command")?;
 
+    println!("DEBUG: Helix compile output: {}", String::from_utf8_lossy(&output.stdout));
+    println!("DEBUG: Helix compile stderr: {}", String::from_utf8_lossy(&output.stderr));
     if !output.status.success() {
         fs::remove_dir_all(&temp_dir).await.ok();
         let stderr = String::from_utf8_lossy(&output.stderr);

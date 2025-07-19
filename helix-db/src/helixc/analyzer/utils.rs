@@ -140,3 +140,48 @@ pub(super) fn field_exists_on_item_type(
         _ => unreachable!("shouldve been caught eariler"),
     }
 }
+
+pub(super) fn get_singular_type(ty: Type) -> Type {
+    match ty {
+        Type::Nodes(node_type) => Type::Node(node_type),
+        Type::Edges(edge_type) => Type::Edge(edge_type),
+        Type::Vectors(vector_type) => Type::Vector(vector_type),
+        Type::Node(_) => ty,
+        Type::Edge(_) => ty,
+        Type::Vector(_) => ty,
+        _ => unreachable!("shouldve been caught eariler"),
+    }
+}
+
+#[derive(Clone)]
+pub(super) struct Variable {
+    pub name: String,
+    pub ty: Type,
+}
+
+impl Variable {
+    pub fn new(name: String, ty: Type) -> Self {
+        Self { name, ty }
+    }
+}
+
+pub(super) trait VariableAccess {
+    fn get_variable_name(&self) -> String;
+    fn get_variable_ty(&self) -> &Type;
+}
+
+impl VariableAccess for Option<Variable> {
+    fn get_variable_name(&self) -> String {
+        match self {
+            Some(v) => v.name.clone(),
+            None => "var".to_string(),
+        }
+    }
+
+    fn get_variable_ty(&self) -> &Type {
+        match self {
+            Some(v) => &v.ty,
+            None => &Type::Unknown,
+        }
+    }
+}
