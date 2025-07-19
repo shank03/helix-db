@@ -1,7 +1,7 @@
 use core::fmt;
 use std::fmt::Display;
 
-use crate::helixc::parser::helix_parser::FieldPrefix;
+use crate::{helix_engine::graph_core::config::Config, helixc::parser::helix_parser::FieldPrefix};
 
 use super::{
     traversal_steps::Traversal,
@@ -14,6 +14,7 @@ pub struct Source {
     pub edges: Vec<EdgeSchema>,
     pub vectors: Vec<VectorSchema>,
     pub queries: Vec<Query>,
+    pub config: Config,
     pub src: String,
 }
 impl Default for Source {
@@ -23,6 +24,7 @@ impl Default for Source {
             edges: vec![],
             vectors: vec![],
             queries: vec![],
+            config: Config::default(),
             src: "".to_string(),
         }
     }
@@ -30,6 +32,7 @@ impl Default for Source {
 impl Display for Source {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}\n", write_headers())?;
+        write!(f, "{}\n", self.config)?;
         write!(
             f,
             "{}",
@@ -257,7 +260,7 @@ impl Display for Query {
             self.name
         )?;
         write!(f, "{{\n")?;
-        
+
         // prints each statement
         for statement in &self.statements {
             write!(f, "    {};\n", statement)?;
@@ -487,7 +490,7 @@ impl Display for ReturnValue {
             ReturnType::NamedLiteral(name) => {
                 write!(
                     f,
-                    "    return_vals.insert(\"{}\".to_string(), ReturnValue::from(Value::from({})));\n",
+                    "    return_vals.insert({}.to_string(), ReturnValue::from(Value::from({})));\n",
                     name, self.value
                 )
             }

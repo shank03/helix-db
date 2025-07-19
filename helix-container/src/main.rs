@@ -12,17 +12,9 @@ mod graphvis;
 mod queries;
 
 #[tokio::main]
+
 async fn main() {
-    let home = dirs::home_dir().expect("Could not retrieve home directory");
-    let config_path = home.join(".helix/repo/helix-db/helix-container/src/config.hx.json");
-    let schema_path = home.join(".helix/repo/helix-db/helix-container/src/schema.hx");
-    let config = match Config::from_files(config_path, schema_path) {
-        Ok(config) => config,
-        Err(e) => {
-            println!("Error loading config: {}", e);
-            Config::default()
-        }
-    };
+    let config = queries::config().unwrap_or(Config::default());
 
     let path = match std::env::var("HELIX_DATA_DIR") {
         Ok(val) => std::path::PathBuf::from(val).join("user"),

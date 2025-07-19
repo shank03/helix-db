@@ -152,7 +152,7 @@ pub fn get_embedding_model(
 /// ```
 macro_rules! embed {
     ($db:expr, $query:expr) => {{
-        let embedding_model = get_embedding_model(None, $db.embedding_model.as_deref(), None)?;
+        let embedding_model = get_embedding_model(None, $db.storage_config.embedding_model.as_deref(), None)?;
         embedding_model.fetch_embedding($query)?
     }};
     ($db:expr, $query:expr, $model:expr) => {{

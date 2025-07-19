@@ -4,7 +4,6 @@ members = [
     "helix-container",
     "helix-macros",
     "helix-cli",
-    "hbuild_redeploy",
     "query-container",
     "hql-tests",
 ]

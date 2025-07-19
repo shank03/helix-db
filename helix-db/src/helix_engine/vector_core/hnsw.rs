@@ -61,6 +61,18 @@ pub trait HNSW
         level: Option<usize>,
     ) -> Result<Vec<HVector>, VectorError>;
 
+    /// Delete a vector from the index
+    ///
+    /// # Arguments
+    ///
+    /// * `txn` - The transaction to use
+    /// * `id` - The id of the vector
+    fn delete(
+        &self,
+        txn: &mut RwTxn,
+        id: u128,
+    ) -> Result<(), VectorError>;
+
     /// Get specific vector based on id and level
     ///
     /// # Arguments

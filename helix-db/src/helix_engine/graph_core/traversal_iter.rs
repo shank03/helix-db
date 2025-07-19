@@ -67,7 +67,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> RoTraversalIterat
             .sorted_by(|a, b| match (a, b) {
                 (TraversalVal::Node(a), TraversalVal::Node(b)) => {
                     match (a.check_property(property), b.check_property(property)) {
-                        (Ok(val_a), Ok(val_b)) => val_a.cmp(val_b),
+                        (Ok(val_a), Ok(val_b)) => val_a.cmp(&val_b),
                         (Ok(_), Err(_)) => Ordering::Less,
                         (Err(_), Ok(_)) => Ordering::Greater,
                         (Err(_), Err(_)) => Ordering::Equal,
@@ -75,7 +75,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> RoTraversalIterat
                 }
                 (TraversalVal::Edge(a), TraversalVal::Edge(b)) => {
                     match (a.check_property(property), b.check_property(property)) {
-                        (Ok(val_a), Ok(val_b)) => val_a.cmp(val_b),
+                        (Ok(val_a), Ok(val_b)) => val_a.cmp(&val_b),
                         (Ok(_), Err(_)) => Ordering::Less,
                         (Err(_), Ok(_)) => Ordering::Greater,
                         (Err(_), Err(_)) => Ordering::Equal,
@@ -83,7 +83,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> RoTraversalIterat
                 }
                 (TraversalVal::Vector(a), TraversalVal::Vector(b)) => {
                     match (a.check_property(property), b.check_property(property)) {
-                        (Ok(val_a), Ok(val_b)) => val_a.cmp(val_b),
+                        (Ok(val_a), Ok(val_b)) => val_a.cmp(&val_b),
                         (Ok(_), Err(_)) => Ordering::Less,
                         (Err(_), Ok(_)) => Ordering::Greater,
                         (Err(_), Err(_)) => Ordering::Equal,
@@ -105,7 +105,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> RoTraversalIterat
             .sorted_by(|a, b| match (a, b) {
                 (TraversalVal::Node(a), TraversalVal::Node(b)) => {
                     match (a.check_property(property), b.check_property(property)) {
-                        (Ok(val_a), Ok(val_b)) => val_b.cmp(val_a),
+                        (Ok(val_a), Ok(val_b)) => val_b.cmp(&val_a),
                         (Ok(_), Err(_)) => Ordering::Greater,
                         (Err(_), Ok(_)) => Ordering::Less,
                         (Err(_), Err(_)) => Ordering::Equal,
@@ -113,7 +113,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> RoTraversalIterat
                 }
                 (TraversalVal::Edge(a), TraversalVal::Edge(b)) => {
                     match (a.check_property(property), b.check_property(property)) {
-                        (Ok(val_a), Ok(val_b)) => val_b.cmp(val_a),
+                        (Ok(val_a), Ok(val_b)) => val_b.cmp(&val_a),
                         (Ok(_), Err(_)) => Ordering::Greater,
                         (Err(_), Ok(_)) => Ordering::Less,
                         (Err(_), Err(_)) => Ordering::Equal,
@@ -121,7 +121,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> RoTraversalIterat
                 }
                 (TraversalVal::Vector(a), TraversalVal::Vector(b)) => {
                     match (a.check_property(property), b.check_property(property)) {
-                        (Ok(val_a), Ok(val_b)) => val_b.cmp(val_a),
+                        (Ok(val_a), Ok(val_b)) => val_b.cmp(&val_a),
                         (Ok(_), Err(_)) => Ordering::Greater,
                         (Err(_), Ok(_)) => Ordering::Less,
                         (Err(_), Err(_)) => Ordering::Equal,

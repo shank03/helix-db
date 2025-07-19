@@ -1,6 +1,6 @@
 [package]
 name = "helix-db"
-version = "1.0.115"
+version = "1.0.118"
 edition = "2024"
 description = "HelixDB is a powerful, open-source, graph-vector database built in Rust for intelligent data storage for RAG and AI."
 license = "AGPL-3.0"
@@ -37,6 +37,7 @@ reqwest = { version = "0.12.15", features = [
     "blocking",
 ], optional = true }
 url = { version = "2.5", optional = true }
+tokio-util = { version = "0.7.15", features = ["compat"] }
 
 [dev-dependencies]
 rand = "0.9.0"

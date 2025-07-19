@@ -1,24 +1,33 @@
-use std::{sync::Arc, time::Instant};
+use std::{collections::HashMap, str::FromStr, sync::Arc, time::Instant};
 
-use crate::helix_engine::{
-    graph_core::ops::{
-        g::G,
-        in_::{in_e::InEdgesAdapter, to_n::ToNAdapter, to_v::ToVAdapter},
-        out::{from_n::FromNAdapter, from_v::FromVAdapter, out::OutAdapter},
-        source::{add_n::AddNAdapter, e_from_id::EFromIdAdapter, n_from_id::NFromIdAdapter},
-        tr_val::{Traversable, TraversalVal},
-        util::{dedup::DedupAdapter, props::PropsAdapter, range::RangeAdapter},
-        vectors::brute_force_search::BruteForceSearchVAdapter,
+use crate::{
+    exclude_field,
+    helix_engine::{
+        graph_core::ops::{
+            g::G,
+            in_::{in_e::InEdgesAdapter, to_n::ToNAdapter, to_v::ToVAdapter},
+            out::{from_n::FromNAdapter, from_v::FromVAdapter, out::OutAdapter},
+            source::{add_n::AddNAdapter, e_from_id::EFromIdAdapter, n_from_id::NFromIdAdapter},
+            tr_val::{Traversable, TraversalVal},
+            util::{
+                dedup::DedupAdapter, map::MapAdapter, props::PropsAdapter, range::RangeAdapter,
+            },
+            vectors::brute_force_search::BruteForceSearchVAdapter,
+        },
+        storage_core::storage_core::HelixGraphStorage,
+        types::GraphError, vector_core::vector,
     },
-    storage_core::storage_core::HelixGraphStorage,
-    types::GraphError,
+    protocol::{
+        remapping::{Remapping, RemappingMap, ResponseRemapping},
+        return_values::ReturnValue,
+    },
 };
 use crate::{
     helix_engine::graph_core::ops::{
         source::n_from_type::NFromTypeAdapter, util::paths::ShortestPathAdapter,
     },
-    utils::{filterable::Filterable, id::ID},
     protocol::value::Value,
+    utils::{filterable::Filterable, id::ID},
 };
 use crate::{
     helix_engine::{
@@ -34,6 +43,7 @@ use crate::{
 use heed3::RoTxn;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+use sonic_rs::JsonValueTrait;
 use tempfile::TempDir;
 
 use super::ops::{
@@ -836,7 +846,7 @@ fn test_filter_nodes() {
         .filter_ref(|val, _| {
             if let Ok(TraversalVal::Node(node)) = val {
                 if let Ok(value) = node.check_property("age") {
-                    match value {
+                    match value.as_ref() {
                         Value::F64(age) => Ok(*age > 30.0),
                         Value::I32(age) => Ok(*age > 30),
                         _ => Ok(false),
@@ -885,8 +895,8 @@ fn test_filter_macro_single_argument() {
             .iter()
             .any(|val| if let TraversalVal::Node(node) = val {
                 let name = node.check_property("name").unwrap();
-                name == &Value::String("Alice".to_string())
-                    || name == &Value::String("Bob".to_string())
+                    name.as_ref() == &Value::String("Alice".to_string())
+                    || name.as_ref() == &Value::String("Bob".to_string())
             } else {
                 false
             })
@@ -912,7 +922,7 @@ fn test_filter_macro_multiple_arguments() {
     ) -> Result<bool, GraphError> {
         if let Ok(TraversalVal::Node(node)) = val {
             if let Ok(value) = node.check_property("age") {
-                match value {
+                match value.as_ref() {
                     Value::F64(age) => Ok(*age > min_age as f64),
                     Value::I32(age) => Ok(*age > min_age),
                     _ => Ok(false),
@@ -974,7 +984,7 @@ fn test_filter_edges() {
     fn recent_edge(val: &Result<TraversalVal, GraphError>, year: i32) -> Result<bool, GraphError> {
         if let Ok(TraversalVal::Edge(edge)) = val {
             if let Ok(value) = edge.check_property("since") {
-                match value {
+                match value.as_ref() {
                     Value::I32(since) => return Ok(*since > year),
                     Value::F64(since) => return Ok(*since > year as f64),
                     _ => return Ok(false),
@@ -1012,7 +1022,7 @@ fn test_filter_empty_result() {
         .filter_ref(|val, _| {
             if let Ok(TraversalVal::Node(node)) = val {
                 if let Ok(value) = node.check_property("age") {
-                    match value {
+                    match value.as_ref() {
                         Value::I32(age) => return Ok(*age > 100),
                         Value::F64(age) => return Ok(*age > 100.0),
                         _ => return Ok(false),
@@ -1068,7 +1078,7 @@ fn test_filter_chain() {
     ) -> Result<bool, GraphError> {
         if let Ok(TraversalVal::Node(node)) = val {
             if let Ok(value) = node.check_property("age") {
-                match value {
+                match value.as_ref() {
                     Value::F64(age) => return Ok(*age > min_age as f64),
                     Value::I32(age) => return Ok(*age > min_age),
                     _ => return Ok(false),
@@ -1333,7 +1343,7 @@ fn test_update_node() {
         .collect_to::<Vec<_>>();
     assert_eq!(updated_users.len(), 1);
     assert_eq!(
-        updated_users[0].check_property("name").unwrap().to_string(),
+        updated_users[0].check_property("name").unwrap().into_owned().to_string(),
         "john"
     );
 }
@@ -1675,13 +1685,16 @@ fn test_add_e_with_dup_flag() {
     };
     println!("random_nodes: {:?}", random_nodes.len());
 
-
     let now = Instant::now();
     let mut txn = storage.graph_env.write_txn().unwrap();
     for chunk in random_nodes.chunks(100000) {
         for (random_node1, random_node2) in chunk {
             if random_node1.id() == random_node2.id() {
-                println!("random_node1: {:?}, random_node2: {:?}", random_node1.id(), random_node2.id());
+                println!(
+                    "random_node1: {:?}, random_node2: {:?}",
+                    random_node1.id(),
+                    random_node2.id()
+                );
                 continue;
             }
             let _ = G::new_mut(Arc::clone(&storage), &mut txn)
@@ -1700,9 +1713,6 @@ fn test_add_e_with_dup_flag() {
     let end = now.elapsed();
     println!("10 mill took {:?}", end);
 
-    
-    
-    
     let start = Instant::now();
     let txn = storage.graph_env.read_txn().unwrap();
     let edge_length = storage.edges_db.len(&txn).unwrap();
@@ -1724,7 +1734,7 @@ fn test_add_e_with_dup_flag() {
         .filter_ref(|val, _| {
             if let Ok(TraversalVal::Node(node)) = val {
                 node.check_property("age").map(|value| {
-                    if let Value::I32(age) = value {
+                    if let Value::I32(age) = value.as_ref() {
                         *age < 10000
                     } else {
                         false
@@ -1740,8 +1750,6 @@ fn test_add_e_with_dup_flag() {
     println!("traversal: {:?}", traversal.len());
 
     assert_eq!(count, 10000);
-
-
 }
 
 #[ignore]
@@ -2203,6 +2211,104 @@ fn test_drop_traversal() {
         .collect_to::<Vec<_>>();
     txn.commit().unwrap();
     println!("traversal: {:?}", traversal);
+
+    assert_eq!(traversal.len(), 0);
+}
+
+#[test]
+fn test_exclude_field_remapping() {
+    let (storage, _temp_dir) = setup_test_db();
+    let mut txn = storage.graph_env.write_txn().unwrap();
+
+    let node = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_n("person", Some(props! { "text" => "test", "other" => "other" }), None)
+        .collect_to_val();
+
+    let traversal = G::new(Arc::clone(&storage), &txn)
+        .n_from_type("person")
+        .collect_to::<Vec<_>>();
+
+    let mut remapping_vals = RemappingMap::new();
+
+    let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
+    return_vals.insert(
+        "files".to_string(),
+        ReturnValue::from_traversal_value_array_with_mixin(
+            G::new_from(Arc::clone(&storage), &txn, traversal.clone())
+                .map_traversal(|item, txn| {
+                    println!("item: {:?}", item);
+                    exclude_field!(remapping_vals, item.clone(), "text")?;
+                    Ok(item)
+                })
+                .collect_to::<Vec<_>>()
+                .clone(),
+            remapping_vals.borrow_mut(),
+        ),
+    );
+
+    assert_eq!(return_vals.len(), 1);
+    
+
+    #[derive(Serialize, Deserialize)]
+    struct Test {
+        text: Option<String>,
+        other: Option<String>,
+    }
+    #[derive(Serialize, Deserialize)]
+    struct Response {
+        files: Vec<Test>,
+    }
+    let value = sonic_rs::to_vec(&return_vals).unwrap();
+    let value: Response = sonic_rs::from_slice(&value).unwrap();
+    let value = value.files.first().unwrap();
+
+    let expected = Test {
+        text: None,
+        other: Some("other".to_string()),
+    };
+
+
+    assert_eq!(value.text, expected.text);
+    assert_eq!(value.other, expected.other);
+}
+
+#[test]
+fn test_delete_vector() {
+    let (storage, _temp_dir) = setup_test_db();
+    let mut txn = storage.graph_env.write_txn().unwrap();
+
+    let vector = G::new_mut(Arc::clone(&storage), &mut txn)
+        .insert_v::<fn(&HVector, &RoTxn) -> bool>(&vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0], "vector", None)
+        .collect_to_val();
+
+    txn.commit().unwrap();
+
+    let txn = storage.graph_env.read_txn().unwrap();
+    let traversal = G::new(Arc::clone(&storage), &txn)
+        .search_v::<fn(&HVector, &RoTxn) -> bool>(&vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 2000, None)
+        .collect_to::<Vec<_>>();
+
+    txn.commit().unwrap();
+    assert_eq!(traversal.len(), 1);
+    assert_eq!(traversal[0].id(), vector.id());
+
+    let mut txn = storage.graph_env.write_txn().unwrap();
+
+    Drop::drop_traversal(
+        G::new(Arc::clone(&storage), &txn)
+            .search_v::<fn(&HVector, &RoTxn) -> bool>(&vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 2000, None)
+            .collect_to::<Vec<_>>(),
+        Arc::clone(&storage),
+        &mut txn,
+    )
+    .unwrap();
+
+    txn.commit().unwrap();
+
+    let txn = storage.graph_env.read_txn().unwrap();
+    let traversal = G::new(Arc::clone(&storage), &txn)
+        .search_v::<fn(&HVector, &RoTxn) -> bool>(&vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 2000, None)
+        .collect_to::<Vec<_>>();
 
     assert_eq!(traversal.len(), 0);
 }

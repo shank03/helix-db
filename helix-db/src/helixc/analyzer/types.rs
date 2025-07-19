@@ -221,3 +221,126 @@ impl From<DefaultValue> for GeneratedValue {
         }
     }
 }
+
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub(crate) enum Type {
+    Node(Option<String>),
+    Nodes(Option<String>),
+    Edge(Option<String>),
+    Edges(Option<String>),
+    Vector(Option<String>),
+    Vectors(Option<String>),
+    Scalar(FieldType),
+    Object(HashMap<String, Type>),
+    Anonymous(Box<Type>),
+    Boolean,
+    Unknown,
+}
+
+impl Type {
+    pub fn kind_str(&self) -> &'static str {
+        match self {
+            Type::Node(_) => "node",
+            Type::Nodes(_) => "nodes",
+            Type::Edge(_) => "edge",
+            Type::Edges(_) => "edges",
+            Type::Vector(_) => "vector",
+            Type::Vectors(_) => "vectors",
+            Type::Scalar(_) => "scalar",
+            Type::Object(_) => "object",
+            Type::Boolean => "boolean",
+            Type::Unknown => "unknown",
+            Type::Anonymous(ty) => ty.kind_str(),
+        }
+    }
+
+    pub fn get_type_name(&self) -> String {
+        match self {
+            Type::Node(Some(name)) => name.clone(),
+            Type::Nodes(Some(name)) => name.clone(),
+            Type::Edge(Some(name)) => name.clone(),
+            Type::Edges(Some(name)) => name.clone(),
+            Type::Vector(Some(name)) => name.clone(),
+            Type::Vectors(Some(name)) => name.clone(),
+            Type::Scalar(ft) => ft.to_string(),
+            Type::Anonymous(ty) => ty.get_type_name(),
+            Type::Boolean => "boolean".to_string(),
+            Type::Unknown => "unknown".to_string(),
+            Type::Object(fields) => {
+                let field_names = fields.keys().map(|k| k.clone()).collect::<Vec<_>>();
+                format!("object({})", field_names.join(", "))
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    /// Recursively strip <code>Anonymous</code> layers and return the base type.
+    pub fn base(&self) -> &Type {
+        match self {
+            Type::Anonymous(inner) => inner.base(),
+            _ => self,
+        }
+    }
+
+    #[allow(dead_code)]
+    /// Same, but returns an owned clone for convenience.
+    pub fn cloned_base(&self) -> Type {
+        // TODO: never used?
+        match self {
+            Type::Anonymous(inner) => inner.cloned_base(),
+            _ => self.clone(),
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn is_numeric(&self) -> bool {
+        match self {
+            Type::Scalar(ft) => match ft {
+                FieldType::I8
+                | FieldType::I16
+                | FieldType::I32
+                | FieldType::I64
+                | FieldType::U8
+                | FieldType::U16
+                | FieldType::U32
+                | FieldType::U64
+                | FieldType::U128
+                | FieldType::F32
+                | FieldType::F64 => true,
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+
+    pub fn is_integer(&self) -> bool {
+        match self {
+            Type::Scalar(ft) => match ft {
+                FieldType::I8
+                | FieldType::I16
+                | FieldType::I32
+                | FieldType::I64
+                | FieldType::U8
+                | FieldType::U16
+                | FieldType::U32
+                | FieldType::U64
+                | FieldType::U128 => true,
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+}
+
+impl From<FieldType> for Type {
+    fn from(ft: FieldType) -> Self {
+        use FieldType::*;
+        match ft {
+            String | Boolean | F32 | F64 | I8 | I16 | I32 | I64 | U8 | U16 | U32 | U64 | U128
+            | Uuid | Date => Type::Scalar(ft.clone()),
+            Array(inner_ft) => Type::from(*inner_ft),
+            _ => Type::Unknown,
+        }
+    }
+}
