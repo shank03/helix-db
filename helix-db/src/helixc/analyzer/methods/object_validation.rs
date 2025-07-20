@@ -5,7 +5,10 @@ use crate::helixc::{
         errors::push_query_err,
         methods::{infer_expr_type::infer_expr_type, traversal_validation::validate_traversal},
         types::Type,
-        utils::{Variable, VariableAccess, is_valid_identifier, type_in_scope},
+        utils::{
+            FieldLookup, Variable, VariableAccess, gen_property_access, is_valid_identifier,
+            type_in_scope, validate_field_name_existence_for_item_type,
+        },
     },
     generator::{
         generator_types::{Query as GeneratedQuery, Statement},
@@ -327,30 +330,10 @@ pub(crate) fn parse_object_remapping<'a>(
                             should_spread,
                         })
                     } else {
-                        let (is_valid_field, item_type) = match &parent_ty {
-                            Type::Nodes(Some(ty)) | Type::Node(Some(ty)) => (
-                                ctx.node_fields
-                                    .get(ty.as_str())
-                                    .unwrap()
-                                    .contains_key(identifier.as_str()),
-                                ty.as_str(),
-                            ),
-                            Type::Edges(Some(ty)) | Type::Edge(Some(ty)) => (
-                                ctx.edge_fields
-                                    .get(ty.as_str())
-                                    .unwrap()
-                                    .contains_key(identifier.as_str()),
-                                ty.as_str(),
-                            ),
-                            Type::Vectors(Some(ty)) | Type::Vector(Some(ty)) => (
-                                ctx.vector_fields
-                                    .get(ty.as_str())
-                                    .unwrap()
-                                    .contains_key(identifier.as_str()),
-                                ty.as_str(),
-                            ),
-                            _ => unreachable!(),
-                        };
+                        let (is_valid_field, item_type) = (
+                            parent_ty.item_fields_contains_key(ctx, identifier.as_str()),
+                            parent_ty.get_type_name(),
+                        );
                         match is_valid_field {
                             true => RemappingType::TraversalRemapping(TraversalRemapping {
                                 variable_name: closure_variable.get_variable_name(),
@@ -360,8 +343,8 @@ pub(crate) fn parse_object_remapping<'a>(
                                         closure_variable.get_variable_name(),
                                     )),
                                     source_step: Separator::Empty(SourceStep::Anonymous),
-                                    steps: vec![Separator::Period(GeneratedStep::PropertyFetch(
-                                        GenRef::Literal(identifier.to_string()),
+                                    steps: vec![Separator::Period(gen_property_access(
+                                        identifier.as_str(),
                                     ))],
                                     should_collect: ShouldCollect::ToVal,
                                 },
@@ -538,8 +521,9 @@ fn validate_property_access<'a>(
 ) {
     assert!(fields.is_some());
     match fields {
-        Some(fields) => {
+        Some(field) => {
             // if there is only one field then it is a property access
+            // e.g. N<User>::{name}
             if obj.fields.len() == 1
                 && matches!(obj.fields[0].value.value, FieldValueType::Identifier(_))
             {
@@ -551,11 +535,16 @@ fn validate_property_access<'a>(
                             obj.fields[0].value.loc.clone(),
                             lit.as_str(),
                         );
+                        validate_field_name_existence_for_item_type(
+                            ctx,
+                            original_query,
+                            obj.fields[0].value.loc.clone(),
+                            cur_ty,
+                            lit.as_str(),
+                        );
                         gen_traversal
                             .steps
-                            .push(Separator::Period(GeneratedStep::PropertyFetch(
-                                GenRef::Literal(lit.clone()),
-                            )));
+                            .push(Separator::Period(gen_property_access(lit.as_str())));
                         match cur_ty {
                             Type::Nodes(_) | Type::Edges(_) | Type::Vectors(_) => {
                                 gen_traversal.should_collect = ShouldCollect::ToVec;

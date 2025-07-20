@@ -247,7 +247,7 @@ impl Filterable for HVector {
 
     fn check_property(&self, key: &str) -> Result<Cow<'_, Value>, GraphError> {
         match key {
-            "id" => Ok(Cow::Owned(Value::from(self.id))),
+            "id" => Ok(Cow::Owned(Value::from(self.uuid()))),
             "label" => Ok(Cow::Owned(Value::from(self.label().to_string()))),
             "data" => Ok(Cow::Owned(Value::Array(
                 self.data.iter().map(|f| Value::F64(*f)).collect(),
