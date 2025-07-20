@@ -33,3 +33,7 @@ QUERY getFileText(file_id: ID) =>
 QUERY getFileMult(file_id: ID) => 
     file <- N<File>(file_id)
     RETURN file::{text, name}
+
+QUERY getFileText1(file_id: ID) => 
+    file <- N<File>
+    RETURN file::{text, name}
