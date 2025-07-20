@@ -407,7 +407,7 @@ impl HybridSearch for HelixGraphStorage {
                 combined_scores
                     .entry(doc_id)
                     .and_modify(|existing_score| *existing_score += (1.0 - alpha) * similarity)
-                    .or_insert((1.0 - alpha) * score as f32);
+                    .or_insert((1.0 - alpha) * similarity); // correction made here from score as f32 to similarity
                 }
         }
 

@@ -5,7 +5,10 @@ use crate::helixc::{
         errors::push_query_err,
         methods::{infer_expr_type::infer_expr_type, traversal_validation::validate_traversal},
         types::Type,
-        utils::is_valid_identifier,
+        utils::{
+            FieldLookup, Variable, VariableAccess, gen_property_access, is_valid_identifier,
+            type_in_scope, validate_field_name_existence_for_item_type,
+        },
     },
     generator::{
         generator_types::{Query as GeneratedQuery, Statement},
@@ -36,7 +39,7 @@ use std::{borrow::Cow, collections::HashMap};
 /// * `gen_traversal` - The generated traversal
 /// * `gen_query` - The generated query
 /// * `scope` - The scope of the query
-/// * `var_name` - The name of the variable that the property access is on if any 
+/// * `var_name` - The name of the variable that the property access is on if any
 pub(crate) fn validate_object<'a>(
     ctx: &mut Ctx<'a>,
     cur_ty: &Type,
@@ -47,7 +50,7 @@ pub(crate) fn validate_object<'a>(
     gen_traversal: &mut GeneratedTraversal,
     gen_query: &mut GeneratedQuery,
     scope: &mut HashMap<&'a str, Type>,
-    var_name: Option<&str>,
+    closure_variable: Option<Variable>,
 ) {
     match &cur_ty {
         Type::Node(Some(node_ty)) | Type::Nodes(Some(node_ty)) => {
@@ -57,7 +60,7 @@ pub(crate) fn validate_object<'a>(
                 original_query,
                 gen_query,
                 scope,
-                var_name,
+                closure_variable,
                 gen_traversal,
                 cur_ty,
                 ctx.node_fields.get(node_ty.as_str()).cloned(),
@@ -70,7 +73,7 @@ pub(crate) fn validate_object<'a>(
                 original_query,
                 gen_query,
                 scope,
-                var_name,
+                closure_variable,
                 gen_traversal,
                 cur_ty,
                 ctx.edge_fields.get(edge_ty.as_str()).cloned(),
@@ -83,7 +86,7 @@ pub(crate) fn validate_object<'a>(
                 original_query,
                 gen_query,
                 scope,
-                var_name,
+                closure_variable,
                 gen_traversal,
                 cur_ty,
                 ctx.vector_fields.get(vector_ty.as_str()).cloned(),
@@ -100,7 +103,7 @@ pub(crate) fn validate_object<'a>(
                 gen_traversal,
                 gen_query,
                 scope,
-                var_name,
+                closure_variable,
             );
         }
         _ => {
@@ -116,7 +119,7 @@ pub(crate) fn validate_object<'a>(
 }
 
 /// Parses the object remapping
-/// 
+///
 /// # Arguments
 ///
 /// * `ctx` - The context of the query
@@ -125,9 +128,9 @@ pub(crate) fn validate_object<'a>(
 /// * `gen_query` - The generated query
 /// * `is_inner` - Whether the remapping is within another remapping
 /// * `scope` - The scope of the query
-/// * `var_name` - The name of the variable that the property access is on if any 
+/// * `var_name` - The name of the variable that the property access is on if any
 /// * `parent_ty` - The type of the parent of the object remapping
-/// 
+///
 /// # Returns
 ///
 /// * `Remapping` - A struct representing the object remapping
@@ -138,8 +141,9 @@ pub(crate) fn parse_object_remapping<'a>(
     gen_query: &mut GeneratedQuery,
     is_inner: bool,
     scope: &mut HashMap<&'a str, Type>,
-    var_name: &str,
+    closure_variable: Option<Variable>,
     parent_ty: Type,
+    should_spread: bool,
 ) -> Remapping {
     let mut remappings = Vec::with_capacity(obj.len());
 
@@ -159,39 +163,53 @@ pub(crate) fn parse_object_remapping<'a>(
                 );
                 match &traversal.start {
                     StartNode::Identifier(name) => {
-                        if name.to_string() == var_name {
-                            inner_traversal.traversal_type =
-                                TraversalType::NestedFrom(GenRef::Std(var_name.to_string()));
+                        if name.to_string() == closure_variable.get_variable_name() {
+                            inner_traversal.traversal_type = TraversalType::NestedFrom(
+                                GenRef::Std(closure_variable.get_variable_name()),
+                            );
                         } else {
                             inner_traversal.traversal_type =
                                 TraversalType::FromVar(GenRef::Std(name.to_string()));
                         }
                     }
                     _ => {
-                        inner_traversal.traversal_type =
-                            TraversalType::NestedFrom(GenRef::Std(var_name.to_string()));
+                        inner_traversal.traversal_type = TraversalType::NestedFrom(GenRef::Std(
+                            closure_variable.get_variable_name(),
+                        ));
                     }
                 };
 
+                match closure_variable.get_variable_ty() {
+                    Type::Node(_) | Type::Edge(_) | Type::Vector(_) => {
+                        inner_traversal.should_collect = ShouldCollect::ToVal;
+                    }
+                    Type::Nodes(_) | Type::Edges(_) | Type::Vectors(_) => {
+                        inner_traversal.should_collect = ShouldCollect::ToVec;
+                    }
+                    _ => unreachable!(),
+                }
                 match &traversal.steps.last() {
                     Some(step) => match step.step {
                         StepType::Count | StepType::BooleanOperation(_) => {
                             RemappingType::ValueRemapping(ValueRemapping {
-                                variable_name: var_name.to_string(),
+                                variable_name: closure_variable.get_variable_name(),
                                 field_name: key.clone(),
                                 value: GenRef::Std(inner_traversal.to_string()),
+                                should_spread,
                             })
                         }
                         _ => RemappingType::TraversalRemapping(TraversalRemapping {
-                            variable_name: var_name.to_string(),
+                            variable_name: closure_variable.get_variable_name(),
                             new_field: key.clone(),
                             new_value: inner_traversal,
+                            should_spread,
                         }),
                     },
                     None => RemappingType::TraversalRemapping(TraversalRemapping {
-                        variable_name: var_name.to_string(),
+                        variable_name: closure_variable.get_variable_name(),
                         new_field: key.clone(),
                         new_value: inner_traversal,
+                        should_spread,
                     }),
                 }
             }
@@ -209,23 +227,35 @@ pub(crate) fn parse_object_remapping<'a>(
                     );
                     match &traversal.start {
                         StartNode::Identifier(name) => {
-                            if name.to_string() == var_name {
-                                inner_traversal.traversal_type =
-                                    TraversalType::NestedFrom(GenRef::Std(var_name.to_string()));
+                            if name.to_string() == closure_variable.get_variable_name() {
+                                inner_traversal.traversal_type = TraversalType::NestedFrom(
+                                    GenRef::Std(closure_variable.get_variable_name()),
+                                );
                             } else {
                                 inner_traversal.traversal_type =
                                     TraversalType::FromVar(GenRef::Std(name.to_string()));
                             }
                         }
                         _ => {
-                            inner_traversal.traversal_type =
-                                TraversalType::NestedFrom(GenRef::Std(var_name.to_string()));
+                            inner_traversal.traversal_type = TraversalType::NestedFrom(
+                                GenRef::Std(closure_variable.get_variable_name()),
+                            );
                         }
                     };
+                    match closure_variable.get_variable_ty() {
+                        Type::Node(_) | Type::Edge(_) | Type::Vector(_) => {
+                            inner_traversal.should_collect = ShouldCollect::ToVal;
+                        }
+                        Type::Nodes(_) | Type::Edges(_) | Type::Vectors(_) => {
+                            inner_traversal.should_collect = ShouldCollect::ToVec;
+                        }
+                        _ => unreachable!(),
+                    }
                     RemappingType::TraversalRemapping(TraversalRemapping {
-                        variable_name: var_name.to_string(),
+                        variable_name: closure_variable.get_variable_name(),
                         new_field: key.clone(),
                         new_value: inner_traversal,
+                        should_spread,
                     })
                 }
                 ExpressionType::Exists(expr) => {
@@ -248,36 +278,41 @@ pub(crate) fn parse_object_remapping<'a>(
                         _ => unreachable!(),
                     };
                     RemappingType::Exists(ExistsRemapping {
-                        variable_name: var_name.to_string(),
+                        variable_name: closure_variable.get_variable_name(),
                         remapping: expr,
+                        should_spread,
                     })
                 }
                 ExpressionType::BooleanLiteral(bo_lit) => {
                     RemappingType::ValueRemapping(ValueRemapping {
-                        variable_name: var_name.to_string(),
+                        variable_name: closure_variable.get_variable_name(),
                         field_name: key.clone(),
                         value: GenRef::Literal(bo_lit.to_string()),
+                        should_spread,
                     })
                 }
                 ExpressionType::FloatLiteral(float) => {
                     RemappingType::ValueRemapping(ValueRemapping {
-                        variable_name: var_name.to_string(),
+                        variable_name: closure_variable.get_variable_name(),
                         field_name: key.clone(),
                         value: GenRef::Literal(float.to_string()),
+                        should_spread,
                     })
                 }
                 ExpressionType::StringLiteral(string) => {
                     RemappingType::ValueRemapping(ValueRemapping {
-                        variable_name: var_name.to_string(),
+                        variable_name: closure_variable.get_variable_name(),
                         field_name: key.clone(),
                         value: GenRef::Literal(string.clone()),
+                        should_spread,
                     })
                 }
                 ExpressionType::IntegerLiteral(integer) => {
                     RemappingType::ValueRemapping(ValueRemapping {
-                        variable_name: var_name.to_string(),
+                        variable_name: closure_variable.get_variable_name(),
                         field_name: key.clone(),
                         value: GenRef::Literal(integer.to_string()),
+                        should_spread,
                     })
                 }
                 ExpressionType::Identifier(identifier) => {
@@ -289,49 +324,31 @@ pub(crate) fn parse_object_remapping<'a>(
                     );
                     if scope.contains_key(identifier.as_str()) {
                         RemappingType::IdentifierRemapping(IdentifierRemapping {
-                            variable_name: var_name.to_string(),
+                            variable_name: closure_variable.get_variable_name(),
                             field_name: key.clone(),
                             identifier_value: identifier.into(),
+                            should_spread,
                         })
                     } else {
-                        let (is_valid_field, item_type) = match &parent_ty {
-                            Type::Nodes(Some(ty)) | Type::Node(Some(ty)) => (
-                                ctx.node_fields
-                                    .get(ty.as_str())
-                                    .unwrap()
-                                    .contains_key(identifier.as_str()),
-                                ty.as_str(),
-                            ),
-                            Type::Edges(Some(ty)) | Type::Edge(Some(ty)) => (
-                                ctx.edge_fields
-                                    .get(ty.as_str())
-                                    .unwrap()
-                                    .contains_key(identifier.as_str()),
-                                ty.as_str(),
-                            ),
-                            Type::Vectors(Some(ty)) | Type::Vector(Some(ty)) => (
-                                ctx.vector_fields
-                                    .get(ty.as_str())
-                                    .unwrap()
-                                    .contains_key(identifier.as_str()),
-                                ty.as_str(),
-                            ),
-                            _ => unreachable!(),
-                        };
+                        let (is_valid_field, item_type) = (
+                            parent_ty.item_fields_contains_key(ctx, identifier.as_str()),
+                            parent_ty.get_type_name(),
+                        );
                         match is_valid_field {
                             true => RemappingType::TraversalRemapping(TraversalRemapping {
-                                variable_name: var_name.to_string(),
+                                variable_name: closure_variable.get_variable_name(),
                                 new_field: key.clone(),
                                 new_value: GeneratedTraversal {
                                     traversal_type: TraversalType::NestedFrom(GenRef::Std(
-                                        var_name.to_string(),
+                                        closure_variable.get_variable_name(),
                                     )),
                                     source_step: Separator::Empty(SourceStep::Anonymous),
-                                    steps: vec![Separator::Period(GeneratedStep::PropertyFetch(
-                                        GenRef::Literal(identifier.to_string()),
+                                    steps: vec![Separator::Period(gen_property_access(
+                                        identifier.as_str(),
                                     ))],
                                     should_collect: ShouldCollect::ToVal,
                                 },
+                                should_spread,
                             }),
                             false => {
                                 push_query_err(
@@ -364,18 +381,20 @@ pub(crate) fn parse_object_remapping<'a>(
             // if field value is identifier then push field remapping
             FieldValueType::Literal(lit) => {
                 RemappingType::ValueRemapping(ValueRemapping {
-                    variable_name: var_name.to_string(),
+                    variable_name: closure_variable.get_variable_name(),
                     field_name: key.clone(),
                     value: GenRef::from(lit.clone()), // TODO: Implement
+                    should_spread,
                 })
             }
             FieldValueType::Identifier(identifier) => {
                 is_valid_identifier(ctx, original_query, value.loc.clone(), identifier.as_str());
                 if scope.contains_key(identifier.as_str()) {
                     RemappingType::IdentifierRemapping(IdentifierRemapping {
-                        variable_name: var_name.to_string(),
+                        variable_name: closure_variable.get_variable_name(),
                         field_name: key.clone(),
                         identifier_value: identifier.into(), // TODO: Implement
+                        should_spread,
                     })
                 } else {
                     let (is_valid_field, item_type) = match &parent_ty {
@@ -404,11 +423,11 @@ pub(crate) fn parse_object_remapping<'a>(
                     };
                     match is_valid_field {
                         true => RemappingType::TraversalRemapping(TraversalRemapping {
-                            variable_name: var_name.to_string(),
+                            variable_name: closure_variable.get_variable_name(),
                             new_field: key.clone(),
                             new_value: GeneratedTraversal {
                                 traversal_type: TraversalType::NestedFrom(GenRef::Std(
-                                    var_name.to_string(),
+                                    closure_variable.get_variable_name(),
                                 )),
                                 source_step: Separator::Empty(SourceStep::Anonymous),
                                 steps: vec![Separator::Period(GeneratedStep::PropertyFetch(
@@ -416,6 +435,7 @@ pub(crate) fn parse_object_remapping<'a>(
                                 ))],
                                 should_collect: ShouldCollect::ToVec,
                             },
+                            should_spread,
                         }),
                         false => {
                             push_query_err(
@@ -442,11 +462,12 @@ pub(crate) fn parse_object_remapping<'a>(
                     gen_query,
                     true,
                     scope,
-                    var_name,
+                    closure_variable.clone(),
                     parent_ty.clone(),
+                    should_spread,
                 );
                 RemappingType::ObjectRemapping(ObjectRemapping {
-                    variable_name: var_name.to_string(),
+                    variable_name: closure_variable.get_variable_name(),
                     field_name: key.clone(),
                     remapping,
                 })
@@ -467,15 +488,15 @@ pub(crate) fn parse_object_remapping<'a>(
     }
 
     Remapping {
-        variable_name: var_name.to_string(),
+        variable_name: closure_variable.get_variable_name(),
         is_inner,
         remappings,
-        should_spread: false,
+        should_spread,
     }
 }
 
 /// Validates the property access
-/// 
+///
 /// # Arguments
 ///
 /// * `ctx` - The context of the query
@@ -483,7 +504,7 @@ pub(crate) fn parse_object_remapping<'a>(
 /// * `original_query` - The original query
 /// * `gen_query` - The generated query
 /// * `scope` - The scope of the query
-/// * `var_name` - The name of the variable that the property access is on if any 
+/// * `var_name` - The name of the variable that the property access is on if any
 /// * `gen_traversal` - The generated traversal
 /// * `cur_ty` - The current type of the traversal
 /// * `fields` - The fields of the object
@@ -493,15 +514,16 @@ fn validate_property_access<'a>(
     original_query: &'a Query,
     gen_query: &mut GeneratedQuery,
     scope: &mut HashMap<&'a str, Type>,
-    var_name: Option<&str>,
+    closure_variable: Option<Variable>,
     gen_traversal: &mut GeneratedTraversal,
     cur_ty: &Type,
     fields: Option<HashMap<&'a str, Cow<'a, Field>>>,
 ) {
     assert!(fields.is_some());
-    if let Some(fields) = fields {
-        if let Some(_) = fields.get(cur_ty.get_type_name().as_str()).cloned() {
+    match fields {
+        Some(field) => {
             // if there is only one field then it is a property access
+            // e.g. N<User>::{name}
             if obj.fields.len() == 1
                 && matches!(obj.fields[0].value.value, FieldValueType::Identifier(_))
             {
@@ -513,11 +535,16 @@ fn validate_property_access<'a>(
                             obj.fields[0].value.loc.clone(),
                             lit.as_str(),
                         );
+                        validate_field_name_existence_for_item_type(
+                            ctx,
+                            original_query,
+                            obj.fields[0].value.loc.clone(),
+                            cur_ty,
+                            lit.as_str(),
+                        );
                         gen_traversal
                             .steps
-                            .push(Separator::Period(GeneratedStep::PropertyFetch(
-                                GenRef::Literal(lit.clone()),
-                            )));
+                            .push(Separator::Period(gen_property_access(lit.as_str())));
                         match cur_ty {
                             Type::Nodes(_) | Type::Edges(_) | Type::Vectors(_) => {
                                 gen_traversal.should_collect = ShouldCollect::ToVec;
@@ -535,16 +562,17 @@ fn validate_property_access<'a>(
             } else if obj.fields.len() > 0 {
                 // if there are multiple fields then it is a field remapping
                 // push object remapping where
-                let remapping = match var_name {
-                    Some(var_name) => parse_object_remapping(
+                let remapping = match closure_variable {
+                    Some(_) => parse_object_remapping(
                         ctx,
                         &obj.fields,
                         original_query,
                         gen_query,
                         false,
                         scope,
-                        var_name,
+                        closure_variable,
                         cur_ty.clone(),
+                        obj.should_spread,
                     ),
                     None => parse_object_remapping(
                         ctx,
@@ -553,8 +581,9 @@ fn validate_property_access<'a>(
                         gen_query,
                         false,
                         scope,
-                        "item",
+                        Some(Variable::new("item".to_string(), cur_ty.clone())),
                         cur_ty.clone(),
+                        obj.should_spread,
                     ),
                 };
 
@@ -571,6 +600,15 @@ fn validate_property_access<'a>(
                     "object must have at least one field".to_string(),
                 );
             }
+        }
+        None => {
+            push_query_err(
+                ctx,
+                original_query,
+                obj.fields[0].value.loc.clone(),
+                format!("`{}` refers to unknown type", cur_ty.get_type_name()),
+                "declare the type in the schema".to_string(),
+            );
         }
     }
 }

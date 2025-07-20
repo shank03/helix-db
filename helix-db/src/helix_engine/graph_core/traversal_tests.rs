@@ -15,7 +15,7 @@ use crate::{
             vectors::brute_force_search::BruteForceSearchVAdapter,
         },
         storage_core::storage_core::HelixGraphStorage,
-        types::GraphError,
+        types::GraphError, vector_core::vector,
     },
     protocol::{
         remapping::{Remapping, RemappingMap, ResponseRemapping},
@@ -2270,4 +2270,45 @@ fn test_exclude_field_remapping() {
 
     assert_eq!(value.text, expected.text);
     assert_eq!(value.other, expected.other);
+}
+
+#[test]
+fn test_delete_vector() {
+    let (storage, _temp_dir) = setup_test_db();
+    let mut txn = storage.graph_env.write_txn().unwrap();
+
+    let vector = G::new_mut(Arc::clone(&storage), &mut txn)
+        .insert_v::<fn(&HVector, &RoTxn) -> bool>(&vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0], "vector", None)
+        .collect_to_val();
+
+    txn.commit().unwrap();
+
+    let txn = storage.graph_env.read_txn().unwrap();
+    let traversal = G::new(Arc::clone(&storage), &txn)
+        .search_v::<fn(&HVector, &RoTxn) -> bool>(&vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 2000, None)
+        .collect_to::<Vec<_>>();
+
+    txn.commit().unwrap();
+    assert_eq!(traversal.len(), 1);
+    assert_eq!(traversal[0].id(), vector.id());
+
+    let mut txn = storage.graph_env.write_txn().unwrap();
+
+    Drop::drop_traversal(
+        G::new(Arc::clone(&storage), &txn)
+            .search_v::<fn(&HVector, &RoTxn) -> bool>(&vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 2000, None)
+            .collect_to::<Vec<_>>(),
+        Arc::clone(&storage),
+        &mut txn,
+    )
+    .unwrap();
+
+    txn.commit().unwrap();
+
+    let txn = storage.graph_env.read_txn().unwrap();
+    let traversal = G::new(Arc::clone(&storage), &txn)
+        .search_v::<fn(&HVector, &RoTxn) -> bool>(&vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 2000, None)
+        .collect_to::<Vec<_>>();
+
+    assert_eq!(traversal.len(), 0);
 }
