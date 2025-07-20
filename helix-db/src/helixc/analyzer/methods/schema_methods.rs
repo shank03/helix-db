@@ -17,22 +17,14 @@ pub(crate) fn build_field_lookups<'a>(
         .node_schemas
         .iter()
         .map(|n| {
-            let mut props = n
-                .fields
-                .iter()
-                .map(|f| (f.name.as_str(), Cow::Borrowed(f)))
-                .collect::<HashMap<&str, Cow<'a, Field>>>();
-            props.insert(
-                "id",
-                Cow::Owned(Field {
-                    prefix: FieldPrefix::Empty,
-                    defaults: None,
-                    name: "id".to_string(),
-                    field_type: FieldType::Uuid,
-                    loc: Loc::empty(),
-                }),
-            );
-            (n.name.1.as_str(), props)
+            (
+                n.name.1.as_str(),
+                n
+                    .fields
+                    .iter()
+                    .map(|f| (f.name.as_str(), Cow::Borrowed(f)))
+                    .collect::<HashMap<&str, Cow<'a, Field>>>(),
+            )
         })
         .collect();
 
