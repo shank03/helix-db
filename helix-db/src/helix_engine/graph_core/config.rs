@@ -1,9 +1,6 @@
 use crate::helix_engine::types::GraphError;
-use std::{
-    path::PathBuf,
-    fmt,
-};
 use serde::{Deserialize, Serialize};
+use std::{fmt, path::PathBuf};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct VectorConfig {
@@ -77,7 +74,7 @@ impl Config {
         }
     }
 
-    pub fn from_files(config_path: PathBuf, schema_path:PathBuf) -> Result<Self, GraphError> {
+    pub fn from_files(config_path: PathBuf, schema_path: PathBuf) -> Result<Self, GraphError> {
         if !config_path.exists() {
             println!("no config path!");
             return Err(GraphError::ConfigFileNotFound);
@@ -97,7 +94,7 @@ impl Config {
     }
 
     pub fn init_config() -> String {
-    r#"
+        r#"
     {
         "vector_config": {
             "m": 16,
@@ -114,7 +111,7 @@ impl Config {
         "graphvis_node_label": ""
     }
     "#
-    .to_string()
+        .to_string()
     }
 
     pub fn to_json(&self) -> String {
@@ -122,7 +119,9 @@ impl Config {
     }
 
     pub fn get_vector_config(&self) -> VectorConfig {
-        self.vector_config.clone().unwrap_or(VectorConfig::default())
+        self.vector_config
+            .clone()
+            .unwrap_or(VectorConfig::default())
     }
 
     pub fn get_graph_config(&self) -> GraphConfig {
@@ -169,37 +168,76 @@ impl Default for Config {
 
 impl fmt::Display for Config {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "pub fn config() -> Option<Config> {{"
-        )?;
+        write!(f, "pub fn config() -> Option<Config> {{")?;
         write!(f, "return Some(Config {{")?;
         write!(f, "vector_config: Some(VectorConfig {{")?;
-        write!(f, "m: Some({}),", self.vector_config.as_ref().unwrap().m.unwrap_or(16))?;
-        write!(f, "ef_construction: Some({}),", self.vector_config.as_ref().unwrap().ef_construction.unwrap_or(128))?;
-        write!(f, "ef_search: Some({}),", self.vector_config.as_ref().unwrap().ef_search.unwrap_or(768))?;
+        write!(
+            f,
+            "m: Some({}),",
+            self.vector_config.as_ref().unwrap().m.unwrap_or(16)
+        )?;
+        write!(
+            f,
+            "ef_construction: Some({}),",
+            self.vector_config
+                .as_ref()
+                .unwrap()
+                .ef_construction
+                .unwrap_or(128)
+        )?;
+        write!(
+            f,
+            "ef_search: Some({}),",
+            self.vector_config
+                .as_ref()
+                .unwrap()
+                .ef_search
+                .unwrap_or(768)
+        )?;
         write!(f, "}}),")?;
         write!(f, "graph_config: Some(GraphConfig {{")?;
-        write!(f, "secondary_indices: {},", match &self.graph_config.as_ref().unwrap().secondary_indices {
-            Some(indices) => format!("Some(vec![{}])", indices.iter().map(|s| format!("\"{}\"", s)).collect::<Vec<_>>().join(", ")),
-            None => "None".to_string(),
-        })?;
+        write!(
+            f,
+            "secondary_indices: {},",
+            match &self.graph_config.as_ref().unwrap().secondary_indices {
+                Some(indices) => format!(
+                    "Some(vec![{}])",
+                    indices
+                        .iter()
+                        .map(|s| format!("\"{}\".to_string()", s))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+                None => "None".to_string(),
+            }
+        )?;
         write!(f, "}}),")?;
-        write!(f, "db_max_size_gb: Some({}),", self.db_max_size_gb.unwrap_or(10))?;
+        write!(
+            f,
+            "db_max_size_gb: Some({}),",
+            self.db_max_size_gb.unwrap_or(10)
+        )?;
         write!(f, "mcp: Some({}),", self.mcp.unwrap_or(true))?;
         write!(f, "bm25: Some({}),", self.bm25.unwrap_or(true))?;
         write!(f, "schema: None,")?;
-        write!(f, "embedding_model: {},", match &self.embedding_model {
-            Some(model) => format!("Some(\"{}\".to_string())", model),
-            None => "None".to_string(),
-        })?;
-        write!(f, "graphvis_node_label: {},", match &self.graphvis_node_label {
-            Some(label) => format!("Some(\"{}\".to_string())", label),
-            None => "None".to_string(),
-        })?;
+        write!(
+            f,
+            "embedding_model: {},",
+            match &self.embedding_model {
+                Some(model) => format!("Some(\"{}\".to_string())", model),
+                None => "None".to_string(),
+            }
+        )?;
+        write!(
+            f,
+            "graphvis_node_label: {},",
+            match &self.graphvis_node_label {
+                Some(label) => format!("Some(\"{}\".to_string())", label),
+                None => "None".to_string(),
+            }
+        )?;
         write!(f, "}})")?;
         write!(f, "}}")?;
         Ok(())
     }
 }
-
