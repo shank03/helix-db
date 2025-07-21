@@ -11,9 +11,7 @@ use std::{collections::HashMap, sync::Arc};
 mod graphvis;
 mod queries;
 
-#[tokio::main]
-
-async fn main() {
+fn main() {
     let config = queries::config().unwrap_or(Config::default());
 
     let path = match std::env::var("HELIX_DATA_DIR") {
@@ -111,10 +109,9 @@ async fn main() {
         GatewayOpts::DEFAULT_POOL_SIZE,
         Some(routes),
         Some(mcp_routes),
-    )
-    .await;
+    );
 
     println!("Starting server...");
-    let a = gateway.connection_handler.accept_conns().await.unwrap();
-    let _b = a.await.unwrap();
+    // let a = gateway.connection_handler.accept_conns().await.unwrap();
+    // let _b = a.await.unwrap();
 }

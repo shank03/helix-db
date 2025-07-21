@@ -1,5 +1,6 @@
 use std::{borrow::Cow, collections::HashMap, error::Error, ops::Deref, str::FromStr};
 
+use axum::http::HeaderValue;
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncWrite;
 use tokio::io::AsyncWriteExt;
@@ -21,7 +22,7 @@ impl Format {
     /// Serialize the value to bytes.
     /// If using a zero-copy format it will return a Cow::Borrowed, with a lifetime corresponding to the value.
     /// Otherwise, it returns a Cow::Owned.
-    /// 
+    ///
     /// # Panics
     /// This method will panic if serialization fails. Ensure that the value being serialized
     /// is compatible with the chosen format to avoid panics.
@@ -61,7 +62,9 @@ impl Format {
             )),
         }
     }
+}
 
+impl Format {
     /// Parse Content-Type and Accept headers from a hashmap
     pub fn from_headers(headers: &HashMap<String, String>) -> (Format, Format) {
         let content_type = headers

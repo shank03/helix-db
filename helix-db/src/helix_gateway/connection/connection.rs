@@ -1,24 +1,15 @@
 use crate::{
-    helix_engine::{
-        graph_core::graph_core::HelixGraphEngine,
-        types::GraphError,
-    },
-    helix_gateway::{
-        router::router::HelixRouter,
-        thread_pool::thread_pool::ThreadPool
-    },
+    helix_engine::{graph_core::graph_core::HelixGraphEngine, types::GraphError},
+    helix_gateway::{router::router::HelixRouter, thread_pool::ThreadPool},
 };
 use chrono::{DateTime, Utc};
-use uuid::Uuid;
 use std::{
-    net::SocketAddr,
     collections::HashMap,
+    net::SocketAddr,
     sync::{Arc, Mutex},
 };
-use tokio::{
-    net::TcpListener,
-    task::JoinHandle,
-};
+use tokio::{net::TcpListener, task::JoinHandle};
+use uuid::Uuid;
 
 pub struct ConnectionHandler {
     pub address: String,
@@ -60,13 +51,10 @@ impl ConnectionHandler {
         let thread_pool_sender = self.thread_pool.sender.clone();
         let _address = self.address.clone();
 
-
         let handle = tokio::spawn(async move {
-
             loop {
                 match listener.accept().await {
                     Ok((stream, addr)) => {
-
                         // Configure TCP stream
                         if let Err(e) = stream.set_nodelay(true) {
                             eprintln!("Failed to set TCP_NODELAY: {}", e);
@@ -90,7 +78,10 @@ impl ConnectionHandler {
                         match thread_pool_sender.send_async(stream).await {
                             Ok(_) => (),
                             Err(e) => {
-                                eprintln!("Error sending connection {} to thread pool: {}", client_id, e);
+                                eprintln!(
+                                    "Error sending connection {} to thread pool: {}",
+                                    client_id, e
+                                );
                                 active_connections.lock().unwrap().remove(&client_id);
                             }
                         }
@@ -105,4 +96,3 @@ impl ConnectionHandler {
         Ok(handle)
     }
 }
-

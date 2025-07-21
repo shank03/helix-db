@@ -49,16 +49,16 @@ inventory::collect!(HandlerSubmission);
 ///
 /// Standard Routes and MCP Routes are stored in a HashMap with the method and path as the key
 pub struct HelixRouter {
-    /// Method+Path => Function
-    pub routes: HashMap<(String, String), HandlerFn>,
-    pub mcp_routes: HashMap<(String, String), MCPHandlerFn>,
+    /// Name => Function
+    pub routes: HashMap<String, HandlerFn>,
+    pub mcp_routes: HashMap<String, MCPHandlerFn>,
 }
 
 impl HelixRouter {
     /// Create a new router with a set of routes
     pub fn new(
-        routes: Option<HashMap<(String, String), HandlerFn>>,
-        mcp_routes: Option<HashMap<(String, String), MCPHandlerFn>>,
+        routes: Option<HashMap<String, HandlerFn>>,
+        mcp_routes: Option<HashMap<String, MCPHandlerFn>>,
     ) -> Self {
         let rts = match routes {
             Some(routes) => routes,
@@ -75,9 +75,8 @@ impl HelixRouter {
     }
 
     /// Add a route to the router
-    pub fn add_route(&mut self, method: &str, path: &str, handler: BasicHandlerFn) {
-        self.routes
-            .insert((method.to_uppercase(), path.to_string()), Arc::new(handler));
+    pub fn add_route(&mut self, name: &str, handler: BasicHandlerFn) {
+        self.routes.insert(name.to_string(), Arc::new(handler));
     }
 
     /// Handle a request by finding the appropriate handler and executing it
@@ -98,9 +97,7 @@ impl HelixRouter {
         request: Request,
         response: &mut Response,
     ) -> Result<(), GraphError> {
-        let route_key = (request.method.clone(), request.path.clone());
-
-        if let Some(handler) = self.routes.get(&route_key) {
+        if let Some(handler) = self.routes.get(&request.name) {
             let input = HandlerInput {
                 request,
                 graph: Arc::clone(&graph_access),
@@ -108,7 +105,7 @@ impl HelixRouter {
             return handler(&input, response);
         }
 
-        if let Some(mcp_handler) = self.mcp_routes.get(&route_key) {
+        if let Some(mcp_handler) = self.mcp_routes.get(&request.name) {
             let mut mcp_input = MCPToolInput {
                 request,
                 mcp_backend: Arc::clone(&graph_access.mcp_backend.as_ref().unwrap()),
