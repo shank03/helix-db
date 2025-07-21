@@ -2,15 +2,15 @@ use std::sync::atomic::{self, AtomicUsize};
 use std::thread::available_parallelism;
 use std::{collections::HashMap, sync::Arc};
 
-use axum::body::{Body, Bytes};
-use axum::extract::{Path, State};
+use axum::body::Body;
+use axum::extract::State;
+use axum::response::IntoResponse;
 use axum::routing::post;
 use core_affinity::{CoreId, set_for_current};
-use tokio::sync::oneshot;
 use tracing::{trace, warn};
 
 use super::router::router::{HandlerFn, HelixRouter};
-use crate::helix_gateway::thread_pool::WorkerPool;
+use crate::helix_gateway::worker_pool::WorkerPool;
 use crate::protocol;
 use crate::{
     helix_engine::graph_core::graph_core::HelixGraphEngine, helix_gateway::mcp::mcp::MCPHandlerFn,
@@ -110,9 +110,10 @@ async fn post_handler(
     State(pool): State<Arc<WorkerPool>>,
     req: protocol::request::Request,
 ) -> axum::http::Response<Body> {
-    let res = pool.process(req).await;
-
-    axum::http::Response::new(Body::empty())
+    match pool.process(req).await {
+        Ok(r) => r.into_response(),
+        Err(e) => e.into_response(),
+    }
 }
 
 #[derive(Clone)]

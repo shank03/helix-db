@@ -53,7 +53,7 @@ fn main() {
                 submission.0.name
             );
             let handler = &submission.0;
-            let func: HandlerFn = Arc::new(move |input, response| (handler.func)(input, response));
+            let func: HandlerFn = Arc::new(handler.func);
             (handler.name.to_string(), func)
         })
         .collect();
@@ -81,8 +81,7 @@ fn main() {
         .map(|submission| {
             println!("Processing submission for handler: {}", submission.0.name);
             let handler = &submission.0;
-            let func: MCPHandlerFn =
-                Arc::new(move |input, response| (handler.func)(input, response));
+            let func: MCPHandlerFn = Arc::new(handler.func);
             (handler.name.to_string(), func)
         })
         .collect::<HashMap<String, MCPHandlerFn>>();

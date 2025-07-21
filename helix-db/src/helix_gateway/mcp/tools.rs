@@ -2,6 +2,7 @@ use crate::{
     debug_println,
     helix_engine::{
         graph_core::ops::{
+            bm25::search_bm25::SearchBM25Adapter,
             g::G,
             in_::{
                 in_::{InAdapter, InNodesIterator},
@@ -12,31 +13,24 @@ use crate::{
                 out_e::{OutEdgesAdapter, OutEdgesIterator},
             },
             source::{add_e::EdgeType, e_from_type::EFromType, n_from_type::NFromType},
+            tr_val::{Traversable, TraversalVal},
             vectors::search::SearchVAdapter,
-            bm25::search_bm25::SearchBM25Adapter,
-            tr_val::{TraversalVal, Traversable},
         },
-        types::GraphError,
         storage_core::storage_core::HelixGraphStorage,
+        types::GraphError,
         vector_core::vector::HVector,
     },
     helix_gateway::{
-        embedding_providers::embedding_providers::{get_embedding_model, EmbeddingModel},
-        mcp::mcp::{
-            MCPConnection, McpBackend,
-            MCPHandler, MCPHandlerSubmission, MCPToolInput
-        },
+        embedding_providers::embedding_providers::{EmbeddingModel, get_embedding_model},
+        mcp::mcp::{MCPConnection, MCPHandler, MCPHandlerSubmission, MCPToolInput, McpBackend},
     },
-    protocol::{
-        response::Response,
-        return_values::ReturnValue,
-    },
+    protocol::{response::Response, return_values::ReturnValue},
     utils::label_hash::hash_label,
 };
 use heed3::RoTxn;
-use helix_macros::{tool_calls, mcp_handler};
+use helix_macros::{mcp_handler, tool_calls};
 use serde::Deserialize;
-use std::{marker::PhantomData, sync::Arc};
+use std::sync::Arc;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -289,8 +283,8 @@ impl<'a> McpTools<'a> for McpBackend {
                         txn,
                     }),
                     Ok(None) => None,
-                    Err(e) => {
-                        debug_println!("{} Error getting out edges: {:?}", line!(), e);
+                    Err(_e) => {
+                        debug_println!("{} Error getting out edges: {:?}", line!(), _e);
                         // return Err(e);
                         None
                     }
@@ -444,4 +438,3 @@ impl<'a> McpTools<'a> for McpBackend {
         Ok(res)
     }
 }
-

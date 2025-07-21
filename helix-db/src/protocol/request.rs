@@ -5,14 +5,15 @@ use reqwest::{
 };
 use tokio::sync::oneshot;
 
-use crate::protocol::{format::Format, response::Response};
+use crate::protocol::{Format, HelixError, Response};
 
-pub type ReqMsg = (Request, oneshot::Sender<Response>);
+pub type ReqMsg = (Request, oneshot::Sender<Result<Response, HelixError>>);
 
 #[derive(Debug)]
 pub struct Request {
     pub name: String,
     pub req_type: RequestType,
+    /// This contains the input parameters serialized with in_fmt
     pub body: Bytes,
     pub in_fmt: Format,
     pub out_fmt: Format,

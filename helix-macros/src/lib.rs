@@ -298,8 +298,7 @@ pub fn tool_calls(_attr: TokenStream, input: TokenStream) -> TokenStream {
                 #[allow(non_camel_case_types)]
                 pub fn #fn_name<'a>(
                     input: &'a mut MCPToolInput,
-                    response: &mut Response,
-                ) -> Result<(), GraphError> {
+                ) -> Result<Response, GraphError> {
                     let data: #struct_name = match sonic_rs::from_slice(&input.request.body) {
                         Ok(data) => data,
                         Err(err) => return Err(GraphError::from(err)),
@@ -323,8 +322,7 @@ pub fn tool_calls(_attr: TokenStream, input: TokenStream) -> TokenStream {
                     connections.add_connection(connection);
                     drop(connections);
 
-                    response.body = sonic_rs::to_vec(&ReturnValue::from(first)).unwrap();
-                    Ok(())
+                    Ok(crate::protocol::format::Format::Json.create_response(&ReturnValue::from(first)))
                 }
             };
 
