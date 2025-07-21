@@ -172,6 +172,10 @@ implement_error_code!(E643, "field `{}` previously excluded" => { field_name }, 
 implement_error_code!(E644, "`exclude` is only valid as the last step in a traversal, or as the step before an object remapping or closure" => {}, "move the `exclude` step to the end of the traversal or before the object remapping or closure" => {});
 implement_error_code!(E645, "object remapping must have at least one field" => {}, "add at least one field to the object remapping" => {});
 
+implement_error_code!(E651, "`IN` variable `{}` is not iterable" => { in_variable }, "ensure the `in` variable is iterable" => {});
+implement_error_code!(E652, "variable `{}` is not a field of the inner object of the `IN` variable `{}`" => { variable, in_variable }, "ensure `{}` is a field of `{}`" => { variable, in_variable });
+implement_error_code!(E653, "inner object of `IN` variable `{}` is not an object" => { in_variable }, "ensure the inner type of `{}` is an object" => { in_variable });
+
 #[macro_export]
 macro_rules! generate_error {
     ($ctx:ident, $original_query:ident, $loc:expr, $error_code:ident, [$($message_args:expr),*], [$($hint_args:expr),*]) => {
