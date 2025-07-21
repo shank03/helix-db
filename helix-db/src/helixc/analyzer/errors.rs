@@ -2,16 +2,24 @@ use crate::helixc::{
     analyzer::{
         analyzer::Ctx,
         diagnostic::{Diagnostic, DiagnosticSeverity},
+        error_codes::ErrorCode,
         fix::Fix,
     },
     parser::{helix_parser::Query, location::Loc},
 };
 
-pub(crate) fn push_schema_err(ctx: &mut Ctx, loc: Loc, msg: String, hint: Option<String>) {
+pub(crate) fn push_schema_err(
+    ctx: &mut Ctx,
+    loc: Loc,
+    error_code: ErrorCode,
+    msg: String,
+    hint: Option<String>,
+) {
     ctx.diagnostics.push(Diagnostic::new(
         loc,
         msg,
         DiagnosticSeverity::Error,
+        error_code,
         hint,
         None,
     ));
@@ -20,6 +28,7 @@ pub(crate) fn push_query_err(
     ctx: &mut Ctx,
     q: &Query,
     loc: Loc,
+    error_code: ErrorCode,
     msg: String,
     hint: impl Into<String>,
 ) {
@@ -27,6 +36,7 @@ pub(crate) fn push_query_err(
         Loc::new(q.loc.filepath.clone(), loc.start, loc.end, loc.span),
         format!("{} (in QUERY named `{}`)", msg, q.name),
         DiagnosticSeverity::Error,
+        error_code,
         Some(hint.into()),
         None,
     ));
@@ -36,6 +46,7 @@ pub(crate) fn push_query_err_with_fix(
     ctx: &mut Ctx,
     q: &Query,
     loc: Loc,
+    error_code: ErrorCode,
     msg: String,
     hint: impl Into<String>,
     fix: Fix,
@@ -44,6 +55,7 @@ pub(crate) fn push_query_err_with_fix(
         Loc::new(q.loc.filepath.clone(), loc.start, loc.end, loc.span),
         format!("{} (in QUERY named `{}`)", msg, q.name),
         DiagnosticSeverity::Error,
+        error_code,
         Some(hint.into()),
         Some(fix),
     ));
@@ -53,6 +65,7 @@ pub(crate) fn push_query_warn(
     ctx: &mut Ctx,
     q: &Query,
     loc: Loc,
+    error_code: ErrorCode,
     msg: String,
     hint: impl Into<String>,
     fix: Option<Fix>,
@@ -61,6 +74,7 @@ pub(crate) fn push_query_warn(
         Loc::new(q.loc.filepath.clone(), loc.start, loc.end, loc.span),
         format!("{} (in QUERY named `{}`)", msg, q.name),
         DiagnosticSeverity::Warning,
+        error_code,
         Some(hint.into()),
         fix,
     ));

@@ -1,5 +1,9 @@
 use crate::helixc::{
-    analyzer::{fix::Fix, pretty},
+    analyzer::{
+        error_codes::ErrorCode,
+        fix::Fix,
+        pretty,
+    },
     parser::location::Loc,
 };
 
@@ -7,6 +11,7 @@ use crate::helixc::{
 #[derive(Debug, Clone)]
 pub struct Diagnostic {
     pub location: Loc,
+    pub error_code: ErrorCode,
     pub message: String,
     pub hint: Option<String>,
     pub filepath: Option<String>,
@@ -28,6 +33,7 @@ impl Diagnostic {
         location: Loc,
         message: impl Into<String>,
         severity: DiagnosticSeverity,
+        error_code: ErrorCode,
         hint: Option<String>,
         fix: Option<Fix>,
     ) -> Self {
@@ -35,6 +41,7 @@ impl Diagnostic {
         Self {
             location,
             message: message.into(),
+            error_code,
             hint,
             fix,
             filepath,
@@ -46,3 +53,6 @@ impl Diagnostic {
         pretty::render(self, src, filepath)
     }
 }
+
+#[derive(Debug, Clone)]
+pub enum Something {}

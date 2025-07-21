@@ -396,6 +396,28 @@ impl Debug for ExpressionType {
         }
     }
 }
+impl Display for ExpressionType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ExpressionType::Traversal(traversal) => write!(f, "Traversal({:?})", traversal),
+            ExpressionType::Identifier(s) => write!(f, "{}", s),
+            ExpressionType::StringLiteral(s) => write!(f, "{}", s),
+            ExpressionType::IntegerLiteral(i) => write!(f, "{}", i),
+            ExpressionType::FloatLiteral(fl) => write!(f, "{}", fl),
+            ExpressionType::BooleanLiteral(b) => write!(f, "{}", b),
+            ExpressionType::Exists(e) => write!(f, "Exists({:?})", e),
+            ExpressionType::BatchAddVector(bav) => write!(f, "BatchAddVector({:?})", bav),
+            ExpressionType::AddVector(av) => write!(f, "AddVector({:?})", av),
+            ExpressionType::AddNode(an) => write!(f, "AddNode({:?})", an),
+            ExpressionType::AddEdge(ae) => write!(f, "AddEdge({:?})", ae),
+            ExpressionType::And(and) => write!(f, "And({:?})", and),
+            ExpressionType::Or(or) => write!(f, "Or({:?})", or),
+            ExpressionType::SearchVector(sv) => write!(f, "SearchVector({:?})", sv),
+            ExpressionType::BM25Search(bm25) => write!(f, "BM25Search({:?})", bm25),
+            ExpressionType::Empty => write!(f, "Empty"),
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Traversal {

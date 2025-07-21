@@ -1,12 +1,12 @@
 //! Semantic analyzer for Helix‑QL.
-use crate::helixc::{
+use crate::{generate_error, helixc::{
     analyzer::{analyzer::Ctx, errors::push_query_err, types::Type},
     generator::{
         traversal_steps::Step,
         utils::{GenRef, GeneratedValue},
     },
     parser::{helix_parser::*, location::Loc},
-};
+}};
 use std::{borrow::Cow, collections::HashMap};
 
 pub(super) fn is_valid_identifier(
@@ -18,13 +18,7 @@ pub(super) fn is_valid_identifier(
     match name {
         "true" | "false" | "NONE" | "String" | "Boolean" | "F32" | "F64" | "I8" | "I16" | "I32"
         | "I64" | "U8" | "U16" | "U32" | "U64" | "U128" | "Uuid" | "Date" => {
-            push_query_err(
-                ctx,
-                original_query,
-                loc.clone(),
-                format!("`{}` is not a valid identifier", name),
-                "use a valid identifier",
-            );
+            generate_error!(ctx, original_query, loc.clone(), E105, name);
             false
         }
         _ => true,
