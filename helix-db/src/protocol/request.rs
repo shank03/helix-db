@@ -1,12 +1,13 @@
-use std::str::FromStr;
-
-use axum::{body::Bytes, extract::FromRequest, http::HeaderValue};
+use axum::{body::Bytes, extract::FromRequest};
 use reqwest::{
     StatusCode,
     header::{ACCEPT, CONTENT_TYPE},
 };
+use tokio::sync::oneshot;
 
-use crate::protocol::format::Format;
+use crate::protocol::{format::Format, response::Response};
+
+pub type ReqMsg = (Request, oneshot::Sender<Response>);
 
 #[derive(Debug)]
 pub struct Request {

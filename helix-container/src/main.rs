@@ -45,7 +45,7 @@ fn main() {
     let submissions: Vec<_> = inventory::iter::<HandlerSubmission>.into_iter().collect();
     println!("Found {} route submissions", submissions.len());
 
-    let post_routes: HashMap<(String, String), HandlerFn> = inventory::iter::<HandlerSubmission>
+    let query_routes: HashMap<String, HandlerFn> = inventory::iter::<HandlerSubmission>
         .into_iter()
         .map(|submission| {
             println!(
@@ -54,10 +54,7 @@ fn main() {
             );
             let handler = &submission.0;
             let func: HandlerFn = Arc::new(move |input, response| (handler.func)(input, response));
-            (
-                ("POST".to_string(), format!("/{}", handler.name.to_string())),
-                func,
-            )
+            (handler.name.to_string(), func)
         })
         .collect();
 
@@ -78,40 +75,27 @@ fn main() {
     //     })
     // .collect();
 
-    let routes: HashMap<(String, String), HandlerFn> = post_routes;
-
-    let mcp_submissions: Vec<_> = inventory::iter::<MCPHandlerSubmission>
+    let mcp_routes = inventory::iter::<MCPHandlerSubmission>
         .into_iter()
-        .collect();
-    let mcp_routes = HashMap::from_iter(
-        mcp_submissions
-            .into_iter()
-            .map(|submission| {
-                println!("Processing submission for handler: {}", submission.0.name);
-                let handler = &submission.0;
-                let func: MCPHandlerFn =
-                    Arc::new(move |input, response| (handler.func)(input, response));
-                (
-                    (
-                        "post".to_ascii_uppercase().to_string(),
-                        format!("/mcp/{}", handler.name.to_string()),
-                    ),
-                    func,
-                )
-            })
-            .collect::<Vec<((String, String), MCPHandlerFn)>>(),
-    );
+        .into_iter()
+        .map(|submission| {
+            println!("Processing submission for handler: {}", submission.0.name);
+            let handler = &submission.0;
+            let func: MCPHandlerFn =
+                Arc::new(move |input, response| (handler.func)(input, response));
+            (handler.name.to_string(), func)
+        })
+        .collect::<HashMap<String, MCPHandlerFn>>();
 
-    println!("Routes: {:?}", routes.keys());
+    println!("Routes: {:?}", query_routes.keys());
     let gateway = HelixGateway::new(
         &format!("0.0.0.0:{}", port),
         graph,
         GatewayOpts::DEFAULT_POOL_SIZE,
-        Some(routes),
+        2,
+        Some(query_routes),
         Some(mcp_routes),
     );
 
-    println!("Starting server...");
-    // let a = gateway.connection_handler.accept_conns().await.unwrap();
-    // let _b = a.await.unwrap();
+    gateway.run().unwrap()
 }

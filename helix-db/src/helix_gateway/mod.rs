@@ -1,4 +1,3 @@
-pub mod connection;
 pub mod embedding_providers;
 pub mod gateway;
 pub mod mcp;

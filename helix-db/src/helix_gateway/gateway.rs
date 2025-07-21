@@ -1,16 +1,17 @@
 use std::sync::atomic::{self, AtomicUsize};
+use std::thread::available_parallelism;
 use std::{collections::HashMap, sync::Arc};
 
 use axum::body::{Body, Bytes};
-use axum::extract::Path;
+use axum::extract::{Path, State};
 use axum::routing::post;
 use core_affinity::{CoreId, set_for_current};
 use tokio::sync::oneshot;
 use tracing::{trace, warn};
 
-use super::connection::connection::ConnectionHandler;
 use super::router::router::{HandlerFn, HelixRouter};
-use crate::helix_gateway::thread_pool::ThreadPool;
+use crate::helix_gateway::thread_pool::WorkerPool;
+use crate::protocol;
 use crate::{
     helix_engine::graph_core::graph_core::HelixGraphEngine, helix_gateway::mcp::mcp::MCPHandlerFn,
 };
@@ -22,30 +23,38 @@ impl GatewayOpts {
 }
 
 pub struct HelixGateway {
-    pub connection_handler: ConnectionHandler,
+    address: String,
+    worker_size: usize,
+    io_size: usize,
+    graph_access: Arc<HelixGraphEngine>,
+    router: Arc<HelixRouter>,
 }
-
-const IO_CORE_NUM: usize = 2;
 
 impl HelixGateway {
     pub fn new(
         address: &str,
-        graph: Arc<HelixGraphEngine>,
-        size: usize,
+        graph_access: Arc<HelixGraphEngine>,
+        worker_size: usize,
+        io_size: usize,
         routes: Option<HashMap<String, HandlerFn>>,
         mcp_routes: Option<HashMap<String, MCPHandlerFn>>,
     ) -> HelixGateway {
-        let router = HelixRouter::new(routes, mcp_routes);
-        let connection_handler = ConnectionHandler::new(address, graph, size, router).unwrap();
-        println!("Gateway created");
-        HelixGateway { connection_handler }
+        let router = Arc::new(HelixRouter::new(routes, mcp_routes));
+        HelixGateway {
+            address: address.to_string(),
+            graph_access,
+            router,
+            worker_size,
+            io_size,
+        }
     }
 
     pub fn run(self) -> Result<(), Box<dyn std::error::Error>> {
+        trace!("Starting Helix Gateway");
         let (io_setter, worker_setter) = match core_affinity::get_core_ids() {
             Some(all_cores) => {
-                let io_cores = CoreSetter::new(&all_cores[0..IO_CORE_NUM]);
-                let worker_cores = CoreSetter::new(&all_cores[IO_CORE_NUM..]);
+                let io_cores = CoreSetter::new(&all_cores[0..self.io_size]);
+                let worker_cores = CoreSetter::new(&all_cores[self.io_size..]);
                 (Some(io_cores), Some(worker_cores))
             }
             None => {
@@ -54,10 +63,27 @@ impl HelixGateway {
             }
         };
 
-        // let worker_pool = ThreadPool
+        if let Ok(total_cores) = available_parallelism()
+            && total_cores.get() < self.worker_size + self.io_size
+        {
+            warn!(
+                "using more threads ({} io + {} worker = {}) than available cores ({}).",
+                self.io_size,
+                self.worker_size,
+                self.io_size + self.worker_size,
+                total_cores.get()
+            );
+        }
+
+        let worker_pool = WorkerPool::new(
+            self.worker_size,
+            worker_setter,
+            self.graph_access.clone(),
+            self.router.clone(),
+        );
 
         let rt = tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(IO_CORE_NUM)
+            .worker_threads(self.io_size)
             .on_thread_start({
                 let local_setter = io_setter.clone();
                 move || {
@@ -68,9 +94,11 @@ impl HelixGateway {
             })
             .build()?;
 
-        let axum_app = axum::Router::new().route("/*path", post(post_handler));
+        let axum_app = axum::Router::new()
+            .route("/*path", post(post_handler))
+            .with_state(Arc::new(worker_pool));
         rt.spawn(async move {
-            let listener = tokio::net::TcpListener::bind("0.0.0.0:7000").await.unwrap();
+            let listener = tokio::net::TcpListener::bind(self.address).await.unwrap();
             axum::serve(listener, axum_app).await.unwrap()
         });
 
@@ -78,8 +106,11 @@ impl HelixGateway {
     }
 }
 
-async fn post_handler(req: crate::protocol::request::Request) -> axum::http::Response<Body> {
-    let ret_chan = oneshot::channel::<crate::protocol::response::Response>();
+async fn post_handler(
+    State(pool): State<Arc<WorkerPool>>,
+    req: protocol::request::Request,
+) -> axum::http::Response<Body> {
+    let res = pool.process(req).await;
 
     axum::http::Response::new(Body::empty())
 }

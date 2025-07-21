@@ -1,6 +1,6 @@
 use crate::{
     helix_engine::{graph_core::graph_core::HelixGraphEngine, types::GraphError},
-    helix_gateway::{router::router::HelixRouter, thread_pool::ThreadPool},
+    helix_gateway::router::router::HelixRouter,
 };
 use chrono::{DateTime, Utc};
 use std::{
