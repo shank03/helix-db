@@ -4,6 +4,7 @@ use reqwest::{
     header::{ACCEPT, CONTENT_TYPE},
 };
 use tokio::sync::oneshot;
+use tracing::error;
 
 use crate::protocol::{Format, HelixError, Response};
 
@@ -69,7 +70,13 @@ where
             None => Format::default(),
         };
 
-        let body = Bytes::from_request(req, state).await.expect("todo");
+        let body = match Bytes::from_request(req, state).await {
+            Ok(b) => b,
+            Err(e) => {
+                error!(?e, "Error getting bytes");
+                return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            }
+        };
         let out = Request {
             name,
             req_type,

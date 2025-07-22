@@ -1,5 +1,5 @@
 use std::fmt::Display;
-use std::{borrow::Cow, collections::HashMap, error::Error, ops::Deref, str::FromStr};
+use std::{borrow::Cow, error::Error, ops::Deref, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncWrite;
@@ -19,6 +19,7 @@ pub enum Format {
     Json,
 }
 
+/// Methods using to format for serialization/deserialization
 impl Format {
     /// Serialize the value to bytes.
     /// If using a zero-copy format it will return a Cow::Borrowed, with a lifetime corresponding to the value.
@@ -69,35 +70,6 @@ impl Format {
                     .map_err(|e| GraphError::DecodeError(e.to_string()))?,
             )),
         }
-    }
-}
-
-impl Format {
-    /// Parse Content-Type and Accept headers from a hashmap
-    pub fn from_headers(headers: &HashMap<String, String>) -> (Format, Format) {
-        let content_type = headers
-            .iter()
-            .find_map(|(k, v)| {
-                if k.to_ascii_lowercase() == "content-type" {
-                    Some(Format::from_str(v).unwrap_or_default())
-                } else {
-                    None
-                }
-            })
-            .unwrap_or_default();
-
-        let accept = headers
-            .iter()
-            .find_map(|(k, v)| {
-                if k.to_ascii_lowercase() == "accept" {
-                    Some(Format::from_str(v).unwrap_or(content_type))
-                } else {
-                    None
-                }
-            })
-            .unwrap_or(content_type);
-
-        (content_type, accept)
     }
 }
 

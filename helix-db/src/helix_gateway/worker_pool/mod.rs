@@ -52,13 +52,18 @@ impl WorkerPool {
     pub async fn process(&self, req: protocol::request::Request) -> Result<Response, HelixError> {
         let (ret_tx, ret_rx) = oneshot::channel();
 
+        // TODO: add graceful shutdown handling here
+
         // this read by Worker in start()
         self.tx
             .send_async((req, ret_tx))
             .await
-            .expect("todo: request on closing channel");
+            .expect("WorkerPool channel should be open");
 
-        let res = ret_rx.await.expect("todo");
+        // This is sent by the Worker
+        let res = ret_rx
+            .await
+            .expect("Worker shouldn't drop sender before replying");
         res
     }
 }

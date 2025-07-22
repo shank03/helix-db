@@ -13,6 +13,6 @@ impl IntoResponse for Response {
         axum::response::Response::builder()
             .header(CONTENT_TYPE, self.fmt.to_string())
             .body(axum::body::Body::from(self.body))
-            .expect("Should be able to construct response from")
+            .expect("Should be able to construct response")
     }
 }

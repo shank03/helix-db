@@ -27,6 +27,9 @@ impl IntoResponse for HelixError {
         axum::response::Response::builder()
             .status(code)
             .body(Body::from(body))
-            .expect("Should be able to turn HelixError into Response")
+            .expect(&format!(
+                "Should be able to turn HelixError into Response: {}",
+                self.to_string()
+            ))
     }
 }
