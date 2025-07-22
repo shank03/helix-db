@@ -174,14 +174,18 @@ impl fmt::Display for Config {
         write!(
             f,
             "m: Some({}),",
-            self.vector_config.as_ref().unwrap().m.unwrap_or(16)
+            self.vector_config
+                .as_ref()
+                .unwrap_or(&VectorConfig::default())
+                .m
+                .unwrap_or(16)
         )?;
         write!(
             f,
             "ef_construction: Some({}),",
             self.vector_config
                 .as_ref()
-                .unwrap()
+                .unwrap_or(&VectorConfig::default())
                 .ef_construction
                 .unwrap_or(128)
         )?;
@@ -190,7 +194,7 @@ impl fmt::Display for Config {
             "ef_search: Some({}),",
             self.vector_config
                 .as_ref()
-                .unwrap()
+                .unwrap_or(&VectorConfig::default())
                 .ef_search
                 .unwrap_or(768)
         )?;
@@ -199,7 +203,12 @@ impl fmt::Display for Config {
         write!(
             f,
             "secondary_indices: {},",
-            match &self.graph_config.as_ref().unwrap().secondary_indices {
+            match &self
+                .graph_config
+                .as_ref()
+                .unwrap_or(&GraphConfig::default())
+                .secondary_indices
+            {
                 Some(indices) => format!(
                     "Some(vec![{}])",
                     indices

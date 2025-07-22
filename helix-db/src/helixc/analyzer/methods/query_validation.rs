@@ -1,5 +1,7 @@
 //! Semantic analyzer for Helix‑QL.
 
+use crate::generate_error;
+use crate::helixc::analyzer::error_codes::ErrorCode;
 use crate::helixc::{
     analyzer::{
         analyzer::Ctx,
@@ -19,6 +21,7 @@ use crate::helixc::{
     },
     parser::{helix_parser::*, location::Loc},
 };
+use paste::paste;
 use std::collections::HashMap;
 
 pub(crate) fn validate_query<'a>(ctx: &mut Ctx<'a>, original_query: &'a Query) {
@@ -32,12 +35,13 @@ pub(crate) fn validate_query<'a>(ctx: &mut Ctx<'a>, original_query: &'a Query) {
             if is_valid_identifier(ctx, original_query, param.param_type.0.clone(), id.as_str()) {
                 // TODO: add support for edges
                 if !ctx.node_set.contains(id.as_str()) {
-                    push_query_err(
+                    generate_error!(
                         ctx,
                         original_query,
                         param.param_type.0.clone(),
-                        format!("unknown type `{}` for parameter `{}`", id, param.name.1),
-                        "declare or use a matching schema object or use a primitive type",
+                        E209,
+                        &id,
+                        &param.name.1
                     );
                 }
             }
@@ -78,7 +82,13 @@ pub(crate) fn validate_query<'a>(ctx: &mut Ctx<'a>, original_query: &'a Query) {
         push_query_warn(
             ctx,
             original_query,
-            Loc::new(original_query.loc.filepath.clone(), end.clone(), end, original_query.loc.span.clone()),
+            Loc::new(
+                original_query.loc.filepath.clone(),
+                end.clone(),
+                end,
+                original_query.loc.span.clone(),
+            ),
+            ErrorCode::W101,
             "query has no RETURN clause".to_string(),
             "add `RETURN <expr>` at the end",
             None,
@@ -92,7 +102,12 @@ pub(crate) fn validate_query<'a>(ctx: &mut Ctx<'a>, original_query: &'a Query) {
             GeneratedStatement::Traversal(traversal) => {
                 match &traversal.source_step.inner() {
                     SourceStep::Identifier(v) => {
-                        is_valid_identifier(ctx, original_query, ret.loc.clone(), v.inner().as_str());
+                        is_valid_identifier(
+                            ctx,
+                            original_query,
+                            ret.loc.clone(),
+                            v.inner().as_str(),
+                        );
 
                         // if is single object, need to handle it as a single object
                         // if is array, need to handle it as an array
@@ -126,17 +141,18 @@ pub(crate) fn validate_query<'a>(ctx: &mut Ctx<'a>, original_query: &'a Query) {
                 let identifier_end_type = match scope.get(id.inner().as_str()) {
                     Some(t) => t.clone(),
                     None => {
-                        push_query_err(
+                        generate_error!(
                             ctx,
                             original_query,
                             ret.loc.clone(),
-                            format!("variable named `{}` is not in scope", id),
-                            "declare it earlier or fix the typo",
+                            E301,
+                            id.inner().as_str()
                         );
                         Type::Unknown
                     }
                 };
-                let value = gen_identifier_or_param(original_query, id.inner().as_str(), false, true);
+                let value =
+                    gen_identifier_or_param(original_query, id.inner().as_str(), false, true);
                 match identifier_end_type {
                     Type::Scalar(_) => {
                         query.return_values.push(ReturnValue::new_named_literal(
@@ -173,11 +189,12 @@ pub(crate) fn validate_query<'a>(ctx: &mut Ctx<'a>, original_query: &'a Query) {
     }
     if original_query.is_mcp {
         if query.return_values.len() != 1 {
-            push_query_err(ctx,
+            generate_error!(
+                ctx,
                 original_query,
                 original_query.loc.clone(),
-                "MCP queries can only return a single value as LLM needs to be able to traverse from the result".to_string(),
-                "add a single return value that is a node, edge, or vector",
+                E401,
+                &query.return_values.len().to_string()
             );
         } else {
             // match query.return_values.first().unwrap().return_type {

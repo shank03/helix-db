@@ -1,7 +1,7 @@
 use std::{borrow::Cow, collections::HashMap};
 
 use crate::helixc::{
-    analyzer::{analyzer::Ctx, errors::push_schema_err},
+    analyzer::{analyzer::Ctx, error_codes::ErrorCode, errors::push_schema_err},
     parser::{
         helix_parser::{Field, FieldPrefix, FieldType, Source},
         location::Loc,
@@ -19,8 +19,7 @@ pub(crate) fn build_field_lookups<'a>(
         .map(|n| {
             (
                 n.name.1.as_str(),
-                n
-                    .fields
+                n.fields
                     .iter()
                     .map(|f| (f.name.as_str(), Cow::Borrowed(f)))
                     .collect::<HashMap<&str, Cow<'a, Field>>>(),
@@ -89,8 +88,15 @@ pub(crate) fn check_schema(ctx: &mut Ctx) {
             push_schema_err(
                 ctx,
                 edge.from.0.clone(),
-                format!("`{}` is not a declared node type", edge.from.1),
-                Some(format!("Declare `N::{}` before this edge", edge.from.1)),
+                ErrorCode::E106,
+                format!(
+                    "use of undeclared node or vector type `{}` in schema",
+                    edge.from.1
+                ),
+                Some(format!(
+                    "declare `{}` in the schema before using it in an edge",
+                    edge.from.1
+                )),
             );
         }
         if !ctx.node_set.contains(edge.to.1.as_str())
@@ -99,8 +105,15 @@ pub(crate) fn check_schema(ctx: &mut Ctx) {
             push_schema_err(
                 ctx,
                 edge.to.0.clone(),
-                format!("`{}` is not a declared node type", edge.to.1),
-                Some(format!("Declare `N::{}` before this edge", edge.to.1)),
+                ErrorCode::E106,
+                format!(
+                    "use of undeclared node or vector type `{}` in schema",
+                    edge.to.1
+                ),
+                Some(format!(
+                    "declare `{}` in the schema before using it in an edge",
+                    edge.to.1
+                )),
             );
         }
         edge.properties.as_ref().map(|v| {
@@ -109,8 +122,9 @@ pub(crate) fn check_schema(ctx: &mut Ctx) {
                     push_schema_err(
                         ctx,
                         f.loc.clone(),
-                        format!("`{}` is a reserved field name", f.name),
-                        Some("rename the field to something else".to_string()),
+                        ErrorCode::E204,
+                        format!("field `{}` is a reserved field name", f.name),
+                        Some("rename the field".to_string()),
                     );
                 }
             })
@@ -123,8 +137,9 @@ pub(crate) fn check_schema(ctx: &mut Ctx) {
                 push_schema_err(
                     ctx,
                     f.loc.clone(),
-                    format!("`{}` is a reserved field name", f.name),
-                    Some("rename the field to something else".to_string()),
+                    ErrorCode::E204,
+                    format!("field `{}` is a reserved field name", f.name),
+                    Some("rename the field".to_string()),
                 );
             }
         });
@@ -136,8 +151,9 @@ pub(crate) fn check_schema(ctx: &mut Ctx) {
                 push_schema_err(
                     ctx,
                     f.loc.clone(),
-                    format!("`{}` is a reserved field name", f.name),
-                    Some("rename the field to something else".to_string()),
+                    ErrorCode::E204,
+                    format!("field `{}` is a reserved field name", f.name),
+                    Some("rename the field".to_string()),
                 );
             }
         });
