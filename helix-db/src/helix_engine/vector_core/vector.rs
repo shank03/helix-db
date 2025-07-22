@@ -3,15 +3,15 @@ use crate::{
         types::{GraphError, VectorError},
         vector_core::vector_distance::DistanceCalc,
     },
-    protocol::{
-        return_values::ReturnValue,
-        value::Value,
+    protocol::{return_values::ReturnValue, value::Value},
+    utils::{
+        filterable::{Filterable, FilterableType},
+        id::v6_uuid,
     },
-    utils::{filterable::{Filterable, FilterableType}, id::v6_uuid},
 };
 use core::fmt;
 use serde::{Deserialize, Serialize};
-use std::{cmp::Ordering, collections::HashMap, fmt::Debug};
+use std::{borrow::Cow, cmp::Ordering, collections::HashMap, fmt::Debug};
 
 // TODO: make this generic over the type of encoding (f32, f64, etc)
 // TODO: use const param to set dimension
@@ -23,7 +23,7 @@ pub struct HVector {
     /// The id of the HVector
     pub id: u128,
     /// Whether the HVector is deleted (will be used for soft deletes)
-    pub is_deleted: bool,
+    // pub is_deleted: bool,
     /// The level of the HVector
     pub level: usize,
     /// The distance of the HVector
@@ -48,7 +48,16 @@ impl Ord for HVector {
 
 impl Debug for HVector {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{{ \nid: {},\nis_deleted: {},\nlevel: {},\ndistance: {:?},\ndata: {:?},\nproperties: {:#?} }}", uuid::Uuid::from_u128(self.id).to_string(), self.is_deleted, self.level, self.distance, self.data, self.properties)
+        write!(
+            f,
+            "{{ \nid: {},\nlevel: {},\ndistance: {:?},\ndata: {:?},\nproperties: {:#?} }}",
+            uuid::Uuid::from_u128(self.id).to_string(),
+            // self.is_deleted,
+            self.level,
+            self.distance,
+            self.data,
+            self.properties
+        )
     }
 }
 
@@ -58,7 +67,7 @@ impl HVector {
         let id = v6_uuid();
         HVector {
             id,
-            is_deleted: false,
+            // is_deleted: false,
             level: 0,
             data,
             distance: None,
@@ -71,7 +80,7 @@ impl HVector {
         let id = v6_uuid();
         HVector {
             id,
-            is_deleted: false,
+            // is_deleted: false,
             level,
             data,
             distance: None,
@@ -125,7 +134,7 @@ impl HVector {
 
         Ok(HVector {
             id,
-            is_deleted: false,
+            // is_deleted: false,
             level,
             data,
             distance: None,
@@ -164,11 +173,10 @@ impl HVector {
     }
 }
 
-
 /// Filterable implementation for HVector
-/// 
+///
 /// see helix_db/src/protocol/filterable.rs
-/// 
+///
 /// NOTE: This could be moved to the protocol module with the node and edges in `helix_db/protocol/items.rs``
 impl Filterable for HVector {
     fn type_name(&self) -> FilterableType {
@@ -237,18 +245,26 @@ impl Filterable for HVector {
         &self.properties
     }
 
-    fn check_property(&self, key: &str) -> Result<&Value, GraphError> {
-        match &self.properties {
-            Some(properties) => properties
-                .get(key)
-                .ok_or(GraphError::ConversionError(format!(
+    fn check_property(&self, key: &str) -> Result<Cow<'_, Value>, GraphError> {
+        match key {
+            "id" => Ok(Cow::Owned(Value::from(self.uuid()))),
+            "label" => Ok(Cow::Owned(Value::from(self.label().to_string()))),
+            "data" => Ok(Cow::Owned(Value::Array(
+                self.data.iter().map(|f| Value::F64(*f)).collect(),
+            ))),
+            _ => match &self.properties {
+                Some(properties) => properties
+                    .get(key)
+                    .ok_or(GraphError::ConversionError(format!(
+                        "Property {} not found",
+                        key
+                    )))
+                    .map(|v| Cow::Borrowed(v)),
+                None => Err(GraphError::ConversionError(format!(
                     "Property {} not found",
                     key
                 ))),
-            None => Err(GraphError::ConversionError(format!(
-                "Property {} not found",
-                key
-            ))),
+            },
         }
     }
 

@@ -144,6 +144,62 @@ impl PartialOrd for Value {
 
 impl Eq for Value {}
 
+impl PartialEq<u8> for Value {
+    fn eq(&self, other: &u8) -> bool {
+        match self {
+            Value::U8(u) => u == other,
+            _ => false,
+        }
+    }
+}
+impl PartialEq<u16> for Value {
+    fn eq(&self, other: &u16) -> bool {
+        match self {
+            Value::U16(u) => u == other,
+            _ => false,
+        }
+    }
+}
+impl PartialEq<u32> for Value {
+    fn eq(&self, other: &u32) -> bool {
+        match self {
+            Value::U32(u) => u == other,
+            _ => false,
+        }
+    }
+}
+impl PartialEq<u64> for Value {
+    fn eq(&self, other: &u64) -> bool {
+        match self {
+            Value::U64(u) => u == other,
+            _ => false,
+        }
+    }
+}
+impl PartialEq<u128> for Value {
+    fn eq(&self, other: &u128) -> bool {
+        match self {
+            Value::U128(u) => u == other,
+            _ => false,
+        }
+    }
+}
+impl PartialEq<i8> for Value {
+    fn eq(&self, other: &i8) -> bool {
+        match self {
+            Value::I8(i) => i == other,
+            _ => false,
+        }
+    }
+}
+impl PartialEq<i16> for Value {
+    fn eq(&self, other: &i16) -> bool {
+        match self {
+            Value::I16(i) => i == other,
+            _ => false,
+        }
+    }
+}
 impl PartialEq<i32> for Value {
     fn eq(&self, other: &i32) -> bool {
         match self {
@@ -161,6 +217,14 @@ impl PartialEq<i64> for Value {
     }
 }
 
+impl PartialEq<f32> for Value {
+    fn eq(&self, other: &f32) -> bool {
+        match self {
+            Value::F32(f) => f == other,
+            _ => false,
+        }
+    }
+}
 impl PartialEq<f64> for Value {
     fn eq(&self, other: &f64) -> bool {
         match self {
@@ -188,15 +252,6 @@ impl PartialEq<bool> for Value {
     }
 }
 
-impl PartialEq<f32> for Value {
-    fn eq(&self, other: &f32) -> bool {
-        match self {
-            Value::F32(f) => f == other,
-            _ => false,
-        }
-    }
-}
-
 impl PartialEq<&str> for Value {
     fn eq(&self, other: &&str) -> bool {
         match self {
@@ -206,6 +261,30 @@ impl PartialEq<&str> for Value {
     }
 }
 
+impl PartialOrd<i8> for Value {
+    fn partial_cmp(&self, other: &i8) -> Option<Ordering> {
+        match self {
+            Value::I8(i) => i.partial_cmp(other),
+            _ => None,
+        }
+    }
+}
+impl PartialOrd<i16> for Value {
+    fn partial_cmp(&self, other: &i16) -> Option<Ordering> {
+        match self {
+            Value::I16(i) => i.partial_cmp(other),
+            _ => None,
+        }
+    }
+}
+impl PartialOrd<i32> for Value {
+    fn partial_cmp(&self, other: &i32) -> Option<Ordering> {
+        match self {
+            Value::I32(i) => i.partial_cmp(other),
+            _ => None,
+        }
+    }
+}
 impl PartialOrd<i64> for Value {
     fn partial_cmp(&self, other: &i64) -> Option<Ordering> {
         match self {
@@ -214,11 +293,10 @@ impl PartialOrd<i64> for Value {
         }
     }
 }
-
-impl PartialOrd<i32> for Value {
-    fn partial_cmp(&self, other: &i32) -> Option<Ordering> {
+impl PartialOrd<f32> for Value {
+    fn partial_cmp(&self, other: &f32) -> Option<Ordering> {
         match self {
-            Value::I32(i) => i.partial_cmp(other),
+            Value::F32(f) => f.partial_cmp(other),
             _ => None,
         }
     }
@@ -231,7 +309,46 @@ impl PartialOrd<f64> for Value {
         }
     }
 }
-
+impl PartialOrd<u8> for Value {
+    fn partial_cmp(&self, other: &u8) -> Option<Ordering> {
+        match self {
+            Value::U8(u) => u.partial_cmp(other),
+            _ => None,
+        }
+    }
+}
+impl PartialOrd<u16> for Value {
+    fn partial_cmp(&self, other: &u16) -> Option<Ordering> {
+        match self {
+            Value::U16(u) => u.partial_cmp(other),
+            _ => None,
+        }
+    }
+}
+impl PartialOrd<u32> for Value {
+    fn partial_cmp(&self, other: &u32) -> Option<Ordering> {
+        match self {
+            Value::U32(u) => u.partial_cmp(other),
+            _ => None,
+        }
+    }
+}
+impl PartialOrd<u64> for Value {
+    fn partial_cmp(&self, other: &u64) -> Option<Ordering> {
+        match self {
+            Value::U64(u) => u.partial_cmp(other),
+            _ => None,
+        }
+    }
+}
+impl PartialOrd<u128> for Value {
+    fn partial_cmp(&self, other: &u128) -> Option<Ordering> {
+        match self {
+            Value::U128(u) => u.partial_cmp(other),
+            _ => None,
+        }
+    }
+}
 /// Custom serialisation implementation for Value that removes enum variant names in JSON
 /// whilst preserving them for binary formats like bincode.
 impl Serialize for Value {

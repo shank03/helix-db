@@ -29,14 +29,14 @@ properties = { "Properties" ~ ":" ~ "{" ~ field_defs? ~ "}" }
 query_def    = { mcp_macro? ~ "QUERY" ~ identifier ~ query_params ~ "=>" ~ query_body ~ return_stmt } // TODO: possible optional return stmt
 query_params = { "(" ~ (param_def ~ ("," ~ param_def)*)? ~ ")" }
 param_def    = { identifier ~ ":" ~ param_type }
-query_body   = { (get_stmt | AddN | AddV | BatchAddV | AddE | drop | for_loop)* }
+query_body   = { (get_stmt | drop | for_loop | creation_stmt)* }
 
 
 // ---------------------------------------------------------------------
 // Assignments and traversals
 // ---------------------------------------------------------------------
 get_stmt            = { identifier ~ "<-" ~ evaluates_to_anything }
-traversal           = { (start_node | start_edge | start_vector ) ~ step* ~ last_step? }
+traversal           = { (start_node | start_edge ) ~ step* ~ last_step? }
 id_traversal        = { identifier ~ ((step+ ~ last_step?) | last_step) }
 anonymous_traversal = { "_"  ~ ((step+ ~ last_step?) | last_step)? }
 step                = { "::" ~ (graph_step | order_by_asc | order_by_desc | where_step | closure_step | object_step | exclude_field | count | ID | range_step | AddE) }
@@ -50,13 +50,20 @@ object_destructuring = { "{" ~ identifier ~ ("," ~ identifier)* ~ "}" }
 // ---------------------------------------------------------------------
 // Evaluation rules for different types
 // ---------------------------------------------------------------------
-evaluates_to_anything = {
-    AddN
+creation_stmt = { 
+  AddN
   | AddV
   | BatchAddV
+  | AddE
+}
+
+evaluates_to_anything = {
+  AddN
+  | AddV
+  | BatchAddV
+  | AddE
   | search_vector
   | bm25_search
-  | AddE
   | exists
   | none
   | traversal
@@ -159,7 +166,7 @@ none         = { "NONE" }
 ID           = { "ID" }
 update_field = { identifier ~ ":" ~ (evaluates_to_anything | anonymous_traversal) }
 update       = { "UPDATE" ~ "(" ~ "{" ~ update_field ~ ("," ~ update_field)* ~ "}" ~ ")" }
-drop = { "DROP" ~ (traversal | id_traversal | identifier)? }
+drop = { "DROP" ~ evaluates_to_anything }
 
 // ---------------------------------------------------------------------
 // Vector steps
@@ -187,8 +194,7 @@ NEQ             = { "NEQ" ~ "(" ~ (evaluates_to_anything | anonymous_traversal) 
 // ---------------------------------------------------------------------
 // Object access and remapping steps
 // ---------------------------------------------------------------------
-object_step   = { "{" ~ ((mapping_field ~ ("," ~ mapping_field)* ~ ","?) |
-(mapping_field ~ ("," ~ mapping_field)* ~ ","?)? ~ spread_object)  ~ "}" }
+object_step   = { "{" ~ ((mapping_field ~ ("," ~ mapping_field)* ~ "," ~ spread_object ~ ","?) | (mapping_field ~ ("," ~ mapping_field)* ~ ","?) ) ~ "}" }
 exclude_field = { "!" ~ "{" ~ identifier ~ ("," ~ identifier)* ~ ("," ~ spread_object)? ~ "}" }
 closure_step  = { "|" ~ identifier ~ "|" ~ object_step }
 spread_object = { ".." ~ ","?}

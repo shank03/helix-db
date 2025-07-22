@@ -196,12 +196,14 @@ impl ReturnValue {
     pub fn mixin_remapping(self, remappings: HashMap<String, Remapping>) -> Self {
         match self {
             ReturnValue::Object(mut a) => {
+                println!("a1: {:?}", a);
                 remappings.into_iter().for_each(|(k, v)| {
                     if v.exclude {
+                        println!("removing key: {:?}", k);
                         let _ = a.remove(&k);
-                    } else if let Some(new_name) = &v.new_name {
+                    } else if let Some(new_name) = v.new_name {
                         if let Some(value) = a.remove(&k) {
-                            a.insert(new_name.clone(), value);
+                            a.insert(new_name, value);
                         } else {
                             println!("no value found for key: {:?}", k);
                             a.insert(k, v.return_value);
@@ -211,6 +213,7 @@ impl ReturnValue {
                         a.insert(k, v.return_value);
                     }
                 });
+                println!("a2: {:?}", a);
                 ReturnValue::Object(a)
             }
             _ => unreachable!(),

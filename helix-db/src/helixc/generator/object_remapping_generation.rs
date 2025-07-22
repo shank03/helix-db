@@ -9,13 +9,14 @@ pub struct TraversalRemapping {
     pub variable_name: String,
     pub new_field: String,
     pub new_value: Traversal,
+    pub should_spread: bool,
 }
 impl Display for TraversalRemapping {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "traversal_remapping!(remapping_vals, {}.clone(), \"{}\" => {})",
-            self.variable_name, self.new_field, self.new_value
+            "traversal_remapping!(remapping_vals, {}.clone(), {}, \"{}\" => {})",
+            self.variable_name, self.should_spread, self.new_field, self.new_value
         )
     }
 }
@@ -26,13 +27,14 @@ pub struct FieldRemapping {
     pub variable_name: String,
     pub new_name: String,
     pub field_name: String,
+    pub should_spread: bool,
 }
 impl Display for FieldRemapping {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "field_remapping!(remapping_vals, {}.clone(), \"{}\" => \"{}\")",
-            self.variable_name, self.field_name, self.new_name
+            "field_remapping!(remapping_vals, {}.clone(), {}, \"{}\" => \"{}\")",
+            self.variable_name, self.should_spread, self.field_name, self.new_name
         )
     }
 }
@@ -85,7 +87,6 @@ pub struct ObjectRemapping {
 }
 impl Display for ObjectRemapping {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // CHECK: do we just let it cascade to terminal value or do we need to handle here?
         write!(f, "{}", self.remapping)
     }
 }
@@ -95,13 +96,14 @@ pub struct ValueRemapping {
     pub variable_name: String,
     pub field_name: String,
     pub value: GenRef<String>,
+    pub should_spread: bool,
 }
 impl Display for ValueRemapping {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "value_remapping!(remapping_vals, {}.clone(), \"{}\" => {})",
-            self.variable_name, self.field_name, self.value
+            "value_remapping!(remapping_vals, {}.clone(), {}, \"{}\" => {})",
+            self.variable_name, self.should_spread, self.field_name, self.value
         )
     }
 }
@@ -111,30 +113,37 @@ pub struct IdentifierRemapping {
     pub variable_name: String,
     pub field_name: String,
     pub identifier_value: String,
+    pub should_spread: bool,
 }
 impl Display for IdentifierRemapping {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "identifier_remapping!(remapping_vals, {}.clone(), \"{}\" => \"{}\")",
-            self.variable_name, self.field_name, self.identifier_value
+            "identifier_remapping!(remapping_vals, {}.clone(), {}, \"{}\" => \"{}\")",
+            self.variable_name, self.should_spread, self.field_name, self.identifier_value
         )
     }
 }
-// pub enum RemappingValue {
-//     Remapping(Remapping),
-//     String(GenRef<String>),
-// }
-// impl Display for RemappingValue {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         write!(f, "{}", self)
-//     }
-// }
 
-// split obj and tr
+#[derive(Clone)]
+pub struct ExistsRemapping {
+    pub variable_name: String,
+    pub remapping: Traversal,
+    pub should_spread: bool,
+}
+impl Display for ExistsRemapping {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "exists_remapping!(remapping_vals, {}.clone(), {}, {})",
+            self.variable_name, self.should_spread, self.remapping
+        )
+    }
+}
 
 #[derive(Clone)]
 pub struct Remapping {
+    /// Whether the remapping is within another remapping
     pub is_inner: bool,
     pub should_spread: bool,
     pub variable_name: String,
@@ -195,7 +204,7 @@ pub enum RemappingType {
     TraversalRemapping(TraversalRemapping),
     ValueRemapping(ValueRemapping),
     IdentifierRemapping(IdentifierRemapping),
-    Spread,
+    Exists(ExistsRemapping),
     Empty,
 }
 impl Display for RemappingType {
@@ -208,7 +217,7 @@ impl Display for RemappingType {
             RemappingType::TraversalRemapping(r) => write!(f, "{}", r),
             RemappingType::ValueRemapping(r) => write!(f, "{}", r),
             RemappingType::IdentifierRemapping(r) => write!(f, "{}", r),
-            RemappingType::Spread => write!(f, ""),
+            RemappingType::Exists(r) => write!(f, "{}", r),
             RemappingType::Empty => write!(f, ""),
         }
     }

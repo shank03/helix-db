@@ -1,0 +1,120 @@
+use std::{borrow::Cow, collections::HashMap, error::Error, ops::Deref, str::FromStr};
+
+use serde::{Deserialize, Serialize};
+use tokio::io::AsyncWrite;
+use tokio::io::AsyncWriteExt;
+use tokio::io::BufWriter;
+
+use crate::helix_engine::types::GraphError;
+
+/// This enum represents the formats that input or output values of HelixDB can be represented as
+/// It also includes tooling to facilitate copy or zero-copy formats
+#[derive(Debug, Default, Clone, Copy)]
+pub enum Format {
+    /// JSON (JavaScript Object Notation)
+    /// The current implementation uses sonic_rs
+    #[default]
+    Json,
+}
+
+impl Format {
+    /// Serialize the value to bytes.
+    /// If using a zero-copy format it will return a Cow::Borrowed, with a lifetime corresponding to the value.
+    /// Otherwise, it returns a Cow::Owned.
+    /// 
+    /// # Panics
+    /// This method will panic if serialization fails. Ensure that the value being serialized
+    /// is compatible with the chosen format to avoid panics.
+    pub fn serialize<T: Serialize>(self, val: &T) -> Cow<[u8]> {
+        match self {
+            Format::Json => sonic_rs::to_string(val).unwrap().into_bytes().into(),
+        }
+    }
+
+    /// Serialize the value to the supplied async writer.
+    /// This will use an underlying async implementation if possible, otherwise it will buffer it
+    pub async fn serialize_to_async<T: Serialize>(
+        self,
+        val: &T,
+        writer: &mut BufWriter<impl AsyncWrite + Unpin>,
+    ) -> Result<(), Box<dyn Error>> {
+        match self {
+            Format::Json => {
+                let encoded = sonic_rs::to_vec(val)?;
+                writer.write_all(&encoded).await?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Deserialize the provided value
+    /// Returns a MaybeOwned::Borrowed if using a zero-copy format
+    /// or a MaybeOwned::Owned otherwise
+    pub fn deserialize<'a, T: Deserialize<'a>>(
+        self,
+        val: &'a [u8],
+    ) -> Result<MaybeOwned<'a, T>, GraphError> {
+        match self {
+            Format::Json => Ok(MaybeOwned::Owned(
+                sonic_rs::from_slice::<T>(val)
+                    .map_err(|e| GraphError::DecodeError(e.to_string()))?,
+            )),
+        }
+    }
+
+    /// Parse Content-Type and Accept headers from a hashmap
+    pub fn from_headers(headers: &HashMap<String, String>) -> (Format, Format) {
+        let content_type = headers
+            .iter()
+            .find_map(|(k, v)| {
+                if k.to_ascii_lowercase() == "content-type" {
+                    Some(Format::from_str(v).unwrap_or_default())
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_default();
+
+        let accept = headers
+            .iter()
+            .find_map(|(k, v)| {
+                if k.to_ascii_lowercase() == "accept" {
+                    Some(Format::from_str(v).unwrap_or(content_type))
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(content_type);
+
+        (content_type, accept)
+    }
+}
+
+impl FromStr for Format {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "application/json" => Ok(Format::Json),
+            _ => Err(()),
+        }
+    }
+}
+
+/// A wrapper for a value which might be owned or borrowed
+/// The key difference from Cow, is that this doesn't require the value to implement Clone
+pub enum MaybeOwned<'a, T> {
+    Owned(T),
+    Borrowed(&'a T),
+}
+
+impl<'a, T> Deref for MaybeOwned<'a, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            MaybeOwned::Owned(v) => &v,
+            MaybeOwned::Borrowed(v) => *v,
+        }
+    }
+}

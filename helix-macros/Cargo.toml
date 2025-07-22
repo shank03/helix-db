@@ -1,6 +1,6 @@
 [package]
 name = "helix-macros"
-version = "0.1.2"
+version = "0.1.5"
 edition = "2024"
 authors = ["HelixDB Team"]
 repository = "https://github.com/HelixDB/helix-db"
@@ -14,6 +14,7 @@ proc-macro = true
 syn = { version = "2.0.104", features = ["full"] }
 quote = "1.0.40"
 proc-macro2 = "1.0.95"
+dirs = "5.0.1"
 
 [features]
 debug-output = []

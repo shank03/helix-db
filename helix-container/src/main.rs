@@ -8,21 +8,13 @@ use helix_db::helix_gateway::{
 use inventory;
 use std::{collections::HashMap, sync::Arc};
 
-mod queries;
 mod graphvis;
+mod queries;
 
 #[tokio::main]
+
 async fn main() {
-    let home = dirs::home_dir().expect("Could not retrieve home directory");
-    let config_path = home.join(".helix/repo/helix-db/helix-container/src/config.hx.json");
-    let schema_path = home.join(".helix/repo/helix-db/helix-container/src/schema.hx");
-    let config = match Config::from_files(config_path, schema_path) {
-        Ok(config) => config,
-        Err(e) => {
-            println!("Error loading config: {}", e);
-            Config::default()
-        }
-    };
+    let config = queries::config().unwrap_or(Config::default());
 
     let path = match std::env::var("HELIX_DATA_DIR") {
         Ok(val) => std::path::PathBuf::from(val).join("user"),
@@ -58,39 +50,37 @@ async fn main() {
     let post_routes: HashMap<(String, String), HandlerFn> = inventory::iter::<HandlerSubmission>
         .into_iter()
         .map(|submission| {
-            println!("Processing POST submission for handler: {}", submission.0.name);
+            println!(
+                "Processing POST submission for handler: {}",
+                submission.0.name
+            );
             let handler = &submission.0;
             let func: HandlerFn = Arc::new(move |input, response| (handler.func)(input, response));
             (
-                (
-                    "POST".to_string(),
-                    format!("/{}", handler.name.to_string()),
-                ),
+                ("POST".to_string(), format!("/{}", handler.name.to_string())),
                 func,
             )
         })
-    .collect();
+        .collect();
 
     // collect GET routes
-    let get_routes: HashMap<(String, String), HandlerFn> = inventory::iter::<HandlerSubmission>
-        .into_iter()
-        .map(|submission| {
-            println!("Processing GET submission for handler: {}", submission.0.name);
-            let handler = &submission.0;
-            let func: HandlerFn = Arc::new(move |input, response| (handler.func)(input, response));
-            (
-                (
-                    "GET".to_string(),
-                    format!("/get/{}", handler.name.to_string()),
-                ),
-                func,
-            )
-        })
-    .collect();
+    // let get_routes: HashMap<(String, String), HandlerFn> = inventory::iter::<HandlerSubmission>
+    //     .into_iter()
+    //     .map(|submission| {
+    //         println!("Processing GET submission for handler: {}", submission.0.name);
+    //         let handler = &submission.0;
+    //         let func: HandlerFn = Arc::new(move |input, response| (handler.func)(input, response));
+    //         (
+    //             (
+    //                 "GET".to_string(),
+    //                 format!("/get/{}", handler.name.to_string()),
+    //             ),
+    //             func,
+    //         )
+    //     })
+    // .collect();
 
-    let routes: HashMap<(String, String), HandlerFn> = post_routes.into_iter()
-        .chain(get_routes)
-        .collect();
+    let routes: HashMap<(String, String), HandlerFn> = post_routes;
 
     let mcp_submissions: Vec<_> = inventory::iter::<MCPHandlerSubmission>
         .into_iter()
@@ -128,4 +118,3 @@ async fn main() {
     let a = gateway.connection_handler.accept_conns().await.unwrap();
     let _b = a.await.unwrap();
 }
-

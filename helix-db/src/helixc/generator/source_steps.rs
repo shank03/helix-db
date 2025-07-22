@@ -185,7 +185,7 @@ impl Display for SourceStep {
 
 #[derive(Clone)]
 pub struct SearchVector {
-    pub vec: GeneratedValue,
+    pub vec: VecData,
     pub k: GeneratedValue,
     pub pre_filter: Option<Vec<BoExp>>,
 }
@@ -216,7 +216,7 @@ impl Display for SearchVector {
 #[derive(Clone)]
 pub struct NFromIndex {
     pub index: GenRef<String>,
-    pub key: GenRef<String>,
+    pub key: GeneratedValue,
 }
 
 impl Display for NFromIndex {

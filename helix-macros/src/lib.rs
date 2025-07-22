@@ -5,9 +5,7 @@ extern crate syn;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
-    Block, Expr, FnArg, Ident, Item, ItemFn, ItemTrait, Pat, Stmt, Token, TraitItem, Type,
-    parse::{Parse, ParseStream},
-    parse_macro_input,
+    parse::{Parse, ParseStream}, parse_macro_input, Expr, FnArg, Ident, ItemEnum, ItemFn, ItemTrait, Pat, Stmt, Token, TraitItem
 };
 
 struct HandlerArgs {
@@ -43,7 +41,6 @@ pub fn handler(args: TokenStream, item: TokenStream) -> TokenStream {
         _ => panic!("Query block not found"),
     };
 
-
     let txn_type = match args.txn_type.to_string().as_str() {
         "with_read" => quote! { let txn = db.graph_env.read_txn().unwrap(); },
         "with_write" => quote! { let mut txn = db.graph_env.write_txn().unwrap(); },
@@ -53,10 +50,8 @@ pub fn handler(args: TokenStream, item: TokenStream) -> TokenStream {
     let expanded = quote! {
         #[allow(non_camel_case_types)]
         #vis #sig {
-            let data: #input_data_name = match sonic_rs::from_slice(&input.request.body) {
-                Ok(data) => data,
-                Err(err) => return Err(GraphError::from(err)),
-            };
+            let (helix_in_fmt, helix_out_fmt) = Format::from_headers(&input.request.headers);
+            let data = &*helix_in_fmt.deserialize::<#input_data_name>(&input.request.body)?;
 
             let mut remapping_vals = RemappingMap::new();
             let db = Arc::clone(&input.graph.storage);
@@ -65,7 +60,8 @@ pub fn handler(args: TokenStream, item: TokenStream) -> TokenStream {
 
             #(#query_stmts)*
 
-            response.body = sonic_rs::to_vec(&return_vals).unwrap();
+            txn.commit().unwrap();
+            response.value = Some((helix_out_fmt, return_vals));
 
             Ok(())
         }
@@ -279,17 +275,25 @@ pub fn tool_calls(_attr: TokenStream, input: TokenStream) -> TokenStream {
                 })
                 .collect();
 
-            println!("method_params: {:?}", method_params);
             let struct_name = quote::format_ident!("{}Data", fn_name);
+            let mcp_struct_name = quote::format_ident!("{}McpInput", fn_name);
             let expanded = quote! {
+
                 #[derive(Debug, Deserialize)]
                 #[allow(non_camel_case_types)]
-                struct #struct_name<'a> {
-                    connection_id: String,
+                pub struct #mcp_struct_name {
                     #(#struct_fields),*
                 }
 
+                #[derive(Debug, Deserialize)]
+                #[allow(non_camel_case_types)]
+                struct #struct_name {
+                    connection_id: String,
+                    data: #mcp_struct_name,
+                }
+
                 #[mcp_handler]
+                #[allow(non_camel_case_types)]
                 pub fn #fn_name<'a>(
                     input: &'a mut MCPToolInput,
                     response: &mut Response,
@@ -304,12 +308,11 @@ pub fn tool_calls(_attr: TokenStream, input: TokenStream) -> TokenStream {
                         Some(conn) => conn,
                         None => return Err(GraphError::Default),
                     };
+                    drop(connections);
 
                     let txn = input.mcp_backend.db.graph_env.read_txn()?;
 
-
-
-                    let result = input.mcp_backend.#fn_name(&txn, &connection, #(data.#field_names),*)?;
+                    let result = input.mcp_backend.#fn_name(&txn, &connection, #(data.data.#field_names),*)?;
 
                     let first = result.first().unwrap_or(&TraversalVal::Empty).clone();
 
@@ -382,6 +385,7 @@ pub fn tool_call(args: TokenStream, input: TokenStream) -> TokenStream {
             #txn_type
             let data: #struct_name = data.data;
             #(#query_stmts)*
+            txn.commit().unwrap();
             #name.into_iter()
         }
     };
@@ -396,6 +400,7 @@ pub fn tool_call(args: TokenStream, input: TokenStream) -> TokenStream {
         }
 
         #[mcp_handler]
+        #[allow(non_camel_case_types)]
         pub fn #mcp_function_name<'a>(
             input: &'a mut MCPToolInput,
             response: &mut Response,
@@ -411,8 +416,6 @@ pub fn tool_call(args: TokenStream, input: TokenStream) -> TokenStream {
                 None => return Err(GraphError::Default),
             };
             drop(connections);
-
-            let txn = input.mcp_backend.db.graph_env.read_txn()?;
 
             let mut result = #mcp_query_block;
 

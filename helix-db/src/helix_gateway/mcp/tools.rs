@@ -1,4 +1,5 @@
 use crate::{
+    debug_println,
     helix_engine::{
         graph_core::ops::{
             g::G,
@@ -11,20 +12,29 @@ use crate::{
                 out_e::{OutEdgesAdapter, OutEdgesIterator},
             },
             source::{add_e::EdgeType, e_from_type::EFromType, n_from_type::NFromType},
-            tr_val::{Traversable, TraversalVal},
+            vectors::search::SearchVAdapter,
+            bm25::search_bm25::SearchBM25Adapter,
+            tr_val::{TraversalVal, Traversable},
         },
-        storage_core::storage_core::HelixGraphStorage,
         types::GraphError,
+        storage_core::storage_core::HelixGraphStorage,
+        vector_core::vector::HVector,
     },
-    helix_gateway::mcp::mcp::{
-        MCPConnection, MCPHandler, MCPHandlerSubmission, MCPToolInput, McpBackend,
+    helix_gateway::{
+        embedding_providers::embedding_providers::{get_embedding_model, EmbeddingModel},
+        mcp::mcp::{
+            MCPConnection, McpBackend,
+            MCPHandler, MCPHandlerSubmission, MCPToolInput
+        },
     },
-    protocol::response::Response,
-    protocol::return_values::ReturnValue,
+    protocol::{
+        response::Response,
+        return_values::ReturnValue,
+    },
     utils::label_hash::hash_label,
 };
 use heed3::RoTxn;
-use helix_macros::{tool_calls, mcp_handler, tool_call};
+use helix_macros::{tool_calls, mcp_handler};
 use serde::Deserialize;
 use std::{marker::PhantomData, sync::Arc};
 
@@ -64,7 +74,7 @@ trait McpTools<'a> {
         &'a self,
         txn: &'a RoTxn,
         connection: &'a MCPConnection,
-        edge_label: &'a str,
+        edge_label: String,
         edge_type: EdgeType,
     ) -> Result<Vec<TraversalVal>, GraphError>;
 
@@ -72,14 +82,14 @@ trait McpTools<'a> {
         &'a self,
         txn: &'a RoTxn,
         connection: &'a MCPConnection,
-        edge_label: &'a str,
+        edge_label: String,
     ) -> Result<Vec<TraversalVal>, GraphError>;
 
     fn in_step(
         &'a self,
         txn: &'a RoTxn,
         connection: &'a MCPConnection,
-        edge_label: &'a str,
+        edge_label: String,
         edge_type: EdgeType,
     ) -> Result<Vec<TraversalVal>, GraphError>;
 
@@ -87,21 +97,21 @@ trait McpTools<'a> {
         &'a self,
         txn: &'a RoTxn,
         connection: &'a MCPConnection,
-        edge_label: &'a str,
+        edge_label: String,
     ) -> Result<Vec<TraversalVal>, GraphError>;
 
     fn n_from_type(
         &'a self,
         txn: &'a RoTxn,
         connection: &'a MCPConnection,
-        node_type: &'a str,
+        node_type: String,
     ) -> Result<Vec<TraversalVal>, GraphError>;
 
     fn e_from_type(
         &'a self,
         txn: &'a RoTxn,
         connection: &'a MCPConnection,
-        edge_type: &'a str,
+        edge_type: String,
     ) -> Result<Vec<TraversalVal>, GraphError>;
 
     /// filters items based on properies and traversal existence
@@ -112,7 +122,23 @@ trait McpTools<'a> {
         connection: &'a MCPConnection,
         properties: Option<Vec<(String, String)>>,
         filter_traversals: Option<Vec<ToolArgs>>,
-        _marker: PhantomData<&'a ()>,
+    ) -> Result<Vec<TraversalVal>, GraphError>;
+
+    /// BM25
+    fn search_keyword(
+        &'a self,
+        txn: &'a RoTxn,
+        connection: &'a MCPConnection,
+        query: String,
+        limit: usize,
+    ) -> Result<Vec<TraversalVal>, GraphError>;
+
+    /// HNSW Search with built int embedding model
+    fn search_vector_text(
+        &'a self,
+        txn: &'a RoTxn,
+        connection: &'a MCPConnection,
+        query: String,
     ) -> Result<Vec<TraversalVal>, GraphError>;
 }
 
@@ -121,7 +147,7 @@ impl<'a> McpTools<'a> for McpBackend {
         &'a self,
         txn: &'a RoTxn,
         connection: &'a MCPConnection,
-        edge_label: &'a str,
+        edge_label: String,
         edge_type: EdgeType,
     ) -> Result<Vec<TraversalVal>, GraphError> {
         let db = Arc::clone(&self.db);
@@ -130,7 +156,7 @@ impl<'a> McpTools<'a> for McpBackend {
             .iter
             .clone()
             .filter_map(move |item| {
-                let edge_label_hash = hash_label(edge_label, None);
+                let edge_label_hash = hash_label(&edge_label, None);
                 let prefix = HelixGraphStorage::out_edge_key(&item.id(), &edge_label_hash);
                 match db
                     .out_edges_db
@@ -154,7 +180,7 @@ impl<'a> McpTools<'a> for McpBackend {
             .flatten();
 
         let result = iter.take(100).collect();
-        println!("result: {:?}", result);
+        debug_println!("result: {:?}", result);
         result
     }
 
@@ -162,7 +188,7 @@ impl<'a> McpTools<'a> for McpBackend {
         &'a self,
         txn: &'a RoTxn,
         connection: &'a MCPConnection,
-        edge_label: &'a str,
+        edge_label: String,
     ) -> Result<Vec<TraversalVal>, GraphError> {
         let db = Arc::clone(&self.db);
 
@@ -170,7 +196,7 @@ impl<'a> McpTools<'a> for McpBackend {
             .iter
             .clone()
             .filter_map(move |item| {
-                let edge_label_hash = hash_label(edge_label, None);
+                let edge_label_hash = hash_label(&edge_label, None);
                 let prefix = HelixGraphStorage::out_edge_key(&item.id(), &edge_label_hash);
                 match db
                     .out_edges_db
@@ -193,7 +219,7 @@ impl<'a> McpTools<'a> for McpBackend {
             .flatten();
 
         let result = iter.take(100).collect();
-        println!("result: {:?}", result);
+        debug_println!("result: {:?}", result);
         result
     }
 
@@ -201,7 +227,7 @@ impl<'a> McpTools<'a> for McpBackend {
         &'a self,
         txn: &'a RoTxn,
         connection: &'a MCPConnection,
-        edge_label: &'a str,
+        edge_label: String,
         edge_type: EdgeType,
     ) -> Result<Vec<TraversalVal>, GraphError> {
         let db = Arc::clone(&self.db);
@@ -210,7 +236,7 @@ impl<'a> McpTools<'a> for McpBackend {
             .iter
             .clone()
             .filter_map(move |item| {
-                let edge_label_hash = hash_label(edge_label, None);
+                let edge_label_hash = hash_label(&edge_label, None);
                 let prefix = HelixGraphStorage::in_edge_key(&item.id(), &edge_label_hash);
                 match db
                     .in_edges_db
@@ -234,7 +260,7 @@ impl<'a> McpTools<'a> for McpBackend {
             .flatten();
 
         let result = iter.take(100).collect();
-        println!("result: {:?}", result);
+        debug_println!("result: {:?}", result);
         result
     }
 
@@ -242,7 +268,7 @@ impl<'a> McpTools<'a> for McpBackend {
         &'a self,
         txn: &'a RoTxn,
         connection: &'a MCPConnection,
-        edge_label: &'a str,
+        edge_label: String,
     ) -> Result<Vec<TraversalVal>, GraphError> {
         let db = Arc::clone(&self.db);
 
@@ -250,7 +276,7 @@ impl<'a> McpTools<'a> for McpBackend {
             .iter
             .clone()
             .filter_map(move |item| {
-                let edge_label_hash = hash_label(edge_label, None);
+                let edge_label_hash = hash_label(&edge_label, None);
                 let prefix = HelixGraphStorage::in_edge_key(&item.id(), &edge_label_hash);
                 match db
                     .in_edges_db
@@ -264,7 +290,7 @@ impl<'a> McpTools<'a> for McpBackend {
                     }),
                     Ok(None) => None,
                     Err(e) => {
-                        println!("{} Error getting out edges: {:?}", line!(), e);
+                        debug_println!("{} Error getting out edges: {:?}", line!(), e);
                         // return Err(e);
                         None
                     }
@@ -273,7 +299,7 @@ impl<'a> McpTools<'a> for McpBackend {
             .flatten();
 
         let result = iter.take(100).collect();
-        println!("result: {:?}", result);
+        debug_println!("result: {:?}", result);
         result
     }
 
@@ -281,17 +307,17 @@ impl<'a> McpTools<'a> for McpBackend {
         &'a self,
         txn: &'a RoTxn,
         _connection: &'a MCPConnection,
-        node_type: &'a str,
+        node_type: String,
     ) -> Result<Vec<TraversalVal>, GraphError> {
         let db = Arc::clone(&self.db);
 
         let iter = NFromType {
             iter: db.nodes_db.lazily_decode_data().iter(txn).unwrap(),
-            label: node_type,
+            label: &node_type,
         };
 
         let result = iter.take(100).collect::<Result<Vec<_>, _>>();
-        println!("result: {:?}", result);
+        debug_println!("result: {:?}", result);
         result
     }
 
@@ -299,17 +325,17 @@ impl<'a> McpTools<'a> for McpBackend {
         &'a self,
         txn: &'a RoTxn,
         _connection: &'a MCPConnection,
-        edge_type: &'a str,
+        edge_type: String,
     ) -> Result<Vec<TraversalVal>, GraphError> {
         let db = Arc::clone(&self.db);
 
         let iter = EFromType {
             iter: db.edges_db.lazily_decode_data().iter(txn).unwrap(),
-            label: edge_type,
+            label: &edge_type,
         };
 
         let result = iter.take(100).collect::<Result<Vec<_>, _>>();
-        println!("result: {:?}", result);
+        debug_println!("result: {:?}", result);
         result
     }
 
@@ -319,13 +345,12 @@ impl<'a> McpTools<'a> for McpBackend {
         connection: &'a MCPConnection,
         properties: Option<Vec<(String, String)>>,
         filter_traversals: Option<Vec<ToolArgs>>,
-        _marker: PhantomData<&'a ()>,
     ) -> Result<Vec<TraversalVal>, GraphError> {
         let db = Arc::clone(&self.db);
 
-        println!("properties: {:?}", properties);
-        println!("filter_traversals: {:?}", filter_traversals);
-        println!("connection: {:?}", connection.iter);
+        debug_println!("properties: {:?}", properties);
+        debug_println!("filter_traversals: {:?}", filter_traversals);
+        debug_println!("connection: {:?}", connection.iter);
 
         let iter = match properties {
             Some(properties) => {
@@ -344,7 +369,7 @@ impl<'a> McpTools<'a> for McpBackend {
             None => connection.iter.clone().collect::<Vec<_>>(),
         };
 
-        println!("iter: {:?}", iter);
+        debug_println!("iter: {:?}", iter);
 
         let result = iter
             .clone()
@@ -378,8 +403,45 @@ impl<'a> McpTools<'a> for McpBackend {
             })
             .collect::<Vec<_>>();
 
-        println!("result: {:?}", result);
+        debug_println!("result: {:?}", result);
 
         Ok(result)
     }
+
+    fn search_keyword(
+        &'a self,
+        txn: &'a RoTxn,
+        _connection: &'a MCPConnection,
+        query: String,
+        limit: usize,
+    ) -> Result<Vec<TraversalVal>, GraphError> {
+        let db = Arc::clone(&self.db);
+
+        let results = G::new(db, &txn)
+            .search_bm25("mcp search", &query, limit)?
+            .collect_to::<Vec<_>>();
+
+        Ok(results)
+    }
+
+    fn search_vector_text(
+        &'a self,
+        txn: &'a RoTxn,
+        _connection: &'a MCPConnection,
+        query: String,
+    ) -> Result<Vec<TraversalVal>, GraphError> {
+        let db = Arc::clone(&self.db);
+
+        let model = get_embedding_model(None, None, None)?;
+        let result = model.fetch_embedding(&query);
+        let embedding = result?;
+
+        let res = G::new(db, &txn)
+            .search_v::<fn(&HVector, &RoTxn) -> bool>(&embedding, 5, None)
+            .collect_to::<Vec<_>>();
+
+        println!("result: {:?}", res);
+        Ok(res)
+    }
 }
+

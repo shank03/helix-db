@@ -18,26 +18,26 @@ pub mod macros {
     /// assert_eq!(properties.len(), 2); // "title" is excluded
     /// ```
     macro_rules! optional_props {
-    () => {
-        vec![]
-    };
-    ($($key:expr => $value:expr),* $(,)?) => {{
-        let mut vec = Vec::with_capacity($crate::count!($($key),*));
-        $(
-            if let Some(value) = $value {
-                vec.push((String::from($key), value.into()));
-            }
-        )*
-        vec
-    }};
-}
+        () => {
+            vec![]
+        };
+        ($($key:expr => $value:expr),* $(,)?) => {{
+            let mut vec = Vec::with_capacity($crate::count!($($key),*));
+            $(
+                if let Some(value) = $value {
+                    vec.push((String::from($key), value.into()));
+                }
+            )*
+                vec
+        }};
+    }
 
     // Helper macro to count the number of expressions
     #[macro_export]
     #[doc(hidden)]
     macro_rules! count {
-    () => (0);
-    ($head:expr $(, $tail:expr)*) => (1 + $crate::count!($($tail),*));
+        () => (0);
+        ($head:expr $(, $tail:expr)*) => (1 + $crate::count!($($tail),*));
     }
 
     #[macro_export]
@@ -55,17 +55,17 @@ pub mod macros {
     ///
     /// assert_eq!(properties.len(), 2);
     macro_rules! props {
-    () => {
-    vec![]
-    };
-    ($($key:expr => $value:expr),* $(,)?) => {
-        vec![
-            $(
-            (String::from($key), $value.into()),
-            )*
-        ]
-    };
- }
+        () => {
+            vec![]
+        };
+        ($($key:expr => $value:expr),* $(,)?) => {
+            vec![
+                $(
+                    (String::from($key), $value.into()),
+                )*
+            ]
+        };
+    }
 
     #[macro_export]
     /// Creates a closeure that takes a node and checks a property of the node against a value.
@@ -131,7 +131,7 @@ pub mod macros {
 
     #[macro_export]
     macro_rules! field_remapping {
-        ($remapping_vals:expr, $var_name:expr, $old_name:expr => $new_name:expr) => {{
+        ($remapping_vals:expr, $var_name:expr, $should_spread:expr, $old_name:expr => $new_name:expr) => {{
             let old_value = match $var_name.check_property($old_name) {
                 Ok(val) => val,
                 Err(e) => {
@@ -147,7 +147,7 @@ pub mod macros {
                 $var_name.id(),
                 ResponseRemapping::new(
                     HashMap::from([($old_name.to_string(), old_value_remapping)]),
-                    false,
+                    $should_spread,
                 ),
             );
             Ok::<TraversalVal, GraphError>($var_name) // Return the Ok value
@@ -156,7 +156,7 @@ pub mod macros {
 
     #[macro_export]
     macro_rules! traversal_remapping {
-        ($remapping_vals:expr, $var_name:expr, $new_name:expr => $traversal:expr) => {{
+        ($remapping_vals:expr, $var_name:expr, $should_spread:expr, $new_name:expr => $traversal:expr) => {{
             // TODO: ref?
             let new_remapping = Remapping::new(
                 false,
@@ -167,7 +167,7 @@ pub mod macros {
                 $var_name.id(),
                 ResponseRemapping::new(
                     HashMap::from([($new_name.to_string(), new_remapping)]),
-                    false,
+                    $should_spread,
                 ),
             );
             Ok::<TraversalVal, GraphError>($var_name)
@@ -178,27 +178,28 @@ pub mod macros {
     macro_rules! exclude_field {
         ($remapping_vals:expr, $var_name:expr, $($field_to_exclude:expr),* $(,)?) => {{
 
-                    $(
-                    let field_to_exclude_remapping = Remapping::new(
+            $(
+                let field_to_exclude_remapping = Remapping::new(
+                    true,
+                    None,
+                    None,
+                );
+                $remapping_vals.insert(
+                    $var_name.id(),
+                    ResponseRemapping::new(
+                        HashMap::from([($field_to_exclude.to_string(), field_to_exclude_remapping)]),
                         true,
-                        Some($field_to_exclude.to_string()),
-                        None,
-                    );
-                    $remapping_vals.insert(
-                        $var_name.id(),
-                        ResponseRemapping::new(
-                            HashMap::from([($field_to_exclude.to_string(), field_to_exclude_remapping)]),
-                            false,
-                        ),
-                    );
-                    )*
+                    ),
+                );
+                println!("inserting remapping: {:?}", $remapping_vals.borrow_mut());
+            )*
                 Ok::<TraversalVal, GraphError>($var_name)
         }};
     }
 
     #[macro_export]
     macro_rules! identifier_remapping {
-        ($remapping_vals:expr, $var_name:expr, $field_name:expr =>  $identifier_value:expr) => {{
+        ($remapping_vals:expr, $var_name:expr, $should_spread:expr, $field_name:expr =>  $identifier_value:expr) => {{
             let value = match $var_name.check_property($field_name) {
                 Ok(val) => val.clone(), // TODO: try and remove clone
                 Err(e) => {
@@ -212,12 +213,12 @@ pub mod macros {
                 false,
                 Some($identifier_value.to_string()),
                 Some(ReturnValue::from(value)),
-            );
+            );-
             $remapping_vals.insert(
                 $var_name.id(),
                 ResponseRemapping::new(
                     HashMap::from([($field_name.to_string(), value_remapping)]),
-                    false,
+                    $should_spread,
                 ),
             );
             Ok::<TraversalVal, GraphError>($var_name)
@@ -226,7 +227,7 @@ pub mod macros {
 
     #[macro_export]
     macro_rules! value_remapping {
-        ($remapping_vals:expr, $var_name:expr, $field_name:expr =>  $value:expr) => {{
+        ($remapping_vals:expr, $var_name:expr, $should_spread:expr, $field_name:expr =>  $value:expr) => {{
             let value = match $var_name.check_property($field_name) {
                 Ok(val) => val.clone(),
                 Err(e) => {
@@ -245,7 +246,7 @@ pub mod macros {
                 $var_name.id(),
                 ResponseRemapping::new(
                     HashMap::from([($field_name.to_string(), old_value_remapping)]),
-                    false,
+                    $should_spread,
                 ),
             );
             Ok::<TraversalVal, GraphError>($var_name) // Return the Ok value

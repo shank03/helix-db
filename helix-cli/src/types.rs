@@ -3,46 +3,7 @@ use std::{
     fmt,
 };
 
-#[derive(Debug)]
-pub enum CliError {
-    Io(std::io::Error),
-    New(String),
-    CompileFailed,
-}
-
-impl std::fmt::Display for CliError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            CliError::Io(e) => write!(f, "IO error: {}", e),
-            CliError::New(msg) => write!(f, "{}", msg),
-            CliError::CompileFailed => write!(f, "Failed to compile queries"),
-        }
-    }
-}
-
-impl From<std::io::Error> for CliError {
-    fn from(e: std::io::Error) -> Self {
-        CliError::Io(e)
-    }
-}
-
-impl From<&'static str> for CliError {
-    fn from(e: &'static str) -> Self {
-        CliError::New(e.to_string())
-    }
-}
-
-impl From<String> for CliError {
-    fn from(e: String) -> Self {
-        CliError::New(e)
-    }
-}
-
-impl From<sonic_rs::Error> for CliError {
-    fn from(e: sonic_rs::Error) -> Self {
-        CliError::New(e.to_string())
-    }
-}
+use clap::{Subcommand, ValueEnum};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Version {
@@ -95,6 +56,25 @@ impl Ord for Version {
 impl fmt::Display for Version {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "v{}.{}.{}", self.major, self.minor, self.patch)
+    }
+}
+
+#[derive(Debug, Subcommand, Clone, ValueEnum)]
+#[clap(name = "output")]
+pub enum OutputLanguage {
+    #[clap(name = "rust", alias = "rs")]
+    Rust,
+    #[clap(name = "typescript", alias = "ts")]
+    TypeScript,
+}
+
+impl PartialEq for OutputLanguage {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (OutputLanguage::TypeScript, OutputLanguage::TypeScript) => true,
+            (OutputLanguage::Rust, OutputLanguage::Rust) => true,
+            _ => false,
+        }
     }
 }
 

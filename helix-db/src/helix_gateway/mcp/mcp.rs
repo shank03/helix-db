@@ -1,23 +1,19 @@
 use crate::{
     helix_engine::{
-        graph_core::ops::tr_val::TraversalVal,
-        storage_core::storage_core::HelixGraphStorage,
+        graph_core::ops::tr_val::TraversalVal, storage_core::storage_core::HelixGraphStorage,
         types::GraphError,
     },
-    protocol::{
-        request::Request, response::Response,
-        return_values::ReturnValue,
-    },
+    helix_gateway::mcp::tools::ToolArgs,
+    protocol::{request::Request, response::Response, return_values::ReturnValue},
     utils::id::v6_uuid,
-    helix_gateway::mcp::tools::{ToolArgs},
 };
 use helix_macros::mcp_handler;
+use serde::Deserialize;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
     vec::IntoIter,
 };
-use serde::Deserialize;
 
 pub struct McpConnections {
     pub connections: HashMap<String, MCPConnection>,
@@ -50,6 +46,10 @@ impl McpConnections {
     pub fn get_connection_mut(&mut self, connection_id: &str) -> Option<&mut MCPConnection> {
         self.connections.get_mut(connection_id)
     }
+
+    pub fn get_connection_owned(&mut self, connection_id: &str) -> Option<MCPConnection> {
+        self.connections.remove(connection_id)
+    }
 }
 pub struct McpBackend {
     pub db: Arc<HelixGraphStorage>,
@@ -80,10 +80,7 @@ pub struct MCPConnection {
 }
 
 impl MCPConnection {
-    pub fn new(
-        connection_id: String,
-        iter: IntoIter<TraversalVal>,
-    ) -> Self {
+    pub fn new(connection_id: String, iter: IntoIter<TraversalVal>) -> Self {
         Self {
             connection_id,
             iter,
@@ -167,35 +164,88 @@ pub fn next<'a>(input: &'a mut MCPToolInput, response: &mut Response) -> Result<
         .next()
         .unwrap_or(TraversalVal::Empty)
         .clone();
-
     drop(connections);
+
     response.body = sonic_rs::to_vec(&ReturnValue::from(next))?;
+    Ok(())
+}
+
+#[derive(Deserialize)]
+pub struct Range {
+    pub start: usize,
+    pub end: usize,
+}
+
+#[derive(Deserialize)]
+pub struct CollectRequest {
+    pub connection_id: String,
+    pub range: Option<Range>,
+}
+
+#[mcp_handler]
+pub fn collect<'a>(input: &'a mut MCPToolInput, response: &mut Response) -> Result<(), GraphError> {
+    let data: CollectRequest = match sonic_rs::from_slice(&input.request.body) {
+        Ok(data) => data,
+        Err(e) => return Err(GraphError::from(e)),
+    };
+
+    let mut connections = input.mcp_connections.lock().unwrap();
+    let connection = match connections.get_connection_owned(&data.connection_id) {
+        Some(conn) => conn,
+        None => return Err(GraphError::StorageError("Connection not found".to_string())),
+    };
+    drop(connections);
+
+    let (start, end) = match data.range {
+        Some(range) => (range.start, range.end),
+        None => (0, 10),
+    };
+
+    let values = connection
+        .iter
+        .skip(start)
+        .take(end - start)
+        .collect::<Vec<TraversalVal>>();
+
+    let mut connections = input.mcp_connections.lock().unwrap();
+    connections.add_connection(MCPConnection::new(
+        connection.connection_id.clone(),
+        vec![].into_iter(),
+    ));
+    drop(connections);
+
+    response.body = sonic_rs::to_vec(&ReturnValue::from(values))?;
     Ok(())
 }
 
 #[mcp_handler]
 pub fn schema_resource<'a>(
     input: &'a mut MCPToolInput,
-    response: &mut Response
+    response: &mut Response,
 ) -> Result<(), GraphError> {
     let data: ResourceCallRequest = match sonic_rs::from_slice(&input.request.body) {
         Ok(data) => data,
         Err(e) => return Err(GraphError::from(e)),
     };
 
-    let _ = match input.mcp_connections.lock().unwrap().get_connection(&data.connection_id) {
+    let _ = match input
+        .mcp_connections
+        .lock()
+        .unwrap()
+        .get_connection(&data.connection_id)
+    {
         Some(conn) => conn,
         None => return Err(GraphError::StorageError("Connection not found".to_string())),
     };
 
     if input.schema.is_some() {
-        response.body = sonic_rs::to_vec(
-            &ReturnValue::from(input.schema.as_ref().unwrap().to_string())
-        ).unwrap();
+        response.body = sonic_rs::to_vec(&ReturnValue::from(
+            input.schema.as_ref().unwrap().to_string(),
+        ))
+        .unwrap();
     } else {
         response.body = sonic_rs::to_vec(&ReturnValue::from("no schema".to_string())).unwrap();
     }
 
     Ok(())
 }
-

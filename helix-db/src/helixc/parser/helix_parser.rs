@@ -312,13 +312,8 @@ pub struct Statement {
 #[derive(Debug, Clone)]
 pub enum StatementType {
     Assignment(Assignment),
-    AddVector(AddVector),
-    AddNode(AddNode),
-    AddEdge(AddEdge),
+    Expression(Expression),
     Drop(Expression),
-    SearchVector(SearchVector),
-    BatchAddVector(BatchAddVector),
-    BM25Search(BM25Search),
     ForLoop(ForLoop),
 }
 
@@ -360,7 +355,7 @@ pub struct Expression {
     pub expr: ExpressionType,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum ExpressionType {
     Traversal(Box<Traversal>),
     Identifier(String),
@@ -378,6 +373,50 @@ pub enum ExpressionType {
     SearchVector(SearchVector),
     BM25Search(BM25Search),
     Empty,
+}
+impl Debug for ExpressionType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ExpressionType::Traversal(traversal) => write!(f, "Traversal({:?})", traversal),
+            ExpressionType::Identifier(s) => write!(f, "{}", s),
+            ExpressionType::StringLiteral(s) => write!(f, "{}", s),
+            ExpressionType::IntegerLiteral(i) => write!(f, "{}", i),
+            ExpressionType::FloatLiteral(fl) => write!(f, "{}", fl),
+            ExpressionType::BooleanLiteral(b) => write!(f, "{}", b),
+            ExpressionType::Exists(e) => write!(f, "Exists({:?})", e),
+            ExpressionType::BatchAddVector(bav) => write!(f, "BatchAddVector({:?})", bav),
+            ExpressionType::AddVector(av) => write!(f, "AddVector({:?})", av),
+            ExpressionType::AddNode(an) => write!(f, "AddNode({:?})", an),
+            ExpressionType::AddEdge(ae) => write!(f, "AddEdge({:?})", ae),
+            ExpressionType::And(and) => write!(f, "And({:?})", and),
+            ExpressionType::Or(or) => write!(f, "Or({:?})", or),
+            ExpressionType::SearchVector(sv) => write!(f, "SearchVector({:?})", sv),
+            ExpressionType::BM25Search(bm25) => write!(f, "BM25Search({:?})", bm25),
+            ExpressionType::Empty => write!(f, "Empty"),
+        }
+    }
+}
+impl Display for ExpressionType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ExpressionType::Traversal(traversal) => write!(f, "Traversal({:?})", traversal),
+            ExpressionType::Identifier(s) => write!(f, "{}", s),
+            ExpressionType::StringLiteral(s) => write!(f, "{}", s),
+            ExpressionType::IntegerLiteral(i) => write!(f, "{}", i),
+            ExpressionType::FloatLiteral(fl) => write!(f, "{}", fl),
+            ExpressionType::BooleanLiteral(b) => write!(f, "{}", b),
+            ExpressionType::Exists(e) => write!(f, "Exists({:?})", e),
+            ExpressionType::BatchAddVector(bav) => write!(f, "BatchAddVector({:?})", bav),
+            ExpressionType::AddVector(av) => write!(f, "AddVector({:?})", av),
+            ExpressionType::AddNode(an) => write!(f, "AddNode({:?})", an),
+            ExpressionType::AddEdge(ae) => write!(f, "AddEdge({:?})", ae),
+            ExpressionType::And(and) => write!(f, "And({:?})", and),
+            ExpressionType::Or(or) => write!(f, "Or({:?})", or),
+            ExpressionType::SearchVector(sv) => write!(f, "SearchVector({:?})", sv),
+            ExpressionType::BM25Search(bm25) => write!(f, "BM25Search({:?})", bm25),
+            ExpressionType::Empty => write!(f, "Empty"),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -672,6 +711,13 @@ pub enum ValueType {
 impl ValueType {
     pub fn new(value: Value, loc: Loc) -> ValueType {
         ValueType::Literal { value, loc }
+    }
+    pub fn to_string(&self) -> String {
+        match self {
+            ValueType::Literal { value, loc: _ } => value.to_string(),
+            ValueType::Identifier { value, loc: _ } => value.clone(),
+            ValueType::Object { fields, loc: _ } => fields.keys().map(|k| k.clone()).collect::<Vec<String>>().join(", "),
+        }
     }
 }
 
@@ -1162,34 +1208,19 @@ impl HelixParser {
                     loc: p.loc(),
                     statement: StatementType::Assignment(self.parse_get_statement(p)?),
                 }),
-                Rule::AddN => Ok(Statement {
+                Rule::creation_stmt => Ok(Statement {
                     loc: p.loc(),
-                    statement: StatementType::AddNode(self.parse_add_node(p)?),
+                    statement: StatementType::Expression(self.parse_expression(p)?),
                 }),
-                Rule::AddV => Ok(Statement {
-                    loc: p.loc(),
-                    statement: StatementType::AddVector(self.parse_add_vector(p)?),
-                }),
-                Rule::AddE => Ok(Statement {
-                    loc: p.loc(),
-                    statement: StatementType::AddEdge(self.parse_add_edge(p, false)?),
-                }),
-                Rule::drop => Ok(Statement {
-                    loc: p.loc(),
-                    statement: StatementType::Drop(self.parse_expression(p)?),
-                }),
-                Rule::BatchAddV => Ok(Statement {
-                    loc: p.loc(),
-                    statement: StatementType::BatchAddVector(self.parse_batch_add_vector(p)?),
-                }),
-                Rule::search_vector => Ok(Statement {
-                    loc: p.loc(),
-                    statement: StatementType::SearchVector(self.parse_search_vector(p)?),
-                }),
-                Rule::bm25_search => Ok(Statement {
-                    loc: p.loc(),
-                    statement: StatementType::BM25Search(self.parse_bm25_search(p)?),
-                }),
+
+                Rule::drop => {
+                    let inner = p.into_inner().next().unwrap();
+                    Ok(Statement {
+                        loc: inner.loc(),
+                        statement: StatementType::Drop(self.parse_expression(inner)?),
+                    })
+                }
+
                 Rule::for_loop => Ok(Statement {
                     loc: p.loc(),
                     statement: StatementType::ForLoop(self.parse_for_loop(p)?),
@@ -2368,15 +2399,12 @@ impl HelixParser {
                 loc: value_pair.loc(),
                 value: FieldValueType::Fields(self.parse_field_additions(value_pair)?),
             },
-            Rule::string_literal => {
-                println!("string_literal: {:?}", value_pair);
-                FieldValue {
-                    loc: value_pair.loc(),
-                    value: FieldValueType::Literal(Value::String(
-                        self.parse_string_literal(value_pair)?,
-                    )),
-                }
-            }
+            Rule::string_literal => FieldValue {
+                loc: value_pair.loc(),
+                value: FieldValueType::Literal(Value::String(
+                    self.parse_string_literal(value_pair)?,
+                )),
+            },
             Rule::integer => FieldValue {
                 loc: value_pair.loc(),
                 value: FieldValueType::Literal(Value::I32(
@@ -2500,6 +2528,7 @@ impl HelixParser {
         let mut should_spread = false;
         for p in pair.clone().into_inner() {
             if p.as_rule() == Rule::spread_object {
+                println!("spread_object");
                 should_spread = true;
                 continue;
             }
