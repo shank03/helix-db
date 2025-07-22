@@ -38,7 +38,7 @@ pub use helix_db::{
         vector_core::vector::HVector,
     },
     helix_gateway::{
-        embedding_providers::embedding_providers::{EmbeddingModel, get_embedding_model},
+        embedding_providers::embedding_providers::{get_embedding_model, EmbeddingModel},
         mcp::mcp::{MCPHandler, MCPHandlerSubmission, MCPToolInput},
         router::router::HandlerInput,
     },
