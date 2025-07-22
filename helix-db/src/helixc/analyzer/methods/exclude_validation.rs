@@ -1,16 +1,21 @@
-use crate::helixc::{
-    analyzer::{
-        analyzer::Ctx,
-        errors::{push_query_err, push_query_err_with_fix},
-        fix::Fix,
-        types::Type,
+use crate::helixc::analyzer::error_codes::ErrorCode;
+use crate::{
+    generate_error,
+    helixc::{
+        analyzer::{
+            analyzer::Ctx,
+            errors::{push_query_err, push_query_err_with_fix},
+            fix::Fix,
+            types::Type,
+        },
+        parser::{helix_parser::*, location::Loc},
     },
-    parser::{helix_parser::*, location::Loc},
 };
+use paste::paste;
 use std::{borrow::Cow, collections::HashMap};
 
 /// Iterates through the fields to exclude and validates that the exist on the type and have not been excluded previously.
-/// 
+///
 /// # Arguments
 ///
 /// * `ctx` - The context of the query
@@ -37,24 +42,27 @@ pub(crate) fn validate_exclude_fields<'a>(
                 ctx,
                 original_query,
                 loc.clone(),
-                format!("field `{}` was previously excluded in this traversal", key),
-                format!("remove the exclusion of `{}`", key),
+                ErrorCode::E643,
+                key.clone(),
+                "remove the exclusion of `{}`",
                 Fix::new(span.clone(), Some(loc.clone()), None),
             );
         } else if !field_set.contains_key(key.as_str()) {
-            push_query_err(
+            generate_error!(
                 ctx,
                 original_query,
                 loc.clone(),
-                format!("`{}` is not a field of {} `{}`", key, type_kind, type_name),
-                "check the schema field names",
+                E202,
+                key.as_str(),
+                type_kind,
+                type_name
             );
         }
     }
 }
 
 /// Validates the exclude fields for a given type
-/// 
+///
 /// # Arguments
 ///
 /// * `ctx` - The context of the query
@@ -119,13 +127,7 @@ pub(crate) fn validate_exclude<'a>(
             validate_exclude(ctx, ty, tr, ex, excluded, original_query);
         }
         _ => {
-            push_query_err(
-                ctx,
-                original_query,
-                ex.fields[0].0.clone(),
-                "cannot access properties on this type".to_string(),
-                "exclude is only valid on nodes, edges and vectors",
-            );
+            generate_error!(ctx, original_query, ex.fields[0].0.clone(), E203, cur_ty.kind_str());
         }
     }
 }

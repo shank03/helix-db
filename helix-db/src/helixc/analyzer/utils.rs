@@ -1,13 +1,18 @@
 //! Semantic analyzer for Helix‑QL.
-use crate::helixc::{
-    analyzer::{analyzer::Ctx, errors::push_query_err, types::Type},
-    generator::{
-        traversal_steps::Step,
-        utils::{GenRef, GeneratedValue},
+use crate::helixc::analyzer::error_codes::ErrorCode;
+use crate::{
+    generate_error,
+    helixc::{
+        analyzer::{analyzer::Ctx, errors::push_query_err, types::Type},
+        generator::{
+            traversal_steps::Step,
+            utils::{GenRef, GeneratedValue},
+        },
+        parser::{helix_parser::*, location::Loc},
     },
-    parser::{helix_parser::*, location::Loc},
 };
-use std::{borrow::Cow, collections::HashMap};
+use paste::paste;
+use std::collections::HashMap;
 
 pub(super) fn is_valid_identifier(
     ctx: &mut Ctx,
@@ -18,13 +23,7 @@ pub(super) fn is_valid_identifier(
     match name {
         "true" | "false" | "NONE" | "String" | "Boolean" | "F32" | "F64" | "I8" | "I16" | "I32"
         | "I64" | "U8" | "U16" | "U32" | "U64" | "U128" | "Uuid" | "Date" => {
-            push_query_err(
-                ctx,
-                original_query,
-                loc.clone(),
-                format!("`{}` is not a valid identifier", name),
-                "use a valid identifier",
-            );
+            generate_error!(ctx, original_query, loc.clone(), E105, name);
             false
         }
         _ => true,
@@ -74,13 +73,7 @@ pub(super) fn type_in_scope(
     match scope.get(name) {
         Some(ty) => Some(ty.clone()),
         None => {
-            push_query_err(
-                ctx,
-                original_query,
-                loc.clone(),
-                format!("variable named `{}` is not in scope", name),
-                "declare {} in the current scope or fix the typo".to_string(),
-            );
+            generate_error!(ctx, original_query, loc.clone(), E301, name);
             None
         }
     }
@@ -101,17 +94,14 @@ pub(super) fn field_exists_on_item_type(
                     .map(|fields| fields.contains_key(key))
                     .unwrap_or(true)
                 {
-                    push_query_err(
+                    generate_error!(
                         ctx,
                         original_query,
                         loc.clone(),
-                        format!(
-                            "`{}` is not a field of node `{}` {}",
-                            key,
-                            node_type,
-                            line!()
-                        ),
-                        "check the schema field names",
+                        E202,
+                        key,
+                        "node",
+                        &node_type
                     );
                 }
             }
@@ -124,17 +114,14 @@ pub(super) fn field_exists_on_item_type(
                     .map(|fields| fields.contains_key(key))
                     .unwrap_or(true)
                 {
-                    push_query_err(
+                    generate_error!(
                         ctx,
                         original_query,
                         loc.clone(),
-                        format!(
-                            "`{}` is not a field of edge `{}` {}",
-                            key,
-                            edge_type,
-                            line!()
-                        ),
-                        "check the schema field names",
+                        E202,
+                        key,
+                        "edge",
+                        &edge_type
                     );
                 }
             }
@@ -143,6 +130,8 @@ pub(super) fn field_exists_on_item_type(
         _ => unreachable!("shouldve been caught eariler"),
     }
 }
+
+#[allow(unused)]
 
 pub(super) fn get_singular_type(ty: Type) -> Type {
     match ty {
@@ -164,16 +153,14 @@ pub(super) fn validate_field_name_existence_for_item_type(
     name: &str,
 ) {
     if !item_type.item_fields_contains_key(ctx, name) {
-        push_query_err(
+        generate_error!(
             ctx,
             original_query,
             loc.clone(),
-            format!(
-                "`{}` is not a field of `{}`",
-                name,
-                item_type.get_type_name()
-            ),
-            "check the schema field names",
+            E202,
+            name,
+            item_type.kind_str(),
+            &item_type.get_type_name()
         );
     }
 }

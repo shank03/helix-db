@@ -1,5 +1,7 @@
 //! Semantic analyzer for Helix‑QL.
+use crate::helixc::analyzer::error_codes::ErrorCode;
 use crate::{
+    generate_error,
     helixc::{
         analyzer::{
             analyzer::Ctx,
@@ -25,6 +27,7 @@ use crate::{
     },
     protocol::date::Date,
 };
+use paste::paste;
 use std::collections::HashMap;
 
 /// Infer the end type of an expression and returns the statement to generate from the expression
@@ -64,12 +67,12 @@ pub(crate) fn infer_expr_type<'a>(
                 ),
 
                 None => {
-                    push_query_err(
+                    generate_error!(
                         ctx,
                         original_query,
                         expression.loc.clone(),
-                        format!("variable named `{}` is not in scope", name),
-                        "declare it earlier or fix the typo",
+                        E301,
+                        name.as_str()
                     );
                     (Type::Unknown, None)
                 }
@@ -117,13 +120,7 @@ pub(crate) fn infer_expr_type<'a>(
         AddNode(add) => {
             if let Some(ref ty) = add.node_type {
                 if !ctx.node_set.contains(ty.as_str()) {
-                    push_query_err(
-                        ctx,
-                        original_query,
-                        add.loc.clone(),
-                        format!("`AddN<{}>` refers to unknown node type", ty),
-                        "declare the node schema first",
-                    );
+                    generate_error!(ctx, original_query, add.loc.clone(), E101, ty.as_str());
                 }
                 let label = GenRef::Literal(ty.clone());
 
@@ -143,12 +140,14 @@ pub(crate) fn infer_expr_type<'a>(
                     if let Some(field_set) = field_set {
                         for (field_name, value) in fields {
                             if !field_set.contains_key(field_name.as_str()) {
-                                push_query_err(
+                                generate_error!(
                                     ctx,
                                     original_query,
                                     add.loc.clone(),
-                                    format!("`{}` is not a field of node `{}`", field_name, ty),
-                                    "check the schema field names",
+                                    E202,
+                                    field_name.as_str(),
+                                    "node",
+                                    ty.as_str()
                                 );
                             }
                             match value {
@@ -160,12 +159,12 @@ pub(crate) fn infer_expr_type<'a>(
                                         value.as_str(),
                                     ) {
                                         if !scope.contains_key(value.as_str()) {
-                                            push_query_err(
+                                            generate_error!(
                                                 ctx,
                                                 original_query,
                                                 loc.clone(),
-                                                format!("`{}` is not in scope", value),
-                                                "declare it earlier or fix the typo",
+                                                E301,
+                                                value.as_str()
                                             );
                                         }
                                     };
@@ -181,12 +180,16 @@ pub(crate) fn infer_expr_type<'a>(
                                         .field_type
                                         .clone();
                                     if field_type != *value {
-                                        push_query_err(ctx,
-                                             original_query,
-                                             loc.clone(),
-                                             format!("value `{}` is of type `{}`, which does not match type {} declared in the schema for field `{}` on node type `{}`", value, GenRef::from(value.clone()), field_type, field_name, ty),
-                                             "ensure the value is of the same type as the field declared in the schema".to_string(),
-                                         );
+                                        generate_error!(
+                                            ctx,
+                                            original_query,
+                                            loc.clone(),
+                                            E205,
+                                            value.as_str(),
+                                            &field_type.to_string(),
+                                            "node",
+                                            ty.as_str()
+                                        );
                                     }
                                 }
                                 _ => {}
@@ -213,13 +216,13 @@ pub(crate) fn infer_expr_type<'a>(
                                                 Ok(date) => GeneratedValue::Literal(
                                                     GenRef::Literal(date.to_rfc3339()),
                                                 ),
-                                                Err(e) => {
-                                                    push_query_err(
+                                                Err(_) => {
+                                                    generate_error!(
                                                         ctx,
                                                         original_query,
                                                         loc.clone(),
-                                                        e.to_string(),
-                                                        "ensure the value is a valid date",
+                                                        E501,
+                                                        value.as_str()
                                                     );
                                                     GeneratedValue::Unknown
                                                 }
@@ -239,12 +242,12 @@ pub(crate) fn infer_expr_type<'a>(
                                         gen_identifier_or_param(original_query, value, true, false)
                                     }
                                     v => {
-                                        push_query_err(
+                                        generate_error!(
                                             ctx,
                                             original_query,
                                             add.loc.clone(),
-                                            format!("`{:?}` is not a valid field value", v),
-                                            "use a literal or identifier",
+                                            E206,
+                                            &v.to_string()
                                         );
                                         GeneratedValue::Unknown
                                     }
@@ -295,25 +298,20 @@ pub(crate) fn infer_expr_type<'a>(
                     return (Type::Node(Some(ty.to_string())), Some(stmt));
                 }
             }
-            push_query_err(
+            generate_error!(
                 ctx,
                 original_query,
                 add.loc.clone(),
-                "`AddN` must have a node type".to_string(),
-                "add a node type",
+                E304,
+                ["node"],
+                ["node"]
             );
             return (Type::Node(None), None);
         }
         AddEdge(add) => {
             if let Some(ref ty) = add.edge_type {
                 if !ctx.edge_map.contains_key(ty.as_str()) {
-                    push_query_err(
-                        ctx,
-                        original_query,
-                        add.loc.clone(),
-                        format!("`AddE<{}>` refers to unknown edge type", ty),
-                        "declare the edge schema first",
-                    );
+                    generate_error!(ctx, original_query, add.loc.clone(), E102, ty.as_str());
                 }
                 let label = GenRef::Literal(ty.clone());
                 // Validate fields if both type and fields are present
@@ -324,12 +322,14 @@ pub(crate) fn infer_expr_type<'a>(
                         if let Some(field_set) = field_set {
                             for (field_name, value) in fields {
                                 if !field_set.contains_key(field_name.as_str()) {
-                                    push_query_err(
+                                    generate_error!(
                                         ctx,
                                         original_query,
                                         add.loc.clone(),
-                                        format!("`{}` is not a field of edge `{}`", field_name, ty),
-                                        "check the schema field names",
+                                        E202,
+                                        field_name.as_str(),
+                                        "edge",
+                                        ty.as_str()
                                     );
                                 }
 
@@ -342,12 +342,12 @@ pub(crate) fn infer_expr_type<'a>(
                                             value.as_str(),
                                         ) {
                                             if !scope.contains_key(value.as_str()) {
-                                                push_query_err(
+                                                generate_error!(
                                                     ctx,
                                                     original_query,
                                                     loc.clone(),
-                                                    format!("`{}` is not in scope", value),
-                                                    "declare it earlier or fix the typo",
+                                                    E301,
+                                                    value.as_str()
                                                 );
                                             }
                                         };
@@ -363,12 +363,16 @@ pub(crate) fn infer_expr_type<'a>(
                                             .field_type
                                             .clone();
                                         if field_type != *value {
-                                            push_query_err(ctx,
-                                                 original_query,
-                                                 loc.clone(),
-                                                 format!("value `{}` is of type `{}`, which does not match type {} declared in the schema for field `{}` on node type `{}`", value, GenRef::from(value.clone()), field_type, field_name, ty),
-                                                 "ensure the value is of the same type as the field declared in the schema".to_string(),
-                                             );
+                                            generate_error!(
+                                                ctx,
+                                                original_query,
+                                                loc.clone(),
+                                                E205,
+                                                value.as_str(),
+                                                &field_type.to_string(),
+                                                "edge",
+                                                ty.as_str()
+                                            );
                                         }
                                     }
                                     _ => {}
@@ -396,13 +400,13 @@ pub(crate) fn infer_expr_type<'a>(
                                                         Ok(date) => GeneratedValue::Literal(
                                                             GenRef::Literal(date.to_rfc3339()),
                                                         ),
-                                                        Err(e) => {
-                                                            push_query_err(
+                                                        Err(_) => {
+                                                            generate_error!(
                                                                 ctx,
                                                                 original_query,
                                                                 loc.clone(),
-                                                                e.to_string(),
-                                                                "ensure the value is a valid date",
+                                                                E501,
+                                                                value.as_str()
                                                             );
                                                             GeneratedValue::Unknown
                                                         }
@@ -427,12 +431,12 @@ pub(crate) fn infer_expr_type<'a>(
                                                 )
                                             }
                                             v => {
-                                                push_query_err(
+                                                generate_error!(
                                                     ctx,
                                                     original_query,
                                                     add.loc.clone(),
-                                                    format!("`{:?}` is not a valid field value", v),
-                                                    "use a literal or identifier",
+                                                    E206,
+                                                    &v.to_string()
                                                 );
                                                 GeneratedValue::Unknown
                                             }
@@ -457,13 +461,7 @@ pub(crate) fn infer_expr_type<'a>(
                         _ => unreachable!(),
                     },
                     _ => {
-                        push_query_err(
-                            ctx,
-                            original_query,
-                            add.loc.clone(),
-                            "`AddE` must have a to id".to_string(),
-                            "add a to id",
-                        );
+                        generate_error!(ctx, original_query, add.loc.clone(), E611);
                         GeneratedValue::Unknown
                     }
                 };
@@ -479,13 +477,7 @@ pub(crate) fn infer_expr_type<'a>(
                         _ => unreachable!(),
                     },
                     _ => {
-                        push_query_err(
-                            ctx,
-                            original_query,
-                            add.loc.clone(),
-                            "`AddE` must have a from id".to_string(),
-                            "add a from id",
-                        );
+                        generate_error!(ctx, original_query, add.loc.clone(), E612);
                         GeneratedValue::Unknown
                     }
                 };
@@ -505,25 +497,20 @@ pub(crate) fn infer_expr_type<'a>(
                 gen_query.is_mut = true;
                 return (Type::Edge(Some(ty.to_string())), Some(stmt));
             }
-            push_query_err(
+            generate_error!(
                 ctx,
                 original_query,
                 add.loc.clone(),
-                "`AddE` must have an edge type".to_string(),
-                "add an edge type",
+                E304,
+                ["edge"],
+                ["edge"]
             );
             (Type::Edge(None), None)
         }
         AddVector(add) => {
             if let Some(ref ty) = add.vector_type {
                 if !ctx.vector_set.contains(ty.as_str()) {
-                    push_query_err(
-                        ctx,
-                        original_query,
-                        add.loc.clone(),
-                        format!("vector type `{}` has not been declared", ty),
-                        format!("add a `V::{}` schema first", ty),
-                    );
+                    generate_error!(ctx, original_query, add.loc.clone(), E103, ty.as_str());
                 }
                 // Validate vector fields
                 let (label, properties) = match &add.fields {
@@ -532,15 +519,14 @@ pub(crate) fn infer_expr_type<'a>(
                         if let Some(field_set) = field_set {
                             for (field_name, value) in fields {
                                 if !field_set.contains_key(field_name.as_str()) {
-                                    push_query_err(
+                                    generate_error!(
                                         ctx,
                                         original_query,
                                         add.loc.clone(),
-                                        format!(
-                                            "`{}` is not a field of vector `{}`",
-                                            field_name, ty
-                                        ),
-                                        "check the schema field names",
+                                        E202,
+                                        field_name.as_str(),
+                                        "vector",
+                                        ty.as_str()
                                     );
                                 }
                                 match value {
@@ -552,12 +538,12 @@ pub(crate) fn infer_expr_type<'a>(
                                             value.as_str(),
                                         ) {
                                             if !scope.contains_key(value.as_str()) {
-                                                push_query_err(
+                                                generate_error!(
                                                     ctx,
                                                     original_query,
                                                     loc.clone(),
-                                                    format!("`{}` is not in scope", value),
-                                                    "declare it earlier or fix the typo",
+                                                    E301,
+                                                    value.as_str()
                                                 );
                                             }
                                         };
@@ -573,12 +559,16 @@ pub(crate) fn infer_expr_type<'a>(
                                             .field_type
                                             .clone();
                                         if field_type != *value {
-                                            push_query_err(ctx,
-                                                 original_query,
-                                                 loc.clone(),
-                                                 format!("value `{}` is of type `{}`, which does not match type {} declared in the schema for field `{}` on node type `{}`", value, GenRef::from(value.clone()), field_type, field_name, ty),
-                                                 "ensure the value is of the same type as the field declared in the schema".to_string(),
-                                             );
+                                            generate_error!(
+                                                ctx,
+                                                original_query,
+                                                loc.clone(),
+                                                E205,
+                                                value.as_str(),
+                                                &field_type.to_string(),
+                                                "vector",
+                                                ty.as_str()
+                                            );
                                         }
                                     }
                                     _ => {}
@@ -606,13 +596,13 @@ pub(crate) fn infer_expr_type<'a>(
                                                     Ok(date) => GeneratedValue::Literal(
                                                         GenRef::Literal(date.to_rfc3339()),
                                                     ),
-                                                    Err(e) => {
-                                                        push_query_err(
+                                                    Err(_) => {
+                                                        generate_error!(
                                                             ctx,
                                                             original_query,
                                                             loc.clone(),
-                                                            e.to_string(),
-                                                            "ensure the value is a valid date",
+                                                            E501,
+                                                            value.as_str()
                                                         );
                                                         GeneratedValue::Unknown
                                                     }
@@ -637,12 +627,12 @@ pub(crate) fn infer_expr_type<'a>(
                                             )
                                         }
                                         v => {
-                                            push_query_err(
+                                            generate_error!(
                                                 ctx,
                                                 original_query,
                                                 add.loc.clone(),
-                                                format!("`{:?}` is not a valid field value", v),
-                                                "use a literal or identifier",
+                                                E206,
+                                                &v.to_string()
                                             );
                                             GeneratedValue::Unknown
                                         }
@@ -695,12 +685,13 @@ pub(crate) fn infer_expr_type<'a>(
                     return (Type::Vector(Some(ty.to_string())), Some(stmt));
                 }
             }
-            push_query_err(
+            generate_error!(
                 ctx,
                 original_query,
                 add.loc.clone(),
-                "`AddV` must have a vector type".to_string(),
-                "add a vector type",
+                E304,
+                ["vector"],
+                ["vector"]
             );
             (Type::Vector(None), None)
         }
@@ -720,13 +711,7 @@ pub(crate) fn infer_expr_type<'a>(
         SearchVector(sv) => {
             if let Some(ref ty) = sv.vector_type {
                 if !ctx.vector_set.contains(ty.as_str()) {
-                    push_query_err(
-                        ctx,
-                        original_query,
-                        sv.loc.clone(),
-                        format!("vector type `{}` has not been declared", ty),
-                        format!("add a `V::{}` schema first", ty),
-                    );
+                    generate_error!(ctx, original_query, sv.loc.clone(), E103, ty.as_str());
                 }
             }
             let vec: VecData = match &sv.data {
@@ -761,12 +746,13 @@ pub(crate) fn infer_expr_type<'a>(
                     }
                 }
                 _ => {
-                    push_query_err(
+                    generate_error!(
                         ctx,
                         original_query,
                         sv.loc.clone(),
-                        "`SearchVector` must have a vector data".to_string(),
-                        "add a vector data",
+                        E305,
+                        ["vector_data", "SearchV"],
+                        ["vector_data"]
                     );
                     VecData::Unknown
                 }
@@ -811,24 +797,19 @@ pub(crate) fn infer_expr_type<'a>(
                         }
                     }
                     _ => {
-                        push_query_err(
+                        generate_error!(
                             ctx,
                             original_query,
                             sv.loc.clone(),
-                            "`SearchV` must have a limit of vectors to return".to_string(),
-                            "add a limit",
+                            E305,
+                            ["k", "SearchV"],
+                            ["k"]
                         );
                         GeneratedValue::Unknown
                     }
                 },
                 None => {
-                    push_query_err(
-                        ctx,
-                        original_query,
-                        sv.loc.clone(),
-                        "`SearchV` must have a limit of vectors to return".to_string(),
-                        "add a limit",
-                    );
+                    generate_error!(ctx, original_query, sv.loc.clone(), E601, &sv.loc.span);
                     GeneratedValue::Unknown
                 }
             };
@@ -989,12 +970,12 @@ pub(crate) fn infer_expr_type<'a>(
             // TODO: look into how best do type checking for type passed in
             if let Some(ref ty) = bm25_search.type_arg {
                 if !ctx.node_set.contains(ty.as_str()) {
-                    push_query_err(
+                    generate_error!(
                         ctx,
                         original_query,
                         bm25_search.loc.clone(),
-                        format!("vector type `{}` has not been declared", ty),
-                        format!("add a `V::{}` schema first", ty),
+                        E101,
+                        ty.as_str()
                     );
                 }
             }
@@ -1005,28 +986,37 @@ pub(crate) fn infer_expr_type<'a>(
                 Some(ValueType::Identifier { value: i, loc: _ }) => {
                     is_valid_identifier(ctx, original_query, bm25_search.loc.clone(), i.as_str());
                     // if is in params then use data.
+                    let _ = type_in_scope(
+                        ctx,
+                        original_query,
+                        bm25_search.loc.clone(),
+                        scope,
+                        i.as_str(),
+                    );
+
                     if let Some(_) = original_query.parameters.iter().find(|p| p.name.1 == *i) {
                         GeneratedValue::Identifier(GenRef::Ref(format!("data.{}", i.to_string())))
                     } else if let Some(_) = scope.get(i.as_str()) {
                         GeneratedValue::Identifier(GenRef::Ref(i.to_string()))
                     } else {
-                        push_query_err(
+                        generate_error!(
                             ctx,
                             original_query,
                             bm25_search.loc.clone(),
-                            format!("variable named `{}` is not in scope", i),
-                            "declare {} in the current scope or fix the typo",
+                            E301,
+                            i.as_str()
                         );
                         GeneratedValue::Unknown
                     }
                 }
                 _ => {
-                    push_query_err(
+                    generate_error!(
                         ctx,
                         original_query,
                         bm25_search.loc.clone(),
-                        "`SearchVector` must have a vector data".to_string(),
-                        "add a vector data",
+                        E305,
+                        ["vector_data", "SearchV"],
+                        ["vector_data"]
                     );
                     GeneratedValue::Unknown
                 }
@@ -1076,23 +1066,24 @@ pub(crate) fn infer_expr_type<'a>(
                         }
                     }
                     _ => {
-                        push_query_err(
+                        generate_error!(
                             ctx,
                             original_query,
                             bm25_search.loc.clone(),
-                            "`SearchVector` must have a limit of vectors to return".to_string(),
-                            "add a limit",
+                            E305,
+                            ["k", "SearchV"],
+                            ["k"]
                         );
                         GeneratedValue::Unknown
                     }
                 },
                 None => {
-                    push_query_err(
+                    generate_error!(
                         ctx,
                         original_query,
                         bm25_search.loc.clone(),
-                        "`SearchV` must have a limit of vectors to return".to_string(),
-                        "add a limit",
+                        E601,
+                        &bm25_search.loc.span
                     );
                     GeneratedValue::Unknown
                 }

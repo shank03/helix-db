@@ -34,14 +34,14 @@ pub fn render(diag: &Diagnostic, src: &str, filepath: &str) -> String {
 
     // Color the error/warning label based on severity
     let severity_str = match diag.severity {
-        DiagnosticSeverity::Error => "error".red().bold(),
-        DiagnosticSeverity::Warning => "warning".yellow().bold(),
+        DiagnosticSeverity::Error => format!("error[{}]", diag.error_code).red().bold(),
+        DiagnosticSeverity::Warning => format!("warning[{}]", diag.error_code).yellow().bold(),
         DiagnosticSeverity::Info => "info".blue().bold(),
         DiagnosticSeverity::Hint => "hint".green().bold(),
         DiagnosticSeverity::Empty => "note".normal(),
     };
 
-    out.push_str(&format!("{}: {}\n", severity_str, diag.message));
+    out.push_str(&format!("\n{}: {}\n", severity_str, diag.message));
 
     // Color the location line in red for errors, yellow for warnings
     let location_color = match diag.severity {
