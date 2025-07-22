@@ -9,6 +9,7 @@ use crate::helixc::{
 
 /// A single diagnostic to be surfaced to the editor.
 #[derive(Debug, Clone)]
+#[allow(unused)]
 pub struct Diagnostic {
     pub location: Loc,
     pub error_code: ErrorCode,

@@ -63,6 +63,7 @@ impl<'a> Ctx<'a> {
         }
     }
 
+    #[allow(unused)]
     pub(super) fn get_item_fields(&self, item_type: &Type) -> Option<&HashMap<&str, Cow<Field>>> {
         match item_type {
             Type::Node(Some(node_type)) | Type::Nodes(Some(node_type)) => {

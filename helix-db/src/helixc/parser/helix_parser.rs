@@ -712,6 +712,13 @@ impl ValueType {
     pub fn new(value: Value, loc: Loc) -> ValueType {
         ValueType::Literal { value, loc }
     }
+    pub fn to_string(&self) -> String {
+        match self {
+            ValueType::Literal { value, loc: _ } => value.to_string(),
+            ValueType::Identifier { value, loc: _ } => value.clone(),
+            ValueType::Object { fields, loc: _ } => fields.keys().map(|k| k.clone()).collect::<Vec<String>>().join(", "),
+        }
+    }
 }
 
 impl From<Value> for ValueType {

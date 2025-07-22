@@ -1,5 +1,8 @@
 //! Semantic analyzer for Helix‑QL.
+use crate::helixc::analyzer::error_codes::ErrorCode;
+use crate::helixc::analyzer::utils::type_in_scope;
 use crate::{
+    generate_error,
     helix_engine::graph_core::ops::source::add_e::EdgeType,
     helixc::{
         analyzer::{
@@ -18,13 +21,13 @@ use crate::{
         },
         parser::helix_parser::*,
     },
-    utils::styled_string::StyledString,
 };
+use paste::paste;
 use std::collections::HashMap;
 
 /// Check that a graph‑navigation step is allowed for the current element
 /// kind and return the post‑step kind.
-/// 
+///
 /// # Arguments
 ///
 /// * `ctx` - The context of the query
@@ -63,27 +66,20 @@ pub(crate) fn apply_graph_step<'a>(
             traversal.should_collect = ShouldCollect::ToVec;
             let edge = ctx.edge_map.get(label.as_str());
             if edge.is_none() {
-                push_query_err(
-                    ctx,
-                    original_query,
-                    gs.loc.clone(),
-                    format!("Edge of type `{}` does not exist", label),
-                    "check the schema for valid edge types",
-                );
+                generate_error!(ctx, original_query, gs.loc.clone(), E102, label.as_str());
                 return None;
             }
             match edge.unwrap().from.1 == node_label.clone() {
                 true => Some(Type::Edges(Some(label.to_string()))),
                 false => {
-                    push_query_err(
+                    generate_error!(
                         ctx,
                         original_query,
                         gs.loc.clone(),
-                        format!(
-                            "Edge of type `{}` exists but it is not a valid outgoing edge type for node of type `{}`",
-                            label, node_label
-                        ),
-                        "check the schema for valid edge types",
+                        E207,
+                        label.as_str(),
+                        "node",
+                        node_label.as_str()
                     );
                     None
                 }
@@ -104,26 +100,14 @@ pub(crate) fn apply_graph_step<'a>(
             traversal.should_collect = ShouldCollect::ToVec;
             let edge = ctx.edge_map.get(label.as_str());
             if edge.is_none() {
-                push_query_err(
-                    ctx,
-                    original_query,
-                    gs.loc.clone(),
-                    format!("Edge of type `{}` does not exist", label),
-                    "check the schema for valid edge types",
-                );
+                generate_error!(ctx, original_query, gs.loc.clone(), E102, label.as_str());
                 return None;
             }
 
             match edge.unwrap().to.1 == node_label.clone() {
                 true => Some(Type::Edges(Some(label.to_string()))),
                 false => {
-                    push_query_err(
-                        ctx,
-                        original_query,
-                        gs.loc.clone(),
-                        format!("Edge of type `{}` does not exist", label),
-                        "check the schema for valid edge types",
-                    );
+                    generate_error!(ctx, original_query, gs.loc.clone(), E102, label.as_str());
                     None
                 }
             }
@@ -148,13 +132,7 @@ pub(crate) fn apply_graph_step<'a>(
                     }
                 }
                 None => {
-                    push_query_err(
-                        ctx,
-                        original_query,
-                        gs.loc.clone(),
-                        format!("Edge of type `{}` does not exist", label),
-                        "check the schema for valid edge types",
-                    );
+                    generate_error!(ctx, original_query, gs.loc.clone(), E102, label.as_str());
                     return None;
                 }
             };
@@ -168,13 +146,7 @@ pub(crate) fn apply_graph_step<'a>(
             let edge = ctx.edge_map.get(label.as_str());
             // assert!(edge.is_some()); // make sure is caught
             if edge.is_none() {
-                push_query_err(
-                    ctx,
-                    original_query,
-                    gs.loc.clone(),
-                    format!("Edge of type `{}` does not exist", label),
-                    "check the schema for valid edge types",
-                );
+                generate_error!(ctx, original_query, gs.loc.clone(), E102, label.as_str());
                 return None;
             }
             match edge.unwrap().from.1 == node_label.clone() {
@@ -188,15 +160,14 @@ pub(crate) fn apply_graph_step<'a>(
                     }
                 }
                 false => {
-                    push_query_err(
+                    generate_error!(
                         ctx,
                         original_query,
                         gs.loc.clone(),
-                        format!(
-                            "Edge of type `{}` exists but it is not a valid outgoing edge type for node of type `{}`",
-                            label, node_label
-                        ),
-                        "check the schema for valid edge types",
+                        E207,
+                        label.as_str(),
+                        "node",
+                        node_label.as_str()
                     );
                     None
                 }
@@ -217,13 +188,7 @@ pub(crate) fn apply_graph_step<'a>(
                     } else if ctx.vector_set.contains(edge.from.1.as_str()) {
                         EdgeType::Vec
                     } else {
-                        push_query_err(
-                            ctx,
-                            original_query,
-                            gs.loc.clone(),
-                            format!("Edge of type `{}` does not exist", label),
-                            "check the schema for valid edge types",
-                        );
+                        generate_error!(ctx, original_query, gs.loc.clone(), E102, label.as_str());
                         return None;
                     }
                 }
@@ -242,13 +207,7 @@ pub(crate) fn apply_graph_step<'a>(
             let edge = ctx.edge_map.get(label.as_str());
             // assert!(edge.is_some());
             if edge.is_none() {
-                push_query_err(
-                    ctx,
-                    original_query,
-                    gs.loc.clone(),
-                    format!("Edge of type `{}` does not exist", label),
-                    "check the schema for valid edge types",
-                );
+                generate_error!(ctx, original_query, gs.loc.clone(), E102, label.as_str());
                 return None;
             }
 
@@ -263,15 +222,14 @@ pub(crate) fn apply_graph_step<'a>(
                     }
                 }
                 false => {
-                    push_query_err(
+                    generate_error!(
                         ctx,
                         original_query,
                         gs.loc.clone(),
-                        format!(
-                            "Edge of type `{}` exists but it is not a valid incoming edge type for node of type `{}`",
-                            label, node_label
-                        ),
-                        "check the schema for valid edge types",
+                        E207,
+                        label.as_str(),
+                        "node",
+                        node_label.as_str()
                     );
                     None
                 }
@@ -283,16 +241,7 @@ pub(crate) fn apply_graph_step<'a>(
             let new_ty = if let Some(edge_schema) = ctx.edge_map.get(edge_ty.as_str()) {
                 let node_type = &edge_schema.from.1;
                 if !ctx.node_set.contains(node_type.as_str()) {
-                    push_query_err(
-                        ctx,
-                        original_query,
-                        gs.loc.clone(),
-                        format!(
-                            "edge type `{}` does not have a node type as its `From` source",
-                            edge_ty
-                        ),
-                        format!("set the `From` type of the edge to a node type"),
-                    );
+                    generate_error!(ctx, original_query, gs.loc.clone(), E623, edge_ty);
                 }
                 match cur_ty {
                     Type::Edges(_) => Some(Type::Nodes(Some(node_type.clone()))),
@@ -312,16 +261,7 @@ pub(crate) fn apply_graph_step<'a>(
             let new_ty = if let Some(edge_schema) = ctx.edge_map.get(edge_ty.as_str()) {
                 let node_type = &edge_schema.to.1;
                 if !ctx.node_set.contains(node_type.as_str()) {
-                    push_query_err(
-                        ctx,
-                        original_query,
-                        gs.loc.clone(),
-                        format!(
-                            "edge type `{}` does not have a node type as its `To` target",
-                            edge_ty
-                        ),
-                        format!("set the `To` type of the edge to a node type"),
-                    );
+                    generate_error!(ctx, original_query, gs.loc.clone(), E624, edge_ty);
                 }
                 match cur_ty {
                     Type::Edges(_) => Some(Type::Nodes(Some(node_type.clone()))),
@@ -340,16 +280,7 @@ pub(crate) fn apply_graph_step<'a>(
             let new_ty = if let Some(edge_schema) = ctx.edge_map.get(edge_ty.as_str()) {
                 let source_type = &edge_schema.from.1;
                 if !ctx.vector_set.contains(source_type.as_str()) {
-                    push_query_err(
-                        ctx,
-                        original_query,
-                        gs.loc.clone(),
-                        format!(
-                            "edge type `{}` does not have a vector type as its `From` source",
-                            edge_ty
-                        ),
-                        format!("set the `From` type of the edge to a vector type"),
-                    );
+                    generate_error!(ctx, original_query, gs.loc.clone(), E625, edge_ty);
                 }
                 match cur_ty {
                     Type::Edges(_) => Some(Type::Vectors(Some(source_type.clone()))),
@@ -370,16 +301,7 @@ pub(crate) fn apply_graph_step<'a>(
             let new_ty = if let Some(edge_schema) = ctx.edge_map.get(edge_ty.as_str()) {
                 let target_type = &edge_schema.to.1;
                 if !ctx.vector_set.contains(target_type.as_str()) {
-                    push_query_err(
-                        ctx,
-                        original_query,
-                        gs.loc.clone(),
-                        format!(
-                            "edge type `{}` does not have a vector type as its `To` target",
-                            edge_ty
-                        ),
-                        format!("set the `To` type of the edge to a vector type"),
-                    );
+                    generate_error!(ctx, original_query, gs.loc.clone(), E626, edge_ty);
                 }
                 match cur_ty {
                     Type::Edges(_) => Some(Type::Vectors(Some(target_type.clone()))),
@@ -427,27 +349,18 @@ pub(crate) fn apply_graph_step<'a>(
         }
         (SearchVector(sv), Type::Vectors(Some(vector_ty)) | Type::Vector(Some(vector_ty))) => {
             if !(matches!(cur_ty, Type::Vector(_)) || matches!(cur_ty, Type::Vectors(_))) {
-                push_query_err(
+                generate_error!(
                     ctx,
                     original_query,
                     sv.loc.clone(),
-                    format!(
-                        "`SearchVector` must be used on a vector type, got `{}`, which is of type `{}`",
-                        cur_ty.get_type_name(),
-                        cur_ty.kind_str()
-                    ),
-                    "ensure the result of the previous step is a vector type",
+                    E603,
+                    &cur_ty.get_type_name(),
+                    cur_ty.kind_str()
                 );
             }
             if let Some(ref ty) = sv.vector_type {
                 if !ctx.vector_set.contains(ty.as_str()) {
-                    push_query_err(
-                        ctx,
-                        original_query,
-                        sv.loc.clone(),
-                        format!("vector type `{}` has not been declared", ty),
-                        format!("add a `V::{}` schema first", ty),
-                    );
+                    generate_error!(ctx, original_query, sv.loc.clone(), E103, ty.as_str());
                 }
             }
             let vec = match &sv.data {
@@ -463,23 +376,9 @@ pub(crate) fn apply_graph_step<'a>(
                 Some(VectorData::Identifier(i)) => {
                     is_valid_identifier(ctx, original_query, sv.loc.clone(), i.as_str());
                     // if is in params then use data.
-                    if let Some(_) = original_query.parameters.iter().find(|p| p.name.1 == *i) {
-                        VecData::Standard(GeneratedValue::Identifier(GenRef::Ref(format!(
-                            "data.{}",
-                            i.to_string()
-                        ))))
-                    } else if let Some(_) = scope.get(i.as_str()) {
-                        VecData::Standard(GeneratedValue::Identifier(GenRef::Ref(i.to_string())))
-                    } else {
-                        push_query_err(
-                            ctx,
-                            original_query,
-                            sv.loc.clone(),
-                            format!("variable named `{}` is not in scope", i),
-                            "declare {} in the current scope or fix the typo",
-                        );
-                        VecData::Standard(GeneratedValue::Unknown)
-                    }
+                    let _ = type_in_scope(ctx, original_query, sv.loc.clone(), scope, i.as_str());
+                    let value = gen_identifier_or_param(original_query, i.as_str(), true, false);
+                    VecData::Standard(value)
                 }
                 Some(VectorData::Embed(e)) => match &e.value {
                     EvaluatesToString::Identifier(i) => {
@@ -490,12 +389,13 @@ pub(crate) fn apply_graph_step<'a>(
                     }
                 },
                 _ => {
-                    push_query_err(
+                    generate_error!(
                         ctx,
                         original_query,
                         sv.loc.clone(),
-                        "`SearchVector` must have a vector data".to_string(),
-                        "add a vector data",
+                        E305,
+                        ["vector_data", "SearchV"],
+                        ["vector_data"]
                     );
                     VecData::Standard(GeneratedValue::Unknown)
                 }
@@ -539,23 +439,25 @@ pub(crate) fn apply_graph_step<'a>(
                         }
                     }
                     _ => {
-                        push_query_err(
+                        generate_error!(
                             ctx,
                             original_query,
                             sv.loc.clone(),
-                            "`SearchVector` must have a limit of vectors to return".to_string(),
-                            "add a limit",
+                            E305,
+                            ["k", "SearchV"],
+                            ["k"]
                         );
                         GeneratedValue::Unknown
                     }
                 },
                 None => {
-                    push_query_err(
+                    generate_error!(
                         ctx,
                         original_query,
                         sv.loc.clone(),
-                        "`SearchV` must have a limit of vectors to return".to_string(),
-                        "add a limit",
+                        E305,
+                        ["k", "SearchV"],
+                        ["k"]
                     );
                     GeneratedValue::Unknown
                 }
@@ -582,65 +484,8 @@ pub(crate) fn apply_graph_step<'a>(
         }
         // Anything else is illegal
         _ => {
-            push_query_err(
-                ctx,
-                original_query,
-                gs.loc.clone(),
-                format!(
-                    "traversal step `{}` cannot follow a step that returns {}",
-                    gs.loc
-                        .span
-                        .trim_matches(|c: char| c == '"' || c.is_whitespace() || c == '\n')
-                        .bold(),
-                    cur_ty
-                        .kind_str()
-                        .trim_matches(|c: char| c == '"' || c.is_whitespace() || c == '\n')
-                        .bold()
-                ),
-                get_traversal_step_hint(cur_ty, &gs.step).as_str(),
-            );
+            generate_error!(ctx, original_query, gs.loc.clone(), E601, &gs.loc.span);
             None
-        }
-    }
-}
-
-pub(crate) fn get_traversal_step_hint<'a>(
-    current_step: &Type,
-    next_step: &GraphStepType,
-) -> String {
-    match (current_step, next_step) {
-        (
-            Type::Nodes(Some(span))
-            | Type::Node(Some(span))
-            | Type::Vectors(Some(span))
-            | Type::Vector(Some(span)),
-            GraphStepType::ToN | GraphStepType::FromN,
-        ) => {
-            format!(
-                "\n{}\n{}",
-                format!(
-                    "      • Use `OutE` or `InE` to traverse edges from `{}`",
-                    span
-                ),
-                format!(
-                    "      • Use `Out` or `In` to traverse nodes from `{}`",
-                    span
-                ),
-            )
-        }
-        (Type::Edges(Some(span)), GraphStepType::OutE(_) | GraphStepType::InE(_)) => {
-            format!("use `FromN` or `ToN` to traverse nodes from `{}`", span)
-        }
-        (Type::Edges(Some(span)), GraphStepType::Out(_) | GraphStepType::In(_)) => {
-            format!("use `FromN` or `ToN` to traverse nodes from `{}`", span)
-        }
-
-        (_, _) => {
-            println!(
-                "get_traversal_step_hint: {:?}, {:?}",
-                current_step, next_step
-            );
-            "re-order the traversal or remove the invalid step".to_string()
         }
     }
 }
