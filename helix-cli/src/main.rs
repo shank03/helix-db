@@ -190,7 +190,7 @@ async fn main() -> Result<(), ()> {
                         return Err(());
                     }
                 };
-                home_dir.join(".helix/repo/helix-db/helixdb")
+                home_dir.join(".helix/repo/helix-db/helix-db")
             };
 
             if !check_cargo_version() {

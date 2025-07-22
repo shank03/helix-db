@@ -274,7 +274,7 @@ pub async fn check_helix_version() {
             Some(dir) => dir,
             None => return,
         };
-        home_dir.join(".helix/repo/helix-db/helixdb")
+        home_dir.join(".helix/repo/helix-db/helix-db")
     };
 
     let local_cli_version = match Version::parse(&format!("v{}", env!("CARGO_PKG_VERSION"))) {

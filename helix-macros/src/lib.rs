@@ -83,37 +83,6 @@ pub fn handler(args: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn local_handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    let input_fn = parse_macro_input!(item as ItemFn);
-    let fn_name = &input_fn.sig.ident;
-    let fn_name_str = fn_name.to_string();
-    println!("fn_name_str: {}", fn_name_str);
-    // Create a unique static name for each handler
-    let static_name = quote::format_ident!(
-        "_LOCAL_HANDLER_REGISTRATION_{}",
-        fn_name.to_string().to_uppercase()
-    );
-
-    let expanded = quote! {
-        #input_fn
-
-        #[doc(hidden)]
-        #[used]
-        static #static_name: () = {
-            inventory::submit! {
-                ::helix_gateway::router::router::HandlerSubmission(
-                    ::helix_gateway::router::router::Handler::new(
-                        #fn_name_str,
-                        #fn_name
-                    )
-                )
-            }
-        };
-    };
-    expanded.into()
-}
-
-#[proc_macro_attribute]
 pub fn mcp_handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(item as ItemFn);
     let fn_name = &input_fn.sig.ident;
@@ -133,36 +102,6 @@ pub fn mcp_handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
             inventory::submit! {
                 MCPHandlerSubmission(
                     MCPHandler::new(
-                        #fn_name_str,
-                        #fn_name
-                    )
-                )
-            }
-        };
-    };
-    expanded.into()
-}
-
-#[proc_macro_attribute]
-pub fn query_mcp_handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    let input_fn = parse_macro_input!(item as ItemFn);
-    let fn_name = &input_fn.sig.ident;
-    let fn_name_str = fn_name.to_string();
-    // Create a unique static name for each handler
-    let static_name = quote::format_ident!(
-        "_MCP_HANDLER_REGISTRATION_{}",
-        fn_name.to_string().to_uppercase()
-    );
-
-    let expanded = quote! {
-        #input_fn
-
-        #[doc(hidden)]
-        #[used]
-        static #static_name: () = {
-            inventory::submit! {
-                ::helixdb::helix_gateway::mcp::mcp::MCPHandlerSubmission(
-                    ::helixdb::helix_gateway::mcp::mcp::MCPHandler::new(
                         #fn_name_str,
                         #fn_name
                     )
