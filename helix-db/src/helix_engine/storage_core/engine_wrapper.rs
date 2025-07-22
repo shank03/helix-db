@@ -10,8 +10,8 @@ use crate::helix_engine::storage_core::engine_wrappers::rocksdb_wrapper::{Bytes,
 use crate::helix_engine::types::GraphError;
 
 pub(crate) trait Txn<'a>: Sized {
-    fn commit(self) -> Result<(), GraphError>;
-    fn abort(self) -> Result<(), GraphError>;
+    fn commit_txn(self) -> Result<(), GraphError>;
+    fn abort_txn(self) -> Result<(), GraphError>;
 }
 
 pub(crate) struct HelixIterator<'a, K, V, M> {
@@ -31,7 +31,7 @@ pub struct RTxn<'a> {
     #[cfg(feature = "rocksdb")]
     pub txn: rocksdb::Transaction<'a, rocksdb::TransactionDB<rocksdb::SingleThreaded>>,
     #[cfg(feature = "lmdb")]
-    pub txn: &'a heed3::RoTxn<'a>,
+    pub txn: heed3::RoTxn<'a>,
     #[cfg(feature = "in_memory")]
     pub txn: skipdb::ReadTransaction<
         &'a [u8],
@@ -39,6 +39,31 @@ pub struct RTxn<'a> {
         OptimisticDb<&'a [u8], &'a [u8]>,
         txn_core::sync::HashCm<&'a [u8]>,
     >,
+}
+impl<'a> RTxn<'a> {
+    #[cfg(feature = "lmdb")]
+    pub fn get_txn(&'a self) -> &'a heed3::RoTxn<'a> {
+        return &self.txn;
+    }
+
+    #[cfg(feature = "rocksdb")]
+    pub fn get_txn(
+        &'a self,
+    ) -> &'a rocksdb::Transaction<'a, rocksdb::TransactionDB<rocksdb::SingleThreaded>> {
+        return &self.txn;
+    }
+
+    #[cfg(feature = "in_memory")]
+    pub fn get_txn(
+        &'a self,
+    ) -> &'a skipdb::ReadTransaction<
+        &'a [u8],
+        &'a [u8],
+        OptimisticDb<&'a [u8], &'a [u8]>,
+        txn_core::sync::HashCm<&'a [u8]>,
+    > {
+        return &self.txn;
+    }
 }
 
 pub struct WTxn<'a> {
@@ -50,21 +75,47 @@ pub struct WTxn<'a> {
     pub txn: skipdb::optimistic::OptimisticTransaction<&'a [u8], &'a [u8]>,
 }
 
-impl<'a> Txn<'a> for RTxn<'a> {
-
-    fn commit_txn(self) -> Result<(), GraphError> {
-        #[cfg(feature = "rocksdb")]
-        self.txn.commit().map_err(|e| GraphError::from(e))
+impl<'a> WTxn<'a> {
+    #[cfg(feature = "lmdb")]
+    pub fn get_txn(&'a mut self) -> &'a mut heed3::RwTxn<'a> {
+        return &mut self.txn;
     }
 
     #[cfg(feature = "rocksdb")]
-    fn abort_txn(self) -> Result<(), GraphError> {
-        self.txn.rollback().map_err(|e| GraphError::from(e))
+    pub fn get_txn(
+        &'a self,
+    ) -> &'a rocksdb::Transaction<'a, rocksdb::TransactionDB<rocksdb::SingleThreaded>> {
+        return &self.txn;
     }
 
-    #[cfg(feature = "lmdb")]
+    #[cfg(feature = "in_memory")]
+    pub fn get_txn(
+        &'a self,
+    ) -> &'a skipdb::ReadTransaction<
+        &'a [u8],
+        &'a [u8],
+        OptimisticDb<&'a [u8], &'a [u8]>,
+        txn_core::sync::HashCm<&'a [u8]>,
+    > {
+        return &self.txn;
+    }
+}
+
+impl<'a> Txn<'a> for RTxn<'a> {
+    fn commit_txn(self) -> Result<(), GraphError> {
+        #[cfg(feature = "rocksdb")]
+        self.txn.commit().map_err(|e| GraphError::from(e))?;
+        #[cfg(feature = "lmdb")]
+        self.txn.commit().map_err(|e| GraphError::from(e))?;
+        Ok(())
+    }
+
     fn abort_txn(self) -> Result<(), GraphError> {
-        self.txn.abort().map_err(|e| GraphError::from(e))
+        #[cfg(feature = "rocksdb")]
+        self.txn.rollback().map_err(|e| GraphError::from(e))?;
+        #[cfg(feature = "lmdb")]
+        self.txn.commit().map_err(|e| GraphError::from(e))?;
+        Ok(())
     }
 
     #[cfg(feature = "in_memory")]
@@ -73,15 +124,13 @@ impl<'a> Txn<'a> for RTxn<'a> {
     }
 }
 
-pub trait Storage<'a> {
-    fn get_data(&self, txn: &'a RTxn<'a>, key: &[u8]) -> Result<Option<Vec<u8>>, GraphError>;
+pub trait Storage<'a, K, V> {
+    fn get_data(&self, txn: &'a RTxn<'a>, key: K) -> Result<Option<Vec<u8>>, GraphError>;
 
-    fn put_data(&self, txn: &mut WTxn, key: &[u8], value: &[u8]) -> Result<(), GraphError>;
-    fn delete_data(&self, txn: &mut WTxn, key: &[u8]) -> Result<(), GraphError>;
-    fn iter_data<M>(
-        &self,
-        txn: &'a RTxn<'a>,
-    ) -> Result<HelixIterator<&'a [u8], &'a [u8], M>, GraphError>;
+    fn put_data(&self, txn: &'a mut WTxn<'a>, key: K, value: V) -> Result<(), GraphError>;
+    fn delete_data(&self, txn: &'a mut WTxn<'a>, key: K) -> Result<(), GraphError>;
+    fn iter_data<M>(&self, txn: &'a RTxn<'a>)
+    -> Result<HelixIterator<K, V, M>, GraphError>;
 }
 
 pub struct Table<'a, K, V> {
