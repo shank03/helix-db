@@ -415,7 +415,7 @@ impl Display for ForLoopInVariable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ForLoopInVariable::Identifier(identifier) => write!(f, "{}", identifier),
-            ForLoopInVariable::Parameter(parameter) => write!(f, "data.{}", parameter),
+            ForLoopInVariable::Parameter(parameter) => write!(f, "&data.{}", parameter),
             ForLoopInVariable::Empty => {
                 assert!(false, "For loop in variable is empty");
                 write!(f, "_")
