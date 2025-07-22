@@ -14,10 +14,7 @@ use heed3::{
 use itertools::Itertools;
 use rand::prelude::Rng;
 use serde::{Deserialize, Serialize};
-use std::{
-    cmp::Ordering,
-    collections::{BinaryHeap, HashMap, HashSet},
-};
+use std::collections::{BinaryHeap, HashMap, HashSet};
 
 const DB_VECTORS: &str = "vectors"; // for vector data (v:)
 const DB_VECTOR_DATA: &str = "vector_data"; // for vector data (v:)

@@ -5,7 +5,9 @@ extern crate syn;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
-    parse::{Parse, ParseStream}, parse_macro_input, Expr, FnArg, Ident, ItemEnum, ItemFn, ItemTrait, Pat, Stmt, Token, TraitItem
+    Expr, FnArg, Ident, ItemFn, ItemTrait, Pat, Stmt, Token, TraitItem,
+    parse::{Parse, ParseStream},
+    parse_macro_input,
 };
 
 struct HandlerArgs {

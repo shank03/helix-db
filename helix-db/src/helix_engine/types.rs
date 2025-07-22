@@ -1,4 +1,4 @@
-use crate::{helixc::parser::parser_methods::ParserError, protocol::request::RequestType};
+use crate::helixc::parser::parser_methods::ParserError;
 use core::fmt;
 use heed3::Error as HeedError;
 use sonic_rs::Error as SonicError;

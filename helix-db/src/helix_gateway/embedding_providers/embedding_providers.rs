@@ -1,10 +1,10 @@
 use crate::helix_engine::types::GraphError;
 use reqwest::blocking::Client;
 use serde_json::json;
-#[cfg(feature = "embed_local")]
-use url::Url;
 #[cfg(feature = "embed_openai")]
 use std::env;
+#[cfg(feature = "embed_local")]
+use url::Url;
 
 // TODO: add support for rust native embedding model libs as well so it runs fully built in
 //      in case we have a gpu or something on the server we're running it on
@@ -31,12 +31,10 @@ impl EmbeddingModelImpl {
         Ok(EmbeddingModelImpl {
             api_key: key,
             client: Client::new(),
-            model: model
-                .map(String::from)
-                .unwrap_or(
-                    // get embedding model from config
-                    "text-embedding-ada-002".into()
-                ),
+            model: model.map(String::from).unwrap_or(
+                // get embedding model from config
+                "text-embedding-ada-002".into(),
+            ),
         })
     }
 }
@@ -83,8 +81,7 @@ impl EmbeddingModelImpl {
         let url_str = url
             .map(String::from)
             .unwrap_or("http://localhost:8699/embed".into());
-        Url::parse(&url_str)
-            .map_err(|e| GraphError::from(format!("Invalid URL: {}", e)))?;
+        Url::parse(&url_str).map_err(|e| GraphError::from(format!("Invalid URL: {}", e)))?;
         Ok(EmbeddingModelImpl {
             url: url_str,
             client: Client::new(),
@@ -127,16 +124,19 @@ impl EmbeddingModel for EmbeddingModelImpl {
 pub fn get_embedding_model(
     api_key: Option<&str>,
     model: Option<&str>,
-    url: Option<&str>,
+    _url: Option<&str>,
 ) -> Result<EmbeddingModelImpl, GraphError> {
     #[cfg(feature = "embed_openai")]
     return Ok(EmbeddingModelImpl::new(api_key, model)?);
 
     #[cfg(feature = "embed_local")]
-    return Ok(EmbeddingModelImpl::new(url)?);
+    return Ok(EmbeddingModelImpl::new(_url)?);
 
     #[cfg(not(any(feature = "embed_openai", feature = "embed_local")))]
     panic!("No embedding model feature enabled. Enable either 'openai' or 'local'.");
+
+    #[cfg(all(feature = "embed_openai", feature = "embed_local"))]
+    panic!("Multiple model features enabled. Enable either 'openai' or 'local'.");
 }
 
 #[macro_export]
@@ -152,7 +152,8 @@ pub fn get_embedding_model(
 /// ```
 macro_rules! embed {
     ($db:expr, $query:expr) => {{
-        let embedding_model = get_embedding_model(None, $db.storage_config.embedding_model.as_deref(), None)?;
+        let embedding_model =
+            get_embedding_model(None, $db.storage_config.embedding_model.as_deref(), None)?;
         embedding_model.fetch_embedding($query)?
     }};
     ($db:expr, $query:expr, $model:expr) => {{
@@ -196,4 +197,3 @@ mod tests {
         assert!(model.is_err());
     }
 }
-

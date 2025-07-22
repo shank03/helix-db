@@ -37,11 +37,6 @@ pub(super) trait HeapOps<T> {
     where
         T: Ord;
 
-    /// Take the top k elements from the heap and return a vector
-    fn to_vec(&mut self, k: usize) -> Vec<T>
-    where
-        T: Ord;
-
     /// Get the maximum element from the heap
     fn get_max(&self) -> Option<&T>
     where
@@ -76,22 +71,6 @@ impl<T> HeapOps<T> for BinaryHeap<T> {
         T: Ord,
     {
         let mut result = BinaryHeap::with_capacity(k);
-        for _ in 0..k {
-            if let Some(item) = self.pop() {
-                result.push(item);
-            } else {
-                break;
-            }
-        }
-        result
-    }
-
-    #[inline(always)]
-    fn to_vec(&mut self, k: usize) -> Vec<T>
-    where
-        T: Ord,
-    {
-        let mut result = Vec::with_capacity(k);
         for _ in 0..k {
             if let Some(item) = self.pop() {
                 result.push(item);
