@@ -191,13 +191,14 @@ macro_rules! implement_error_code {
     };
 }
 
+// Schema errors
 implement_error_code!(E101, "unknown node type `{}`" => { node_type }, "check the schema field names or declare the node type" => {});
 implement_error_code!(E102, "unknown edge type `{} `" => { edge_type }, "check the schema field names or declare the edge type" => {});
 implement_error_code!(E103, "unknown vector type `{}`" => { vector_type }, "check the schema field names or declare the vector type" => {});
 implement_error_code!(E105, "invalid identifier `{}`" => { identifier }, "check the identifier" => {});
 implement_error_code!(E106, "use of undeclared node or vector type `{}` in schema" => { item_type_name }, "declare `{}` in the schema before using it in an edge" => { item_type_name });
 
-
+// Type errors
 implement_error_code!(E201, "item type not in schema `{}`" => { item_type }, "check the schema field names" => {});
 implement_error_code!(E202, 
     "given field `{}` is not a valid field for a given {} type `{}`" => { field_name, item_type, item_type_name  }, 
@@ -212,15 +213,19 @@ implement_error_code!(E207, "edge type `{}` exists but it is not a valid edge ty
 implement_error_code!(E208, "field `{}` has not been indexed for node type `{}`" => { field_name, node_type }, "use a field that has been indexed with `INDEX` in the schema for node type `{}`" => { node_type });
 implement_error_code!(E209, "unknown type `{}` for parameter `{}`" => { parameter_type, parameter_name }, "declare or use a matching schema object or use a primitive type" => {});
 
+// Query errors
 implement_error_code!(E301, "variable `{}` not in scope" => { variable }, "check the variable" => {});
 implement_error_code!(E302, "variable `{}` previously declared" => { variable }, "check the variable" => {});
 implement_error_code!(E304, "missing {} type" => { item_type }, "add an {} type" => { item_type });
 implement_error_code!(E305, "missing parameter `{}` for method `{}`" => { parameter_name, method_name }, "add the parameter `{}`" => { parameter_name });
 
+// MCP errors
 implement_error_code!(E401, "MCP query must return a single value, but got `{}`" => { number_of_values }, "return a single value" => {});
 
+// Conversion errors
 implement_error_code!(E501, "invalid date `{}`" => { date }, "ensure the date conforms to the ISO 8601 or RFC 3339 formats" => {});
 
+// Traversal errors
 implement_error_code!(E601, "invalid traversal `{}`" => { traversal }, "ensure the traversal is valid" => {});
 implement_error_code!(E602, "step `{}` is not valid given the previous step `{}`" => { step, previous_step }, "{}" => { reason });
 implement_error_code!(E603, "`SearchV` must be used on a vector type, got `{}`, which is a `{}`" => { cur_ty, cur_ty_name }, "ensure the result of the previous step is a vector type" => {});
@@ -228,6 +233,7 @@ implement_error_code!(E604, "`UPDATE` step is only valid on nodes or edges, but 
 implement_error_code!(E611, "edge creation must have a to id" => {}, "add a `::To(target_node_id)` step to your edge creation" => {});
 implement_error_code!(E612, "edge creation must have a from id" => {}, "add a `::From(source_node_id)` step to your edge creation" => {});
 
+// Edge type errors
 implement_error_code!(E621, "boolean comparison operation cannot be applied to given {} type `{}`" => { item_type, item_type_name }, "use a valid boolean comparison operation" => {});
 implement_error_code!(E622, 
     "property `{}` of {} `{}` is of type `{}`, which does not match type of compared value which is of type `{}`" => { property_name, item_type, item_type_name, property_type, compared_value_type }, 
@@ -237,10 +243,12 @@ implement_error_code!(E624, "edge type `{}` does not have a node type as its `To
 implement_error_code!(E625, "edge type `{}` does not have a vector type as its `From` source" => { edge_type }, "set the `From` type of the edge to a vector type" => {});
 implement_error_code!(E626, "edge type `{}` does not have a vector type as its `To` source" => { edge_type }, "set the `To` type of the edge to a vector type" => {});
 
+// Range errors
 implement_error_code!(E631, "range must have a start and end, missing the `{}` value" => { start_or_end }, "add a `{}` value to the range" => { start_or_end });
 implement_error_code!(E632, "range start must be less than range end, got `{}` which is larger than `{}`" => { start, end }, "change the range start to be less than the range end" => {});
 implement_error_code!(E633, "index of range must be an integer, got `{}` which is of type `{}`" => { index, index_type }, "change {} to be an integer" => { index_type });
 
+// Object remapping errors
 implement_error_code!(E641, "closure is only valid as the last step in a traversal" => {}, "move the closure to the end of the traversal" => {});
 implement_error_code!(E642, "object remapping is only valid as the last step in a traversal" => {}, "move the object remapping to the end of the traversal" => {});
 implement_error_code!(E643, "field `{}` previously excluded" => { field_name }, "remove the `exclude` step for this field" => {});
@@ -248,6 +256,7 @@ implement_error_code!(E644, "`exclude` is only valid as the last step in a trave
 implement_error_code!(E645, "object remapping must have at least one field" => {}, "add at least one field to the object remapping" => {});
 implement_error_code!(E646, "field value is empty" => {}, "field value must be a literal, identifier, traversal,or object" => {});
 
+// For loop errors
 implement_error_code!(E651, "`IN` variable `{}` is not iterable" => { in_variable }, "ensure the `in` variable is iterable" => {});
 implement_error_code!(E652, "variable `{}` is not a field of the inner object of the `IN` variable `{}`" => { variable, in_variable }, "ensure `{}` is a field of `{}`" => { variable, in_variable });
 implement_error_code!(E653, "inner object of `IN` variable `{}` is not an object" => { in_variable }, "ensure the inner type of `{}` is an object" => { in_variable });
