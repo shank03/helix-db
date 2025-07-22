@@ -91,11 +91,43 @@ pub(crate) fn validate_statements<'a>(
             // Add loop vars to new child scope and walk the body
             let mut body_scope = HashMap::new();
             let mut for_loop_in_variable: ForLoopInVariable = ForLoopInVariable::Empty;
-            // find param from fl.in_variable
+
+            // check if fl.in_variable is a valid parameter
             let param = original_query
                 .parameters
                 .iter()
                 .find(|p| p.name.1 == fl.in_variable.1);
+            let _ = match param {
+                Some(param) => {
+                    for_loop_in_variable =
+                        ForLoopInVariable::Parameter(GenRef::Std(fl.in_variable.1.clone()));
+                    Type::from(param.param_type.1.clone())
+                }
+                None => match scope.get(fl.in_variable.1.as_str()) {
+                    Some(fl_in_var_ty) => {
+                        is_valid_identifier(
+                            ctx,
+                            original_query,
+                            fl.loc.clone(),
+                            fl.in_variable.1.as_str(),
+                        );
+
+                        for_loop_in_variable =
+                            ForLoopInVariable::Identifier(GenRef::Std(fl.in_variable.1.clone()));
+                        fl_in_var_ty.clone()
+                    }
+                    None => {
+                        generate_error!(
+                            ctx,
+                            original_query,
+                            fl.loc.clone(),
+                            E301,
+                            &fl.in_variable.1
+                        );
+                        Type::Unknown
+                    }
+                },
+            };
 
             let mut for_variable: ForVariable = ForVariable::Empty;
 
@@ -187,8 +219,13 @@ pub(crate) fn validate_statements<'a>(
                                 );
                             }
                             false => {
-                                
-                                generate_error!(ctx, original_query, fl.in_variable.0.clone(), E301, &fl.in_variable.1);
+                                generate_error!(
+                                    ctx,
+                                    original_query,
+                                    fl.in_variable.0.clone(),
+                                    E301,
+                                    &fl.in_variable.1
+                                );
                             }
                         },
                     }
