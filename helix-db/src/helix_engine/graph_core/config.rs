@@ -213,7 +213,7 @@ impl fmt::Display for Config {
                     "Some(vec![{}])",
                     indices
                         .iter()
-                        .map(|s| format!("\"{}\"", s))
+                        .map(|s| format!("\"{}\".to_string()", s))
                         .collect::<Vec<_>>()
                         .join(", ")
                 ),

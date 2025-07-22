@@ -114,17 +114,17 @@ pub struct InitCommand {
 #[derive(Debug, Args)]
 #[clap(name = "stop", about = "Stop Helix instances")]
 pub struct StopCommand {
-    #[clap(short, long, help = "Stop all running instances")]
+    #[clap(short, long, help = "Stop all running clusters")]
     pub all: bool,
 
-    #[clap(short, long, help = "Instance ID to stop")]
+    #[clap(help = "Cluster ID to stop")]
     pub cluster: Option<String>,
 }
 
 #[derive(Debug, Args)]
 #[clap(name = "save", about = "Save an instances data.mdb file")]
 pub struct SaveCommand {
-    #[clap(short, long, help = "Instance ID to save")]
+    #[clap(help = "Cluster ID to save")]
     pub cluster: String,
 
     #[clap(short, long, help = "Where to save the file to")]
@@ -132,16 +132,16 @@ pub struct SaveCommand {
 }
 
 #[derive(Debug, Args)]
-#[clap(name = "delete", about = "Delete an instance and its saved data")]
+#[clap(name = "delete", about = "Delete an cluster and its saved data")]
 pub struct DeleteCommand {
-    #[clap(short, long, help = "Cluster ID to delete")]
+    #[clap(help = "Cluster ID to delete")]
     pub cluster: String,
 }
 
 #[derive(Debug, Args)]
 #[clap(name = "visualize", about = "Visualize the Helix graph")]
 pub struct VisualizeCommand {
-    #[clap(short, long, help = "Cluster ID to visualize")]
+    #[clap(help = "Cluster ID to visualize")]
     pub cluster: String,
 }
 
