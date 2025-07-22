@@ -11,6 +11,7 @@ use crate::helix_gateway::router::router::HelixRouter;
 use crate::protocol::request::ReqMsg;
 use crate::protocol::response::Response;
 
+/// A Thread Pool of workers to execute Database operations
 pub struct WorkerPool {
     tx: Sender<ReqMsg>,
     _workers: Vec<Worker>,
@@ -47,11 +48,15 @@ impl WorkerPool {
         }
     }
 
+    /// Process a request on the Worker Pool
     pub async fn process(&self, req: protocol::request::Request) -> Result<Response, HelixError> {
         let (ret_tx, ret_rx) = oneshot::channel();
 
         // this read by Worker in start()
-        self.tx.send_async((req, ret_tx)).await.expect("todo");
+        self.tx
+            .send_async((req, ret_tx))
+            .await
+            .expect("todo: request on closing channel");
 
         let res = ret_rx.await.expect("todo");
         res
