@@ -124,13 +124,13 @@ pub(crate) fn infer_expr_type<'a>(
                 }
                 let label = GenRef::Literal(ty.clone());
 
-                let node_in_schema = ctx
-                    .output
-                    .nodes
-                    .iter()
-                    .find(|n| n.name == ty.as_str())
-                    .unwrap()
-                    .clone();
+                let node_in_schema = match ctx.output.nodes.iter().find(|n| n.name == ty.as_str()) {
+                    Some(node) => node.clone(),
+                    None => {
+                        generate_error!(ctx, original_query, add.loc.clone(), E101, ty.as_str());
+                        return (Type::Node(None), None);
+                    }
+                };
 
                 // Validate fields if both type and fields are present
                 if let Some(fields) = &add.fields {
