@@ -256,7 +256,7 @@ impl Display for Query {
         // prints the function signature
         write!(
             f,
-            "pub fn {} (input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {{\n",
+            "pub fn {} (input: &HandlerInput) -> Result<Response, GraphError> {{\n",
             self.name
         )?;
         write!(f, "{{\n")?;

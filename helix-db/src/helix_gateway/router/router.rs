@@ -10,11 +10,12 @@
 use crate::{
     helix_engine::{graph_core::graph_core::HelixGraphEngine, types::GraphError},
     helix_gateway::mcp::mcp::{MCPHandlerFn, MCPToolInput},
+    protocol::HelixError,
 };
 use core::fmt;
 use std::{collections::HashMap, sync::Arc};
 
-use crate::protocol::{request::Request, response::Response};
+use crate::protocol::{Request, Response};
 
 pub struct HandlerInput {
     pub request: Request,
@@ -22,11 +23,10 @@ pub struct HandlerInput {
 }
 
 // basic type for function pointer
-pub type BasicHandlerFn = fn(&HandlerInput, &mut Response) -> Result<(), GraphError>;
+pub type BasicHandlerFn = fn(&HandlerInput) -> Result<Response, GraphError>;
 
 // thread safe type for multi threaded use
-pub type HandlerFn =
-    Arc<dyn Fn(&HandlerInput, &mut Response) -> Result<(), GraphError> + Send + Sync>;
+pub type HandlerFn = Arc<dyn Fn(&HandlerInput) -> Result<Response, GraphError> + Send + Sync>;
 
 #[derive(Clone, Debug)]
 pub struct HandlerSubmission(pub Handler);
@@ -49,16 +49,16 @@ inventory::collect!(HandlerSubmission);
 ///
 /// Standard Routes and MCP Routes are stored in a HashMap with the method and path as the key
 pub struct HelixRouter {
-    /// Method+Path => Function
-    pub routes: HashMap<(String, String), HandlerFn>,
-    pub mcp_routes: HashMap<(String, String), MCPHandlerFn>,
+    /// Name => Function
+    pub routes: HashMap<String, HandlerFn>,
+    pub mcp_routes: HashMap<String, MCPHandlerFn>,
 }
 
 impl HelixRouter {
     /// Create a new router with a set of routes
     pub fn new(
-        routes: Option<HashMap<(String, String), HandlerFn>>,
-        mcp_routes: Option<HashMap<(String, String), MCPHandlerFn>>,
+        routes: Option<HashMap<String, HandlerFn>>,
+        mcp_routes: Option<HashMap<String, MCPHandlerFn>>,
     ) -> Self {
         let rts = match routes {
             Some(routes) => routes,
@@ -75,9 +75,8 @@ impl HelixRouter {
     }
 
     /// Add a route to the router
-    pub fn add_route(&mut self, method: &str, path: &str, handler: BasicHandlerFn) {
-        self.routes
-            .insert((method.to_uppercase(), path.to_string()), Arc::new(handler));
+    pub fn add_route(&mut self, name: &str, handler: BasicHandlerFn) {
+        self.routes.insert(name.to_string(), Arc::new(handler));
     }
 
     /// Handle a request by finding the appropriate handler and executing it
@@ -86,41 +85,38 @@ impl HelixRouter {
     ///
     /// * `graph_access` - A reference to the graph engine
     /// * `request` - The request to handle
-    /// * `response` - The response to write to
     ///
     /// ## Returns
     ///
-    /// * `Ok(())` if the request was handled successfully
+    /// * `Ok(Response)` if the request was handled successfully
     /// * `Err(RouterError)` if there was an error handling the request
     pub fn handle(
         &self,
         graph_access: Arc<HelixGraphEngine>,
         request: Request,
-        response: &mut Response,
-    ) -> Result<(), GraphError> {
-        let route_key = (request.method.clone(), request.path.clone());
-
-        if let Some(handler) = self.routes.get(&route_key) {
+    ) -> Result<Response, HelixError> {
+        if let Some(handler) = self.routes.get(&request.name) {
             let input = HandlerInput {
                 request,
                 graph: Arc::clone(&graph_access),
             };
-            return handler(&input, response);
+            return handler(&input).map_err(Into::into);
         }
 
-        if let Some(mcp_handler) = self.mcp_routes.get(&route_key) {
+        if let Some(mcp_handler) = self.mcp_routes.get(&request.name) {
             let mut mcp_input = MCPToolInput {
                 request,
                 mcp_backend: Arc::clone(&graph_access.mcp_backend.as_ref().unwrap()),
                 mcp_connections: Arc::clone(&graph_access.mcp_connections.as_ref().unwrap()),
                 schema: Some(graph_access.storage.storage_config.schema.clone()),
             };
-            return mcp_handler(&mut mcp_input, response);
+            return mcp_handler(&mut mcp_input).map_err(Into::into);
         };
 
-        response.status = 404;
-        response.body = b"404 - Not Found".to_vec();
-        return Ok(());
+        return Err(HelixError::NotFound {
+            ty: request.req_type,
+            name: request.name,
+        });
     }
 }
 

@@ -50,8 +50,7 @@ pub fn handler(args: TokenStream, item: TokenStream) -> TokenStream {
     let expanded = quote! {
         #[allow(non_camel_case_types)]
         #vis #sig {
-            let (helix_in_fmt, helix_out_fmt) = Format::from_headers(&input.request.headers);
-            let data = &*helix_in_fmt.deserialize::<#input_data_name>(&input.request.body)?;
+            let data = &*input.request.in_fmt.deserialize::<#input_data_name>(&input.request.body)?;
 
             let mut remapping_vals = RemappingMap::new();
             let db = Arc::clone(&input.graph.storage);
@@ -61,9 +60,8 @@ pub fn handler(args: TokenStream, item: TokenStream) -> TokenStream {
             #(#query_stmts)*
 
             txn.commit().unwrap();
-            response.value = Some((helix_out_fmt, return_vals));
 
-            Ok(())
+            Ok(input.request.out_fmt.create_response(&return_vals))
         }
 
         #[doc(hidden)]
@@ -235,8 +233,7 @@ pub fn tool_calls(_attr: TokenStream, input: TokenStream) -> TokenStream {
                 #[allow(non_camel_case_types)]
                 pub fn #fn_name<'a>(
                     input: &'a mut MCPToolInput,
-                    response: &mut Response,
-                ) -> Result<(), GraphError> {
+                ) -> Result<Response, GraphError> {
                     let data: #struct_name = match sonic_rs::from_slice(&input.request.body) {
                         Ok(data) => data,
                         Err(err) => return Err(GraphError::from(err)),
@@ -260,8 +257,7 @@ pub fn tool_calls(_attr: TokenStream, input: TokenStream) -> TokenStream {
                     connections.add_connection(connection);
                     drop(connections);
 
-                    response.body = sonic_rs::to_vec(&ReturnValue::from(first)).unwrap();
-                    Ok(())
+                    Ok(crate::protocol::format::Format::Json.create_response(&ReturnValue::from(first)))
                 }
             };
 

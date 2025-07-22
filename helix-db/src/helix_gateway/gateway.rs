@@ -1,7 +1,17 @@
+use std::sync::atomic::{self, AtomicUsize};
+use std::thread::available_parallelism;
 use std::{collections::HashMap, sync::Arc};
 
-use super::connection::connection::ConnectionHandler;
+use axum::body::Body;
+use axum::extract::State;
+use axum::response::IntoResponse;
+use axum::routing::post;
+use core_affinity::{CoreId, set_for_current};
+use tracing::{info, trace, warn};
+
 use super::router::router::{HandlerFn, HelixRouter};
+use crate::helix_gateway::worker_pool::WorkerPool;
+use crate::protocol;
 use crate::{
     helix_engine::graph_core::graph_core::HelixGraphEngine, helix_gateway::mcp::mcp::MCPHandlerFn,
 };
@@ -13,20 +23,132 @@ impl GatewayOpts {
 }
 
 pub struct HelixGateway {
-    pub connection_handler: ConnectionHandler,
+    address: String,
+    worker_size: usize,
+    io_size: usize,
+    graph_access: Arc<HelixGraphEngine>,
+    router: Arc<HelixRouter>,
 }
 
 impl HelixGateway {
-    pub async fn new(
+    pub fn new(
         address: &str,
-        graph: Arc<HelixGraphEngine>,
-        size: usize,
-        routes: Option<HashMap<(String, String), HandlerFn>>,
-        mcp_routes: Option<HashMap<(String, String), MCPHandlerFn>>,
+        graph_access: Arc<HelixGraphEngine>,
+        worker_size: usize,
+        io_size: usize,
+        routes: Option<HashMap<String, HandlerFn>>,
+        mcp_routes: Option<HashMap<String, MCPHandlerFn>>,
     ) -> HelixGateway {
-        let router = HelixRouter::new(routes, mcp_routes);
-        let connection_handler = ConnectionHandler::new(address, graph, size, router).unwrap();
-        println!("Gateway created");
-        HelixGateway { connection_handler }
+        let router = Arc::new(HelixRouter::new(routes, mcp_routes));
+        HelixGateway {
+            address: address.to_string(),
+            graph_access,
+            router,
+            worker_size,
+            io_size,
+        }
+    }
+
+    pub fn run(self) -> Result<(), Box<dyn std::error::Error>> {
+        trace!("Starting Helix Gateway");
+        let (io_setter, worker_setter) = match core_affinity::get_core_ids() {
+            Some(all_cores) => {
+                let io_cores = CoreSetter::new(&all_cores[0..self.io_size]);
+                let worker_cores = CoreSetter::new(&all_cores[self.io_size..]);
+                (Some(io_cores), Some(worker_cores))
+            }
+            None => {
+                warn!("Failed to get core ids");
+                (None, None)
+            }
+        };
+
+        if let Ok(total_cores) = available_parallelism()
+            && total_cores.get() < self.worker_size + self.io_size
+        {
+            warn!(
+                "using more threads ({} io + {} worker = {}) than available cores ({}).",
+                self.io_size,
+                self.worker_size,
+                self.io_size + self.worker_size,
+                total_cores.get()
+            );
+        }
+
+        let worker_pool = WorkerPool::new(
+            self.worker_size,
+            worker_setter,
+            self.graph_access.clone(),
+            self.router.clone(),
+        );
+
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(self.io_size)
+            .on_thread_start({
+                let local_setter = io_setter.clone();
+                move || {
+                    if let Some(s) = &local_setter {
+                        s.set_current();
+                    }
+                }
+            })
+            .enable_all()
+            .build()?;
+
+        let axum_app = axum::Router::new()
+            .route("/{*path}", post(post_handler))
+            .with_state(Arc::new(worker_pool));
+
+        rt.block_on(async move {
+            let listener = tokio::net::TcpListener::bind(self.address).await.unwrap();
+            info!("Listener has been bound, starting server");
+            axum::serve(listener, axum_app).await.unwrap()
+        });
+
+        Ok(())
+    }
+}
+
+async fn post_handler(
+    State(pool): State<Arc<WorkerPool>>,
+    req: protocol::request::Request,
+) -> axum::http::Response<Body> {
+    let res = pool.process(req).await;
+
+    match res {
+        Ok(r) => r.into_response(),
+        Err(e) => {
+            info!(?e, "Got error");
+            e.into_response()
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct CoreSetter(Arc<CoreSetterInner>);
+
+pub struct CoreSetterInner {
+    cores: Vec<CoreId>,
+    index: AtomicUsize,
+}
+
+impl CoreSetter {
+    pub fn new(cores: &[CoreId]) -> Self {
+        Self(Arc::new(CoreSetterInner {
+            cores: cores.to_vec(),
+            index: AtomicUsize::new(0),
+        }))
+    }
+
+    pub fn set_current(&self) {
+        let inner = &self.0;
+        let idx = inner.index.fetch_add(1, atomic::Ordering::SeqCst);
+        match inner.cores.get(idx) {
+            Some(c) => {
+                set_for_current(*c);
+                trace!("Set core affinity to: {c:?}");
+            }
+            None => warn!("Tried to set core affinity, but all cores already used"),
+        };
     }
 }

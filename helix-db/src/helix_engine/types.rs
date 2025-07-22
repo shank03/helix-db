@@ -1,4 +1,4 @@
-use crate::helixc::parser::parser_methods::ParserError;
+use crate::{helixc::parser::parser_methods::ParserError, protocol::request::RequestType};
 use core::fmt;
 use heed3::Error as HeedError;
 use sonic_rs::Error as SonicError;
@@ -28,6 +28,8 @@ pub enum GraphError {
     ShortestPathNotFound,
     EmbeddingError(String),
 }
+
+impl std::error::Error for GraphError {}
 
 impl fmt::Display for GraphError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -143,6 +145,8 @@ pub enum VectorError {
     VectorCoreError(String),
     VectorAlreadyDeleted(String),
 }
+
+impl std::error::Error for VectorError {}
 
 impl fmt::Display for VectorError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
