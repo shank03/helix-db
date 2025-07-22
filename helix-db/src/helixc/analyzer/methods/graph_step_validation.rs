@@ -128,7 +128,8 @@ pub(crate) fn apply_graph_step<'a>(
                     } else if ctx.vector_set.contains(edge.to.1.as_str()) {
                         EdgeType::Vec
                     } else {
-                        panic!("Edge of type `{}` does not exist", label);
+                        generate_error!(ctx, original_query, gs.loc.clone(), E102, label);
+                        return None;
                     }
                 }
                 None => {
@@ -193,7 +194,8 @@ pub(crate) fn apply_graph_step<'a>(
                     }
                 }
                 None => {
-                    unreachable!()
+                    generate_error!(ctx, original_query, gs.loc.clone(), E102, label.as_str());
+                    return None;
                 }
             };
 

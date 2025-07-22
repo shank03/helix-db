@@ -1,5 +1,5 @@
 use paste::paste;
-use std::fmt::Debug;
+use std::fmt::{Debug};
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
@@ -115,6 +115,59 @@ pub enum ErrorCode {
 
     /// `W101` - `query has no return`
     W101,
+}
+impl std::fmt::Display for ErrorCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ErrorCode::E101 => write!(f, "E101"),
+            ErrorCode::E102 => write!(f, "E102"),
+            ErrorCode::E103 => write!(f, "E103"),
+            ErrorCode::E104 => write!(f, "E104"),
+            ErrorCode::E105 => write!(f, "E105"),
+            ErrorCode::E106 => write!(f, "E106"),
+            ErrorCode::E201 => write!(f, "E201"),
+            ErrorCode::E202 => write!(f, "E202"),
+            ErrorCode::E203 => write!(f, "E203"),
+            ErrorCode::E204 => write!(f, "E204"),
+            ErrorCode::E205 => write!(f, "E205"),
+            ErrorCode::E206 => write!(f, "E206"),
+            ErrorCode::E207 => write!(f, "E207"),
+            ErrorCode::E208 => write!(f, "E208"),
+            ErrorCode::E209 => write!(f, "E209"),
+            ErrorCode::E301 => write!(f, "E301"),
+            ErrorCode::E302 => write!(f, "E302"),
+            ErrorCode::E303 => write!(f, "E303"),
+            ErrorCode::E304 => write!(f, "E304"),
+            ErrorCode::E305 => write!(f, "E305"),
+            ErrorCode::E401 => write!(f, "E401"),
+            ErrorCode::E501 => write!(f, "E501"),
+            ErrorCode::E601 => write!(f, "E601"),
+            ErrorCode::E602 => write!(f, "E602"),
+            ErrorCode::E603 => write!(f, "E603"),
+            ErrorCode::E604 => write!(f, "E604"),
+            ErrorCode::E611 => write!(f, "E611"),
+            ErrorCode::E612 => write!(f, "E612"),
+            ErrorCode::E621 => write!(f, "E621"),
+            ErrorCode::E622 => write!(f, "E622"),
+            ErrorCode::E623 => write!(f, "E623"),
+            ErrorCode::E624 => write!(f, "E624"),
+            ErrorCode::E625 => write!(f, "E625"),
+            ErrorCode::E626 => write!(f, "E626"),
+            ErrorCode::E631 => write!(f, "E631"),
+            ErrorCode::E632 => write!(f, "E632"),
+            ErrorCode::E633 => write!(f, "E633"),
+            ErrorCode::E641 => write!(f, "E641"),
+            ErrorCode::E642 => write!(f, "E642"),
+            ErrorCode::E643 => write!(f, "E643"),
+            ErrorCode::E644 => write!(f, "E644"),
+            ErrorCode::E645 => write!(f, "E645"),
+            ErrorCode::E646 => write!(f, "E646"),
+            ErrorCode::E651 => write!(f, "E651"),
+            ErrorCode::E652 => write!(f, "E652"),
+            ErrorCode::E653 => write!(f, "E653"),
+            ErrorCode::W101 => write!(f, "W101"),
+        }
+    }
 }
 
 #[macro_export]
