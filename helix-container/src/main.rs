@@ -7,11 +7,17 @@ use helix_db::helix_gateway::{
 };
 use inventory;
 use std::{collections::HashMap, sync::Arc};
+use tracing::Level;
+use tracing_subscriber::util::SubscriberInitExt;
 
 mod graphvis;
 mod queries;
 
 fn main() {
+    tracing_subscriber::fmt()
+        .with_max_level(Level::TRACE)
+        .finish()
+        .init();
     let config = queries::config().unwrap_or(Config::default());
 
     let path = match std::env::var("HELIX_DATA_DIR") {

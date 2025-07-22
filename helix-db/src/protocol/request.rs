@@ -4,6 +4,7 @@ use reqwest::{
     header::{ACCEPT, CONTENT_TYPE},
 };
 use tokio::sync::oneshot;
+use tracing::info;
 
 use crate::protocol::{Format, HelixError, Response};
 
@@ -63,21 +64,22 @@ where
 
         let out_fmt = match headers.get(ACCEPT) {
             Some(v) => match v.to_str() {
-                Ok(s) => s.parse().map_err(|_| StatusCode::BAD_REQUEST)?,
+                Ok(s) => s.parse().unwrap_or_default(),
                 Err(_) => return Err(StatusCode::BAD_REQUEST),
             },
             None => Format::default(),
         };
 
         let body = Bytes::from_request(req, state).await.expect("todo");
-
-        Ok(Request {
+        let out = Request {
             name,
             req_type,
             body,
             in_fmt,
             out_fmt,
-        })
+        };
+
+        Ok(out)
     }
 }
 

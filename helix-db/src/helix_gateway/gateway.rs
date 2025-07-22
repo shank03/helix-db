@@ -7,7 +7,7 @@ use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::routing::post;
 use core_affinity::{CoreId, set_for_current};
-use tracing::{trace, warn};
+use tracing::{info, trace, warn};
 
 use super::router::router::{HandlerFn, HelixRouter};
 use crate::helix_gateway::worker_pool::WorkerPool;
@@ -92,13 +92,16 @@ impl HelixGateway {
                     }
                 }
             })
+            .enable_all()
             .build()?;
 
         let axum_app = axum::Router::new()
-            .route("/*path", post(post_handler))
+            .route("/{*path}", post(post_handler))
             .with_state(Arc::new(worker_pool));
-        rt.spawn(async move {
+
+        rt.block_on(async move {
             let listener = tokio::net::TcpListener::bind(self.address).await.unwrap();
+            info!("Listener has been bound, starting server");
             axum::serve(listener, axum_app).await.unwrap()
         });
 
@@ -110,9 +113,14 @@ async fn post_handler(
     State(pool): State<Arc<WorkerPool>>,
     req: protocol::request::Request,
 ) -> axum::http::Response<Body> {
-    match pool.process(req).await {
+    let res = pool.process(req).await;
+
+    match res {
         Ok(r) => r.into_response(),
-        Err(e) => e.into_response(),
+        Err(e) => {
+            info!(?e, "Got error");
+            e.into_response()
+        }
     }
 }
 
