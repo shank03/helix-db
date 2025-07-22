@@ -3,11 +3,12 @@ use helix_db::{
     helix_gateway::router::router::HandlerInput,
     protocol::response::Response,
 };
-use helix_macros::get_handler;
+// use helix_macros::get_handler;
 use serde_json::Value;
 use std::sync::Arc;
 
 // #[get_handler]
+#[allow(unused)]
 pub fn graphvis(input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
     let db = Arc::clone(&input.graph.storage);
     let txn = db.graph_env.read_txn()?;

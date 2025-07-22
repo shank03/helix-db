@@ -342,20 +342,21 @@ async fn main() -> Result<()> {
     let build_script_path = project_root.join("helix-cli/build.sh");
     println!("DEBUG: Build script path: {}", build_script_path.display());
     println!("DEBUG: Build script exists: {}", build_script_path.exists());
-    
+
     let helix_cli_dir = project_root.join("helix-cli");
     println!("DEBUG: Helix CLI dir: {}", helix_cli_dir.display());
     println!("DEBUG: Helix CLI dir exists: {}", helix_cli_dir.exists());
-    
+
     // Check if helix is already available
-    let helix_check = Command::new("helix")
-        .arg("--version")
-        .output();
-    
+    let helix_check = Command::new("helix").arg("--version").output();
+
     match helix_check {
         Ok(output) => {
             if output.status.success() {
-                println!("DEBUG: Helix already available: {}", String::from_utf8_lossy(&output.stdout));
+                println!(
+                    "DEBUG: Helix already available: {}",
+                    String::from_utf8_lossy(&output.stdout)
+                );
             } else {
                 println!("DEBUG: Helix not available or failed version check");
             }
@@ -364,18 +365,24 @@ async fn main() -> Result<()> {
             println!("DEBUG: Helix command not found: {}", e);
         }
     }
-    
+
     let output = Command::new("sh")
         .arg("build.sh")
         .arg("dev")
-        .current_dir(&helix_cli_dir)  // Change to helix-cli directory first
+        .current_dir(&helix_cli_dir) // Change to helix-cli directory first
         .output()
         .context("Failed to execute build.sh")?;
-    
+
     println!("DEBUG: build.sh exit code: {:?}", output.status.code());
-    println!("DEBUG: build.sh stdout: {}", String::from_utf8_lossy(&output.stdout));
-    println!("DEBUG: build.sh stderr: {}", String::from_utf8_lossy(&output.stderr));
-    
+    println!(
+        "DEBUG: build.sh stdout: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    println!(
+        "DEBUG: build.sh stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
     if !output.status.success() {
         bail!(
             "Error: build.sh failed\nStderr: {}\nStdout: {}",
@@ -384,19 +391,23 @@ async fn main() -> Result<()> {
         );
     } else {
         println!("DEBUG: build.sh dev succeeded");
-        
+
         // Check if helix is available after build
-        let helix_check_after = Command::new("helix")
-            .arg("--version")
-            .output();
-        
+        let helix_check_after = Command::new("helix").arg("--version").output();
+
         match helix_check_after {
             Ok(output) => {
                 if output.status.success() {
-                    println!("DEBUG: Helix available after build: {}", String::from_utf8_lossy(&output.stdout));
+                    println!(
+                        "DEBUG: Helix available after build: {}",
+                        String::from_utf8_lossy(&output.stdout)
+                    );
                 } else {
                     println!("DEBUG: Helix still not available after build");
-                    println!("DEBUG: Helix version check stderr: {}", String::from_utf8_lossy(&output.stderr));
+                    println!(
+                        "DEBUG: Helix version check stderr: {}",
+                        String::from_utf8_lossy(&output.stderr)
+                    );
                 }
             }
             Err(e) => {
@@ -572,8 +583,14 @@ async fn process_file_parallel(
         .output()
         .context("Failed to execute helix compile command")?;
 
-    println!("DEBUG: Helix compile output: {}", String::from_utf8_lossy(&output.stdout));
-    println!("DEBUG: Helix compile stderr: {}", String::from_utf8_lossy(&output.stderr));
+    println!(
+        "DEBUG: Helix compile output: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    println!(
+        "DEBUG: Helix compile stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     if !output.status.success() {
         fs::remove_dir_all(&temp_dir).await.ok();
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -629,7 +646,7 @@ async fn process_file_parallel(
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            let stdout = String::from_utf8_lossy(&output.stdout);
+            let _stdout = String::from_utf8_lossy(&output.stdout);
             // let filtered_errors = extract_cargo_errors(&stderr, &stdout);
             let error_message = format!("Cargo check failed for file{}\n{}", file_num, stderr);
 
