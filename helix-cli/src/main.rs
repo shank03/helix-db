@@ -9,7 +9,7 @@ use helix_db::{helix_engine::graph_core::config::Config, utils::styled_string::S
 use spinners::{Spinner, Spinners};
 use std::{
     fmt::Write,
-    fs::{self, read_to_string, OpenOptions},
+    fs::{self, OpenOptions, read_to_string},
     io::Write as iWrite,
     path::{Path, PathBuf},
     process::Command,
@@ -91,29 +91,6 @@ async fn main() -> Result<(), ()> {
                 Some(port) => port,
                 None => 6969,
             };
-            let port = match find_available_port(start_port) {
-                Some(port) => {
-                    if port != start_port {
-                        println!(
-                            "{} {} {} {} {}",
-                            "Port".yellow(),
-                            start_port,
-                            "is in use, using port".yellow(),
-                            port,
-                            "instead".yellow(),
-                        );
-                    }
-                    port
-                }
-                None => {
-                    println!(
-                        "{} {}",
-                        "No available ports found starting from".red().bold(),
-                        start_port
-                    );
-                    return Err(());
-                }
-            };
 
             let path = get_cfg_deploy_path(command.path.clone());
             let files = match check_and_read_files(&path) {
@@ -148,6 +125,29 @@ async fn main() -> Result<(), ()> {
                 if command.cluster.is_none()
                     && (command.path.is_some() || Path::new(&format!("./{}", DB_DIR)).is_dir())
                 {
+                    let port = match find_available_port(start_port) {
+                        Some(port) => {
+                            if port != start_port {
+                                println!(
+                                    "{} {} {} {} {}",
+                                    "Port".yellow(),
+                                    start_port,
+                                    "is in use, using port".yellow(),
+                                    port,
+                                    "instead".yellow(),
+                                );
+                            }
+                            port
+                        }
+                        None => {
+                            println!(
+                                "{} {}",
+                                "No available ports found starting from".red().bold(),
+                                start_port
+                            );
+                            return Err(());
+                        }
+                    };
                     match deploy_helix(port, code, None) {
                         Ok(_) => {}
                         Err(_) => return Err(()),

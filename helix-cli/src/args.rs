@@ -100,14 +100,14 @@ pub struct CheckCommand {
 #[derive(Debug, Args)]
 #[clap(name = "install", about = "Install the Helix repo")]
 pub struct InstallCommand {
-    #[clap(help = "Install HelixDB from the development branch (considered unstable)")]
+    #[clap(short, long, help = "Install HelixDB from the development branch (considered unstable)")]
     pub dev: bool,
 }
 
 #[derive(Debug, Args)]
 #[clap(name = "init", about = "Initialise a new Helix project")]
 pub struct InitCommand {
-    #[clap(help = "The path to the project")]
+    #[clap(short, long, help = "The path to the project")]
     pub path: Option<String>,
 }
 
@@ -117,14 +117,14 @@ pub struct StopCommand {
     #[clap(short, long, help = "Stop all running instances")]
     pub all: bool,
 
-    #[clap(help = "Instance ID to stop")]
+    #[clap(short, long, help = "Instance ID to stop")]
     pub cluster: Option<String>,
 }
 
 #[derive(Debug, Args)]
 #[clap(name = "save", about = "Save an instances data.mdb file")]
 pub struct SaveCommand {
-    #[clap(help = "Instance ID to save")]
+    #[clap(short, long, help = "Instance ID to save")]
     pub cluster: String,
 
     #[clap(short, long, help = "Where to save the file to")]
@@ -134,14 +134,14 @@ pub struct SaveCommand {
 #[derive(Debug, Args)]
 #[clap(name = "delete", about = "Delete an instance and its saved data")]
 pub struct DeleteCommand {
-    #[clap(help = "Cluster ID to delete")]
+    #[clap(short, long, help = "Cluster ID to delete")]
     pub cluster: String,
 }
 
 #[derive(Debug, Args)]
 #[clap(name = "visualize", about = "Visualize the Helix graph")]
 pub struct VisualizeCommand {
-    #[clap(help = "Cluster ID to visualize")]
+    #[clap(short, long, help = "Cluster ID to visualize")]
     pub cluster: String,
 }
 

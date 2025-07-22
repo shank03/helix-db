@@ -6,6 +6,7 @@ use crate::helixc::{
             query_validation::validate_query,
             schema_methods::{build_field_lookups, check_schema},
         },
+        types::Type,
     },
     generator::generator_types::Source as GeneratedSource,
     parser::helix_parser::{EdgeSchema, Field, Source},
@@ -59,6 +60,21 @@ impl<'a> Ctx<'a> {
             src,
             diagnostics: Vec::new(),
             output,
+        }
+    }
+
+    pub(super) fn get_item_fields(&self, item_type: &Type) -> Option<&HashMap<&str, Cow<Field>>> {
+        match item_type {
+            Type::Node(Some(node_type)) | Type::Nodes(Some(node_type)) => {
+                self.node_fields.get(node_type.as_str())
+            }
+            Type::Edge(Some(edge_type)) | Type::Edges(Some(edge_type)) => {
+                self.edge_fields.get(edge_type.as_str())
+            }
+            Type::Vector(Some(vector_type)) | Type::Vectors(Some(vector_type)) => {
+                self.vector_fields.get(vector_type.as_str())
+            }
+            _ => None,
         }
     }
 

@@ -87,7 +87,6 @@ pub struct ObjectRemapping {
 }
 impl Display for ObjectRemapping {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // CHECK: do we just let it cascade to terminal value or do we need to handle here?
         write!(f, "{}", self.remapping)
     }
 }
