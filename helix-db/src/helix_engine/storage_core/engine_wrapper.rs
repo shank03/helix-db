@@ -102,6 +102,9 @@ impl<'a> Txn<'a> for RTxn<'a> {
     }
 }
 
+pub type NodeId = u128;
+pub type EdgeId = u128;
+
 pub trait Storage {
     type Key<'a>;
     type Value<'a>;
