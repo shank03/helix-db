@@ -430,12 +430,7 @@ pub(crate) fn apply_graph_step<'a>(
                     }
                     EvaluatesToNumberType::Identifier(i) => {
                         is_valid_identifier(ctx, original_query, sv.loc.clone(), i.as_str());
-                        // is param
-                        if original_query.parameters.iter().any(|p| p.name.1 == *i) {
-                            GeneratedValue::Identifier(GenRef::Std(format!("data.{i} as usize")))
-                        } else {
-                            GeneratedValue::Identifier(GenRef::Std(i.to_string()))
-                        }
+                        gen_identifier_or_param(original_query, i, true, false)
                     }
                     _ => {
                         generate_error!(
