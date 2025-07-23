@@ -37,87 +37,6 @@ fn generate_error_hash(error_type: &str, error_message: &str, _file_num: u32) ->
     general_purpose::STANDARD.encode(hash)[0..12].to_string()
 }
 
-fn extract_cargo_errors(stderr: &str, stdout: &str) -> String {
-    let mut errors = Vec::new();
-
-    // Parse both stderr and stdout for error messages
-    let combined_output = format!("{}\n{}", stderr, stdout);
-
-    let lines: Vec<&str> = combined_output.lines().collect();
-    let mut i = 0;
-
-    while i < lines.len() {
-        let line = lines[i];
-
-        // Look for error lines
-        if line.starts_with("error:") || line.contains("error:") {
-            // Start collecting this error
-            let mut error_block = Vec::new();
-            error_block.push(line);
-
-            // Continue collecting related lines until we hit a blank line or another error/warning
-            i += 1;
-            while i < lines.len() {
-                let next_line = lines[i];
-
-                // Stop if we hit another error or warning
-                if next_line.starts_with("error:")
-                    || next_line.starts_with("warning:")
-                    || next_line.starts_with("note:")
-                {
-                    break;
-                }
-
-                // Stop if we hit compilation result lines
-                if next_line.contains("error: could not compile")
-                    || next_line.contains("error: aborting due to")
-                    || next_line.contains("For more information about this error")
-                {
-                    break;
-                }
-
-                // Include the line if it's not empty or if it's providing error context
-                if !next_line.trim().is_empty()
-                    || next_line.starts_with("  ")
-                    || next_line.starts_with("   ")
-                    || next_line.contains("-->")
-                    || next_line.contains("|")
-                {
-                    error_block.push(next_line);
-                }
-
-                i += 1;
-            }
-
-            // Add this error block to our collection
-            if !error_block.is_empty() {
-                errors.push(error_block.join("\n"));
-            }
-        } else {
-            i += 1;
-        }
-    }
-
-    // If no structured errors found, look for any line containing "error:"
-    if errors.is_empty() {
-        for line in lines {
-            if line.contains("error:")
-                && !line.contains("error: could not compile")
-                && !line.contains("error: aborting due to")
-            {
-                errors.push(line.to_string());
-            }
-        }
-    }
-
-    // Join all errors with double newlines
-    if errors.is_empty() {
-        "Unknown compilation error".to_string()
-    } else {
-        errors.join("\n\n")
-    }
-}
-
 async fn check_issue_exists(github_config: &GitHubConfig, error_hash: &str) -> Result<bool> {
     println!("DEBUG: Checking if issue exists with hash: {}", error_hash);
 
@@ -647,7 +566,6 @@ async fn process_file_parallel(
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             let _stdout = String::from_utf8_lossy(&output.stdout);
-            // let filtered_errors = extract_cargo_errors(&stderr, &stdout);
             let error_message = format!("Cargo check failed for file{}\n{}", file_num, stderr);
 
             // Create GitHub issue if configuration is available
