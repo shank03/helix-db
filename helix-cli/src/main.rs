@@ -706,6 +706,7 @@ async fn main() -> Result<(), ()> {
                     };
                     to_delete.push(iid.to_string());
                 }
+
                 for del_iid in to_delete {
                     match instance_manager.stop_instance(&del_iid) {
                         Ok(true) => println!(
