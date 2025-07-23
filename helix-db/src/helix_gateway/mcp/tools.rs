@@ -173,8 +173,9 @@ impl<'a> McpTools<'a> for McpBackend {
             })
             .flatten();
 
+        let result = iter.take(100).collect();
         debug_println!("result: {:?}", result);
-        iter.take(100).collect()
+        result
     }
 
     fn out_e_step(
@@ -211,8 +212,9 @@ impl<'a> McpTools<'a> for McpBackend {
             })
             .flatten();
 
+        let result = iter.take(100).collect();
         debug_println!("result: {:?}", result);
-        iter.take(100).collect()
+        result
     }
 
     fn in_step(
@@ -251,8 +253,9 @@ impl<'a> McpTools<'a> for McpBackend {
             })
             .flatten();
 
+        let result = iter.take(100).collect();
         debug_println!("result: {:?}", result);
-        iter.take(100).collect()
+        result
     }
 
     fn in_e_step(
@@ -289,8 +292,9 @@ impl<'a> McpTools<'a> for McpBackend {
             })
             .flatten();
 
+        let result = iter.take(100).collect();
         debug_println!("result: {:?}", result);
-        iter.take(100).collect()
+        result
     }
 
     fn n_from_type(
@@ -306,8 +310,9 @@ impl<'a> McpTools<'a> for McpBackend {
             label: &node_type,
         };
 
+        let result = iter.take(100).collect::<Result<Vec<_>, _>>();
         debug_println!("result: {:?}", result);
-        iter.take(100).collect::<Result<Vec<_>, _>>()
+        result
     }
 
     fn e_from_type(
