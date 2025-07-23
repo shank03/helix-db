@@ -133,10 +133,10 @@ pub fn get_embedding_model(
     return Ok(EmbeddingModelImpl::new(_url)?);
 
     #[cfg(not(any(feature = "embed_openai", feature = "embed_local")))]
-    panic!("No embedding model feature enabled. Enable either 'openai' or 'local'.");
+    compile_error!("No embedding model feature enabled. Enable either 'openai' or 'local'.");
 
     #[cfg(all(feature = "embed_openai", feature = "embed_local"))]
-    panic!("Multiple model features enabled. Enable either 'openai' or 'local'.");
+    compile_error!("Multiple model features enabled. Enable either 'openai' or 'local'.");
 }
 
 #[macro_export]
