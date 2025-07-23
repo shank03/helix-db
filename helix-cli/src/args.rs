@@ -136,6 +136,9 @@ pub struct SaveCommand {
 pub struct DeleteCommand {
     #[clap(help = "Cluster ID to delete")]
     pub cluster: String,
+
+    #[clap(short, long, help = "Delete all clusters")]
+    pub all: bool,
 }
 
 #[derive(Debug, Args)]
