@@ -6,7 +6,6 @@ use std::{
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
-use dirs;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -69,18 +68,18 @@ impl InstanceManager {
         let data_dir = self.cache_dir.join("data").join(&instance_id);
         fs::create_dir_all(&data_dir)?;
 
-        let log_file = self.logs_dir.join(format!("instance_{}.log", instance_id));
+        let log_file = self.logs_dir.join(format!("instance_{instance_id}.log"));
         let log_file = OpenOptions::new()
             .create(true)
-            .write(true)
+            
             .append(true)
             .open(log_file)?;
         let error_log_file = self
             .logs_dir
-            .join(format!("instance_{}_error.log", instance_id));
+            .join(format!("instance_{instance_id}_error.log"));
         let error_log_file = OpenOptions::new()
             .create(true)
-            .write(true)
+            
             .append(true)
             .open(error_log_file)?;
 
@@ -127,10 +126,10 @@ impl InstanceManager {
             Ok(instance) => {
                 match instance {
                     Some(val) => val,
-                    None => return Err(format!("No instance found with id {}", instance_id)),
+                    None => return Err(format!("No instance found with id {instance_id}")),
                 }
             }
-            Err(e) => return Err(format!("Error occured getting instance {}", e)),
+            Err(e) => return Err(format!("Error occured getting instance {e}")),
         };
 
         if !instance.binary_path.exists() {
@@ -141,22 +140,22 @@ impl InstanceManager {
         let data_dir = self.cache_dir.join("data").join(&instance_id);
         if !data_dir.exists() {
             fs::create_dir_all(&data_dir).map_err(|e| {
-                format!("Failed to create data directory for {}: {}", instance_id, e)
+                format!("Failed to create data directory for {instance_id}: {e}")
             })?;
         }
 
-        let log_file = self.logs_dir.join(format!("instance_{}.log", instance_id));
+        let log_file = self.logs_dir.join(format!("instance_{instance_id}.log"));
         let log_file = OpenOptions::new()
-            .write(true)
+            
             .append(true)
             .create(true)
             .open(log_file)
-            .map_err(|e| format!("Failed to open log file: {}", e))?;
+            .map_err(|e| format!("Failed to open log file: {e}"))?;
 
         let port = match find_available_port(instance.port) {
             Some(port) => port,
             None => {
-                return Err(format!("{}", "Could not find an available port!".red().bold()));
+                return Err("Could not find an available port!".red().bold().to_string());
             }
         };
         instance.port = port;
@@ -168,12 +167,12 @@ impl InstanceManager {
             .env("HELIX_DATA_DIR", data_dir.to_str().unwrap())
             .env("HELIX_PORT", instance.port.to_string())
             .stdout(Stdio::from(log_file.try_clone().map_err(|e| {
-                format!("Failed to clone log file: {}", e)
+                format!("Failed to clone log file: {e}")
             })?))
         .stderr(Stdio::from(log_file));
 
         let child = command.spawn().map_err(|e| {
-            format!("Failed to spawn process for {}: {}", instance_id, e)
+            format!("Failed to spawn process for {instance_id}: {e}")
         })?;
 
         instance.pid = child.id();
@@ -192,9 +191,8 @@ impl InstanceManager {
             Ok(n) => match self.id_from_short_id(n) {
                 Ok(n) => n.id,
                 Err(_) => return Err(
-                    io::Error::new(
-                        io::ErrorKind::Other,
-                        format!("No instance found with id {}", instance_id),
+                    io::Error::other(
+                        format!("No instance found with id {instance_id}"),
                     )),
             },
             Err(_) => instance_id.to_string(),
@@ -232,7 +230,7 @@ impl InstanceManager {
 
         let mut instances = match self.list_instances() {
             Ok(val) => val,
-            Err(e) => return Err(format!("Error occured stopping instnace! {}", e)),
+            Err(e) => return Err(format!("Error occured stopping instnace! {e}")),
         };
         if let Some(pos) = instances.iter().position(|i| i.id == instance_id) {
             if !instances[pos].running {
@@ -253,7 +251,7 @@ impl InstanceManager {
                     unsafe { TerminateProcess(handle, 0) };
                 }
             }
-            let _ = self.save_instances(&instances)?;
+            self.save_instances(&instances)?;
             return Ok(true);
         }
         Ok(false)
@@ -262,7 +260,7 @@ impl InstanceManager {
     pub fn running_instances(&self) -> Result<bool, String> {
         let instances = match self.list_instances() {
             Ok(val) => val,
-            Err(e) => return Err(format!("Error occured listing instnaces! {}", e)),
+            Err(e) => return Err(format!("Error occured listing instnaces! {e}")),
         };
         for instance in instances {
             if instance.running {
@@ -276,7 +274,7 @@ impl InstanceManager {
     fn save_instances(&self, instances: &[InstanceInfo]) -> Result<(), String> {
         let contents = match sonic_rs::to_string(instances) {
             Ok(s) => s,
-            Err(e) => return Err(format!("Failed to serialize instances: {}", e)),
+            Err(e) => return Err(format!("Failed to serialize instances: {e}")),
         };
         let mut file = match OpenOptions::new()
             .write(true)
@@ -285,11 +283,11 @@ impl InstanceManager {
             .open(&self.instances_file)
             {
                 Ok(f) => f,
-                Err(e) => return Err(format!("Failed to open file: {}", e)),
+                Err(e) => return Err(format!("Failed to open file: {e}")),
             };
         match file.write_all(contents.as_bytes()) {
             Ok(_) => (),
-            Err(e) => return Err(format!("Failed to write to file: {}", e)),
+            Err(e) => return Err(format!("Failed to write to file: {e}")),
         };
         Ok(())
     }
@@ -297,7 +295,7 @@ impl InstanceManager {
     fn update_instance(&self, updated_instance: &InstanceInfo) -> Result<(), String> {
         let mut instances = match self.list_instances() {
             Ok(val) => val,
-            Err(e) => return Err(format!("Error occured stopping instnace! {}", e)),
+            Err(e) => return Err(format!("Error occured stopping instnace! {e}")),
         };
         if let Some(pos) = instances.iter().position(|i| i.id == updated_instance.id) {
             instances[pos] = updated_instance.clone();
@@ -319,7 +317,7 @@ impl InstanceManager {
 
         let mut instances = match self.list_instances() {
             Ok(val) => val,
-            Err(e) => return Err(format!("Error occured stopping instnace! {}", e)),
+            Err(e) => return Err(format!("Error occured stopping instnace! {e}")),
         };
         if let Some(pos) = instances.iter().position(|i| i.id == instance_id) {
             instances.remove(pos);

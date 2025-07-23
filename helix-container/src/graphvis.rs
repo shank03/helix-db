@@ -17,7 +17,7 @@ pub fn graphvis(input: &HandlerInput, response: &mut Response) -> Result<(), Gra
         match db.nodes_edges_to_json(&txn, None, db.storage_config.graphvis_node_label.clone()) {
             Ok(value) => value,
             Err(e) => {
-                println!("error with json: {}", e);
+                println!("error with json: {e}");
                 return Ok(());
             }
         };
@@ -26,14 +26,14 @@ pub fn graphvis(input: &HandlerInput, response: &mut Response) -> Result<(), Gra
     let db_counts: String = match db.get_db_stats_json(&txn) {
         Ok(value) => value,
         Err(e) => {
-            println!("error with json: {:?}", e);
+            println!("error with json: {e:?}");
             return Ok(());
         }
     };
     let db_counts_m: Value = match serde_json::from_str(&db_counts) {
         Ok(value) => value,
         Err(e) => {
-            println!("error with json: {:?}", e);
+            println!("error with json: {e:?}");
             return Ok(());
         }
     };

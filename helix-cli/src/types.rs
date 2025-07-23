@@ -18,7 +18,7 @@ impl Version {
 
         let parts: Vec<&str> = version.split('.').collect();
         if parts.len() != 3 {
-            return Err(format!("Invalid version format: {}", version));
+            return Err(format!("Invalid version format: {version}"));
         }
 
         let major = parts[0]
