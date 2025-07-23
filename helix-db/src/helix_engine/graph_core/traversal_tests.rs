@@ -15,7 +15,8 @@ use crate::{
             vectors::brute_force_search::BruteForceSearchVAdapter,
         },
         storage_core::storage_core::HelixGraphStorage,
-        types::GraphError, vector_core::vector,
+        types::GraphError,
+        vector_core::vector,
     },
     protocol::{
         remapping::{Remapping, RemappingMap, ResponseRemapping},
@@ -895,7 +896,7 @@ fn test_filter_macro_single_argument() {
             .iter()
             .any(|val| if let TraversalVal::Node(node) = val {
                 let name = node.check_property("name").unwrap();
-                    name.as_ref() == &Value::String("Alice".to_string())
+                name.as_ref() == &Value::String("Alice".to_string())
                     || name.as_ref() == &Value::String("Bob".to_string())
             } else {
                 false
@@ -1343,7 +1344,11 @@ fn test_update_node() {
         .collect_to::<Vec<_>>();
     assert_eq!(updated_users.len(), 1);
     assert_eq!(
-        updated_users[0].check_property("name").unwrap().into_owned().to_string(),
+        updated_users[0]
+            .check_property("name")
+            .unwrap()
+            .into_owned()
+            .to_string(),
         "john"
     );
 }
@@ -1495,8 +1500,8 @@ fn huge_traversal() {
     let mut txn = storage.graph_env.write_txn().unwrap();
 
     let _start = Instant::now();
-    let mut nodes = Vec::with_capacity(1000_000);
-    for _ in 0..1000_000 {
+    let mut nodes = Vec::with_capacity(1_000_000);
+    for _ in 0..1_000_000 {
         let id = G::new_mut(Arc::clone(&storage), &mut txn)
             .add_n("user", None, None)
             .collect_to_val();
@@ -2221,7 +2226,11 @@ fn test_exclude_field_remapping() {
     let mut txn = storage.graph_env.write_txn().unwrap();
 
     let node = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "text" => "test", "other" => "other" }), None)
+        .add_n(
+            "person",
+            Some(props! { "text" => "test", "other" => "other" }),
+            None,
+        )
         .collect_to_val();
 
     let traversal = G::new(Arc::clone(&storage), &txn)
@@ -2247,7 +2256,6 @@ fn test_exclude_field_remapping() {
     );
 
     assert_eq!(return_vals.len(), 1);
-    
 
     #[derive(Serialize, Deserialize)]
     struct Test {
@@ -2267,7 +2275,6 @@ fn test_exclude_field_remapping() {
         other: Some("other".to_string()),
     };
 
-
     assert_eq!(value.text, expected.text);
     assert_eq!(value.other, expected.other);
 }
@@ -2278,7 +2285,11 @@ fn test_delete_vector() {
     let mut txn = storage.graph_env.write_txn().unwrap();
 
     let vector = G::new_mut(Arc::clone(&storage), &mut txn)
-        .insert_v::<fn(&HVector, &RoTxn) -> bool>(&vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0], "vector", None)
+        .insert_v::<fn(&HVector, &RoTxn) -> bool>(
+            &vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+            "vector",
+            None,
+        )
         .collect_to_val();
 
     txn.commit().unwrap();
@@ -2296,7 +2307,11 @@ fn test_delete_vector() {
 
     Drop::drop_traversal(
         G::new(Arc::clone(&storage), &txn)
-            .search_v::<fn(&HVector, &RoTxn) -> bool>(&vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 2000, None)
+            .search_v::<fn(&HVector, &RoTxn) -> bool>(
+                &vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+                2000,
+                None,
+            )
             .collect_to::<Vec<_>>(),
         Arc::clone(&storage),
         &mut txn,

@@ -1,22 +1,12 @@
-/// parse -> analyze -> generate -> compile
+//! parse -> analyze -> generate -> compile
 
 use crate::helixc::{
-    generator::generator_types::Source as GeneratedSource,
-    parser::helix_parser::{
-        Source as ParsedSource,
-        Content,
-        HelixParser,
-        HxFile,
-    },
     analyzer::analyzer::analyze,
+    generator::generator_types::Source as GeneratedSource,
+    parser::helix_parser::{Content, HelixParser, HxFile, Source as ParsedSource},
 };
 
-use std::{
-    path::PathBuf,
-    fmt::Write,
-    fs,
-    process::Command,
-};
+use std::{fmt::Write, fs, path::PathBuf, process::Command};
 
 pub fn check_helix_installation() -> Result<PathBuf, String> {
     let home_dir = PathBuf::from(std::env::var("HOME").unwrap_or("~/".to_string()));
@@ -89,7 +79,7 @@ fn compile(analyzed_source: GeneratedSource) -> Result<(), String> {
         Err(e) => return Err(format!("Failed to write queries file: {:?}", e)),
     }
     match fs::write(file_path, generated_rust_code) {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => return Err(format!("Failed to write queries file: {:?}", e)),
     }
 
@@ -246,4 +236,3 @@ fn generator_test_3() {
     };
 }
 */
-
