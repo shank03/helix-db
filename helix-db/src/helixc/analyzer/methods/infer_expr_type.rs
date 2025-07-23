@@ -986,10 +986,10 @@ pub(crate) fn infer_expr_type<'a>(
                         i.as_str(),
                     );
 
-                    if original_query.parameters.iter().any(|p| p.name.1 == *i) {
-                        GeneratedValue::Identifier(GenRef::Ref(format!("data.{i}")))
-                    } else if scope.get(i.as_str()).is_some() {
-                        GeneratedValue::Identifier(GenRef::Ref(i.to_string()))
+                    if original_query.parameters.iter().any(|p| p.name.1 == *i)
+                        || scope.get(i.as_str()).is_some()
+                    {
+                        gen_identifier_or_param(original_query, i, true, false)
                     } else {
                         generate_error!(
                             ctx,
@@ -1050,7 +1050,6 @@ pub(crate) fn infer_expr_type<'a>(
                             bm25_search.loc.clone(),
                             i.as_str(),
                         );
-                        // is param
                         gen_identifier_or_param(original_query, i, true, false)
                     }
                     _ => {
