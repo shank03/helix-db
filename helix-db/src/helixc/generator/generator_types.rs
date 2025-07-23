@@ -281,7 +281,6 @@ impl Display for Query {
         }
 
         write!(f, "}}\n")?;
-        write!(f, "    Ok(())\n")?;
         write!(f, "}}\n")
     }
 }
