@@ -684,7 +684,7 @@ async fn main() -> Result<(), ()> {
                 return Err(());
             }
 
-            if instance_manager.list_instances().unwrap().len() == 0 {
+            if instance_manager.list_instances().unwrap().is_empty() {
                 println!("{}", "No instances running!".yellow().bold());
                 return Err(());
             }
