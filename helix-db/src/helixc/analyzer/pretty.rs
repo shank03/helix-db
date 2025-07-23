@@ -83,7 +83,7 @@ pub fn render(diag: &Diagnostic, src: &str, filepath: &str) -> String {
         ),
     };
 
-    out.push_str(&format!("{}\n", location_color));
+    out.push_str(&format!("{location_color}\n"));
 
     // Color the vertical bars and line numbers based on severity
     let (line_num_color, vertical_bar) = match diag.severity {
@@ -103,8 +103,7 @@ pub fn render(diag: &Diagnostic, src: &str, filepath: &str) -> String {
 
     out.push_str(&format!("{:>2} {} \n", "", vertical_bar));
     out.push_str(&format!(
-        "{} {} {}\n",
-        line_num_color, vertical_bar, code_line
+        "{line_num_color} {vertical_bar} {code_line}\n"
     ));
     out.push_str(&format!(
         "{:>2} {} {}{}\n",
@@ -152,7 +151,7 @@ pub fn render(diag: &Diagnostic, src: &str, filepath: &str) -> String {
                 format!(
                     "{}{}{}",
                     start_chunk,
-                    format!("{}", to_remove.span.trim_end_matches('\n'))
+                    to_remove.span.trim_end_matches('\n').to_string()
                         .red()
                         .bold(),
                     end_chunk
@@ -167,7 +166,7 @@ pub fn render(diag: &Diagnostic, src: &str, filepath: &str) -> String {
                 format!(
                     "{}{}{}",
                     start_chunk,
-                    format!("{}", to_add.trim_end_matches('\n')).green().bold(),
+                    to_add.trim_end_matches('\n').to_string().green().bold(),
                     end_chunk
                 )
             ));

@@ -65,7 +65,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> InsertVAdapte
                 (String::from("is_deleted"), Value::Boolean(false)),
             ]),
         };
-        let vector = self.storage.vectors.insert::<F>(self.txn, &query, fields);
+        let vector = self.storage.vectors.insert::<F>(self.txn, query, fields);
 
         let result = match vector {
             Ok(vector) => Ok(TraversalVal::Vector(vector)),
@@ -92,7 +92,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> InsertVAdapte
         let iter = queries
             .iter()
             .map(|vec| {
-                let vector = storage.vectors.insert::<F>(txn, &vec, fields.clone()); // TODO: remove clone
+                let vector = storage.vectors.insert::<F>(txn, vec, fields.clone()); // TODO: remove clone
                 match vector {
                     Ok(vector) => Ok(TraversalVal::Vector(vector)),
                     Err(e) => Err(GraphError::from(e)),

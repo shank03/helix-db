@@ -29,7 +29,7 @@ impl IntoResponse for HelixError {
             .body(Body::from(body))
             .expect(&format!(
                 "Should be able to turn HelixError into Response: {}",
-                self.to_string()
+                self
             ))
     }
 }

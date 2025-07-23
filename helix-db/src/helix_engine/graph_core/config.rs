@@ -20,17 +20,11 @@ impl Default for VectorConfig {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Default)]
 pub struct GraphConfig {
     pub secondary_indices: Option<Vec<String>>,
 }
 
-impl Default for GraphConfig {
-    fn default() -> Self {
-        Self {
-            secondary_indices: None,
-        }
-    }
-}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
@@ -121,11 +115,11 @@ impl Config {
     pub fn get_vector_config(&self) -> VectorConfig {
         self.vector_config
             .clone()
-            .unwrap_or(VectorConfig::default())
+            .unwrap_or_default()
     }
 
     pub fn get_graph_config(&self) -> GraphConfig {
-        self.graph_config.clone().unwrap_or(GraphConfig::default())
+        self.graph_config.clone().unwrap_or_default()
     }
 
     pub fn get_db_max_size_gb(&self) -> usize {
@@ -213,7 +207,7 @@ impl fmt::Display for Config {
                     "Some(vec![{}])",
                     indices
                         .iter()
-                        .map(|s| format!("\"{}\".to_string()", s))
+                        .map(|s| format!("\"{s}\".to_string()"))
                         .collect::<Vec<_>>()
                         .join(", ")
                 ),
@@ -233,7 +227,7 @@ impl fmt::Display for Config {
             f,
             "embedding_model: {},",
             match &self.embedding_model {
-                Some(model) => format!("Some(\"{}\".to_string())", model),
+                Some(model) => format!("Some(\"{model}\".to_string())"),
                 None => "None".to_string(),
             }
         )?;
@@ -241,7 +235,7 @@ impl fmt::Display for Config {
             f,
             "graphvis_node_label: {},",
             match &self.graphvis_node_label {
-                Some(label) => format!("Some(\"{}\".to_string())", label),
+                Some(label) => format!("Some(\"{label}\".to_string())"),
                 None => "None".to_string(),
             }
         )?;

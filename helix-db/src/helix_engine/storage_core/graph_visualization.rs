@@ -70,21 +70,21 @@ impl GraphVisualization for HelixGraphStorage {
             return Err(GraphError::New("cannot not visualize more than 300 nodes!".to_string()));
         }
 
-        if self.nodes_db.is_empty(&txn)? || self.edges_db.is_empty(&txn)? {
+        if self.nodes_db.is_empty(txn)? || self.edges_db.is_empty(txn)? {
             return Err(GraphError::New("edges or nodes db is empty!".to_string()));
         }
 
-        let top_nodes = self.get_nodes_by_cardinality(&txn, k)?;
+        let top_nodes = self.get_nodes_by_cardinality(txn, k)?;
 
-        let ret_json = self.cards_to_json(&txn, k, top_nodes, node_prop)?;
+        let ret_json = self.cards_to_json(txn, k, top_nodes, node_prop)?;
         sonic_rs::to_string(&ret_json).map_err(|e| GraphError::New(e.to_string()))
     }
 
     fn get_db_stats_json(&self, txn: &RoTxn) -> Result<String, GraphError> {
         let result = json!({
-            "num_nodes":   self.nodes_db.len(&txn).unwrap_or(0),
-            "num_edges":   self.edges_db.len(&txn).unwrap_or(0),
-            "num_vectors": self.vectors.vectors_db.len(&txn).unwrap_or(0),
+            "num_nodes":   self.nodes_db.len(txn).unwrap_or(0),
+            "num_edges":   self.edges_db.len(txn).unwrap_or(0),
+            "num_vectors": self.vectors.vectors_db.len(txn).unwrap_or(0),
         });
         debug_println!("db stats json: {:?}", result);
 
@@ -108,7 +108,7 @@ impl HelixGraphStorage {
         txn: &RoTxn,
         k: usize,
     ) -> Result<Vec<(u128, Vec<(u128, u128, u128)>, Vec<(u128, u128, u128)>)>, GraphError> {
-        let node_count = self.nodes_db.len(&txn)?;
+        let node_count = self.nodes_db.len(txn)?;
 
         type EdgeID = u128;
         type ToNodeId = u128;
@@ -142,7 +142,8 @@ impl HelixGraphStorage {
         let out_db = Arc::clone(&db);
         let in_db = Arc::clone(&db);
 
-        struct Edges<'a> {
+        #[derive(Default)]
+struct Edges<'a> {
             edge_count: usize,
             out_edges: Option<
                 RoIter<
@@ -162,15 +163,7 @@ impl HelixGraphStorage {
                     >,
         }
 
-        impl<'a> Default for Edges<'a> {
-            fn default() -> Self {
-                Self {
-                    edge_count: 0,
-                    out_edges: None,
-                    in_edges: None,
-                }
-            }
-        }
+        
 
         let mut edge_counts: HashMap<u128, Edges> = HashMap::with_capacity(node_count as usize);
         let mut ordered_edge_counts: BinaryHeap<EdgeCount> =
@@ -179,7 +172,7 @@ impl HelixGraphStorage {
         // out edges
         // this gets each node ID from the out edges db
         // by using the out_edges_db it pulls data into os cache
-        let out_node_key_iter = out_db.out_edges_db.lazily_decode_data().iter(&txn).unwrap();
+        let out_node_key_iter = out_db.out_edges_db.lazily_decode_data().iter(txn).unwrap();
         for data in out_node_key_iter {
             match data {
                 Ok((key, _)) => {
@@ -190,14 +183,14 @@ impl HelixGraphStorage {
                     let edges = out_db
                         .out_edges_db
                         .lazily_decode_data()
-                        .get_duplicates(&txn, key)
+                        .get_duplicates(txn, key)
                         .unwrap();
 
                     let edges_count = edges.iter().count();
 
                     let edge_count = edge_counts
                         .entry(u128::from_be_bytes(node_id.try_into().unwrap()))
-                        .or_insert(Edges::default());
+                        .or_default();
                     edge_count.edge_count += edges_count;
                     edge_count.out_edges = edges;
                 }
@@ -210,7 +203,7 @@ impl HelixGraphStorage {
         // in edges
         // this gets each node ID from the in edges db
         // by using the in_edges_db it pulls data into os cache
-        let in_node_key_iter = in_db.in_edges_db.lazily_decode_data().iter(&txn).unwrap();
+        let in_node_key_iter = in_db.in_edges_db.lazily_decode_data().iter(txn).unwrap();
         for data in in_node_key_iter {
             match data {
                 Ok((key, _)) => {
@@ -221,13 +214,13 @@ impl HelixGraphStorage {
                     let edges = in_db
                         .in_edges_db
                         .lazily_decode_data()
-                        .get_duplicates(&txn, key)
+                        .get_duplicates(txn, key)
                         .unwrap();
                     let edges_count = edges.iter().count();
 
                     let edge_count = edge_counts
                         .entry(u128::from_be_bytes(node_id.try_into().unwrap()))
-                        .or_insert(Edges::default());
+                        .or_default();
                     edge_count.edge_count += edges_count;
                     edge_count.in_edges = edges;
                 }
@@ -312,15 +305,15 @@ impl HelixGraphStorage {
             if let Some(prop) = &node_prop {
                 let mut node = self.nodes_db
                     .lazily_decode_data()
-                    .prefix_iter(&txn, id)
+                    .prefix_iter(txn, id)
                     .unwrap();
                 if let Some((_, data)) = node.next().transpose().unwrap() {
                     let node = Node::decode_node(data.decode().unwrap(), *id)?;
                     let props = node.properties.as_ref().ok_or_else(|| {
-                        GraphError::New(format!("no properties for node {}", id))
+                        GraphError::New(format!("no properties for node {id}"))
                     })?;
                     let prop_value = props.get(prop).ok_or_else(|| {
-                        GraphError::New(format!("property {} not found for node {}", prop, id))
+                        GraphError::New(format!("property {prop} not found for node {id}"))
                     })?;
                     json_node
                         .as_object_mut()

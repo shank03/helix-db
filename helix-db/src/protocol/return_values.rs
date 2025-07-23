@@ -42,7 +42,7 @@ impl ReturnValue {
     where
         T: Filterable + Clone,
     {
-        if let Some(m) = mixin.remove(&item.id()) {
+        if let Some(m) = mixin.remove(item.id()) {
             if m.should_spread {
                 ReturnValue::from(item).mixin_remapping(m.remappings)
             } else {
@@ -81,7 +81,7 @@ impl ReturnValue {
                             ReturnValue::Array(
                                 nodes
                                     .into_iter()
-                                    .map(|node| ReturnValue::from(node))
+                                    .map(ReturnValue::from)
                                     .collect(),
                             ),
                         );
@@ -90,7 +90,7 @@ impl ReturnValue {
                             ReturnValue::Array(
                                 edges
                                     .into_iter()
-                                    .map(|edge| ReturnValue::from(edge))
+                                    .map(ReturnValue::from)
                                     .collect(),
                             ),
                         );
@@ -127,7 +127,7 @@ impl ReturnValue {
                             ReturnValue::Array(
                                 nodes
                                     .into_iter()
-                                    .map(|node| ReturnValue::from(node))
+                                    .map(ReturnValue::from)
                                     .collect(),
                             ),
                         );
@@ -136,7 +136,7 @@ impl ReturnValue {
                             ReturnValue::Array(
                                 edges
                                     .into_iter()
-                                    .map(|edge| ReturnValue::from(edge))
+                                    .map(ReturnValue::from)
                                     .collect(),
                             ),
                         );
@@ -196,24 +196,24 @@ impl ReturnValue {
     pub fn mixin_remapping(self, remappings: HashMap<String, Remapping>) -> Self {
         match self {
             ReturnValue::Object(mut a) => {
-                println!("a1: {:?}", a);
+                println!("a1: {a:?}");
                 remappings.into_iter().for_each(|(k, v)| {
                     if v.exclude {
-                        println!("removing key: {:?}", k);
+                        println!("removing key: {k:?}");
                         let _ = a.remove(&k);
                     } else if let Some(new_name) = v.new_name {
                         if let Some(value) = a.remove(&k) {
                             a.insert(new_name, value);
                         } else {
-                            println!("no value found for key: {:?}", k);
+                            println!("no value found for key: {k:?}");
                             a.insert(k, v.return_value);
                         }
                     } else {
-                        println!("inserting value: {:?}", k);
+                        println!("inserting value: {k:?}");
                         a.insert(k, v.return_value);
                     }
                 });
-                println!("a2: {:?}", a);
+                println!("a2: {a:?}");
                 ReturnValue::Object(a)
             }
             _ => unreachable!(),

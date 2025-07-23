@@ -26,8 +26,7 @@ impl WorkerPool {
     ) -> WorkerPool {
         assert!(
             size > 0,
-            "Expected number of threads in thread pool to be more than 0, got {}",
-            size
+            "Expected number of threads in thread pool to be more than 0, got {size}"
         );
 
         let (tx, rx) = flume::bounded::<ReqMsg>(1000); // TODO: make this configurable
@@ -61,10 +60,10 @@ impl WorkerPool {
             .expect("WorkerPool channel should be open");
 
         // This is sent by the Worker
-        let res = ret_rx
+        
+        ret_rx
             .await
-            .expect("Worker shouldn't drop sender before replying");
-        res
+            .expect("Worker shouldn't drop sender before replying")
     }
 }
 

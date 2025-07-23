@@ -36,17 +36,17 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> BruteForceSe
         k: usize,
     ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>> {
         let mut iter = self.inner.collect::<Vec<_>>();
-        println!("iter: {:?}", iter);
+        println!("iter: {iter:?}");
         iter = iter
             .into_iter()
             .map(|v| match v {
                 Ok(TraversalVal::Vector(mut v)) => {
-                    let d = cosine_similarity(&v.get_data(), query).unwrap();
+                    let d = cosine_similarity(v.get_data(), query).unwrap();
                     v.set_distance(d);
                     Ok(TraversalVal::Vector(v))
                 }
                 other => {
-                    println!("expected vector traversal values, got: {:?}", other);
+                    println!("expected vector traversal values, got: {other:?}");
                     panic!("expected vector traversal values")
                 }
             })
@@ -54,7 +54,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> BruteForceSe
 
         iter.sort_by(|v1, v2| match (v1, v2) {
             (Ok(TraversalVal::Vector(v1)), Ok(TraversalVal::Vector(v2))) => {
-                v1.partial_cmp(&v2).unwrap()
+                v1.partial_cmp(v2).unwrap()
             }
             _ => panic!("expected vector traversal values"),
         });

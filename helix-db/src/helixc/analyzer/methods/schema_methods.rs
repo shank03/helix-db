@@ -39,7 +39,7 @@ pub(crate) fn build_field_lookups<'a>(
                         .map(|f| (f.name.as_str(), Cow::Borrowed(f)))
                         .collect()
                 })
-                .unwrap_or_else(HashMap::new);
+                .unwrap_or_default();
             props.insert(
                 "id",
                 Cow::Owned(Field {
@@ -116,8 +116,7 @@ pub(crate) fn check_schema(ctx: &mut Ctx) {
                 )),
             );
         }
-        edge.properties.as_ref().map(|v| {
-            v.iter().for_each(|f| {
+        if let Some(v) = edge.properties.as_ref() { v.iter().for_each(|f| {
                 if f.name.to_lowercase() == "id" {
                     push_schema_err(
                         ctx,
@@ -127,8 +126,7 @@ pub(crate) fn check_schema(ctx: &mut Ctx) {
                         Some("rename the field".to_string()),
                     );
                 }
-            })
-        });
+            }) }
         ctx.output.edges.push(edge.clone().into());
     }
     for node in &ctx.src.node_schemas {

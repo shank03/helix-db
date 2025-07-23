@@ -51,9 +51,9 @@ impl EmbeddingModel for EmbeddingModelImpl {
                 "model": &self.model,
             }))
             .send()
-            .map_err(|e| GraphError::from(format!("Failed to send request: {}", e)))?
+            .map_err(|e| GraphError::from(format!("Failed to send request: {e}")))?
             .json::<serde_json::Value>()
-            .map_err(|e| GraphError::from(format!("Failed to parse response: {}", e)))?;
+            .map_err(|e| GraphError::from(format!("Failed to parse response: {e}")))?;
 
         let embedding = response["data"][0]["embedding"]
             .as_array()
@@ -127,7 +127,7 @@ pub fn get_embedding_model(
     _url: Option<&str>,
 ) -> Result<EmbeddingModelImpl, GraphError> {
     #[cfg(feature = "embed_openai")]
-    return Ok(EmbeddingModelImpl::new(api_key, model)?);
+    return EmbeddingModelImpl::new(api_key, model);
 
     #[cfg(feature = "embed_local")]
     return Ok(EmbeddingModelImpl::new(_url)?);

@@ -157,8 +157,8 @@ pub(crate) fn infer_expr_type<'a>(
                                         original_query,
                                         loc.clone(),
                                         value.as_str(),
-                                    ) {
-                                        if !scope.contains_key(value.as_str()) {
+                                    )
+                                        && !scope.contains_key(value.as_str()) {
                                             generate_error!(
                                                 ctx,
                                                 original_query,
@@ -167,7 +167,7 @@ pub(crate) fn infer_expr_type<'a>(
                                                 value.as_str()
                                             );
                                         }
-                                    };
+                                    ;
                                 }
                                 ValueType::Literal { value, loc } => {
                                     // check against type
@@ -306,7 +306,7 @@ pub(crate) fn infer_expr_type<'a>(
                 ["node"],
                 ["node"]
             );
-            return (Type::Node(None), None);
+            (Type::Node(None), None)
         }
         AddEdge(add) => {
             if let Some(ref ty) = add.edge_type {
@@ -340,8 +340,8 @@ pub(crate) fn infer_expr_type<'a>(
                                             original_query,
                                             loc.clone(),
                                             value.as_str(),
-                                        ) {
-                                            if !scope.contains_key(value.as_str()) {
+                                        )
+                                            && !scope.contains_key(value.as_str()) {
                                                 generate_error!(
                                                     ctx,
                                                     original_query,
@@ -350,7 +350,7 @@ pub(crate) fn infer_expr_type<'a>(
                                                     value.as_str()
                                                 );
                                             }
-                                        };
+                                        ;
                                     }
                                     ValueType::Literal { value, loc } => {
                                         // check against type
@@ -536,8 +536,8 @@ pub(crate) fn infer_expr_type<'a>(
                                             original_query,
                                             loc.clone(),
                                             value.as_str(),
-                                        ) {
-                                            if !scope.contains_key(value.as_str()) {
+                                        )
+                                            && !scope.contains_key(value.as_str()) {
                                                 generate_error!(
                                                     ctx,
                                                     original_query,
@@ -546,7 +546,7 @@ pub(crate) fn infer_expr_type<'a>(
                                                     value.as_str()
                                                 );
                                             }
-                                        };
+                                        ;
                                     }
                                     ValueType::Literal { value, loc } => {
                                         // check against type
@@ -790,8 +790,8 @@ pub(crate) fn infer_expr_type<'a>(
                     EvaluatesToNumberType::Identifier(i) => {
                         is_valid_identifier(ctx, original_query, sv.loc.clone(), i.as_str());
                         // is param
-                        if let Some(_) = original_query.parameters.iter().find(|p| p.name.1 == *i) {
-                            GeneratedValue::Identifier(GenRef::Std(format!("data.{} as usize", i)))
+                        if original_query.parameters.iter().find(|p| p.name.1 == *i).is_some() {
+                            GeneratedValue::Identifier(GenRef::Std(format!("data.{i} as usize")))
                         } else {
                             GeneratedValue::Identifier(GenRef::Std(i.to_string()))
                         }
@@ -994,9 +994,9 @@ pub(crate) fn infer_expr_type<'a>(
                         i.as_str(),
                     );
 
-                    if let Some(_) = original_query.parameters.iter().find(|p| p.name.1 == *i) {
-                        GeneratedValue::Identifier(GenRef::Ref(format!("data.{}", i.to_string())))
-                    } else if let Some(_) = scope.get(i.as_str()) {
+                    if original_query.parameters.iter().find(|p| p.name.1 == *i).is_some() {
+                        GeneratedValue::Identifier(GenRef::Ref(format!("data.{}", i)))
+                    } else if scope.get(i.as_str()).is_some() {
                         GeneratedValue::Identifier(GenRef::Ref(i.to_string()))
                     } else {
                         generate_error!(
@@ -1059,8 +1059,8 @@ pub(crate) fn infer_expr_type<'a>(
                             i.as_str(),
                         );
                         // is param
-                        if let Some(_) = original_query.parameters.iter().find(|p| p.name.1 == *i) {
-                            GeneratedValue::Identifier(GenRef::Std(format!("data.{} as usize", i)))
+                        if original_query.parameters.iter().find(|p| p.name.1 == *i).is_some() {
+                            GeneratedValue::Identifier(GenRef::Std(format!("data.{i} as usize")))
                         } else {
                             GeneratedValue::Identifier(GenRef::Std(i.to_string()))
                         }
@@ -1105,7 +1105,7 @@ pub(crate) fn infer_expr_type<'a>(
             )
         }
         _ => {
-            println!("Unknown expression: {:?}", expr);
+            println!("Unknown expression: {expr:?}");
             todo!()
         }
     }

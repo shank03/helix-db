@@ -247,7 +247,7 @@ pub(crate) fn validate_statements<'a>(
             let stmt = GeneratedStatement::ForEach(GeneratedForEach {
                 for_variables: for_variable,
                 in_variable: for_loop_in_variable,
-                statements: statements,
+                statements,
             });
             Some(stmt)
         }

@@ -21,10 +21,10 @@ impl<'a> Iterator for NFromType<'a> {
 
     #[debug_trace("N_FROM_TYPE")]
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(value) = self.iter.next() {
+        for value in self.iter.by_ref() {
             let (key_, value) = value.unwrap();
             match value.decode() {
-                Ok(value) => match Node::decode_node(&value, key_) {
+                Ok(value) => match Node::decode_node(value, key_) {
                     Ok(node) => match &node.label {
                         label if label == self.label => return Some(Ok(TraversalVal::Node(node))),
                         _ => continue,

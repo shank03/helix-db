@@ -28,25 +28,24 @@ where
                         Ok(_) => {
                             if let Some(bm25) = &storage.bm25 {
                                 if let Err(e) = bm25.delete_doc(txn, node.id) {
-                                    println!("failed to delete doc from bm25: {}", e);
+                                    println!("failed to delete doc from bm25: {e}");
                                 }
                             }
                             Ok(println!("Dropped node: {:?}", node.id))
                         }
-                        Err(e) => return Err(e),
+                        Err(e) => Err(e),
                     },
                     TraversalVal::Edge(edge) => match storage.drop_edge(txn, &edge.id) {
                         Ok(_) => Ok(()),
-                        Err(e) => return Err(e),
+                        Err(e) => Err(e),
                     },
                     TraversalVal::Vector(vector) => match storage.vectors.delete(txn, vector.id) {
                         Ok(_) => Ok(()),
-                        Err(e) => return Err(e.into()),
+                        Err(e) => Err(e.into()),
                     },
                     _ => {
                         return Err(GraphError::ConversionError(format!(
-                            "Incorrect Type: {:?}",
-                            item
+                            "Incorrect Type: {item:?}"
                         )));
                     }
                 }

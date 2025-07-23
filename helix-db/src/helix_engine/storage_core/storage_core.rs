@@ -276,8 +276,7 @@ impl DBMethods for HelixGraphStorage {
             .secondary_indices
             .get(name)
             .ok_or(GraphError::New(format!(
-                "Secondary Index {} not found",
-                name
+                "Secondary Index {name} not found"
             )))?;
         db.clear(&mut wtxn)?;
         wtxn.commit()?;
@@ -298,7 +297,7 @@ impl StorageMethods for HelixGraphStorage {
             Some(data) => data,
             None => return Err(GraphError::NodeNotFound),
         };
-        let node: Node = match Node::decode_node(&node, *id) {
+        let node: Node = match Node::decode_node(node, *id) {
             Ok(node) => node,
             Err(e) => return Err(e),
         };
@@ -311,7 +310,7 @@ impl StorageMethods for HelixGraphStorage {
             Some(data) => data,
             None => return Err(GraphError::EdgeNotFound),
         };
-        let edge: Edge = match Edge::decode_edge(&edge, *id) {
+        let edge: Edge = match Edge::decode_edge(edge, *id) {
             Ok(edge) => edge,
             Err(e) => return Err(e),
         };
@@ -324,7 +323,7 @@ impl StorageMethods for HelixGraphStorage {
 
         // Delete outgoing edges
         let out_edges = {
-            let iter = self.out_edges_db.prefix_iter(&txn, &id.to_be_bytes())?;
+            let iter = self.out_edges_db.prefix_iter(txn, &id.to_be_bytes())?;
             let capacity = match iter.size_hint() {
                 (_, Some(upper)) => upper,
                 (lower, None) => lower,
@@ -336,7 +335,7 @@ impl StorageMethods for HelixGraphStorage {
                 assert_eq!(key.len(), 20);
                 let mut label = [0u8; 4];
                 label.copy_from_slice(&key[16..20]);
-                let (edge_id, _) = Self::unpack_adj_edge_data(&value)?;
+                let (edge_id, _) = Self::unpack_adj_edge_data(value)?;
                 out_edges.push((edge_id, label));
             }
             out_edges
@@ -345,7 +344,7 @@ impl StorageMethods for HelixGraphStorage {
         // Delete incoming edges
 
         let in_edges = {
-            let iter = self.in_edges_db.prefix_iter(&txn, &id.to_be_bytes())?;
+            let iter = self.in_edges_db.prefix_iter(txn, &id.to_be_bytes())?;
             let capacity = match iter.size_hint() {
                 (_, Some(c)) => c,
                 (c, None) => c,
@@ -357,7 +356,7 @@ impl StorageMethods for HelixGraphStorage {
                 assert_eq!(key.len(), 20);
                 let mut label = [0u8; 4];
                 label.copy_from_slice(&key[16..20]);
-                let (edge_id, node_id) = Self::unpack_adj_edge_data(&value)?;
+                let (edge_id, node_id) = Self::unpack_adj_edge_data(value)?;
                 in_edges.push((edge_id, label, node_id));
             }
 
@@ -367,12 +366,12 @@ impl StorageMethods for HelixGraphStorage {
         // Delete all related data
         for (out_edge_id, label_bytes) in out_edges.iter() {
             // Delete edge data
-            self.edges_db.delete(txn, &Self::edge_key(out_edge_id))?;
+            self.edges_db.delete(txn, Self::edge_key(out_edge_id))?;
             self.out_edges_db
                 .delete(txn, &Self::out_edge_key(id, label_bytes))?;
         }
         for (in_edge_id, label_bytes, other_id) in in_edges.iter() {
-            self.edges_db.delete(txn, &Self::edge_key(in_edge_id))?;
+            self.edges_db.delete(txn, Self::edge_key(in_edge_id))?;
             self.in_edges_db
                 .delete(txn, &Self::in_edge_key(other_id, label_bytes))?;
         }
@@ -385,14 +384,14 @@ impl StorageMethods for HelixGraphStorage {
 
     fn drop_edge(&self, txn: &mut RwTxn, edge_id: &u128) -> Result<(), GraphError> {
         // Get edge data first
-        let edge_data = match self.edges_db.get(&txn, &Self::edge_key(edge_id))? {
+        let edge_data = match self.edges_db.get(txn, Self::edge_key(edge_id))? {
             Some(data) => data,
             None => return Err(GraphError::EdgeNotFound),
         };
         let edge: Edge = bincode::deserialize(edge_data)?;
         let label_hash = hash_label(&edge.label, None);
         // Delete all edge-related data
-        self.edges_db.delete(txn, &Self::edge_key(edge_id))?;
+        self.edges_db.delete(txn, Self::edge_key(edge_id))?;
         self.out_edges_db
             .delete(txn, &Self::out_edge_key(&edge.from_node, &label_hash))?;
         self.in_edges_db

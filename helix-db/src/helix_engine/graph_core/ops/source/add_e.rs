@@ -119,13 +119,13 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddEAdapter<'
                 if let Err(e) = self.storage.edges_db.put_with_flags(
                     self.txn,
                     PutFlags::APPEND,
-                    &HelixGraphStorage::edge_key(&edge.id),
+                    HelixGraphStorage::edge_key(&edge.id),
                     &bytes,
                 ) {
                     result = Err(GraphError::from(e));
                 }
             }
-            Err(e) => result = Err(GraphError::from(e)),
+            Err(e) => result = Err(e),
         }
 
         let label_hash = hash_label(edge.label.as_str(), None);
@@ -138,7 +138,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddEAdapter<'
         ) {
             Ok(_) => {}
             Err(e) => {
-                println!("add_e => error adding out edge between {:?} and {:?}: {:?}", from_node, to_node, e);
+                println!("add_e => error adding out edge between {from_node:?} and {to_node:?}: {e:?}");
                 result = Err(GraphError::from(e));
             }
         }
@@ -151,7 +151,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddEAdapter<'
         ) {
             Ok(_) => {}
             Err(e) => {
-                println!("add_e => error adding in edge between {:?} and {:?}: {:?}", from_node, to_node, e);
+                println!("add_e => error adding in edge between {from_node:?} and {to_node:?}: {e:?}");
                 result = Err(GraphError::from(e));
             }
         }
@@ -173,8 +173,8 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddEAdapter<'
             EdgeType::Node => self
                 .storage
                 .nodes_db
-                .get(self.txn, &HelixGraphStorage::node_key(&node_vec_id))
-                .map_or(false, |node| node.is_some()),
+                .get(self.txn, &HelixGraphStorage::node_key(node_vec_id))
+                .is_ok_and(|node| node.is_some()),
             EdgeType::Vec => self
                 .storage
                 .vectors

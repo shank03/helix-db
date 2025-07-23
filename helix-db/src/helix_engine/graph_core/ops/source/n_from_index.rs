@@ -23,7 +23,7 @@ impl<'a> Iterator for NFromIndex<'a> {
 
     #[debug_trace("N_FROM_INDEX")]
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(value) = self.iter.next() {
+        for value in self.iter.by_ref() {
             let (_, value) = value.unwrap();
             match value.decode() {
                 Ok(value) => match self.storage.get_node(self.txn, &value) {
@@ -76,8 +76,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>, K: Into<Value> + 
             .get(index)
             // TODO: this
             .ok_or(GraphError::New(format!(
-                "Secondary Index {} not found",
-                index
+                "Secondary Index {index} not found"
             )))
             .unwrap();
         let res = db

@@ -51,7 +51,7 @@ impl Debug for HVector {
         write!(
             f,
             "{{ \nid: {},\nlevel: {},\ndistance: {:?},\ndata: {:?},\nproperties: {:#?} }}",
-            uuid::Uuid::from_u128(self.id).to_string(),
+            uuid::Uuid::from_u128(self.id),
             // self.is_deleted,
             self.level,
             self.distance,
@@ -164,12 +164,7 @@ impl HVector {
 
     #[inline(always)]
     pub fn get_distance(&self) -> f64 {
-        match self.distance {
-            Some(distance) => distance,
-            // changed from 0.0 to 2.0 to match the distance calculation
-            // if the distance is not set, make it the furthest distance
-            None => 2.0,
-        }
+        self.distance.unwrap_or(2.0)
     }
 }
 
@@ -218,10 +213,7 @@ impl Filterable for HVector {
     }
 
     fn properties(self) -> Option<HashMap<String, Value>> {
-        let mut properties = match self.properties {
-            Some(properties) => properties,
-            None => HashMap::new(),
-        };
+        let mut properties = self.properties.unwrap_or_default();
         properties.insert(
             "data".to_string(),
             Value::Array(self.data.iter().map(|f| Value::F64(*f)).collect()),
@@ -256,13 +248,11 @@ impl Filterable for HVector {
                 Some(properties) => properties
                     .get(key)
                     .ok_or(GraphError::ConversionError(format!(
-                        "Property {} not found",
-                        key
+                        "Property {key} not found"
                     )))
-                    .map(|v| Cow::Borrowed(v)),
+                    .map(Cow::Borrowed),
                 None => Err(GraphError::ConversionError(format!(
-                    "Property {} not found",
-                    key
+                    "Property {key} not found"
                 ))),
             },
         }

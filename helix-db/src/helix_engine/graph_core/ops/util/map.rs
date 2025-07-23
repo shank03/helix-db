@@ -21,9 +21,9 @@ where
     type Item = I::Item;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(item) = self.iter.next() {
+        for item in self.iter.by_ref() {
             return match item {
-                Ok(item) => Some((self.f)(item, &self.txn)),
+                Ok(item) => Some((self.f)(item, self.txn)),
                 Err(e) => return Some(Err(e)),
             };
         }
@@ -89,7 +89,7 @@ where
     type Item = I::Item;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(item) = self.iter.next() {
+        for item in self.iter.by_ref() {
             if let Ok(item) = (self.f)(item) {
                 return Some(Ok(item));
             }

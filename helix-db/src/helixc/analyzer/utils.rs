@@ -31,7 +31,7 @@ pub(super) fn is_valid_identifier(
 }
 
 pub(super) fn is_param(q: &Query, name: &str) -> bool {
-    q.parameters.iter().find(|p| p.name.1 == *name).is_some()
+    q.parameters.iter().any(|p| p.name.1 == *name)
 }
 
 pub(super) fn gen_identifier_or_param(
@@ -42,24 +42,24 @@ pub(super) fn gen_identifier_or_param(
 ) -> GeneratedValue {
     if is_param(original_query, name) {
         if should_ref {
-            GeneratedValue::Parameter(GenRef::Ref(format!("data.{}", name)))
+            GeneratedValue::Parameter(GenRef::Ref(format!("data.{name}")))
         } else {
-            GeneratedValue::Parameter(GenRef::Std(format!("data.{}.clone()", name)))
+            GeneratedValue::Parameter(GenRef::Std(format!("data.{name}.clone()")))
         }
     } else {
         if should_ref {
             GeneratedValue::Identifier(GenRef::Ref(name.to_string()))
         } else {
-            GeneratedValue::Identifier(GenRef::Std(format!("{}.clone()", name.to_string())))
+            GeneratedValue::Identifier(GenRef::Std(format!("{}.clone()", name)))
         }
     }
 }
 
 pub(super) fn gen_id_access_or_param(original_query: &Query, name: &str) -> GeneratedValue {
     if is_param(original_query, name) {
-        GeneratedValue::Parameter(GenRef::DeRef(format!("data.{}", name)))
+        GeneratedValue::Parameter(GenRef::DeRef(format!("data.{name}")))
     } else {
-        GeneratedValue::Identifier(GenRef::Std(format!("{}.id()", name.to_string())))
+        GeneratedValue::Identifier(GenRef::Std(format!("{}.id()", name)))
     }
 }
 

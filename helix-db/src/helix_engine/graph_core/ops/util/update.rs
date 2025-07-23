@@ -94,7 +94,7 @@ impl<'scope, 'env, I: Iterator<Item = Result<TraversalVal, GraphError>>> UpdateA
                                     }
                                 }
                             }
-                            if properties.len() > 0 {
+                            if !properties.is_empty() {
                                 old_node.properties = Some(properties);
                             } else {
                                 old_node.properties = None;
@@ -104,14 +104,14 @@ impl<'scope, 'env, I: Iterator<Item = Result<TraversalVal, GraphError>>> UpdateA
                             Ok(serialized) => {
                                 match storage.nodes_db.put(
                                     self.txn,
-                                    &HelixGraphStorage::node_key(&node.id),
+                                    HelixGraphStorage::node_key(&node.id),
                                     &serialized,
                                 ) {
                                     Ok(_) => vec.push(Ok(TraversalVal::Node(old_node))),
                                     Err(e) => vec.push(Err(GraphError::from(e))),
                                 }
                             }
-                            Err(e) => vec.push(Err(GraphError::from(e))),
+                            Err(e) => vec.push(Err(e)),
                         }
                     }
                     Err(e) => vec.push(Err(e)),
@@ -131,14 +131,14 @@ impl<'scope, 'env, I: Iterator<Item = Result<TraversalVal, GraphError>>> UpdateA
                             Ok(serialized) => {
                                 match storage.nodes_db.put(
                                     self.txn,
-                                    &HelixGraphStorage::edge_key(&edge.id),
+                                    HelixGraphStorage::edge_key(&edge.id),
                                     &serialized,
                                 ) {
                                     Ok(_) => vec.push(Ok(TraversalVal::Edge(old_edge))),
                                     Err(e) => vec.push(Err(GraphError::from(e))),
                                 }
                             }
-                            Err(e) => vec.push(Err(GraphError::from(e))),
+                            Err(e) => vec.push(Err(e)),
                         }
                     }
                     Err(e) => vec.push(Err(e)),
