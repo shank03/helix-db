@@ -1,8 +1,8 @@
+use crate::helix_engine::graph_core::config::Config;
 use crate::helix_engine::storage_core::storage_core::HelixGraphStorage;
 use crate::helix_engine::types::GraphError;
 use crate::helix_gateway::mcp::mcp::{McpBackend, McpConnections};
 use std::sync::{Arc, Mutex};
-use crate::helix_engine::graph_core::config::Config;
 
 #[derive(Debug)]
 pub enum QueryInput {
@@ -18,18 +18,10 @@ pub struct HelixGraphEngine {
     pub mcp_connections: Option<Arc<Mutex<McpConnections>>>,
 }
 
+#[derive(Default)]
 pub struct HelixGraphEngineOpts {
     pub path: String,
     pub config: Config,
-}
-
-impl HelixGraphEngineOpts {
-    pub fn default() -> Self {
-        Self {
-            path: String::new(),
-            config: Config::default(),
-        }
-    }
 }
 
 impl HelixGraphEngine {
@@ -55,4 +47,3 @@ impl HelixGraphEngine {
         })
     }
 }
-

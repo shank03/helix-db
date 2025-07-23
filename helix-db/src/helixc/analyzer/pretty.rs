@@ -102,9 +102,7 @@ pub fn render(diag: &Diagnostic, src: &str, filepath: &str) -> String {
     };
 
     out.push_str(&format!("{:>2} {} \n", "", vertical_bar));
-    out.push_str(&format!(
-        "{line_num_color} {vertical_bar} {code_line}\n"
-    ));
+    out.push_str(&format!("{line_num_color} {vertical_bar} {code_line}\n"));
     out.push_str(&format!(
         "{:>2} {} {}{}\n",
         "", vertical_bar, caret_pad, caret_underline
@@ -145,30 +143,21 @@ pub fn render(diag: &Diagnostic, src: &str, filepath: &str) -> String {
         out.push_str(&format!("{:>2} {}\n", "", bar));
         if let Some(to_remove) = &fix.to_remove {
             out.push_str(&format!(
-                "{} {} {}\n",
-                location,
+                "{location} {} {start_chunk}{}{end_chunk}\n",
                 "-".bright_red().bold(),
-                format!(
-                    "{}{}{}",
-                    start_chunk,
-                    to_remove.span.trim_end_matches('\n').to_string()
-                        .red()
-                        .bold(),
-                    end_chunk
-                )
+                to_remove
+                    .span
+                    .trim_end_matches('\n')
+                    .to_string()
+                    .red()
+                    .bold(),
             ));
         }
         if let Some(to_add) = &fix.to_add {
             out.push_str(&format!(
-                "{} {} {}\n",
-                location,
+                "{location} {} {start_chunk}{}{end_chunk}\n",
                 "+".green().bold(),
-                format!(
-                    "{}{}{}",
-                    start_chunk,
-                    to_add.trim_end_matches('\n').to_string().green().bold(),
-                    end_chunk
-                )
+                to_add.trim_end_matches('\n').to_string().green().bold(),
             ));
         }
         out.push_str(&format!("{:>2} {}\n", "", bar));

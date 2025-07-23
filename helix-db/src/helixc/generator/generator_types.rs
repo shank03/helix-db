@@ -379,7 +379,7 @@ impl Display for ForEach {
                 write!(f, "for {} in {}", identifier, self.in_variable)?;
             }
             ForVariable::Empty => {
-                assert!(false, "For variable is empty");
+                panic!("For variable is empty");
             }
         }
         writeln!(f, " {{")?;
@@ -417,8 +417,7 @@ impl Display for ForLoopInVariable {
             ForLoopInVariable::Identifier(identifier) => write!(f, "{identifier}"),
             ForLoopInVariable::Parameter(parameter) => write!(f, "&data.{parameter}"),
             ForLoopInVariable::Empty => {
-                assert!(false, "For loop in variable is empty");
-                write!(f, "_")
+                panic!("For loop in variable is empty");
             }
         }
     }

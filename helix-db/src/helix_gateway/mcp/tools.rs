@@ -173,7 +173,6 @@ impl<'a> McpTools<'a> for McpBackend {
             })
             .flatten();
 
-        
         debug_println!("result: {:?}", result);
         iter.take(100).collect()
     }
@@ -212,7 +211,6 @@ impl<'a> McpTools<'a> for McpBackend {
             })
             .flatten();
 
-        
         debug_println!("result: {:?}", result);
         iter.take(100).collect()
     }
@@ -253,7 +251,6 @@ impl<'a> McpTools<'a> for McpBackend {
             })
             .flatten();
 
-        
         debug_println!("result: {:?}", result);
         iter.take(100).collect()
     }
@@ -292,7 +289,6 @@ impl<'a> McpTools<'a> for McpBackend {
             })
             .flatten();
 
-        
         debug_println!("result: {:?}", result);
         iter.take(100).collect()
     }
@@ -310,7 +306,6 @@ impl<'a> McpTools<'a> for McpBackend {
             label: &node_type,
         };
 
-        
         debug_println!("result: {:?}", result);
         iter.take(100).collect::<Result<Vec<_>, _>>()
     }
@@ -328,7 +323,6 @@ impl<'a> McpTools<'a> for McpBackend {
             label: &edge_type,
         };
 
-        
         debug_println!("result: {:?}", result);
         iter.take(100).collect::<Result<Vec<_>, _>>()
     }
@@ -347,19 +341,16 @@ impl<'a> McpTools<'a> for McpBackend {
         debug_println!("connection: {:?}", connection.iter);
 
         let iter = match properties {
-            Some(properties) => {
-                
-                connection
-                    .iter
-                    .clone()
-                    .filter(move |item| {
-                        properties.iter().all(|(key, value)| {
-                            item.check_property(key.as_str())
-                                .is_ok_and(|v| *v == *value)
-                        })
+            Some(properties) => connection
+                .iter
+                .clone()
+                .filter(move |item| {
+                    properties.iter().all(|(key, value)| {
+                        item.check_property(key.as_str())
+                            .is_ok_and(|v| *v == *value)
                     })
-                    .collect::<Vec<_>>()
-            }
+                })
+                .collect::<Vec<_>>(),
             None => connection.iter.clone().collect::<Vec<_>>(),
         };
 
@@ -368,7 +359,7 @@ impl<'a> McpTools<'a> for McpBackend {
         let result = iter
             .clone()
             .into_iter()
-            .filter_map(move |item| match &filter_traversals {
+            .map(move |item| match &filter_traversals {
                 Some(filter_traversals) => {
                     filter_traversals.iter().any(|filter| {
                         let result = G::new_from(Arc::clone(&db), txn, vec![item.clone()]);
@@ -391,9 +382,9 @@ impl<'a> McpTools<'a> for McpBackend {
                         }
                     });
 
-                    Some(item)
+                    item
                 }
-                None => Some(item),
+                None => item,
             })
             .collect::<Vec<_>>();
 

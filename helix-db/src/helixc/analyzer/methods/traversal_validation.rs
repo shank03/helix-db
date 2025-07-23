@@ -38,7 +38,7 @@ use std::collections::HashMap;
 /// This method also builds the generated traversal (`gen_traversal`) as it analyzes the traversal
 ///
 /// - `gen_query`: is used to set the query to being a mutating query if necessary.
-///                This is then used to determine the transaction type to use.
+///   This is then used to determine the transaction type to use.
 ///
 /// - `parent_ty`: is used with anonymous traversals to keep track of the parent type that the anonymous traversal is nested in.
 pub(crate) fn validate_traversal<'a>(
@@ -129,16 +129,16 @@ pub(crate) fn validate_traversal<'a>(
                                             original_query,
                                             loc.clone(),
                                             value.as_str(),
-                                        )
-                                            && !scope.contains_key(value.as_str()) {
-                                                generate_error!(
-                                                    ctx,
-                                                    original_query,
-                                                    loc.clone(),
-                                                    E301,
-                                                    value.as_str()
-                                                );
-                                            }
+                                        ) && !scope.contains_key(value.as_str())
+                                        {
+                                            generate_error!(
+                                                ctx,
+                                                original_query,
+                                                loc.clone(),
+                                                E301,
+                                                value.as_str()
+                                            );
+                                        }
                                         gen_identifier_or_param(
                                             original_query,
                                             value.as_str(),
@@ -173,9 +173,10 @@ pub(crate) fn validate_traversal<'a>(
                     }
                     IdType::Identifier { value: i, loc } => {
                         if is_valid_identifier(ctx, original_query, loc.clone(), i.as_str())
-                            && !scope.contains_key(i.as_str()) {
-                                generate_error!(ctx, original_query, loc.clone(), E301, i.as_str());
-                            }
+                            && !scope.contains_key(i.as_str())
+                        {
+                            generate_error!(ctx, original_query, loc.clone(), E301, i.as_str());
+                        }
                         gen_traversal.source_step =
                             Separator::Period(SourceStep::NFromID(NFromID {
                                 id: GenRef::Ref(format!("data.{i}")),
@@ -214,15 +215,10 @@ pub(crate) fn validate_traversal<'a>(
                     id: match ids[0].clone() {
                         IdType::Identifier { value: i, loc } => {
                             if is_valid_identifier(ctx, original_query, loc.clone(), i.as_str())
-                                && !scope.contains_key(i.as_str()) {
-                                    generate_error!(
-                                        ctx,
-                                        original_query,
-                                        loc.clone(),
-                                        E301,
-                                        i.as_str()
-                                    );
-                                }
+                                && !scope.contains_key(i.as_str())
+                            {
+                                generate_error!(ctx, original_query, loc.clone(), E301, i.as_str());
+                            }
                             GenRef::Std(format!("&data.{i}"))
                         }
                         IdType::Literal { value: s, loc: _ } => GenRef::Std(s),

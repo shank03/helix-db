@@ -37,12 +37,15 @@ pub struct HVector {
 impl Eq for HVector {}
 impl PartialOrd for HVector {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        other.distance.partial_cmp(&self.distance)
+        Some(self.cmp(other))
     }
 }
 impl Ord for HVector {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap_or(Ordering::Equal)
+        other
+            .distance
+            .partial_cmp(&self.distance)
+            .unwrap_or(Ordering::Equal)
     }
 }
 

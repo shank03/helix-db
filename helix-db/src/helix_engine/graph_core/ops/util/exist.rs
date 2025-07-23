@@ -4,7 +4,7 @@ pub struct Exist<I> {
     pub iter: I,
 }
 
-impl<'a, I> Exist<I>
+impl<I> Exist<I>
 where
     I: Iterator<Item = Result<TraversalVal, GraphError>>,
 {

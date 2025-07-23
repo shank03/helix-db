@@ -3,20 +3,12 @@ use crate::{
     helix_engine::{storage_core::storage_core::HelixGraphStorage, types::GraphError},
     utils::items::Node,
 };
-use heed3::{
-    types::*,
-    RoTxn,
-    RoIter,
-};
+use heed3::{RoIter, RoTxn, types::*};
+use sonic_rs::{JsonValueMutTrait, Value as JsonValue, json};
 use std::{
     cmp::Ordering,
     collections::{BinaryHeap, HashMap},
     sync::Arc,
-};
-use sonic_rs::{
-    json,
-    Value as JsonValue,
-    JsonValueMutTrait
 };
 
 /// Set of functions to access the nodes and edges stored to export to json
@@ -41,7 +33,7 @@ pub trait GraphVisualization {
         &self,
         txn: &RoTxn,
         k: Option<usize>,
-        node_prop: Option<String>
+        node_prop: Option<String>,
     ) -> Result<String, GraphError>;
 
     /// Retrieves database statistics in JSON format.
@@ -63,11 +55,13 @@ impl GraphVisualization for HelixGraphStorage {
         &self,
         txn: &RoTxn,
         k: Option<usize>,
-        node_prop: Option<String>
+        node_prop: Option<String>,
     ) -> Result<String, GraphError> {
         let k = k.unwrap_or(200);
         if k > 300 {
-            return Err(GraphError::New("cannot not visualize more than 300 nodes!".to_string()));
+            return Err(GraphError::New(
+                "cannot not visualize more than 300 nodes!".to_string(),
+            ));
         }
 
         if self.nodes_db.is_empty(txn)? || self.edges_db.is_empty(txn)? {
@@ -103,6 +97,8 @@ impl HelixGraphStorage {
     ///     out_edges: Vec<(EdgeID, FromNodeId, ToNodeId)>,
     ///     in_edges: Vec<(EdgeID, FromNodeId, ToNodeId)>,
     /// ]
+    // TODO: refactor into EdgeData type
+    #[allow(clippy::type_complexity)]
     fn get_nodes_by_cardinality(
         &self,
         txn: &RoTxn,
@@ -143,27 +139,25 @@ impl HelixGraphStorage {
         let in_db = Arc::clone(&db);
 
         #[derive(Default)]
-struct Edges<'a> {
+        struct Edges<'a> {
             edge_count: usize,
             out_edges: Option<
                 RoIter<
-                'a,
-                Bytes,
-                LazyDecode<Bytes>,
-                heed3::iteration_method::MoveOnCurrentKeyDuplicates,
-                >,
-                >,
-                in_edges: Option<
-                    RoIter<
                     'a,
                     Bytes,
                     LazyDecode<Bytes>,
                     heed3::iteration_method::MoveOnCurrentKeyDuplicates,
-                    >,
-                    >,
+                >,
+            >,
+            in_edges: Option<
+                RoIter<
+                    'a,
+                    Bytes,
+                    LazyDecode<Bytes>,
+                    heed3::iteration_method::MoveOnCurrentKeyDuplicates,
+                >,
+            >,
         }
-
-        
 
         let mut edge_counts: HashMap<u128, Edges> = HashMap::with_capacity(node_count as usize);
         let mut ordered_edge_counts: BinaryHeap<EdgeCount> =
@@ -234,32 +228,28 @@ struct Edges<'a> {
         // and add to the ordered_edge_counts heap
         for (node_id, edges_count) in edge_counts.into_iter() {
             let out_edges = match edges_count.out_edges {
-                Some(out_edges_iter) => {
-                    out_edges_iter
-                        .map(|result| {
-                            let (key, value) = result.unwrap();
-                            let from_node = u128::from_be_bytes(key[0..16].try_into().unwrap());
-                            let (edge_id, to_node) =
-                                Self::unpack_adj_edge_data(value.decode().unwrap()).unwrap();
-                            (edge_id, from_node, to_node)
-                        })
-                    .collect::<Vec<(EdgeID, FromNodeId, ToNodeId)>>()
-                }
-                None => vec![]
+                Some(out_edges_iter) => out_edges_iter
+                    .map(|result| {
+                        let (key, value) = result.unwrap();
+                        let from_node = u128::from_be_bytes(key[0..16].try_into().unwrap());
+                        let (edge_id, to_node) =
+                            Self::unpack_adj_edge_data(value.decode().unwrap()).unwrap();
+                        (edge_id, from_node, to_node)
+                    })
+                    .collect::<Vec<(EdgeID, FromNodeId, ToNodeId)>>(),
+                None => vec![],
             };
             let in_edges = match edges_count.in_edges {
-                Some(in_edges_iter) => {
-                    in_edges_iter
-                        .map(|result| {
-                            let (key, value) = result.unwrap();
-                            let to_node = u128::from_be_bytes(key[0..16].try_into().unwrap());
-                            let (edge_id, from_node) =
-                                Self::unpack_adj_edge_data(value.decode().unwrap()).unwrap();
-                            (edge_id, from_node, to_node)
-                        })
-                    .collect::<Vec<(EdgeID, FromNodeId, ToNodeId)>>()
-                }
-                None => vec![]
+                Some(in_edges_iter) => in_edges_iter
+                    .map(|result| {
+                        let (key, value) = result.unwrap();
+                        let to_node = u128::from_be_bytes(key[0..16].try_into().unwrap());
+                        let (edge_id, from_node) =
+                            Self::unpack_adj_edge_data(value.decode().unwrap()).unwrap();
+                        (edge_id, from_node, to_node)
+                    })
+                    .collect::<Vec<(EdgeID, FromNodeId, ToNodeId)>>(),
+                None => vec![],
             };
 
             ordered_edge_counts.push(EdgeCount {
@@ -273,9 +263,9 @@ struct Edges<'a> {
         let mut top_nodes = Vec::with_capacity(k);
         while let Some(edges_count) = ordered_edge_counts.pop() {
             top_nodes.push((
-                    edges_count.node_id,
-                    edges_count.out_edges,
-                    edges_count.in_edges,
+                edges_count.node_id,
+                edges_count.out_edges,
+                edges_count.in_edges,
             ));
             if top_nodes.len() >= k {
                 break;
@@ -290,6 +280,7 @@ struct Edges<'a> {
     ///     "nodes": [{"id": uuid_id_node, "label": "optional_property", "title": "uuid"}],
     ///     "edges": [{"from": uuid, "to": uuid, "title": "uuid"}]
     /// }
+    #[allow(clippy::type_complexity)]
     fn cards_to_json(
         &self,
         txn: &RoTxn,
@@ -300,49 +291,54 @@ struct Edges<'a> {
         let mut nodes = Vec::with_capacity(k);
         let mut edges = Vec::new();
 
-        top_nodes.iter().try_for_each(|(id, out_edges, _in_edges)| {
-            let mut json_node = json!({ "id": id.to_string(), "title": id.to_string() });
-            if let Some(prop) = &node_prop {
-                let mut node = self.nodes_db
-                    .lazily_decode_data()
-                    .prefix_iter(txn, id)
-                    .unwrap();
-                if let Some((_, data)) = node.next().transpose().unwrap() {
-                    let node = Node::decode_node(data.decode().unwrap(), *id)?;
-                    let props = node.properties.as_ref().ok_or_else(|| {
-                        GraphError::New(format!("no properties for node {id}"))
-                    })?;
-                    let prop_value = props.get(prop).ok_or_else(|| {
-                        GraphError::New(format!("property {prop} not found for node {id}"))
-                    })?;
-                    json_node
-                        .as_object_mut()
-                        .ok_or_else(|| GraphError::New("invalid JSON object".to_string()))?
-                        .insert("label", json!(prop_value));
+        top_nodes
+            .iter()
+            .try_for_each(|(id, out_edges, _in_edges)| {
+                let mut json_node = json!({ "id": id.to_string(), "title": id.to_string() });
+                if let Some(prop) = &node_prop {
+                    let mut node = self
+                        .nodes_db
+                        .lazily_decode_data()
+                        .prefix_iter(txn, id)
+                        .unwrap();
+                    if let Some((_, data)) = node.next().transpose().unwrap() {
+                        let node = Node::decode_node(data.decode().unwrap(), *id)?;
+                        let props = node.properties.as_ref().ok_or_else(|| {
+                            GraphError::New(format!("no properties for node {id}"))
+                        })?;
+                        let prop_value = props.get(prop).ok_or_else(|| {
+                            GraphError::New(format!("property {prop} not found for node {id}"))
+                        })?;
+                        json_node
+                            .as_object_mut()
+                            .ok_or_else(|| GraphError::New("invalid JSON object".to_string()))?
+                            .insert("label", json!(prop_value));
+                    }
                 }
-            }
 
-            nodes.push(json_node);
-            out_edges.iter().for_each(|(edge_id, from_node_id, to_node_id)| {
-                edges.push(json!({
-                    "from": from_node_id.to_string(),
-                    "to": to_node_id.to_string(),
-                    "title": edge_id.to_string(),
-                }));
-            });
+                nodes.push(json_node);
+                out_edges
+                    .iter()
+                    .for_each(|(edge_id, from_node_id, to_node_id)| {
+                        edges.push(json!({
+                            "from": from_node_id.to_string(),
+                            "to": to_node_id.to_string(),
+                            "title": edge_id.to_string(),
+                        }));
+                    });
 
-            /*
-               in_edges.iter().for_each(|(edge_id, from_node_id, to_node_id)| {
-               edges.push(json!({
-               "from": from_node_id.to_string(),
-               "to": to_node_id.to_string(),
-               "title": edge_id.to_string(),
-               }));
-               });
-            */
+                /*
+                   in_edges.iter().for_each(|(edge_id, from_node_id, to_node_id)| {
+                   edges.push(json!({
+                   "from": from_node_id.to_string(),
+                   "to": to_node_id.to_string(),
+                   "title": edge_id.to_string(),
+                   }));
+                   });
+                */
 
-            Ok::<(), GraphError>(())
-        })?;
+                Ok::<(), GraphError>(())
+            })?;
 
         let result = json!({
             "nodes": nodes,
@@ -351,6 +347,4 @@ struct Edges<'a> {
 
         Ok(result)
     }
-
 }
-

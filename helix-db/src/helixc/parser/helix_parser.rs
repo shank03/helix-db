@@ -49,8 +49,7 @@ impl Default for HelixParser {
 }
 
 // AST Structures
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Source {
     pub source: String,
     pub node_schemas: Vec<NodeSchema>,
@@ -123,10 +122,7 @@ pub enum FieldPrefix {
 }
 impl FieldPrefix {
     pub fn is_indexed(&self) -> bool {
-        match self {
-            FieldPrefix::Index => true,
-            _ => false,
-        }
+        matches!(self, FieldPrefix::Index)
     }
 }
 
@@ -462,22 +458,25 @@ pub enum StepType {
 }
 impl PartialEq<StepType> for StepType {
     fn eq(&self, other: &StepType) -> bool {
-        match (self, other) {
-            (&StepType::Node(_), &StepType::Node(_)) => true,
-            (&StepType::Edge(_), &StepType::Edge(_)) => true,
-            (&StepType::Where(_), &StepType::Where(_)) => true,
-            (&StepType::BooleanOperation(_), &StepType::BooleanOperation(_)) => true,
-            (&StepType::Count, &StepType::Count) => true,
-            (&StepType::Update(_), &StepType::Update(_)) => true,
-            (&StepType::Object(_), &StepType::Object(_)) => true,
-            (&StepType::Exclude(_), &StepType::Exclude(_)) => true,
-            (&StepType::Closure(_), &StepType::Closure(_)) => true,
-            (&StepType::Range(_), &StepType::Range(_)) => true,
-            (&StepType::OrderByAsc(_), &StepType::OrderByAsc(_)) => true,
-            (&StepType::OrderByDesc(_), &StepType::OrderByDesc(_)) => true,
-            (&StepType::AddEdge(_), &StepType::AddEdge(_)) => true,
-            _ => false,
-        }
+        matches!(
+            (self, other),
+            (&StepType::Node(_), &StepType::Node(_))
+                | (&StepType::Edge(_), &StepType::Edge(_))
+                | (&StepType::Where(_), &StepType::Where(_))
+                | (
+                    &StepType::BooleanOperation(_),
+                    &StepType::BooleanOperation(_)
+                )
+                | (&StepType::Count, &StepType::Count)
+                | (&StepType::Update(_), &StepType::Update(_))
+                | (&StepType::Object(_), &StepType::Object(_))
+                | (&StepType::Exclude(_), &StepType::Exclude(_))
+                | (&StepType::Closure(_), &StepType::Closure(_))
+                | (&StepType::Range(_), &StepType::Range(_))
+                | (&StepType::OrderByAsc(_), &StepType::OrderByAsc(_))
+                | (&StepType::OrderByDesc(_), &StepType::OrderByDesc(_))
+                | (&StepType::AddEdge(_), &StepType::AddEdge(_))
+        )
     }
 }
 #[derive(Debug, Clone)]
@@ -706,7 +705,9 @@ impl ValueType {
         match self {
             ValueType::Literal { value, loc: _ } => value.to_string(),
             ValueType::Identifier { value, loc: _ } => value.clone(),
-            ValueType::Object { fields, loc: _ } => fields.keys().cloned().collect::<Vec<String>>().join(", "),
+            ValueType::Object { fields, loc: _ } => {
+                fields.keys().cloned().collect::<Vec<String>>().join(", ")
+            }
         }
     }
 }
@@ -811,12 +812,9 @@ impl HelixParser {
             source.source.push_str(&file.content);
             source.source.push('\n');
             let pair = match HelixParser::parse(Rule::source, &file.content) {
-                Ok(mut pairs) => {
-                    
-                    pairs
-                        .next()
-                        .ok_or_else(|| ParserError::from("Empty input"))?
-                }
+                Ok(mut pairs) => pairs
+                    .next()
+                    .ok_or_else(|| ParserError::from("Empty input"))?,
                 Err(e) => {
                     return Err(ParserError::from(e));
                 }
@@ -915,7 +913,7 @@ impl HelixParser {
     fn parse_field_type(
         &self,
         field: Pair<Rule>,
-        schema: Option<&Source>,
+        _schema: Option<&Source>,
     ) -> Result<FieldType, ParserError> {
         match field.as_rule() {
             Rule::named_type => {
@@ -949,7 +947,7 @@ impl HelixParser {
                             .into_inner()
                             .next()
                             .unwrap(),
-                        schema,
+                        _schema,
                     )?,
                 )))
             }

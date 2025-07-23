@@ -486,9 +486,7 @@ fn test_count_mixed_steps() {
         )
         .collect_to::<Vec<_>>();
     txn.commit().unwrap();
-    println!(
-        "person1: {person1:?},\nperson2: {person2:?},\nperson3: {person3:?}"
-    );
+    println!("person1: {person1:?},\nperson2: {person2:?},\nperson3: {person3:?}");
 
     let txn = storage.graph_env.read_txn().unwrap();
     let count = G::new(Arc::clone(&storage), &txn)
@@ -694,7 +692,7 @@ fn test_e_from_id() {
         assert_eq!(edge.from_node(), person1.id());
         assert_eq!(edge.to_node(), person2.id());
     } else {
-        assert!(false, "Expected Edge value");
+        panic!("Expected Edge value");
     }
 }
 
@@ -1176,11 +1174,11 @@ fn test_edge_properties() {
     let node2 = G::new_mut(Arc::clone(&storage), &mut txn)
         .add_n("person", Some(props!()), None)
         .collect_to_val();
-    let props = Some(props! { "since" => 2020, "date" => 1744965900, "name" => "hello"});
+    let props = props! { "since" => 2020, "date" => 1744965900, "name" => "hello"};
     let _ = G::new_mut(Arc::clone(&storage), &mut txn)
         .add_e(
             "knows",
-            props.clone(),
+            Some(props.clone()),
             node1.id(),
             node2.id(),
             false,
@@ -1210,7 +1208,7 @@ fn test_edge_properties() {
         TraversalVal::Edge(edge) => {
             assert_eq!(
                 edge.properties.clone().unwrap(),
-                props.unwrap().into_iter().collect()
+                props.into_iter().collect()
             );
         }
         _ => {
@@ -1513,7 +1511,7 @@ fn huge_traversal() {
     txn.commit().unwrap();
     let start = Instant::now();
     let mut txn = storage.graph_env.write_txn().unwrap();
-    for _ in 0..1000_000 {
+    for _ in 0..1_000_000 {
         let random_node1 = nodes[rand::rng().random_range(0..nodes.len())];
         let random_node2 = nodes[rand::rng().random_range(0..nodes.len())];
         G::new_mut(Arc::clone(&storage), &mut txn)
@@ -1612,7 +1610,7 @@ fn huge_traversal() {
     //     "size of mdb file on disk: {:?}",
     //     storage.graph_env.real_disk_size()
     // );
-    assert!(false);
+    panic!();
 }
 
 #[test]
@@ -1785,9 +1783,7 @@ fn test_add_n_parallel() {
         .collect_to::<Vec<_>>();
 
     println!("time taken to collect nodes: {:?}", start.elapsed());
-    println!("count: {:?}", count.len());
-
-    assert!(false)
+    panic!("count: {:?}", count.len());
 }
 
 // 3 614 375 936
@@ -1803,7 +1799,7 @@ fn test_add_e_between_node_and_vector() {
         .collect_to_val();
 
     let vector = G::new_mut(Arc::clone(&storage), &mut txn)
-        .insert_v::<fn(&HVector, &RoTxn) -> bool>(&vec![1.0, 2.0, 3.0], "vector", None)
+        .insert_v::<fn(&HVector, &RoTxn) -> bool>(&[1.0, 2.0, 3.0], "vector", None)
         .collect_to_val();
 
     let _ = G::new_mut(Arc::clone(&storage), &mut txn)
@@ -1830,7 +1826,7 @@ fn test_add_e_between_node_and_vector() {
     println!(
         "vectors: {:?}",
         G::new(Arc::clone(&storage), &txn)
-            .search_v::<fn(&HVector, &RoTxn) -> bool>(&vec![1.0, 2.0, 3.0], 10, None)
+            .search_v::<fn(&HVector, &RoTxn) -> bool>(&[1.0, 2.0, 3.0], 10, None)
             .collect_to::<Vec<_>>()
     );
 
@@ -1848,7 +1844,7 @@ fn test_from_v() {
         .collect_to_val();
 
     let vector = G::new_mut(Arc::clone(&storage), &mut txn)
-        .insert_v::<fn(&HVector, &RoTxn) -> bool>(&vec![1.0, 2.0, 3.0], "vector", None)
+        .insert_v::<fn(&HVector, &RoTxn) -> bool>(&[1.0, 2.0, 3.0], "vector", None)
         .collect_to_val();
 
     let _ = G::new_mut(Arc::clone(&storage), &mut txn)
@@ -1879,7 +1875,7 @@ fn test_to_v() {
         .collect_to_val();
 
     let vector = G::new_mut(Arc::clone(&storage), &mut txn)
-        .insert_v::<fn(&HVector, &RoTxn) -> bool>(&vec![1.0, 2.0, 3.0], "vector", None)
+        .insert_v::<fn(&HVector, &RoTxn) -> bool>(&[1.0, 2.0, 3.0], "vector", None)
         .collect_to_val();
 
     let _ = G::new_mut(Arc::clone(&storage), &mut txn)
@@ -1944,7 +1940,7 @@ fn test_brute_force_vector_search() {
         .n_from_id(&node.id())
         .out_e("embedding")
         .to_v()
-        .brute_force_search_v(&vec![1.0, 2.0, 3.0], 10)
+        .brute_force_search_v(&[1.0, 2.0, 3.0], 10)
         .collect_to::<Vec<_>>();
 
     println!("traversal: {traversal:?}");
@@ -2069,7 +2065,7 @@ fn test_vector_search() {
 
     let txn = storage.graph_env.read_txn().unwrap();
     let traversal = G::new(Arc::clone(&storage), &txn)
-        .search_v::<fn(&HVector, &RoTxn) -> bool>(&vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 2000, None)
+        .search_v::<fn(&HVector, &RoTxn) -> bool>(&[1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 2000, None)
         .collect_to::<Vec<_>>();
     // traversal.reverse();
 
@@ -2222,7 +2218,7 @@ fn test_exclude_field_remapping() {
     let (storage, _temp_dir) = setup_test_db();
     let mut txn = storage.graph_env.write_txn().unwrap();
 
-    let node = G::new_mut(Arc::clone(&storage), &mut txn)
+    let _node = G::new_mut(Arc::clone(&storage), &mut txn)
         .add_n(
             "person",
             Some(props! { "text" => "test", "other" => "other" }),
@@ -2241,7 +2237,7 @@ fn test_exclude_field_remapping() {
         "files".to_string(),
         ReturnValue::from_traversal_value_array_with_mixin(
             G::new_from(Arc::clone(&storage), &txn, traversal.clone())
-                .map_traversal(|item, txn| {
+                .map_traversal(|item, _txn| {
                     println!("item: {item:?}");
                     exclude_field!(remapping_vals, item.clone(), "text")?;
                     Ok(item)
@@ -2282,18 +2278,14 @@ fn test_delete_vector() {
     let mut txn = storage.graph_env.write_txn().unwrap();
 
     let vector = G::new_mut(Arc::clone(&storage), &mut txn)
-        .insert_v::<fn(&HVector, &RoTxn) -> bool>(
-            &vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-            "vector",
-            None,
-        )
+        .insert_v::<fn(&HVector, &RoTxn) -> bool>(&[1.0, 1.0, 1.0, 1.0, 1.0, 1.0], "vector", None)
         .collect_to_val();
 
     txn.commit().unwrap();
 
     let txn = storage.graph_env.read_txn().unwrap();
     let traversal = G::new(Arc::clone(&storage), &txn)
-        .search_v::<fn(&HVector, &RoTxn) -> bool>(&vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 2000, None)
+        .search_v::<fn(&HVector, &RoTxn) -> bool>(&[1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 2000, None)
         .collect_to::<Vec<_>>();
 
     txn.commit().unwrap();
@@ -2304,11 +2296,7 @@ fn test_delete_vector() {
 
     Drop::drop_traversal(
         G::new(Arc::clone(&storage), &txn)
-            .search_v::<fn(&HVector, &RoTxn) -> bool>(
-                &vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-                2000,
-                None,
-            )
+            .search_v::<fn(&HVector, &RoTxn) -> bool>(&[1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 2000, None)
             .collect_to::<Vec<_>>(),
         Arc::clone(&storage),
         &mut txn,
@@ -2319,7 +2307,7 @@ fn test_delete_vector() {
 
     let txn = storage.graph_env.read_txn().unwrap();
     let traversal = G::new(Arc::clone(&storage), &txn)
-        .search_v::<fn(&HVector, &RoTxn) -> bool>(&vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 2000, None)
+        .search_v::<fn(&HVector, &RoTxn) -> bool>(&[1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 2000, None)
         .collect_to::<Vec<_>>();
 
     assert_eq!(traversal.len(), 0);

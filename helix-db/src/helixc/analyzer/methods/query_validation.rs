@@ -25,8 +25,11 @@ use paste::paste;
 use std::collections::HashMap;
 
 pub(crate) fn validate_query<'a>(ctx: &mut Ctx<'a>, original_query: &'a Query) {
-    let mut query = GeneratedQuery::default();
-    query.name = original_query.name.clone();
+    let mut query = GeneratedQuery {
+        name: original_query.name.clone(),
+        ..Default::default()
+    };
+
     // -------------------------------------------------
     // Parameter validation
     // -------------------------------------------------
@@ -66,8 +69,8 @@ pub(crate) fn validate_query<'a>(ctx: &mut Ctx<'a>, original_query: &'a Query) {
     }
     for stmt in &original_query.statements {
         let statement = validate_statements(ctx, &mut scope, original_query, &mut query, stmt);
-        if statement.is_some() {
-            query.statements.push(statement.unwrap());
+        if let Some(s) = statement {
+            query.statements.push(s);
         } else {
             // given all erroneous statements are caught by the analyzer, this should never happen
             unreachable!()

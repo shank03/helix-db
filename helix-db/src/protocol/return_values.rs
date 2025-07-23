@@ -2,12 +2,12 @@ use super::{
     remapping::{Remapping, ResponseRemapping},
     value::Value,
 };
+use crate::helix_engine::graph_core::ops::tr_val::TraversalVal;
 use crate::utils::{
     count::Count,
     filterable::{Filterable, FilterableType},
     items::{Edge, Node},
 };
-use crate::helix_engine::graph_core::ops::tr_val::TraversalVal;
 use sonic_rs::{Deserialize, Serialize};
 use std::{cell::RefMut, collections::HashMap};
 
@@ -78,21 +78,11 @@ impl ReturnValue {
                         let mut properties = HashMap::with_capacity(2);
                         properties.insert(
                             "nodes".to_string(),
-                            ReturnValue::Array(
-                                nodes
-                                    .into_iter()
-                                    .map(ReturnValue::from)
-                                    .collect(),
-                            ),
+                            ReturnValue::Array(nodes.into_iter().map(ReturnValue::from).collect()),
                         );
                         properties.insert(
                             "edges".to_string(),
-                            ReturnValue::Array(
-                                edges
-                                    .into_iter()
-                                    .map(ReturnValue::from)
-                                    .collect(),
-                            ),
+                            ReturnValue::Array(edges.into_iter().map(ReturnValue::from).collect()),
                         );
                         ReturnValue::Object(properties)
                     }
@@ -107,41 +97,29 @@ impl ReturnValue {
         mut mixin: RefMut<HashMap<u128, ResponseRemapping>>,
     ) -> Self {
         match traversal_value {
-                    TraversalVal::Node(node) => {
-                        println!("node processing");
-                        ReturnValue::process_items_with_mixin(node, &mut mixin)
-                    }
-                    TraversalVal::Edge(edge) => {
-                        ReturnValue::process_items_with_mixin(edge, &mut mixin)
-                    }
-                    TraversalVal::Vector(vector) => {
-                        ReturnValue::process_items_with_mixin(vector, &mut mixin)
-                    }
-                    TraversalVal::Count(count) => ReturnValue::from(count),
-                    TraversalVal::Empty => ReturnValue::Empty,
-                    TraversalVal::Value(value) => ReturnValue::from(value),
-                    TraversalVal::Path((nodes, edges)) => {
-                        let mut properties = HashMap::with_capacity(2);
-                        properties.insert(
-                            "nodes".to_string(),
-                            ReturnValue::Array(
-                                nodes
-                                    .into_iter()
-                                    .map(ReturnValue::from)
-                                    .collect(),
-                            ),
-                        );
-                        properties.insert(
-                            "edges".to_string(),
-                            ReturnValue::Array(
-                                edges
-                                    .into_iter()
-                                    .map(ReturnValue::from)
-                                    .collect(),
-                            ),
-                        );
-                        ReturnValue::Object(properties)
-                    }
+            TraversalVal::Node(node) => {
+                println!("node processing");
+                ReturnValue::process_items_with_mixin(node, &mut mixin)
+            }
+            TraversalVal::Edge(edge) => ReturnValue::process_items_with_mixin(edge, &mut mixin),
+            TraversalVal::Vector(vector) => {
+                ReturnValue::process_items_with_mixin(vector, &mut mixin)
+            }
+            TraversalVal::Count(count) => ReturnValue::from(count),
+            TraversalVal::Empty => ReturnValue::Empty,
+            TraversalVal::Value(value) => ReturnValue::from(value),
+            TraversalVal::Path((nodes, edges)) => {
+                let mut properties = HashMap::with_capacity(2);
+                properties.insert(
+                    "nodes".to_string(),
+                    ReturnValue::Array(nodes.into_iter().map(ReturnValue::from).collect()),
+                );
+                properties.insert(
+                    "edges".to_string(),
+                    ReturnValue::Array(edges.into_iter().map(ReturnValue::from).collect()),
+                );
+                ReturnValue::Object(properties)
+            }
         }
     }
 
@@ -164,9 +142,9 @@ impl ReturnValue {
     ///
     /// - If the mapping is an exclude, then the key is removed from the return value
     /// - If the mapping is a remapping from an old value to a new value, then the key
-    ///     is replaced with the new name and the value is the new value
+    ///   is replaced with the new name and the value is the new value
     /// - If the mapping is a new mapping, then the key is added to the return value
-    ///     and the value is the new value
+    ///   and the value is the new value
     /// - Otherwise, the key is left unchanged and the value is the original value
     ///
     /// Basic usage:

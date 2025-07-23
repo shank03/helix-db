@@ -26,7 +26,7 @@ impl<I: Iterator<Item = Result<TraversalVal, GraphError>>> Iterator for SearchV<
 pub trait SearchVAdapter<'a>: Iterator<Item = Result<TraversalVal, GraphError>> {
     fn search_v<F>(
         self,
-        query: &Vec<f64>,
+        query: &[f64],
         k: usize,
         filter: Option<&[F]>,
     ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>
@@ -39,7 +39,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> SearchVAdapt
 {
     fn search_v<F>(
         self,
-        query: &Vec<f64>,
+        query: &[f64],
         k: usize,
         filter: Option<&[F]>,
     ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>
@@ -83,8 +83,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> SearchVAdapt
                 once(Err(error)).collect::<Vec<_>>().into_iter()
             }
             Err(VectorError::VectorAlreadyDeleted(id)) => {
-                let error =
-                    GraphError::VectorError(format!("vector already deleted for id {id}"));
+                let error = GraphError::VectorError(format!("vector already deleted for id {id}"));
                 once(Err(error)).collect::<Vec<_>>().into_iter()
             }
             .collect::<Vec<_>>()

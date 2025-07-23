@@ -1,7 +1,4 @@
-use std::{
-    cmp::Ordering,
-    fmt,
-};
+use std::{cmp::Ordering, fmt};
 
 use clap::{Subcommand, ValueEnum};
 
@@ -31,7 +28,11 @@ impl Version {
             .parse::<u32>()
             .map_err(|_| format!("Invalid patch version: {}", parts[2]))?;
 
-        Ok(Version { major, minor, patch })
+        Ok(Version {
+            major,
+            minor,
+            patch,
+        })
     }
 }
 
@@ -70,11 +71,10 @@ pub enum OutputLanguage {
 
 impl PartialEq for OutputLanguage {
     fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (OutputLanguage::TypeScript, OutputLanguage::TypeScript) => true,
-            (OutputLanguage::Rust, OutputLanguage::Rust) => true,
-            _ => false,
-        }
+        matches!(
+            (self, other),
+            (OutputLanguage::TypeScript, OutputLanguage::TypeScript)
+                | (OutputLanguage::Rust, OutputLanguage::Rust)
+        )
     }
 }
-

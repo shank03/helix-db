@@ -26,7 +26,7 @@ impl Iterator for InsertVIterator {
 pub trait InsertVAdapter<'a, 'b>: Iterator<Item = Result<TraversalVal, GraphError>> {
     fn insert_v<F>(
         self,
-        query: &Vec<f64>,
+        query: &[f64],
         label: &str,
         fields: Option<Vec<(String, Value)>>,
     ) -> RwTraversalIterator<'a, 'b, impl Iterator<Item = Result<TraversalVal, GraphError>>>
@@ -35,7 +35,7 @@ pub trait InsertVAdapter<'a, 'b>: Iterator<Item = Result<TraversalVal, GraphErro
 
     fn insert_vs<F>(
         self,
-        queries: &Vec<Vec<f64>>,
+        queries: &[Vec<f64>],
         fields: Option<Vec<(String, Value)>>,
     ) -> RwTraversalIterator<'a, 'b, impl Iterator<Item = Result<TraversalVal, GraphError>>>
     where
@@ -47,7 +47,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> InsertVAdapte
 {
     fn insert_v<F>(
         self,
-        query: &Vec<f64>,
+        query: &[f64],
         label: &str,
         fields: Option<Vec<(String, Value)>>,
     ) -> RwTraversalIterator<'a, 'b, impl Iterator<Item = Result<TraversalVal, GraphError>>>
@@ -81,7 +81,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> InsertVAdapte
 
     fn insert_vs<F>(
         self,
-        queries: &Vec<Vec<f64>>,
+        queries: &[Vec<f64>],
         fields: Option<Vec<(String, Value)>>,
     ) -> RwTraversalIterator<'a, 'b, impl Iterator<Item = Result<TraversalVal, GraphError>>>
     where

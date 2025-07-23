@@ -155,8 +155,7 @@ fn generator_test_1() {
     match compile(generate(input.to_string()).unwrap()) {
         Ok(_) => {}
         Err(e) => {
-            println!("error: {e:?}");
-            assert!(false);
+            panic!("error: {e:?}");
         }
     };
 }
@@ -215,8 +214,7 @@ fn generator_test_2() {
     match compile(generate(input.to_string()).unwrap()) {
         Ok(_) => {}
         Err(e) => {
-            println!("error: {e:?}");
-            assert!(false);
+            panic!("error: {e:?}");
         }
     };
 }

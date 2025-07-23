@@ -22,7 +22,7 @@ impl<I: Iterator<Item = Result<TraversalVal, GraphError>>> Iterator for BruteFor
 pub trait BruteForceSearchVAdapter<'a>: Iterator<Item = Result<TraversalVal, GraphError>> {
     fn brute_force_search_v(
         self,
-        query: &Vec<f64>,
+        query: &[f64],
         k: usize,
     ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>;
 }
@@ -32,7 +32,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> BruteForceSe
 {
     fn brute_force_search_v(
         self,
-        query: &Vec<f64>,
+        query: &[f64],
         k: usize,
     ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>> {
         let mut iter = self.inner.collect::<Vec<_>>();

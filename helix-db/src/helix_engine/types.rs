@@ -36,10 +36,10 @@ impl fmt::Display for GraphError {
         match self {
             GraphError::Io(e) => write!(f, "IO error: {e}"),
             GraphError::StorageConnectionError(msg, e) => {
-                write!(f, "Error: {}", format!("{} {}", msg, e))
+                write!(f, "Error: {msg} {e}")
             }
             GraphError::GraphConnectionError(msg, e) => {
-                write!(f, "Error: {}", format!("{} {}", msg, e))
+                write!(f, "Error: {msg} {e}")
             }
             GraphError::TraversalError(msg) => write!(f, "Traversal error: {msg}"),
             GraphError::StorageError(msg) => write!(f, "Storage error: {msg}"),

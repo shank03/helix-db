@@ -97,7 +97,7 @@ impl VectorCore {
         // Should instead using an atomic mutable seed and the XOR shift algorithm
         let mut rng = rand::rng();
         let r: f64 = rng.random::<f64>();
-        
+
         (-r.ln() * self.config.m_l).floor() as usize
     }
 
@@ -163,20 +163,19 @@ impl VectorCore {
 
         let prefix_len = out_key.len();
 
-        for result in iter {
-            if let Ok((key, _)) = result {
-                // TODO: fix here because not working at all
-                let mut arr = [0u8; 16];
-                let len = std::cmp::min(key.len(), 16);
-                arr[..len].copy_from_slice(&key[prefix_len..(prefix_len + len)]);
-                let neighbor_id = u128::from_be_bytes(arr);
+        for result in iter.flatten() {
+            let (key, _) = result;
+            // TODO: fix here because not working at all
+            let mut arr = [0u8; 16];
+            let len = std::cmp::min(key.len(), 16);
+            arr[..len].copy_from_slice(&key[prefix_len..(prefix_len + len)]);
+            let neighbor_id = u128::from_be_bytes(arr);
 
-                if neighbor_id != id {
-                    if let Ok(vector) = self.get_vector(txn, neighbor_id, level, true) {
-                        // TODO: look at implementing a macro that actually just runs each function rather than iterating through
-                        if filter.is_none() || filter.unwrap().iter().all(|f| f(&vector, txn)) {
-                            neighbors.push(vector);
-                        }
+            if neighbor_id != id {
+                if let Ok(vector) = self.get_vector(txn, neighbor_id, level, true) {
+                    // TODO: look at implementing a macro that actually just runs each function rather than iterating through
+                    if filter.is_none() || filter.unwrap().iter().all(|f| f(&vector, txn)) {
+                        neighbors.push(vector);
                     }
                 }
             }
@@ -240,9 +239,9 @@ impl VectorCore {
         F: Fn(&HVector, &RoTxn) -> bool,
     {
         let m: usize = if level == 0 {
-            self.config.m
-        } else {
             self.config.m_max_0
+        } else {
+            self.config.m
         };
         let mut visited: HashSet<String> = HashSet::new();
         if should_extend {
@@ -482,12 +481,6 @@ impl HNSW for VectorCore {
             for e in neighbors {
                 let id = e.get_id();
                 let e_conns = self.get_neighbors::<F>(txn, id, level, None)?;
-                if e_conns.len()
-                    > if level == 0 {
-                        self.config.m_max_0
-                    } else {
-                        self.config.m_max_0
-                    }
                 {
                     let e_conns = BinaryHeap::from(e_conns);
                     let e_new_conn =
@@ -520,12 +513,10 @@ impl HNSW for VectorCore {
 
         println!("properties: {properties:?}");
         if let Some(mut properties) = properties {
-            if let Some(is_deleted) = properties.get("is_deleted") {
-                if let Value::Boolean(is_deleted) = is_deleted {
-                    if *is_deleted {
-                        return Err(VectorError::VectorAlreadyDeleted(id.to_string()));
-                    }
-                }
+            if let Some(Value::Boolean(is_deleted)) = properties.get("is_deleted")
+                && *is_deleted
+            {
+                return Err(VectorError::VectorAlreadyDeleted(id.to_string()));
             }
             properties.insert("is_deleted".to_string(), Value::Boolean(true));
             println!("properties: {properties:?}");

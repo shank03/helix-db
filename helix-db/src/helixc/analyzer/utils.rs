@@ -130,7 +130,6 @@ pub(super) fn field_exists_on_item_type(
 }
 
 #[allow(unused)]
-
 pub(super) fn get_singular_type(ty: Type) -> Type {
     match ty {
         Type::Nodes(node_type) => Type::Node(node_type),

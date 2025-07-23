@@ -133,9 +133,7 @@ fn unwrap_object(
                     unwrap_object(format!("{field_name}Data"), obj, sub_parameters);
                     GeneratedParameter {
                         name: field_name.clone(),
-                        field_type: GeneratedType::Object(GenRef::Std(format!(
-                            "{field_name}Data"
-                        ))),
+                        field_type: GeneratedType::Object(GenRef::Std(format!("{field_name}Data"))),
                     }
                 }
                 FieldType::Array(inner) => match inner.as_ref() {
@@ -294,41 +292,39 @@ impl Type {
 
     #[allow(dead_code)]
     pub fn is_numeric(&self) -> bool {
-        match self {
-            Type::Scalar(ft) => match ft {
+        matches!(
+            self,
+            Type::Scalar(
                 FieldType::I8
-                | FieldType::I16
-                | FieldType::I32
-                | FieldType::I64
-                | FieldType::U8
-                | FieldType::U16
-                | FieldType::U32
-                | FieldType::U64
-                | FieldType::U128
-                | FieldType::F32
-                | FieldType::F64 => true,
-                _ => false,
-            },
-            _ => false,
-        }
+                    | FieldType::I16
+                    | FieldType::I32
+                    | FieldType::I64
+                    | FieldType::U8
+                    | FieldType::U16
+                    | FieldType::U32
+                    | FieldType::U64
+                    | FieldType::U128
+                    | FieldType::F32
+                    | FieldType::F64,
+            )
+        )
     }
 
     pub fn is_integer(&self) -> bool {
-        match self {
-            Type::Scalar(ft) => match ft {
+        matches!(
+            self,
+            Type::Scalar(
                 FieldType::I8
-                | FieldType::I16
-                | FieldType::I32
-                | FieldType::I64
-                | FieldType::U8
-                | FieldType::U16
-                | FieldType::U32
-                | FieldType::U64
-                | FieldType::U128 => true,
-                _ => false,
-            },
-            _ => false,
-        }
+                    | FieldType::I16
+                    | FieldType::I32
+                    | FieldType::I64
+                    | FieldType::U8
+                    | FieldType::U16
+                    | FieldType::U32
+                    | FieldType::U64
+                    | FieldType::U128
+            )
+        )
     }
 }
 

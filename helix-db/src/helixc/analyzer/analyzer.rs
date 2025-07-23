@@ -43,8 +43,10 @@ impl<'a> Ctx<'a> {
         // Build field look‑ups once
         let (node_fields, edge_fields, vector_fields) = build_field_lookups(src);
 
-        let mut output = GeneratedSource::default();
-        output.src = src.source.clone();
+        let output = GeneratedSource {
+            src: src.source.clone(),
+            ..Default::default()
+        };
 
         Self {
             node_set: src.node_schemas.iter().map(|n| n.name.1.as_str()).collect(),

@@ -14,13 +14,16 @@ impl Eq for Candidate {}
 
 impl PartialOrd for Candidate {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        other.distance.partial_cmp(&self.distance)
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for Candidate {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap_or(Ordering::Equal)
+        other
+            .distance
+            .partial_cmp(&self.distance)
+            .unwrap_or(Ordering::Equal)
     }
 }
 

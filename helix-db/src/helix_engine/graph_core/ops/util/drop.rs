@@ -12,7 +12,7 @@ pub struct Drop<I> {
     pub iter: I,
 }
 
-impl<'a, T> Drop<Vec<Result<T, GraphError>>>
+impl<T> Drop<Vec<Result<T, GraphError>>>
 where
     T: IntoIterator<Item = TraversalVal> + Debug,
 {
@@ -31,7 +31,8 @@ where
                                     println!("failed to delete doc from bm25: {e}");
                                 }
                             }
-                            Ok(println!("Dropped node: {:?}", node.id))
+                            println!("Dropped node: {:?}", node.id);
+                            Ok(())
                         }
                         Err(e) => Err(e),
                     },
@@ -43,11 +44,9 @@ where
                         Ok(_) => Ok(()),
                         Err(e) => Err(e.into()),
                     },
-                    _ => {
-                        Err(GraphError::ConversionError(format!(
-                            "Incorrect Type: {item:?}"
-                        )))
-                    }
+                    _ => Err(GraphError::ConversionError(format!(
+                        "Incorrect Type: {item:?}"
+                    ))),
                 }
             })
     }

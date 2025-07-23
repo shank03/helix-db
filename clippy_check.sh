@@ -1,0 +1,1 @@
+cargo clippy --workspace --frozen --locked --fix --allow-dirty -- -D warnings -A clippy::too_many_arguments -A clippy::module-inception -A clippy::new-ret-no-self -A clippy::wrong-self-convention -A clippy::large-enum-variant -A clippy::inherent-to-string -A clippy::inherent_to_string_shadow_display -A deprecated

@@ -10,7 +10,7 @@ use crate::{
             types::Type,
             utils::{
                 FieldLookup, Variable, VariableAccess, gen_property_access, is_valid_identifier,
-             validate_field_name_existence_for_item_type,
+                validate_field_name_existence_for_item_type,
             },
         },
         generator::{
@@ -49,9 +49,9 @@ use std::{borrow::Cow, collections::HashMap};
 pub(crate) fn validate_object<'a>(
     ctx: &mut Ctx<'a>,
     cur_ty: &Type,
-    tr: &Traversal,
+    _tr: &Traversal,
     obj: &'a Object,
-    excluded: &HashMap<&str, Loc>,
+    _excluded: &HashMap<&str, Loc>,
     original_query: &'a Query,
     gen_traversal: &mut GeneratedTraversal,
     gen_query: &mut GeneratedQuery,
@@ -102,9 +102,9 @@ pub(crate) fn validate_object<'a>(
             validate_object(
                 ctx,
                 ty,
-                tr,
+                _tr,
                 obj,
-                excluded,
+                _excluded,
                 original_query,
                 gen_traversal,
                 gen_query,
