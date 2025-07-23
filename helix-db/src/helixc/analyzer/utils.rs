@@ -46,12 +46,10 @@ pub(super) fn gen_identifier_or_param(
         } else {
             GeneratedValue::Parameter(GenRef::Std(format!("data.{name}.clone()")))
         }
+    } else if should_ref {
+        GeneratedValue::Identifier(GenRef::Ref(name.to_string()))
     } else {
-        if should_ref {
-            GeneratedValue::Identifier(GenRef::Ref(name.to_string()))
-        } else {
-            GeneratedValue::Identifier(GenRef::Std(format!("{}.clone()", name)))
-        }
+        GeneratedValue::Identifier(GenRef::Std(format!("{name}.clone()")))
     }
 }
 
@@ -59,7 +57,7 @@ pub(super) fn gen_id_access_or_param(original_query: &Query, name: &str) -> Gene
     if is_param(original_query, name) {
         GeneratedValue::Parameter(GenRef::DeRef(format!("data.{name}")))
     } else {
-        GeneratedValue::Identifier(GenRef::Std(format!("{}.id()", name)))
+        GeneratedValue::Identifier(GenRef::Std(format!("{name}.id()")))
     }
 }
 

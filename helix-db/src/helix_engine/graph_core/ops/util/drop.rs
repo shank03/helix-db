@@ -44,9 +44,9 @@ where
                         Err(e) => Err(e.into()),
                     },
                     _ => {
-                        return Err(GraphError::ConversionError(format!(
+                        Err(GraphError::ConversionError(format!(
                             "Incorrect Type: {item:?}"
-                        )));
+                        )))
                     }
                 }
             })

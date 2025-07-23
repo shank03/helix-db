@@ -77,19 +77,19 @@ impl From<std::io::Error> for GraphError {
 
 impl From<AddrParseError> for GraphError {
     fn from(error: AddrParseError) -> Self {
-        GraphError::ConversionError(format!("AddrParseError: {}", error))
+        GraphError::ConversionError(format!("AddrParseError: {error}"))
     }
 }
 
 impl From<SonicError> for GraphError {
     fn from(error: SonicError) -> Self {
-        GraphError::ConversionError(format!("sonic error: {}", error))
+        GraphError::ConversionError(format!("sonic error: {error}"))
     }
 }
 
 impl From<FromUtf8Error> for GraphError {
     fn from(error: FromUtf8Error) -> Self {
-        GraphError::ConversionError(format!("FromUtf8Error: {}", error))
+        GraphError::ConversionError(format!("FromUtf8Error: {error}"))
     }
 }
 
@@ -107,31 +107,31 @@ impl From<String> for GraphError {
 
 impl From<bincode::Error> for GraphError {
     fn from(error: bincode::Error) -> Self {
-        GraphError::ConversionError(format!("bincode error: {}", error))
+        GraphError::ConversionError(format!("bincode error: {error}"))
     }
 }
 
 impl From<ParserError> for GraphError {
     fn from(error: ParserError) -> Self {
-        GraphError::ConversionError(format!("ParserError: {}", error))
+        GraphError::ConversionError(format!("ParserError: {error}"))
     }
 }
 
 impl From<Utf8Error> for GraphError {
     fn from(error: Utf8Error) -> Self {
-        GraphError::ConversionError(format!("Utf8Error: {}", error))
+        GraphError::ConversionError(format!("Utf8Error: {error}"))
     }
 }
 
 impl From<uuid::Error> for GraphError {
     fn from(error: uuid::Error) -> Self {
-        GraphError::ConversionError(format!("uuid error: {}", error))
+        GraphError::ConversionError(format!("uuid error: {error}"))
     }
 }
 
 impl From<VectorError> for GraphError {
     fn from(error: VectorError) -> Self {
-        GraphError::VectorError(format!("VectorError: {}", error))
+        GraphError::VectorError(format!("VectorError: {error}"))
     }
 }
 
@@ -164,30 +164,30 @@ impl fmt::Display for VectorError {
 
 impl From<HeedError> for VectorError {
     fn from(error: HeedError) -> Self {
-        VectorError::VectorCoreError(format!("heed error: {}", error))
+        VectorError::VectorCoreError(format!("heed error: {error}"))
     }
 }
 
 impl From<FromUtf8Error> for VectorError {
     fn from(error: FromUtf8Error) -> Self {
-        VectorError::ConversionError(format!("FromUtf8Error: {}", error))
+        VectorError::ConversionError(format!("FromUtf8Error: {error}"))
     }
 }
 
 impl From<Utf8Error> for VectorError {
     fn from(error: Utf8Error) -> Self {
-        VectorError::ConversionError(format!("Utf8Error: {}", error))
+        VectorError::ConversionError(format!("Utf8Error: {error}"))
     }
 }
 
 impl From<SonicError> for VectorError {
     fn from(error: SonicError) -> Self {
-        VectorError::ConversionError(format!("SonicError: {}", error))
+        VectorError::ConversionError(format!("SonicError: {error}"))
     }
 }
 
 impl From<bincode::Error> for VectorError {
     fn from(error: bincode::Error) -> Self {
-        VectorError::ConversionError(format!("bincode error: {}", error))
+        VectorError::ConversionError(format!("bincode error: {error}"))
     }
 }

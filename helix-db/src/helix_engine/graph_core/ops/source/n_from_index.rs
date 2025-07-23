@@ -23,7 +23,7 @@ impl<'a> Iterator for NFromIndex<'a> {
 
     #[debug_trace("N_FROM_INDEX")]
     fn next(&mut self) -> Option<Self::Item> {
-        for value in self.iter.by_ref() {
+        if let Some(value) = self.iter.by_ref().next() {
             let (_, value) = value.unwrap();
             match value.decode() {
                 Ok(value) => match self.storage.get_node(self.txn, &value) {

@@ -173,7 +173,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddEAdapter<'
             EdgeType::Node => self
                 .storage
                 .nodes_db
-                .get(self.txn, &HelixGraphStorage::node_key(node_vec_id))
+                .get(self.txn, HelixGraphStorage::node_key(node_vec_id))
                 .is_ok_and(|node| node.is_some()),
             EdgeType::Vec => self
                 .storage

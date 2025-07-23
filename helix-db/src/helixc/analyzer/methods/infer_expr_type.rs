@@ -790,7 +790,7 @@ pub(crate) fn infer_expr_type<'a>(
                     EvaluatesToNumberType::Identifier(i) => {
                         is_valid_identifier(ctx, original_query, sv.loc.clone(), i.as_str());
                         // is param
-                        if original_query.parameters.iter().find(|p| p.name.1 == *i).is_some() {
+                        if original_query.parameters.iter().any(|p| p.name.1 == *i) {
                             GeneratedValue::Identifier(GenRef::Std(format!("data.{i} as usize")))
                         } else {
                             GeneratedValue::Identifier(GenRef::Std(i.to_string()))
@@ -994,8 +994,8 @@ pub(crate) fn infer_expr_type<'a>(
                         i.as_str(),
                     );
 
-                    if original_query.parameters.iter().find(|p| p.name.1 == *i).is_some() {
-                        GeneratedValue::Identifier(GenRef::Ref(format!("data.{}", i)))
+                    if original_query.parameters.iter().any(|p| p.name.1 == *i) {
+                        GeneratedValue::Identifier(GenRef::Ref(format!("data.{i}")))
                     } else if scope.get(i.as_str()).is_some() {
                         GeneratedValue::Identifier(GenRef::Ref(i.to_string()))
                     } else {
@@ -1059,7 +1059,7 @@ pub(crate) fn infer_expr_type<'a>(
                             i.as_str(),
                         );
                         // is param
-                        if original_query.parameters.iter().find(|p| p.name.1 == *i).is_some() {
+                        if original_query.parameters.iter().any(|p| p.name.1 == *i) {
                             GeneratedValue::Identifier(GenRef::Std(format!("data.{i} as usize")))
                         } else {
                             GeneratedValue::Identifier(GenRef::Std(i.to_string()))

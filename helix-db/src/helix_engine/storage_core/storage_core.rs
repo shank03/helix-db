@@ -297,10 +297,7 @@ impl StorageMethods for HelixGraphStorage {
             Some(data) => data,
             None => return Err(GraphError::NodeNotFound),
         };
-        let node: Node = match Node::decode_node(node, *id) {
-            Ok(node) => node,
-            Err(e) => return Err(e),
-        };
+        let node: Node = Node::decode_node(node, *id)?;
         Ok(node)
     }
 
@@ -310,10 +307,7 @@ impl StorageMethods for HelixGraphStorage {
             Some(data) => data,
             None => return Err(GraphError::EdgeNotFound),
         };
-        let edge: Edge = match Edge::decode_edge(edge, *id) {
-            Ok(edge) => edge,
-            Err(e) => return Err(e),
-        };
+        let edge: Edge = Edge::decode_edge(edge, *id)?;
         Ok(edge)
     }
 

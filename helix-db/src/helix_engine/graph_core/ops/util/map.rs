@@ -21,7 +21,7 @@ where
     type Item = I::Item;
 
     fn next(&mut self) -> Option<Self::Item> {
-        for item in self.iter.by_ref() {
+        if let Some(item) = self.iter.by_ref().next() {
             return match item {
                 Ok(item) => Some((self.f)(item, self.txn)),
                 Err(e) => return Some(Err(e)),

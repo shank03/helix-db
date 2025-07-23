@@ -31,7 +31,7 @@ pub(crate) fn build_field_lookups<'a>(
         .edge_schemas
         .iter()
         .map(|e| {
-            let mut props = e
+            let mut props: HashMap<_, _> = e
                 .properties
                 .as_ref()
                 .map(|v| {
@@ -116,7 +116,8 @@ pub(crate) fn check_schema(ctx: &mut Ctx) {
                 )),
             );
         }
-        if let Some(v) = edge.properties.as_ref() { v.iter().for_each(|f| {
+        if let Some(v) = edge.properties.as_ref() {
+            v.iter().for_each(|f| {
                 if f.name.to_lowercase() == "id" {
                     push_schema_err(
                         ctx,
@@ -126,7 +127,8 @@ pub(crate) fn check_schema(ctx: &mut Ctx) {
                         Some("rename the field".to_string()),
                     );
                 }
-            }) }
+            })
+        }
         ctx.output.edges.push(edge.clone().into());
     }
     for node in &ctx.src.node_schemas {

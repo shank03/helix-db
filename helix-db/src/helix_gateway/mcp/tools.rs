@@ -348,7 +348,8 @@ impl<'a> McpTools<'a> for McpBackend {
 
         let iter = match properties {
             Some(properties) => {
-                let iter = connection
+                
+                connection
                     .iter
                     .clone()
                     .filter(move |item| {
@@ -357,8 +358,7 @@ impl<'a> McpTools<'a> for McpBackend {
                                 .is_ok_and(|v| *v == *value)
                         })
                     })
-                    .collect::<Vec<_>>();
-                iter
+                    .collect::<Vec<_>>()
             }
             None => connection.iter.clone().collect::<Vec<_>>(),
         };

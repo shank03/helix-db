@@ -177,7 +177,7 @@ mod tests {
         let result = model.fetch_embedding("test text");
         assert!(result.is_ok());
         let embedding = result.unwrap();
-        println!("embedding: {:?}", embedding);
+        println!("embedding: {embedding:?}");
     }
 
     #[cfg(feature = "embed_local")]

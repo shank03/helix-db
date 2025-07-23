@@ -318,7 +318,7 @@ fn test_add_node_query() {
     let result = match HelixParser::parse_source(&input) {
         Ok(result) => result,
         Err(e) => {
-            println!("{:?}", e);
+            println!("{e:?}");
             panic!();
         }
     };
@@ -339,7 +339,7 @@ fn test_add_edge_query() {
     let result = match HelixParser::parse_source(&input) {
         Ok(result) => result,
         Err(e) => {
-            println!("{:?}", e);
+            println!("{e:?}");
             panic!();
         }
     };
@@ -361,7 +361,7 @@ fn test_adding_with_identifiers() {
     let result = match HelixParser::parse_source(&input) {
         Ok(result) => result,
         Err(e) => {
-            println!("{:?}", e);
+            println!("{e:?}");
             panic!();
         }
     };
@@ -821,11 +821,7 @@ fn test_array_as_param_type() {
         .any(|param| match param.param_type.1 {
             FieldType::Array(ref field) => match &**field {
                 FieldType::String =>
-                    if param.name.1 == "names" || param.name.1 == "ids" {
-                        true
-                    } else {
-                        false
-                    },
+                    param.name.1 == "names" || param.name.1 == "ids",
                         _ => false,
             },
             _ => false,
@@ -836,11 +832,7 @@ fn test_array_as_param_type() {
         .any(|param| match param.param_type.1 {
             FieldType::Array(ref field) => match &**field {
                 FieldType::I32 =>
-                    if param.name.1 == "ages" {
-                        true
-                    } else {
-                        false
-                    },
+                    param.name.1 == "ages",
                         _ => false,
             },
             _ => false,
@@ -879,8 +871,7 @@ fn test_schema_obj_as_param_type() {
                 },
                 _ => false,
             }),
-            "Param of type {} was not found",
-            param_type
+            "Param of type {param_type} was not found"
         );
 }
 
