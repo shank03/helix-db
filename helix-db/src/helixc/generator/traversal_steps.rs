@@ -77,17 +77,17 @@ impl Display for Traversal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.traversal_type {
             TraversalType::FromVar(var) => {
-                write!(f, "G::new_from(Arc::clone(&db), &txn, {}.clone())", var)?;
+                write!(f, "G::new_from(Arc::clone(&db), &txn, {var}.clone())")?;
                 write!(f, "{}", self.source_step)?;
                 for step in &self.steps {
-                    write!(f, "\n{}", step)?;
+                    write!(f, "\n{step}")?;
                 }
             }
             TraversalType::Ref => {
                 write!(f, "G::new(Arc::clone(&db), &txn)")?;
                 write!(f, "{}", self.source_step)?;
                 for step in &self.steps {
-                    write!(f, "\n{}", step)?;
+                    write!(f, "\n{step}")?;
                 }
             }
 
@@ -95,25 +95,24 @@ impl Display for Traversal {
                 write!(f, "G::new_mut(Arc::clone(&db), &mut txn)")?;
                 write!(f, "{}", self.source_step)?;
                 for step in &self.steps {
-                    write!(f, "\n{}", step)?;
+                    write!(f, "\n{step}")?;
                 }
             }
             TraversalType::Nested(nested) => {
-                assert!(nested.inner().len() > 0, "Empty nested traversal name");
-                write!(f, "{}", nested)?; // this should be var name default val
+                assert!(!nested.inner().is_empty(), "Empty nested traversal name");
+                write!(f, "{nested}")?; // this should be var name default val
                 for step in &self.steps {
-                    write!(f, "\n{}", step)?;
+                    write!(f, "\n{step}")?;
                 }
             }
             TraversalType::NestedFrom(nested) => {
-                assert!(nested.inner().len() > 0, "Empty nested traversal name");
+                assert!(!nested.inner().is_empty(), "Empty nested traversal name");
                 write!(
                     f,
-                    "G::new_from(Arc::clone(&db), &txn, vec![{}.clone()])",
-                    nested
+                    "G::new_from(Arc::clone(&db), &txn, vec![{nested}.clone()])"
                 )?;
                 for step in &self.steps {
-                    write!(f, "\n{}", step)?;
+                    write!(f, "\n{step}")?;
                 }
             }
             TraversalType::Empty => panic!("Should not be empty"),
@@ -122,7 +121,7 @@ impl Display for Traversal {
                 write!(f, "let update_tr = G::new(Arc::clone(&db), &txn)")?;
                 write!(f, "{}", self.source_step)?;
                 for step in &self.steps {
-                    write!(f, "\n{}", step)?;
+                    write!(f, "\n{step}")?;
                 }
                 write!(f, "\n    .collect_to::<Vec<_>>();")?;
                 write!(
@@ -131,7 +130,7 @@ impl Display for Traversal {
                                                                              // this less
                                                                              // scrappy
                 )?;
-                write!(f, "\n    .update({})", write_properties(&properties))?;
+                write!(f, "\n    .update({})", write_properties(properties))?;
                 write!(f, "\n    .collect_to_obj()")?;
                 write!(f, "}}")?;
             }
@@ -195,19 +194,19 @@ impl Display for Step {
             Step::FromV => write!(f, "from_v()"),
             Step::ToN => write!(f, "to_n()"),
             Step::ToV => write!(f, "to_v()"),
-            Step::PropertyFetch(property) => write!(f, "check_property({})", property),
+            Step::PropertyFetch(property) => write!(f, "check_property({property})"),
 
-            Step::Out(out) => write!(f, "{}", out),
-            Step::In(in_) => write!(f, "{}", in_),
-            Step::OutE(out_e) => write!(f, "{}", out_e),
-            Step::InE(in_e) => write!(f, "{}", in_e),
-            Step::Where(where_) => write!(f, "{}", where_),
-            Step::Range(range) => write!(f, "{}", range),
-            Step::OrderBy(order_by) => write!(f, "{}", order_by),
-            Step::BoolOp(bool_op) => write!(f, "{}", bool_op),
-            Step::Remapping(remapping) => write!(f, "{}", remapping),
-            Step::ShortestPath(shortest_path) => write!(f, "{}", shortest_path),
-            Step::SearchVector(search_vector) => write!(f, "{}", search_vector),
+            Step::Out(out) => write!(f, "{out}"),
+            Step::In(in_) => write!(f, "{in_}"),
+            Step::OutE(out_e) => write!(f, "{out_e}"),
+            Step::InE(in_e) => write!(f, "{in_e}"),
+            Step::Where(where_) => write!(f, "{where_}"),
+            Step::Range(range) => write!(f, "{range}"),
+            Step::OrderBy(order_by) => write!(f, "{order_by}"),
+            Step::BoolOp(bool_op) => write!(f, "{bool_op}"),
+            Step::Remapping(remapping) => write!(f, "{remapping}"),
+            Step::ShortestPath(shortest_path) => write!(f, "{shortest_path}"),
+            Step::SearchVector(search_vector) => write!(f, "{search_vector}"),
         }
     }
 }
@@ -218,7 +217,7 @@ impl Debug for Step {
             Step::Dedup => write!(f, "Dedup"),
             Step::FromN => write!(f, "FromN"),
             Step::ToN => write!(f, "ToN"),
-            Step::PropertyFetch(property) => write!(f, "check_property({})", property),
+            Step::PropertyFetch(property) => write!(f, "check_property({property})"),
             Step::FromV => write!(f, "FromV"),
             Step::ToV => write!(f, "ToV"),
             Step::Out(_) => write!(f, "Out"),
@@ -286,8 +285,8 @@ pub enum Where {
 impl Display for Where {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Where::Ref(wr) => write!(f, "{}", wr),
-            Where::Mut(wm) => write!(f, "{}", wm),
+            Where::Ref(wr) => write!(f, "{wr}"),
+            Where::Mut(wm) => write!(f, "{wm}"),
         }
     }
 }
@@ -360,13 +359,13 @@ impl Display for ShortestPath {
             "shortest_path({}, {}, {})",
             self.label
                 .clone()
-                .map_or("None".to_string(), |label| format!("Some({})", label)),
+                .map_or("None".to_string(), |label| format!("Some({label})")),
             self.from
                 .clone()
-                .map_or("None".to_string(), |from| format!("Some(&{})", from)),
+                .map_or("None".to_string(), |from| format!("Some(&{from})")),
             self.to
                 .clone()
-                .map_or("None".to_string(), |to| format!("Some(&{})", to))
+                .map_or("None".to_string(), |to| format!("Some(&{to})"))
         )
     }
 }

@@ -911,7 +911,7 @@ impl From<JsonValue> for Value {
             JsonValue::String(s) => Value::String(s),
             JsonValue::Number(n) => {
                 if n.is_u64() {
-                    Value::U64(n.as_u64().unwrap() as u64)
+                    Value::U64(n.as_u64().unwrap())
                 } else if n.is_i64() {
                     Value::I64(n.as_i64().unwrap())
                 } else {
@@ -941,7 +941,7 @@ where
 {
     #[inline]
     fn from(k: &'a K) -> Self {
-        Value::from(k.clone().into())
+        k.clone().into()
     }
 }
 
@@ -962,8 +962,7 @@ impl Encodings for HashMap<String, Value> {
         match bincode::deserialize(bytes) {
             Ok(properties) => Ok(properties),
             Err(e) => Err(GraphError::ConversionError(format!(
-                "Error deserializing properties: {}",
-                e
+                "Error deserializing properties: {e}"
             ))),
         }
     }
@@ -972,8 +971,7 @@ impl Encodings for HashMap<String, Value> {
         match bincode::serialize(self) {
             Ok(bytes) => Ok(bytes),
             Err(e) => Err(GraphError::ConversionError(format!(
-                "Error serializing properties: {}",
-                e
+                "Error serializing properties: {e}"
             ))),
         }
     }
@@ -983,18 +981,18 @@ impl From<Value> for GenRef<String> {
     fn from(v: Value) -> Self {
         match v {
             Value::String(s) => GenRef::Literal(s),
-            Value::I8(i) => GenRef::Std(format!("{}", i)),
-            Value::I16(i) => GenRef::Std(format!("{}", i)),
-            Value::I32(i) => GenRef::Std(format!("{}", i)),
-            Value::I64(i) => GenRef::Std(format!("{}", i)),
-            Value::F32(f) => GenRef::Std(format!("{:?}", f)), // {:?} forces decimal point
-            Value::F64(f) => GenRef::Std(format!("{:?}", f)),
-            Value::Boolean(b) => GenRef::Std(format!("{}", b)),
-            Value::U8(u) => GenRef::Std(format!("{}", u)),
-            Value::U16(u) => GenRef::Std(format!("{}", u)),
-            Value::U32(u) => GenRef::Std(format!("{}", u)),
-            Value::U64(u) => GenRef::Std(format!("{}", u)),
-            Value::U128(u) => GenRef::Std(format!("{}", u)),
+            Value::I8(i) => GenRef::Std(format!("{i}")),
+            Value::I16(i) => GenRef::Std(format!("{i}")),
+            Value::I32(i) => GenRef::Std(format!("{i}")),
+            Value::I64(i) => GenRef::Std(format!("{i}")),
+            Value::F32(f) => GenRef::Std(format!("{f:?}")), // {:?} forces decimal point
+            Value::F64(f) => GenRef::Std(format!("{f:?}")),
+            Value::Boolean(b) => GenRef::Std(format!("{b}")),
+            Value::U8(u) => GenRef::Std(format!("{u}")),
+            Value::U16(u) => GenRef::Std(format!("{u}")),
+            Value::U32(u) => GenRef::Std(format!("{u}")),
+            Value::U64(u) => GenRef::Std(format!("{u}")),
+            Value::U128(u) => GenRef::Std(format!("{u}")),
             Value::Array(_a) => unimplemented!(),
             Value::Object(_o) => unimplemented!(),
             Value::Empty => GenRef::Literal("".to_string()),

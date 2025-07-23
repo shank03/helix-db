@@ -82,7 +82,7 @@ impl Traversable for TraversalVal {
             TraversalVal::Value(_) => unreachable!(),
             TraversalVal::Empty => 0,
             t => {
-                println!("invalid traversal value {:?}", t);
+                println!("invalid traversal value {t:?}");
                 panic!("Invalid traversal value")
             }
         }
@@ -110,9 +110,7 @@ impl Traversable for TraversalVal {
             TraversalVal::Node(node) => node.check_property(prop),
             TraversalVal::Edge(edge) => edge.check_property(prop),
             TraversalVal::Vector(vector) => vector.check_property(prop),
-            _ => Err(GraphError::ConversionError(format!(
-                "Invalid traversal value"
-            ))),
+            _ => Err(GraphError::ConversionError("Invalid traversal value".to_string())),
         }
     }
 }
@@ -134,9 +132,7 @@ impl Traversable for Vec<TraversalVal> {
 
     fn check_property(&self, prop: &str) -> Result<Cow<'_,Value>, GraphError> {
         if self.is_empty() {
-            return Err(GraphError::ConversionError(format!(
-                "Invalid traversal value"
-            )));
+            return Err(GraphError::ConversionError("Invalid traversal value".to_string()));
         }
         self[0].check_property(prop)
     }

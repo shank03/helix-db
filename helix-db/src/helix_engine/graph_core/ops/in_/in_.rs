@@ -36,10 +36,10 @@ impl<'a> Iterator for InNodesIterator<'a, RoTxn<'a>> {
         while let Some(Ok((_, data))) = self.iter.next() {
             match data.decode() {
                 Ok(data) => {
-                    let (_, node_id) = match HelixGraphStorage::unpack_adj_edge_data(&data) {
+                    let (_, node_id) = match HelixGraphStorage::unpack_adj_edge_data(data) {
                         Ok(data) => data,
                         Err(e) => {
-                            println!("Error unpacking edge data: {:?}", e);
+                            println!("Error unpacking edge data: {e:?}");
                             return Some(Err(e));
                         }
                     };
@@ -57,7 +57,7 @@ impl<'a> Iterator for InNodesIterator<'a, RoTxn<'a>> {
                     }
                 }
                 Err(e) => {
-                    println!("Error decoding edge data: {:?}", e);
+                    println!("Error decoding edge data: {e:?}");
                     return Some(Err(GraphError::DecodeError(e.to_string())));
                 }
             }
@@ -116,7 +116,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> InAdapter<'a
                     }),
                     Ok(None) => None,
                     Err(e) => {
-                        println!("Error getting in edges: {:?}", e);
+                        println!("Error getting in edges: {e:?}");
                         // return Err(e);
                         None
                     }

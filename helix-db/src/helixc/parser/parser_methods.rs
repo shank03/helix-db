@@ -15,9 +15,9 @@ pub enum ParserError {
 impl fmt::Display for ParserError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ParserError::ParseError(e) => write!(f, "Parse error: {}", e),
-            ParserError::LexError(e) => write!(f, "Lex error: {}", e),
-            ParserError::ParamDoesNotMatchSchema(p) => write!(f, "Parameter with name: {} does not exist in the schema", p),
+            ParserError::ParseError(e) => write!(f, "Parse error: {e}"),
+            ParserError::LexError(e) => write!(f, "Lex error: {e}"),
+            ParserError::ParamDoesNotMatchSchema(p) => write!(f, "Parameter with name: {p} does not exist in the schema"),
         }
     }
 }
@@ -44,9 +44,9 @@ impl From<&'static str> for ParserError {
 impl std::fmt::Debug for ParserError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ParserError::ParseError(e) => write!(f, "Parse error: {}", e),
-            ParserError::LexError(e) => write!(f, "Lex error: {}", e),
-            ParserError::ParamDoesNotMatchSchema(p) => write!(f, "Parameter with name: {} does not exist in the schema", p),
+            ParserError::ParseError(e) => write!(f, "Parse error: {e}"),
+            ParserError::LexError(e) => write!(f, "Lex error: {e}"),
+            ParserError::ParamDoesNotMatchSchema(p) => write!(f, "Parameter with name: {p} does not exist in the schema"),
         }
     }
 }

@@ -10,7 +10,7 @@ use crate::{
             types::Type,
             utils::{
                 FieldLookup, Variable, VariableAccess, gen_property_access, is_valid_identifier,
-             validate_field_name_existence_for_item_type,
+                validate_field_name_existence_for_item_type,
             },
         },
         generator::{
@@ -49,9 +49,9 @@ use std::{borrow::Cow, collections::HashMap};
 pub(crate) fn validate_object<'a>(
     ctx: &mut Ctx<'a>,
     cur_ty: &Type,
-    tr: &Traversal,
+    _tr: &Traversal,
     obj: &'a Object,
-    excluded: &HashMap<&str, Loc>,
+    _excluded: &HashMap<&str, Loc>,
     original_query: &'a Query,
     gen_traversal: &mut GeneratedTraversal,
     gen_query: &mut GeneratedQuery,
@@ -102,9 +102,9 @@ pub(crate) fn validate_object<'a>(
             validate_object(
                 ctx,
                 ty,
-                tr,
+                _tr,
                 obj,
-                excluded,
+                _excluded,
                 original_query,
                 gen_traversal,
                 gen_query,
@@ -160,7 +160,7 @@ pub(crate) fn parse_object_remapping<'a>(
                 let mut inner_traversal = GeneratedTraversal::default();
                 validate_traversal(
                     ctx,
-                    &traversal,
+                    traversal,
                     scope,
                     original_query,
                     Some(parent_ty.clone()),
@@ -169,7 +169,7 @@ pub(crate) fn parse_object_remapping<'a>(
                 );
                 match &traversal.start {
                     StartNode::Identifier(name) => {
-                        if name.to_string() == closure_variable.get_variable_name() {
+                        if *name == closure_variable.get_variable_name() {
                             inner_traversal.traversal_type = TraversalType::NestedFrom(
                                 GenRef::Std(closure_variable.get_variable_name()),
                             );
@@ -224,7 +224,7 @@ pub(crate) fn parse_object_remapping<'a>(
                     let mut inner_traversal = GeneratedTraversal::default();
                     validate_traversal(
                         ctx,
-                        &traversal,
+                        traversal,
                         scope,
                         original_query,
                         Some(parent_ty.clone()),
@@ -233,7 +233,7 @@ pub(crate) fn parse_object_remapping<'a>(
                     );
                     match &traversal.start {
                         StartNode::Identifier(name) => {
-                            if name.to_string() == closure_variable.get_variable_name() {
+                            if *name == closure_variable.get_variable_name() {
                                 inner_traversal.traversal_type = TraversalType::NestedFrom(
                                     GenRef::Std(closure_variable.get_variable_name()),
                                 );
@@ -460,7 +460,7 @@ pub(crate) fn parse_object_remapping<'a>(
             FieldValueType::Fields(fields) => {
                 let remapping = parse_object_remapping(
                     ctx,
-                    &fields,
+                    fields,
                     original_query,
                     gen_query,
                     true,
@@ -555,7 +555,7 @@ fn validate_property_access<'a>(
                     }
                     _ => unreachable!(),
                 }
-            } else if obj.fields.len() > 0 {
+            } else if !obj.fields.is_empty() {
                 // if there are multiple fields then it is a field remapping
                 // push object remapping where
                 let remapping = match closure_variable {

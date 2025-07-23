@@ -32,10 +32,10 @@ impl<'a> Iterator for OutEdgesIterator<'a, RoTxn<'a>> {
         while let Some(Ok((_, data))) = self.iter.next() {
             match data.decode() {
                 Ok(data) => {
-                    let (edge_id, _) = match HelixGraphStorage::unpack_adj_edge_data(&data) {
+                    let (edge_id, _) = match HelixGraphStorage::unpack_adj_edge_data(data) {
                         Ok(data) => data,
                         Err(e) => {
-                            println!("Error unpacking edge data: {:?}", e);
+                            println!("Error unpacking edge data: {e:?}");
                             return Some(Err(e));
                         }
                     };
@@ -44,7 +44,7 @@ impl<'a> Iterator for OutEdgesIterator<'a, RoTxn<'a>> {
                     }
                 }
                 Err(e) => {
-                    println!("Error decoding edge data: {:?}", e);
+                    println!("Error decoding edge data: {e:?}");
                     return Some(Err(GraphError::DecodeError(e.to_string())));
                 }
             }

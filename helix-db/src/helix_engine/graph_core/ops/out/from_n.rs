@@ -27,7 +27,7 @@ where
                     match self.storage.get_node(self.txn, &item.from_node) {
                         Ok(node) => node,
                         Err(e) => {
-                            println!("Error getting node: {:?}", e);
+                            println!("Error getting node: {e:?}");
                             return Some(Err(e));
                         }
                     },

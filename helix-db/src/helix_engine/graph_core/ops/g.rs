@@ -63,7 +63,7 @@ impl G {
         items: T,
     ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>> {
         RoTraversalIterator {
-            inner: items.into().into_iter().map(|val| Ok(val)),
+            inner: items.into().into_iter().map(Ok),
             storage,
             txn,
         }
@@ -120,10 +120,9 @@ impl G {
     ) -> RwTraversalIterator<'scope, 'env, impl Iterator<Item = Result<TraversalVal, GraphError>>>
     {
         RwTraversalIterator {
-            inner: vals.into_iter().map(|val| Ok(val)),
+            inner: vals.into_iter().map(Ok),
             storage,
             txn,
         }
     }
 }
-

@@ -71,6 +71,14 @@ impl Format {
             )),
         }
     }
+
+    /// Deserialize the provided value
+    pub fn deserialize_owned<'a, T: Deserialize<'a>>(self, val: &'a [u8]) -> Result<T, GraphError> {
+        match self {
+            Format::Json => Ok(sonic_rs::from_slice::<T>(val)
+                .map_err(|e| GraphError::DecodeError(e.to_string()))?),
+        }
+    }
 }
 
 impl FromStr for Format {
@@ -104,8 +112,8 @@ impl<'a, T> Deref for MaybeOwned<'a, T> {
 
     fn deref(&self) -> &Self::Target {
         match self {
-            MaybeOwned::Owned(v) => &v,
-            MaybeOwned::Borrowed(v) => *v,
+            MaybeOwned::Owned(v) => v,
+            MaybeOwned::Borrowed(v) => v,
         }
     }
 }

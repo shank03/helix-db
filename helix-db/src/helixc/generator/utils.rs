@@ -27,18 +27,18 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            GenRef::Literal(t) => write!(f, "\"{}\"", t),
-            GenRef::Std(t) => write!(f, "{}", t),
-            GenRef::Mut(t) => write!(f, "mut {}", t),
-            GenRef::Ref(t) => write!(f, "&{}", t),
-            GenRef::RefLT(lifetime_name, t) => write!(f, "&'{} {}", lifetime_name, t),
-            GenRef::DeRef(t) => write!(f, "*{}", t),
-            GenRef::MutRef(t) => write!(f, "& mut {}", t),
-            GenRef::MutRefLT(lifetime_name, t) => write!(f, "&'{} mut {}", lifetime_name, t),
-            GenRef::MutDeRef(t) => write!(f, "mut *{}", t),
-            GenRef::RefLiteral(t) => write!(f, "ref {}", t),
+            GenRef::Literal(t) => write!(f, "\"{t}\""),
+            GenRef::Std(t) => write!(f, "{t}"),
+            GenRef::Mut(t) => write!(f, "mut {t}"),
+            GenRef::Ref(t) => write!(f, "&{t}"),
+            GenRef::RefLT(lifetime_name, t) => write!(f, "&'{lifetime_name} {t}"),
+            GenRef::DeRef(t) => write!(f, "*{t}"),
+            GenRef::MutRef(t) => write!(f, "& mut {t}"),
+            GenRef::MutRefLT(lifetime_name, t) => write!(f, "&'{lifetime_name} mut {t}"),
+            GenRef::MutDeRef(t) => write!(f, "mut *{t}"),
+            GenRef::RefLiteral(t) => write!(f, "ref {t}"),
             GenRef::Unknown => write!(f, ""),
-            GenRef::Id(id) => write!(f, "data.{}", id),
+            GenRef::Id(id) => write!(f, "data.{id}"),
         }
     }
 }
@@ -70,29 +70,29 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            GenRef::Literal(t) => write!(f, "Literal({})", t),
-            GenRef::Std(t) => write!(f, "Std({})", t),
-            GenRef::Mut(t) => write!(f, "Mut({})", t),
-            GenRef::Ref(t) => write!(f, "Ref({})", t),
-            GenRef::RefLT(lifetime_name, t) => write!(f, "RefLT({}, {})", lifetime_name, t),
-            GenRef::DeRef(t) => write!(f, "DeRef({})", t),
-            GenRef::MutRef(t) => write!(f, "MutRef({})", t),
-            GenRef::MutRefLT(lifetime_name, t) => write!(f, "MutRefLT({}, {})", lifetime_name, t),
-            GenRef::MutDeRef(t) => write!(f, "MutDeRef({})", t),
-            GenRef::RefLiteral(t) => write!(f, "RefLiteral({})", t),
+            GenRef::Literal(t) => write!(f, "Literal({t})"),
+            GenRef::Std(t) => write!(f, "Std({t})"),
+            GenRef::Mut(t) => write!(f, "Mut({t})"),
+            GenRef::Ref(t) => write!(f, "Ref({t})"),
+            GenRef::RefLT(lifetime_name, t) => write!(f, "RefLT({lifetime_name}, {t})"),
+            GenRef::DeRef(t) => write!(f, "DeRef({t})"),
+            GenRef::MutRef(t) => write!(f, "MutRef({t})"),
+            GenRef::MutRefLT(lifetime_name, t) => write!(f, "MutRefLT({lifetime_name}, {t})"),
+            GenRef::MutDeRef(t) => write!(f, "MutDeRef({t})"),
+            GenRef::RefLiteral(t) => write!(f, "RefLiteral({t})"),
             GenRef::Unknown => write!(f, "Unknown"),
-            GenRef::Id(id) => write!(f, "String({})", id),
+            GenRef::Id(id) => write!(f, "String({id})"),
         }
     }
 }
 impl From<GenRef<String>> for String {
     fn from(value: GenRef<String>) -> Self {
         match value {
-            GenRef::Literal(s) => format!("\"{}\"", s),
-            GenRef::Std(s) => format!("\"{}\"", s),
-            GenRef::Ref(s) => format!("\"{}\"", s),
+            GenRef::Literal(s) => format!("\"{s}\""),
+            GenRef::Std(s) => format!("\"{s}\""),
+            GenRef::Ref(s) => format!("\"{s}\""),
             _ => {
-                println!("Cannot convert to string: {:?}", value);
+                println!("Cannot convert to string: {value:?}");
                 panic!("Cannot convert to string")
             }
         }
@@ -103,7 +103,7 @@ impl From<IdType> for GenRef<String> {
         match value {
             IdType::Literal { value: s, .. } => GenRef::Literal(s),
             IdType::Identifier { value: s, .. } => GenRef::Id(s),
-            _ => panic!("Cannot convert to string: {:?}", value),
+            _ => panic!("Cannot convert to string: {value:?}"),
         }
     }
 }
@@ -118,8 +118,8 @@ pub enum VecData {
 impl Display for VecData {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            VecData::Standard(v) => write!(f, "{}", v),
-            VecData::Embed(v) => write!(f, "&embed!(db, {})", v),
+            VecData::Standard(v) => write!(f, "{v}"),
+            VecData::Embed(v) => write!(f, "&embed!(db, {v})"),
             VecData::Unknown => panic!("Cannot convert to string, VecData is unknown"),
         }
     }
@@ -146,7 +146,7 @@ pub fn write_properties(properties: &Option<Vec<(String, GeneratedValue)>>) -> S
             "Some(props! {{ {} }})",
             properties
                 .iter()
-                .map(|(name, value)| format!("\"{}\" => {}", name, value))
+                .map(|(name, value)| format!("\"{name}\" => {value}"))
                 .collect::<Vec<String>>()
                 .join(", ")
         ),
@@ -160,7 +160,7 @@ pub fn write_secondary_indices(secondary_indices: &Option<Vec<String>>) -> Strin
             "Some(&[{}])",
             indices
                 .iter()
-                .map(|idx| format!("\"{}\"", idx))
+                .map(|idx| format!("\"{idx}\""))
                 .collect::<Vec<String>>()
                 .join(", ")
         ),
@@ -192,10 +192,10 @@ impl GeneratedValue {
 impl Display for GeneratedValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            GeneratedValue::Literal(value) => write!(f, "{}", value),
-            GeneratedValue::Primitive(value) => write!(f, "{}", value),
-            GeneratedValue::Identifier(value) => write!(f, "{}", value),
-            GeneratedValue::Parameter(value) => write!(f, "{}", value),
+            GeneratedValue::Literal(value) => write!(f, "{value}"),
+            GeneratedValue::Primitive(value) => write!(f, "{value}"),
+            GeneratedValue::Identifier(value) => write!(f, "{value}"),
+            GeneratedValue::Parameter(value) => write!(f, "{value}"),
             GeneratedValue::Unknown => write!(f, ""),
         }
     }
@@ -203,10 +203,10 @@ impl Display for GeneratedValue {
 impl Debug for GeneratedValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            GeneratedValue::Literal(value) => write!(f, "Literal({})", value),
-            GeneratedValue::Primitive(value) => write!(f, "Primitive({})", value),
-            GeneratedValue::Identifier(value) => write!(f, "Identifier({})", value),
-            GeneratedValue::Parameter(value) => write!(f, "Parameter({})", value),
+            GeneratedValue::Literal(value) => write!(f, "Literal({value})"),
+            GeneratedValue::Primitive(value) => write!(f, "Primitive({value})"),
+            GeneratedValue::Identifier(value) => write!(f, "Identifier({value})"),
+            GeneratedValue::Parameter(value) => write!(f, "Parameter({value})"),
             GeneratedValue::Unknown => write!(f, "Unknown"),
         }
     }
@@ -223,10 +223,10 @@ pub enum GeneratedType {
 impl Display for GeneratedType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            GeneratedType::RustType(t) => write!(f, "{}", t),
-            GeneratedType::Vec(t) => write!(f, "Vec<{}>", t),
-            GeneratedType::Variable(v) => write!(f, "{}", v),
-            GeneratedType::Object(o) => write!(f, "{}", o),
+            GeneratedType::RustType(t) => write!(f, "{t}"),
+            GeneratedType::Vec(t) => write!(f, "Vec<{t}>"),
+            GeneratedType::Variable(v) => write!(f, "{v}"),
+            GeneratedType::Object(o) => write!(f, "{o}"),
         }
     }
 }
@@ -304,11 +304,11 @@ pub enum Separator<T> {
 impl<T: Display> Display for Separator<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Separator::Comma(t) => write!(f, ",\n{}", t),
-            Separator::Semicolon(t) => write!(f, ";\n{}", t),
-            Separator::Period(t) => write!(f, "\n.{}", t),
-            Separator::Newline(t) => write!(f, "\n{}", t),
-            Separator::Empty(t) => write!(f, "{}", t),
+            Separator::Comma(t) => write!(f, ",\n{t}"),
+            Separator::Semicolon(t) => write!(f, ";\n{t}"),
+            Separator::Period(t) => write!(f, "\n.{t}"),
+            Separator::Newline(t) => write!(f, "\n{t}"),
+            Separator::Empty(t) => write!(f, "{t}"),
         }
     }
 }

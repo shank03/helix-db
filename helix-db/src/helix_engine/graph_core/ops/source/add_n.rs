@@ -59,13 +59,13 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddNAdapter<'
                     result = Err(GraphError::from(e));
                 }
             }
-            Err(e) => result = Err(GraphError::from(e)),
+            Err(e) => result = Err(e),
         }
 
         for index in secondary_indices {
             match self.storage.secondary_indices.get(index) {
                 Some(db) => {
-                    let key = match node.check_property(&index) {
+                    let key = match node.check_property(index) {
                         Ok(value) => value,
                         Err(e) => {
                             result = Err(e);
@@ -87,8 +87,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddNAdapter<'
                 }
                 None => {
                     result = Err(GraphError::New(format!(
-                        "Secondary Index {} not found",
-                        index
+                        "Secondary Index {index} not found"
                     )));
                 }
             }
@@ -99,7 +98,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddNAdapter<'
                 let mut data = props.flatten_bm25();
                 data.push_str(&node.label);
                 if let Err(e) = bm25.insert_doc(self.txn, node.id, &data) {
-                    result = Err(GraphError::from(e));
+                    result = Err(e);
                 }
             }
         }
@@ -107,9 +106,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddNAdapter<'
         if result.is_ok() {
             result = Ok(TraversalVal::Node(node.clone()));
         } else {
-            result = Err(GraphError::New(format!(
-                "Failed to add node to secondary indices"
-            )));
+            result = Err(GraphError::New("Failed to add node to secondary indices".to_string()));
         }
 
         RwTraversalIterator {
