@@ -31,8 +31,6 @@ jobs:
           
     - name: Run tests
       run: | 
-        cd helix-db
-        pwd
-        ls -al
         sh clippy_check.sh
+        cd helix-db
         cargo test --release helix_engine
