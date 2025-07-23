@@ -157,16 +157,15 @@ pub(crate) fn infer_expr_type<'a>(
                                         original_query,
                                         loc.clone(),
                                         value.as_str(),
-                                    ) {
-                                        if !scope.contains_key(value.as_str()) {
-                                            generate_error!(
-                                                ctx,
-                                                original_query,
-                                                loc.clone(),
-                                                E301,
-                                                value.as_str()
-                                            );
-                                        }
+                                    ) && !scope.contains_key(value.as_str())
+                                    {
+                                        generate_error!(
+                                            ctx,
+                                            original_query,
+                                            loc.clone(),
+                                            E301,
+                                            value.as_str()
+                                        );
                                     };
                                 }
                                 ValueType::Literal { value, loc } => {
@@ -306,7 +305,7 @@ pub(crate) fn infer_expr_type<'a>(
                 ["node"],
                 ["node"]
             );
-            return (Type::Node(None), None);
+            (Type::Node(None), None)
         }
         AddEdge(add) => {
             if let Some(ref ty) = add.edge_type {
@@ -340,16 +339,15 @@ pub(crate) fn infer_expr_type<'a>(
                                             original_query,
                                             loc.clone(),
                                             value.as_str(),
-                                        ) {
-                                            if !scope.contains_key(value.as_str()) {
-                                                generate_error!(
-                                                    ctx,
-                                                    original_query,
-                                                    loc.clone(),
-                                                    E301,
-                                                    value.as_str()
-                                                );
-                                            }
+                                        ) && !scope.contains_key(value.as_str())
+                                        {
+                                            generate_error!(
+                                                ctx,
+                                                original_query,
+                                                loc.clone(),
+                                                E301,
+                                                value.as_str()
+                                            );
                                         };
                                     }
                                     ValueType::Literal { value, loc } => {
@@ -536,16 +534,15 @@ pub(crate) fn infer_expr_type<'a>(
                                             original_query,
                                             loc.clone(),
                                             value.as_str(),
-                                        ) {
-                                            if !scope.contains_key(value.as_str()) {
-                                                generate_error!(
-                                                    ctx,
-                                                    original_query,
-                                                    loc.clone(),
-                                                    E301,
-                                                    value.as_str()
-                                                );
-                                            }
+                                        ) && !scope.contains_key(value.as_str())
+                                        {
+                                            generate_error!(
+                                                ctx,
+                                                original_query,
+                                                loc.clone(),
+                                                E301,
+                                                value.as_str()
+                                            );
                                         };
                                     }
                                     ValueType::Literal { value, loc } => {
@@ -789,12 +786,7 @@ pub(crate) fn infer_expr_type<'a>(
                     }
                     EvaluatesToNumberType::Identifier(i) => {
                         is_valid_identifier(ctx, original_query, sv.loc.clone(), i.as_str());
-                        // is param
-                        if let Some(_) = original_query.parameters.iter().find(|p| p.name.1 == *i) {
-                            GeneratedValue::Identifier(GenRef::Std(format!("data.{} as usize", i)))
-                        } else {
-                            GeneratedValue::Identifier(GenRef::Std(i.to_string()))
-                        }
+                        gen_identifier_or_param(original_query, i, true, false)
                     }
                     _ => {
                         generate_error!(
@@ -994,10 +986,10 @@ pub(crate) fn infer_expr_type<'a>(
                         i.as_str(),
                     );
 
-                    if let Some(_) = original_query.parameters.iter().find(|p| p.name.1 == *i) {
-                        GeneratedValue::Identifier(GenRef::Ref(format!("data.{}", i.to_string())))
-                    } else if let Some(_) = scope.get(i.as_str()) {
-                        GeneratedValue::Identifier(GenRef::Ref(i.to_string()))
+                    if original_query.parameters.iter().any(|p| p.name.1 == *i)
+                        || scope.get(i.as_str()).is_some()
+                    {
+                        gen_identifier_or_param(original_query, i, true, false)
                     } else {
                         generate_error!(
                             ctx,
@@ -1058,12 +1050,7 @@ pub(crate) fn infer_expr_type<'a>(
                             bm25_search.loc.clone(),
                             i.as_str(),
                         );
-                        // is param
-                        if let Some(_) = original_query.parameters.iter().find(|p| p.name.1 == *i) {
-                            GeneratedValue::Identifier(GenRef::Std(format!("data.{} as usize", i)))
-                        } else {
-                            GeneratedValue::Identifier(GenRef::Std(i.to_string()))
-                        }
+                        gen_identifier_or_param(original_query, i, true, false)
                     }
                     _ => {
                         generate_error!(
@@ -1105,7 +1092,7 @@ pub(crate) fn infer_expr_type<'a>(
             )
         }
         _ => {
-            println!("Unknown expression: {:?}", expr);
+            println!("Unknown expression: {expr:?}");
             todo!()
         }
     }

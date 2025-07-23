@@ -24,7 +24,7 @@ impl Serialize for Remapping {
 impl Remapping {
     pub fn new(exclude: bool, new_name: Option<String>, return_value: Option<ReturnValue>) -> Self {
         assert!(
-            !exclude || (!new_name.is_some() || !return_value.is_some()),
+            !exclude || (new_name.is_none() || return_value.is_none()),
             "Cannot have both exclude and new_name set"
         );
         Self {
@@ -65,6 +65,12 @@ impl ResponseRemapping {
 
 pub struct RemappingMap {
     pub remappings: RefCell<HashMap<u128, ResponseRemapping>>,
+}
+
+impl Default for RemappingMap {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl RemappingMap {

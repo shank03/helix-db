@@ -28,7 +28,7 @@ where
                     match self.storage.get_vector(self.txn, &item.to_node) {
                         Ok(vector) => vector,
                         Err(e) => {
-                            println!("Error getting vector: {:?}", e);
+                            println!("Error getting vector: {e:?}");
                             return Some(Err(e));
                         }
                     },

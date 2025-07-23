@@ -5,13 +5,9 @@ pub struct Count {
     value: usize,
 }
 
-
-
 impl Count {
     pub fn new(value: usize) -> Count {
-        Count {
-            value
-        }
+        Count { value }
     }
 
     pub fn gt(&self, cmp: usize) -> bool {
@@ -28,10 +24,6 @@ impl Count {
 
     pub fn lte(&self, cmp: usize) -> bool {
         self.value <= cmp
-    }
-
-    pub fn eq(&self, cmp: usize) -> bool {
-        self.value == cmp
     }
 
     pub fn neq(&self, cmp: usize) -> bool {
@@ -53,9 +45,6 @@ impl std::cmp::PartialEq<usize> for Count {
     fn eq(&self, other: &usize) -> bool {
         &self.value == other
     }
-    fn ne(&self, other: &usize) -> bool {
-       &self.value != other
-    }
 }
 
 impl std::cmp::PartialOrd<usize> for Count {
@@ -66,7 +55,7 @@ impl std::cmp::PartialOrd<usize> for Count {
 
 impl PartialOrd for Count {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.value.partial_cmp(&other.value)
+        Some(self.cmp(other))
     }
 }
 
@@ -84,7 +73,7 @@ impl From<Count> for usize {
     }
 }
 
-impl From<usize> for Count { 
+impl From<usize> for Count {
     fn from(value: usize) -> Self {
         Count::new(value)
     }

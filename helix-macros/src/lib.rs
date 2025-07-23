@@ -30,7 +30,7 @@ pub fn handler(args: TokenStream, item: TokenStream) -> TokenStream {
     let fn_name_str = fn_name.to_string();
     let vis = &input_fn.vis;
     let sig = &input_fn.sig;
-    println!("fn_name_str: {}", fn_name_str);
+    println!("fn_name_str: {fn_name_str}");
     // Create a unique static name for each handler
     let static_name = quote::format_ident!(
         "_MAIN_HANDLER_REGISTRATION_{}",

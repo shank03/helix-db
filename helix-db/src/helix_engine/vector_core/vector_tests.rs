@@ -70,7 +70,7 @@ fn test_hvector_distance_different_dimensions() {
     let v1 = HVector::new(vec![1.0, 2.0, 3.0]);
     let v2 = HVector::new(vec![1.0, 2.0, 3.0, 4.0]);
     let distance = v1.distance_to(&v2).unwrap();
-    println!("distance: {}", distance);
+    println!("distance: {distance}");
     assert!(distance.is_finite());
 }
 

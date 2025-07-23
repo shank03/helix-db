@@ -46,8 +46,7 @@ impl Node {
                 properties: node.properties,
             }),
             Err(e) => Err(GraphError::ConversionError(format!(
-                "Error deserializing node: {}",
-                e
+                "Error deserializing node: {e}"
             ))),
         }
     }
@@ -57,7 +56,7 @@ impl Node {
     /// This skips the ID and if the properties are None, it skips the properties.
     pub fn encode_node(&self) -> Result<Vec<u8>, GraphError> {
         bincode::serialize(&self)
-            .map_err(|e| GraphError::ConversionError(format!("Error serializing node: {}", e)))
+            .map_err(|e| GraphError::ConversionError(format!("Error serializing node: {e}")))
     }
 }
 
@@ -67,7 +66,7 @@ impl std::fmt::Display for Node {
         write!(
             f,
             "{{ id: {}, label: {}, properties: {:?} }}",
-            uuid::Uuid::from_u128(self.id).to_string(),
+            uuid::Uuid::from_u128(self.id),
             self.label,
             self.properties
         )
@@ -78,7 +77,7 @@ impl std::fmt::Debug for Node {
         write!(
             f,
             "{{ \nid:{},\nlabel:{},\nproperties:{:#?} }}",
-            uuid::Uuid::from_u128(self.id).to_string(),
+            uuid::Uuid::from_u128(self.id),
             self.label,
             self.properties
         )
@@ -139,8 +138,7 @@ impl Edge {
                 properties: edge.properties,
             }),
             Err(e) => Err(GraphError::ConversionError(format!(
-                "Error deserializing edge: {}",
-                e
+                "Error deserializing edge: {e}"
             ))),
         }
     }
@@ -150,7 +148,7 @@ impl Edge {
     /// This skips the ID and if the properties are None, it skips the properties.
     pub fn encode_edge(&self) -> Result<Vec<u8>, GraphError> {
         bincode::serialize(self)
-            .map_err(|e| GraphError::ConversionError(format!("Error serializing edge: {}", e)))
+            .map_err(|e| GraphError::ConversionError(format!("Error serializing edge: {e}")))
     }
 }
 
@@ -161,10 +159,10 @@ impl std::fmt::Display for Edge {
         write!(
             f,
             "{{ id: {}, label: {}, from_node: {}, to_node: {}, properties: {:?} }}",
-            uuid::Uuid::from_u128(self.id).to_string(),
+            uuid::Uuid::from_u128(self.id),
             self.label,
-            uuid::Uuid::from_u128(self.from_node).to_string(),
-            uuid::Uuid::from_u128(self.to_node).to_string(),
+            uuid::Uuid::from_u128(self.from_node),
+            uuid::Uuid::from_u128(self.to_node),
             self.properties
         )
     }
@@ -174,10 +172,10 @@ impl std::fmt::Debug for Edge {
         write!(
             f,
             "{{ \nid: {},\nlabel: {},\nfrom_node: {},\nto_node: {},\nproperties: {:#?} }}",
-            uuid::Uuid::from_u128(self.id).to_string(),
+            uuid::Uuid::from_u128(self.id),
             self.label,
-            uuid::Uuid::from_u128(self.from_node).to_string(),
-            uuid::Uuid::from_u128(self.to_node).to_string(),
+            uuid::Uuid::from_u128(self.from_node),
+            uuid::Uuid::from_u128(self.to_node),
             self.properties
         )
     }

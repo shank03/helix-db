@@ -1,10 +1,4 @@
-use super::helix_parser::{
-    HelixParser,
-    write_to_temp_file,
-    FieldType,
-    Content,
-    Source,
-};
+use super::helix_parser::{Content, FieldType, HelixParser, Source, write_to_temp_file};
 
 #[test]
 fn test_parse_node_schema() {
@@ -15,12 +9,12 @@ fn test_parse_node_schema() {
         }
         "#;
 
-        let input = write_to_temp_file(vec![input]);
-        let result = HelixParser::parse_source(&input).unwrap();
-        assert_eq!(result.node_schemas.len(), 1);
-        let schema = &result.node_schemas[0];
-        assert_eq!(schema.name.1, "User");
-        assert_eq!(schema.fields.len(), 2);
+    let input = write_to_temp_file(vec![input]);
+    let result = HelixParser::parse_source(&input).unwrap();
+    assert_eq!(result.node_schemas.len(), 1);
+    let schema = &result.node_schemas[0];
+    assert_eq!(schema.name.1, "User");
+    assert_eq!(schema.fields.len(), 2);
 }
 
 #[test]
@@ -36,18 +30,18 @@ fn test_parse_edge_schema() {
         }
         "#;
 
-        let input = write_to_temp_file(vec![input]);
-        let result = HelixParser::parse_source(&input).unwrap();
-        assert_eq!(result.edge_schemas.len(), 1);
-        let schema = &result.edge_schemas[0];
-        assert_eq!(schema.name.1, "Follows");
-        assert_eq!(schema.from.1, "User");
-        assert_eq!(schema.to.1, "User");
-        assert!(schema.properties.is_some());
-        let properties = schema.properties.as_ref().unwrap();
-        assert_eq!(properties.len(), 1);
-        assert_eq!(properties[0].name, "Since");
-        matches!(properties[0].field_type, FieldType::F64);
+    let input = write_to_temp_file(vec![input]);
+    let result = HelixParser::parse_source(&input).unwrap();
+    assert_eq!(result.edge_schemas.len(), 1);
+    let schema = &result.edge_schemas[0];
+    assert_eq!(schema.name.1, "Follows");
+    assert_eq!(schema.from.1, "User");
+    assert_eq!(schema.to.1, "User");
+    assert!(schema.properties.is_some());
+    let properties = schema.properties.as_ref().unwrap();
+    assert_eq!(properties.len(), 1);
+    assert_eq!(properties[0].name, "Since");
+    matches!(properties[0].field_type, FieldType::F64);
 }
 
 #[test]
@@ -61,20 +55,20 @@ fn test_parse_edge_schema_no_props() {
             }
         }
         "#;
-        let input = Content {
-            content: input.to_string(),
-            files: vec![],
-            source: Source::default(),
-        };
-        let result = HelixParser::parse_source(&input).unwrap();
-        assert_eq!(result.edge_schemas.len(), 1);
-        let schema = &result.edge_schemas[0];
-        assert_eq!(schema.name.1, "Follows");
-        assert_eq!(schema.from.1, "User");
-        assert_eq!(schema.to.1, "User");
-        assert!(schema.properties.is_some());
-        let properties = schema.properties.as_ref().unwrap();
-        assert_eq!(properties.len(), 0);
+    let input = Content {
+        content: input.to_string(),
+        files: vec![],
+        source: Source::default(),
+    };
+    let result = HelixParser::parse_source(&input).unwrap();
+    assert_eq!(result.edge_schemas.len(), 1);
+    let schema = &result.edge_schemas[0];
+    assert_eq!(schema.name.1, "Follows");
+    assert_eq!(schema.from.1, "User");
+    assert_eq!(schema.to.1, "User");
+    assert!(schema.properties.is_some());
+    let properties = schema.properties.as_ref().unwrap();
+    assert_eq!(properties.len(), 0);
 }
 
 #[test]
@@ -105,21 +99,21 @@ fn test_query_with_parameters() {
             ageField <- user::{Age}
             RETURN nameField, ageField
         "#;
-            let input = write_to_temp_file(vec![input]);
-            let result = HelixParser::parse_source(&input).unwrap();
-            assert_eq!(result.queries.len(), 1);
-            let query = &result.queries[0];
-            assert_eq!(query.name, "fetchUsers");
-            assert_eq!(query.parameters.len(), 2);
-            assert_eq!(query.parameters[0].name.1, "name");
-            assert!(matches!(
-                    query.parameters[0].param_type.1,
-                    FieldType::String
-            ));
-            assert_eq!(query.parameters[1].name.1, "age");
-            assert!(matches!(query.parameters[1].param_type.1, FieldType::I32));
-            assert_eq!(query.statements.len(), 3);
-            assert_eq!(query.return_values.len(), 2);
+    let input = write_to_temp_file(vec![input]);
+    let result = HelixParser::parse_source(&input).unwrap();
+    assert_eq!(result.queries.len(), 1);
+    let query = &result.queries[0];
+    assert_eq!(query.name, "fetchUsers");
+    assert_eq!(query.parameters.len(), 2);
+    assert_eq!(query.parameters[0].name.1, "name");
+    assert!(matches!(
+        query.parameters[0].param_type.1,
+        FieldType::String
+    ));
+    assert_eq!(query.parameters[1].name.1, "age");
+    assert!(matches!(query.parameters[1].param_type.1, FieldType::I32));
+    assert_eq!(query.statements.len(), 3);
+    assert_eq!(query.return_values.len(), 2);
 }
 
 #[test]
@@ -131,12 +125,12 @@ fn test_node_definition() {
             Age: I32
         }
         "#;
-        let input = write_to_temp_file(vec![input]);
-        let result = HelixParser::parse_source(&input).unwrap();
-        assert_eq!(result.node_schemas.len(), 1);
-        let schema = &result.node_schemas[0];
-        assert_eq!(schema.name.1, "USER");
-        assert_eq!(schema.fields.len(), 3);
+    let input = write_to_temp_file(vec![input]);
+    let result = HelixParser::parse_source(&input).unwrap();
+    assert_eq!(result.node_schemas.len(), 1);
+    let schema = &result.node_schemas[0];
+    assert_eq!(schema.name.1, "USER");
+    assert_eq!(schema.fields.len(), 3);
 }
 
 #[test]
@@ -151,15 +145,15 @@ fn test_edge_with_properties() {
             }
         }
         "#;
-        let input = write_to_temp_file(vec![input]);
-        let result = HelixParser::parse_source(&input).unwrap();
-        assert_eq!(result.edge_schemas.len(), 1);
-        let schema = &result.edge_schemas[0];
-        assert_eq!(schema.name.1, "FRIENDSHIP");
-        assert_eq!(schema.from.1, "USER");
-        assert_eq!(schema.to.1, "USER");
-        let props = schema.properties.as_ref().unwrap();
-        assert_eq!(props.len(), 2);
+    let input = write_to_temp_file(vec![input]);
+    let result = HelixParser::parse_source(&input).unwrap();
+    assert_eq!(result.edge_schemas.len(), 1);
+    let schema = &result.edge_schemas[0];
+    assert_eq!(schema.name.1, "FRIENDSHIP");
+    assert_eq!(schema.from.1, "USER");
+    assert_eq!(schema.to.1, "USER");
+    let props = schema.properties.as_ref().unwrap();
+    assert_eq!(props.len(), 2);
 }
 
 #[test]
@@ -182,10 +176,10 @@ fn test_multiple_schemas() {
             }
         }
         "#;
-        let input = write_to_temp_file(vec![input]);
-        let result = HelixParser::parse_source(&input).unwrap();
-        assert_eq!(result.node_schemas.len(), 2);
-        assert_eq!(result.edge_schemas.len(), 1);
+    let input = write_to_temp_file(vec![input]);
+    let result = HelixParser::parse_source(&input).unwrap();
+    assert_eq!(result.node_schemas.len(), 2);
+    assert_eq!(result.edge_schemas.len(), 1);
 }
 
 /// THESE FAIL
@@ -216,11 +210,11 @@ fn test_anonymous_traversal() {
         result <- N::OutE<FRIENDSHIP>::InN::{Age}
         RETURN result
     "#;
-        let input = write_to_temp_file(vec![input]);
-        let result = HelixParser::parse_source(&input).unwrap();
-        let query = &result.queries[0];
-        assert_eq!(query.name, "anonymousTraversal");
-        assert_eq!(query.statements.len(), 1);
+    let input = write_to_temp_file(vec![input]);
+    let result = HelixParser::parse_source(&input).unwrap();
+    let query = &result.queries[0];
+    assert_eq!(query.name, "anonymousTraversal");
+    assert_eq!(query.statements.len(), 1);
 }
 
 #[test]
@@ -271,11 +265,11 @@ fn test_multiple_return_values() {
         age <- user::{Age}
         RETURN name, age
     "#;
-        let input = write_to_temp_file(vec![input]);
-        let result = HelixParser::parse_source(&input).unwrap();
-        let query = &result.queries[0];
-        assert_eq!(query.statements.len(), 3);
-        assert_eq!(query.return_values.len(), 2);
+    let input = write_to_temp_file(vec![input]);
+    let result = HelixParser::parse_source(&input).unwrap();
+    let query = &result.queries[0];
+    assert_eq!(query.statements.len(), 3);
+    assert_eq!(query.return_values.len(), 2);
 }
 
 #[test]
@@ -286,10 +280,10 @@ fn test_add_fields() {
         enriched <- user::{Name: "name", Follows: _::Out<Follows>::{Age}}
         RETURN enriched
     "#;
-        let input = write_to_temp_file(vec![input]);
-        let result = HelixParser::parse_source(&input).unwrap();
-        let query = &result.queries[0];
-        assert_eq!(query.statements.len(), 2);
+    let input = write_to_temp_file(vec![input]);
+    let result = HelixParser::parse_source(&input).unwrap();
+    let query = &result.queries[0];
+    assert_eq!(query.statements.len(), 2);
 }
 
 #[test]
@@ -318,7 +312,7 @@ fn test_add_node_query() {
     let result = match HelixParser::parse_source(&input) {
         Ok(result) => result,
         Err(e) => {
-            println!("{:?}", e);
+            println!("{e:?}");
             panic!();
         }
     };
@@ -339,7 +333,7 @@ fn test_add_edge_query() {
     let result = match HelixParser::parse_source(&input) {
         Ok(result) => result,
         Err(e) => {
-            println!("{:?}", e);
+            println!("{e:?}");
             panic!();
         }
     };
@@ -361,7 +355,7 @@ fn test_adding_with_identifiers() {
     let result = match HelixParser::parse_source(&input) {
         Ok(result) => result,
         Err(e) => {
-            println!("{:?}", e);
+            println!("{e:?}");
             panic!();
         }
     };
@@ -440,12 +434,12 @@ fn test_complex_traversal_combinations() {
             }
             RETURN result1, result2, result3
         "#;
-            let input = write_to_temp_file(vec![input]);
-            let result = HelixParser::parse_source(&input).unwrap();
-            let query = &result.queries[0];
-            assert_eq!(query.name, "complexTraversal");
-            assert_eq!(query.statements.len(), 3);
-            assert_eq!(query.return_values.len(), 3);
+    let input = write_to_temp_file(vec![input]);
+    let result = HelixParser::parse_source(&input).unwrap();
+    let query = &result.queries[0];
+    assert_eq!(query.name, "complexTraversal");
+    assert_eq!(query.statements.len(), 3);
+    assert_eq!(query.return_values.len(), 3);
 }
 
 #[test]
@@ -466,10 +460,10 @@ fn test_nested_property_operations() {
             }
             RETURN result
         "#;
-            let input = write_to_temp_file(vec![input]);
-            let result = HelixParser::parse_source(&input).unwrap();
-            let query = &result.queries[0];
-            assert_eq!(query.statements.len(), 2);
+    let input = write_to_temp_file(vec![input]);
+    let result = HelixParser::parse_source(&input).unwrap();
+    let query = &result.queries[0];
+    assert_eq!(query.statements.len(), 2);
 }
 
 #[test]
@@ -504,11 +498,11 @@ fn test_mixed_type_operations() {
             ))
             RETURN v1, result
         "#;
-            let input = write_to_temp_file(vec![input]);
-            let result = HelixParser::parse_source(&input).unwrap();
-            let query = &result.queries[0];
-            assert_eq!(query.statements.len(), 2);
-            assert_eq!(query.return_values.len(), 2);
+    let input = write_to_temp_file(vec![input]);
+    let result = HelixParser::parse_source(&input).unwrap();
+    let query = &result.queries[0];
+    assert_eq!(query.statements.len(), 2);
+    assert_eq!(query.return_values.len(), 2);
 }
 
 #[test]
@@ -528,9 +522,9 @@ fn test_error_cases() {
             result <- N<User>::{}
             RETURN result
         "#;
-            let input = write_to_temp_file(vec![invalid_props]);
-            let result = HelixParser::parse_source(&input);
-            assert!(result.is_err());
+    let input = write_to_temp_file(vec![invalid_props]);
+    let result = HelixParser::parse_source(&input);
+    assert!(result.is_err());
 }
 
 #[test]
@@ -555,17 +549,17 @@ fn test_complex_schema_definitions() {
             }
         }
         "#;
-        let input = write_to_temp_file(vec![input]);
-        let result = HelixParser::parse_source(&input).unwrap();
-        assert_eq!(result.node_schemas.len(), 1);
-        assert_eq!(result.edge_schemas.len(), 1);
+    let input = write_to_temp_file(vec![input]);
+    let result = HelixParser::parse_source(&input).unwrap();
+    assert_eq!(result.node_schemas.len(), 1);
+    assert_eq!(result.edge_schemas.len(), 1);
 
-        let node = &result.node_schemas[0];
-        assert_eq!(node.fields.len(), 5);
+    let node = &result.node_schemas[0];
+    assert_eq!(node.fields.len(), 5);
 
-        let edge = &result.edge_schemas[0];
-        let props = edge.properties.as_ref().unwrap();
-        assert_eq!(props.len(), 5);
+    let edge = &result.edge_schemas[0];
+    let props = edge.properties.as_ref().unwrap();
+    assert_eq!(props.len(), 5);
 }
 
 #[test]
@@ -589,11 +583,11 @@ fn test_query_chaining() {
                 ::EQ("active")
             RETURN result, filtered, updated, has_updated
         "#;
-                let input = write_to_temp_file(vec![input]);
-                let result = HelixParser::parse_source(&input).unwrap();
-                let query = &result.queries[0];
-                assert_eq!(query.statements.len(), 4);
-                assert_eq!(query.return_values.len(), 4);
+    let input = write_to_temp_file(vec![input]);
+    let result = HelixParser::parse_source(&input).unwrap();
+    let query = &result.queries[0];
+    assert_eq!(query.statements.len(), 4);
+    assert_eq!(query.return_values.len(), 4);
 }
 
 #[test]
@@ -606,10 +600,10 @@ fn test_property_assignments() {
             })
             RETURN user
         "#;
-            let input = write_to_temp_file(vec![input]);
-            let result = HelixParser::parse_source(&input).unwrap();
-            let query = &result.queries[0];
-            assert_eq!(query.parameters.len(), 1);
+    let input = write_to_temp_file(vec![input]);
+    let result = HelixParser::parse_source(&input).unwrap();
+    let query = &result.queries[0];
+    assert_eq!(query.parameters.len(), 1);
 }
 
 #[test]
@@ -620,11 +614,11 @@ fn test_map_operation() {
             mapped <- user::{name: "name", age: "age"}
             RETURN mapped
         "#;
-            let input = write_to_temp_file(vec![input]);
-            let result = HelixParser::parse_source(&input).unwrap();
-            let query = &result.queries[0];
-            assert_eq!(query.statements.len(), 2);
-            assert_eq!(query.return_values.len(), 1);
+    let input = write_to_temp_file(vec![input]);
+    let result = HelixParser::parse_source(&input).unwrap();
+    let query = &result.queries[0];
+    assert_eq!(query.statements.len(), 2);
+    assert_eq!(query.return_values.len(), 1);
 }
 
 #[test]
@@ -637,11 +631,11 @@ fn test_map_in_return() {
                 age
             }
         "#;
-        let input = write_to_temp_file(vec![input]);
-        let result = HelixParser::parse_source(&input).unwrap();
-        let query = &result.queries[0];
-        assert_eq!(query.statements.len(), 1);
-        assert_eq!(query.return_values.len(), 1);
+    let input = write_to_temp_file(vec![input]);
+    let result = HelixParser::parse_source(&input).unwrap();
+    let query = &result.queries[0];
+    assert_eq!(query.statements.len(), 1);
+    assert_eq!(query.return_values.len(), 1);
 }
 
 #[test]
@@ -661,11 +655,11 @@ fn test_complex_object_operations() {
             }
             RETURN result
         "#;
-            let input = write_to_temp_file(vec![input]);
-            let result = HelixParser::parse_source(&input).unwrap();
-            let query = &result.queries[0];
-            assert_eq!(query.statements.len(), 2);
-            assert_eq!(query.return_values.len(), 1);
+    let input = write_to_temp_file(vec![input]);
+    let result = HelixParser::parse_source(&input).unwrap();
+    let query = &result.queries[0];
+    assert_eq!(query.statements.len(), 2);
+    assert_eq!(query.return_values.len(), 1);
 }
 
 #[test]
@@ -676,11 +670,11 @@ fn test_exclude_fields() {
             filtered <- user::!{password, secretKey}
             RETURN filtered
         "#;
-            let input = write_to_temp_file(vec![input]);
-            let result = HelixParser::parse_source(&input).unwrap();
-            let query = &result.queries[0];
-            assert_eq!(query.statements.len(), 2);
-            assert_eq!(query.return_values.len(), 1);
+    let input = write_to_temp_file(vec![input]);
+    let result = HelixParser::parse_source(&input).unwrap();
+    let query = &result.queries[0];
+    assert_eq!(query.statements.len(), 2);
+    assert_eq!(query.return_values.len(), 1);
 }
 
 #[test]
@@ -694,11 +688,11 @@ fn test_spread_operator() {
             }
             RETURN result
         "#;
-            let input = write_to_temp_file(vec![input]);
-            let result = HelixParser::parse_source(&input).unwrap();
-            let query = &result.queries[0];
-            assert_eq!(query.statements.len(), 2);
-            assert_eq!(query.return_values.len(), 1);
+    let input = write_to_temp_file(vec![input]);
+    let result = HelixParser::parse_source(&input).unwrap();
+    let query = &result.queries[0];
+    assert_eq!(query.statements.len(), 2);
+    assert_eq!(query.return_values.len(), 1);
 }
 
 #[test]
@@ -714,11 +708,11 @@ fn test_complex_update_operations() {
             })
             RETURN updated
         "#;
-            let input = write_to_temp_file(vec![input]);
-            let result = HelixParser::parse_source(&input).unwrap();
-            let query = &result.queries[0];
-            assert_eq!(query.statements.len(), 2);
-            assert_eq!(query.return_values.len(), 1);
+    let input = write_to_temp_file(vec![input]);
+    let result = HelixParser::parse_source(&input).unwrap();
+    let query = &result.queries[0];
+    assert_eq!(query.statements.len(), 2);
+    assert_eq!(query.return_values.len(), 1);
 }
 
 #[test]
@@ -730,11 +724,11 @@ fn test_nested_traversals() {
             filtered <- result::WHERE(_::{likes}::GT(10))
             RETURN filtered
         "#;
-            let input = write_to_temp_file(vec![input]);
-            let result = HelixParser::parse_source(&input).unwrap();
-            let query = &result.queries[0];
-            assert_eq!(query.statements.len(), 3);
-            assert_eq!(query.return_values.len(), 1);
+    let input = write_to_temp_file(vec![input]);
+    let result = HelixParser::parse_source(&input).unwrap();
+    let query = &result.queries[0];
+    assert_eq!(query.statements.len(), 3);
+    assert_eq!(query.return_values.len(), 1);
 }
 
 #[test]
@@ -754,11 +748,11 @@ fn test_combined_operations() {
             }
             RETURN result
         "#;
-            let input = write_to_temp_file(vec![input]);
-            let result = HelixParser::parse_source(&input).unwrap();
-            let query = &result.queries[0];
-            assert_eq!(query.statements.len(), 4);
-            assert_eq!(query.return_values.len(), 1);
+    let input = write_to_temp_file(vec![input]);
+    let result = HelixParser::parse_source(&input).unwrap();
+    let query = &result.queries[0];
+    assert_eq!(query.statements.len(), 4);
+    assert_eq!(query.return_values.len(), 1);
 }
 
 #[test]
@@ -772,12 +766,12 @@ fn test_closure() {
             }
             RETURN result
         "#;
-            let input = write_to_temp_file(vec![input]);
-            let result = HelixParser::parse_source(&input).unwrap();
-            // println!("\n\nresult: {:?}\n\n", result);
-            let query = &result.queries[0];
-            assert_eq!(query.statements.len(), 1);
-            assert_eq!(query.return_values.len(), 1);
+    let input = write_to_temp_file(vec![input]);
+    let result = HelixParser::parse_source(&input).unwrap();
+    // println!("\n\nresult: {:?}\n\n", result);
+    let query = &result.queries[0];
+    assert_eq!(query.statements.len(), 1);
+    assert_eq!(query.return_values.len(), 1);
 }
 
 #[test]
@@ -790,10 +784,10 @@ fn test_complex_return_traversal() {
                 }
             }::!{createdAt, lastUpdated}::{username: name, ..}
         "#;
-        let input = write_to_temp_file(vec![input]);
-        let result = HelixParser::parse_source(&input).unwrap();
-        let query = &result.queries[0];
-        assert_eq!(query.return_values.len(), 1);
+    let input = write_to_temp_file(vec![input]);
+    let result = HelixParser::parse_source(&input).unwrap();
+    let query = &result.queries[0];
+    assert_eq!(query.return_values.len(), 1);
 }
 
 #[test]
@@ -808,43 +802,36 @@ fn test_array_as_param_type() {
     let query = &result.queries[0];
     assert_eq!(query.return_values.len(), 1);
 
-    assert!(query
-        .parameters
-        .iter()
-        .any(|param| match param.param_type.1 {
-            FieldType::String => true,
-            _ => false,
-        }));
-    assert!(query
-        .parameters
-        .iter()
-        .any(|param| match param.param_type.1 {
-            FieldType::Array(ref field) => match &**field {
-                FieldType::String =>
-                    if param.name.1 == "names" || param.name.1 == "ids" {
-                        true
-                    } else {
-                        false
-                    },
-                        _ => false,
-            },
-            _ => false,
-        }));
-    assert!(query
-        .parameters
-        .iter()
-        .any(|param| match param.param_type.1 {
-            FieldType::Array(ref field) => match &**field {
-                FieldType::I32 =>
-                    if param.name.1 == "ages" {
-                        true
-                    } else {
-                        false
-                    },
-                        _ => false,
-            },
-            _ => false,
-        }))
+    assert!(
+        query
+            .parameters
+            .iter()
+            .any(|param| matches!(param.param_type.1, FieldType::String))
+    );
+    assert!(
+        query
+            .parameters
+            .iter()
+            .any(|param| match param.param_type.1 {
+                FieldType::Array(ref field) => match &**field {
+                    FieldType::String => param.name.1 == "names" || param.name.1 == "ids",
+                    _ => false,
+                },
+                _ => false,
+            })
+    );
+    assert!(
+        query
+            .parameters
+            .iter()
+            .any(|param| match param.param_type.1 {
+                FieldType::Array(ref field) => match &**field {
+                    FieldType::I32 => param.name.1 == "ages",
+                    _ => false,
+                },
+                _ => false,
+            })
+    )
 }
 
 #[test]
@@ -858,15 +845,15 @@ fn test_schema_obj_as_param_type() {
             AddN<User>({Name: "test"})
             RETURN "SUCCESS"
         "#;
-        let input = write_to_temp_file(vec![input]);
-        let result = HelixParser::parse_source(&input).unwrap();
-        let query = &result.queries[0];
-        assert_eq!(query.return_values.len(), 1);
+    let input = write_to_temp_file(vec![input]);
+    let result = HelixParser::parse_source(&input).unwrap();
+    let query = &result.queries[0];
+    assert_eq!(query.return_values.len(), 1);
 
-        // println!("{:?}", query.parameters);
-        let mut param_type = "";
-        assert!(
-            query
+    // println!("{:?}", query.parameters);
+    let mut param_type = "";
+    assert!(
+        query
             .parameters
             .iter()
             .any(|param| match param.param_type.1 {
@@ -879,9 +866,8 @@ fn test_schema_obj_as_param_type() {
                 },
                 _ => false,
             }),
-            "Param of type {} was not found",
-            param_type
-        );
+        "Param of type {param_type} was not found"
+    );
 }
 
 #[test]
@@ -924,4 +910,3 @@ fn test_search_vector() {
     let query = &result.queries[0];
     assert_eq!(query.return_values.len(), 1);
 }
-

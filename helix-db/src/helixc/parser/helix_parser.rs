@@ -49,7 +49,7 @@ impl Default for HelixParser {
 }
 
 // AST Structures
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Source {
     pub source: String,
     pub node_schemas: Vec<NodeSchema>,
@@ -58,17 +58,6 @@ pub struct Source {
     pub queries: Vec<Query>,
 }
 
-impl Default for Source {
-    fn default() -> Self {
-        Source {
-            source: String::new(),
-            node_schemas: Vec::new(),
-            edge_schemas: Vec::new(),
-            vector_schemas: Vec::new(),
-            queries: Vec::new(),
-        }
-    }
-}
 #[derive(Debug, Clone)]
 pub struct NodeSchema {
     pub name: (Loc, String),
@@ -133,10 +122,7 @@ pub enum FieldPrefix {
 }
 impl FieldPrefix {
     pub fn is_indexed(&self) -> bool {
-        match self {
-            FieldPrefix::Index => true,
-            _ => false,
-        }
+        matches!(self, FieldPrefix::Index)
     }
 }
 
@@ -219,12 +205,12 @@ impl Display for FieldType {
             FieldType::Boolean => write!(f, "Boolean"),
             FieldType::Uuid => write!(f, "ID"),
             FieldType::Date => write!(f, "Date"),
-            FieldType::Array(t) => write!(f, "Array({})", t),
-            FieldType::Identifier(s) => write!(f, "{}", s),
+            FieldType::Array(t) => write!(f, "Array({t})"),
+            FieldType::Identifier(s) => write!(f, "{s}"),
             FieldType::Object(m) => {
                 write!(f, "{{")?;
                 for (k, v) in m {
-                    write!(f, "{}: {}", k, v)?;
+                    write!(f, "{k}: {v}")?;
                 }
                 write!(f, "}}")
             } // FieldType::Closure(a, b) => write!(f, "Closure({})", a),
@@ -278,7 +264,7 @@ impl PartialEq<Value> for FieldType {
                 _ => false,
             },
             l => {
-                println!("l: {:?}", l);
+                println!("l: {l:?}");
                 false
             }
         }
@@ -377,21 +363,21 @@ pub enum ExpressionType {
 impl Debug for ExpressionType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ExpressionType::Traversal(traversal) => write!(f, "Traversal({:?})", traversal),
-            ExpressionType::Identifier(s) => write!(f, "{}", s),
-            ExpressionType::StringLiteral(s) => write!(f, "{}", s),
-            ExpressionType::IntegerLiteral(i) => write!(f, "{}", i),
-            ExpressionType::FloatLiteral(fl) => write!(f, "{}", fl),
-            ExpressionType::BooleanLiteral(b) => write!(f, "{}", b),
-            ExpressionType::Exists(e) => write!(f, "Exists({:?})", e),
-            ExpressionType::BatchAddVector(bav) => write!(f, "BatchAddVector({:?})", bav),
-            ExpressionType::AddVector(av) => write!(f, "AddVector({:?})", av),
-            ExpressionType::AddNode(an) => write!(f, "AddNode({:?})", an),
-            ExpressionType::AddEdge(ae) => write!(f, "AddEdge({:?})", ae),
-            ExpressionType::And(and) => write!(f, "And({:?})", and),
-            ExpressionType::Or(or) => write!(f, "Or({:?})", or),
-            ExpressionType::SearchVector(sv) => write!(f, "SearchVector({:?})", sv),
-            ExpressionType::BM25Search(bm25) => write!(f, "BM25Search({:?})", bm25),
+            ExpressionType::Traversal(traversal) => write!(f, "Traversal({traversal:?})"),
+            ExpressionType::Identifier(s) => write!(f, "{s}"),
+            ExpressionType::StringLiteral(s) => write!(f, "{s}"),
+            ExpressionType::IntegerLiteral(i) => write!(f, "{i}"),
+            ExpressionType::FloatLiteral(fl) => write!(f, "{fl}"),
+            ExpressionType::BooleanLiteral(b) => write!(f, "{b}"),
+            ExpressionType::Exists(e) => write!(f, "Exists({e:?})"),
+            ExpressionType::BatchAddVector(bav) => write!(f, "BatchAddVector({bav:?})"),
+            ExpressionType::AddVector(av) => write!(f, "AddVector({av:?})"),
+            ExpressionType::AddNode(an) => write!(f, "AddNode({an:?})"),
+            ExpressionType::AddEdge(ae) => write!(f, "AddEdge({ae:?})"),
+            ExpressionType::And(and) => write!(f, "And({and:?})"),
+            ExpressionType::Or(or) => write!(f, "Or({or:?})"),
+            ExpressionType::SearchVector(sv) => write!(f, "SearchVector({sv:?})"),
+            ExpressionType::BM25Search(bm25) => write!(f, "BM25Search({bm25:?})"),
             ExpressionType::Empty => write!(f, "Empty"),
         }
     }
@@ -399,21 +385,21 @@ impl Debug for ExpressionType {
 impl Display for ExpressionType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ExpressionType::Traversal(traversal) => write!(f, "Traversal({:?})", traversal),
-            ExpressionType::Identifier(s) => write!(f, "{}", s),
-            ExpressionType::StringLiteral(s) => write!(f, "{}", s),
-            ExpressionType::IntegerLiteral(i) => write!(f, "{}", i),
-            ExpressionType::FloatLiteral(fl) => write!(f, "{}", fl),
-            ExpressionType::BooleanLiteral(b) => write!(f, "{}", b),
-            ExpressionType::Exists(e) => write!(f, "Exists({:?})", e),
-            ExpressionType::BatchAddVector(bav) => write!(f, "BatchAddVector({:?})", bav),
-            ExpressionType::AddVector(av) => write!(f, "AddVector({:?})", av),
-            ExpressionType::AddNode(an) => write!(f, "AddNode({:?})", an),
-            ExpressionType::AddEdge(ae) => write!(f, "AddEdge({:?})", ae),
-            ExpressionType::And(and) => write!(f, "And({:?})", and),
-            ExpressionType::Or(or) => write!(f, "Or({:?})", or),
-            ExpressionType::SearchVector(sv) => write!(f, "SearchVector({:?})", sv),
-            ExpressionType::BM25Search(bm25) => write!(f, "BM25Search({:?})", bm25),
+            ExpressionType::Traversal(traversal) => write!(f, "Traversal({traversal:?})"),
+            ExpressionType::Identifier(s) => write!(f, "{s}"),
+            ExpressionType::StringLiteral(s) => write!(f, "{s}"),
+            ExpressionType::IntegerLiteral(i) => write!(f, "{i}"),
+            ExpressionType::FloatLiteral(fl) => write!(f, "{fl}"),
+            ExpressionType::BooleanLiteral(b) => write!(f, "{b}"),
+            ExpressionType::Exists(e) => write!(f, "Exists({e:?})"),
+            ExpressionType::BatchAddVector(bav) => write!(f, "BatchAddVector({bav:?})"),
+            ExpressionType::AddVector(av) => write!(f, "AddVector({av:?})"),
+            ExpressionType::AddNode(an) => write!(f, "AddNode({an:?})"),
+            ExpressionType::AddEdge(ae) => write!(f, "AddEdge({ae:?})"),
+            ExpressionType::And(and) => write!(f, "And({and:?})"),
+            ExpressionType::Or(or) => write!(f, "Or({or:?})"),
+            ExpressionType::SearchVector(sv) => write!(f, "SearchVector({sv:?})"),
+            ExpressionType::BM25Search(bm25) => write!(f, "BM25Search({bm25:?})"),
             ExpressionType::Empty => write!(f, "Empty"),
         }
     }
@@ -472,22 +458,25 @@ pub enum StepType {
 }
 impl PartialEq<StepType> for StepType {
     fn eq(&self, other: &StepType) -> bool {
-        match (self, other) {
-            (&StepType::Node(_), &StepType::Node(_)) => true,
-            (&StepType::Edge(_), &StepType::Edge(_)) => true,
-            (&StepType::Where(_), &StepType::Where(_)) => true,
-            (&StepType::BooleanOperation(_), &StepType::BooleanOperation(_)) => true,
-            (&StepType::Count, &StepType::Count) => true,
-            (&StepType::Update(_), &StepType::Update(_)) => true,
-            (&StepType::Object(_), &StepType::Object(_)) => true,
-            (&StepType::Exclude(_), &StepType::Exclude(_)) => true,
-            (&StepType::Closure(_), &StepType::Closure(_)) => true,
-            (&StepType::Range(_), &StepType::Range(_)) => true,
-            (&StepType::OrderByAsc(_), &StepType::OrderByAsc(_)) => true,
-            (&StepType::OrderByDesc(_), &StepType::OrderByDesc(_)) => true,
-            (&StepType::AddEdge(_), &StepType::AddEdge(_)) => true,
-            _ => false,
-        }
+        matches!(
+            (self, other),
+            (&StepType::Node(_), &StepType::Node(_))
+                | (&StepType::Edge(_), &StepType::Edge(_))
+                | (&StepType::Where(_), &StepType::Where(_))
+                | (
+                    &StepType::BooleanOperation(_),
+                    &StepType::BooleanOperation(_)
+                )
+                | (&StepType::Count, &StepType::Count)
+                | (&StepType::Update(_), &StepType::Update(_))
+                | (&StepType::Object(_), &StepType::Object(_))
+                | (&StepType::Exclude(_), &StepType::Exclude(_))
+                | (&StepType::Closure(_), &StepType::Closure(_))
+                | (&StepType::Range(_), &StepType::Range(_))
+                | (&StepType::OrderByAsc(_), &StepType::OrderByAsc(_))
+                | (&StepType::OrderByDesc(_), &StepType::OrderByDesc(_))
+                | (&StepType::AddEdge(_), &StepType::AddEdge(_))
+        )
     }
 }
 #[derive(Debug, Clone)]
@@ -682,13 +671,13 @@ pub enum IdType {
 impl Display for IdType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            IdType::Literal { value, loc: _ } => write!(f, "{}", value),
-            IdType::Identifier { value, loc: _ } => write!(f, "{}", value),
+            IdType::Literal { value, loc: _ } => write!(f, "{value}"),
+            IdType::Identifier { value, loc: _ } => write!(f, "{value}"),
             IdType::ByIndex {
                 index,
                 value: _,
                 loc: _,
-            } => write!(f, "{}", index),
+            } => write!(f, "{index}"),
         }
     }
 }
@@ -716,7 +705,9 @@ impl ValueType {
         match self {
             ValueType::Literal { value, loc: _ } => value.to_string(),
             ValueType::Identifier { value, loc: _ } => value.clone(),
-            ValueType::Object { fields, loc: _ } => fields.keys().map(|k| k.clone()).collect::<Vec<String>>().join(", "),
+            ValueType::Object { fields, loc: _ } => {
+                fields.keys().cloned().collect::<Vec<String>>().join(", ")
+            }
         }
     }
 }
@@ -819,14 +810,11 @@ impl HelixParser {
 
         input.files.iter().try_for_each(|file| {
             source.source.push_str(&file.content);
-            source.source.push_str("\n");
+            source.source.push('\n');
             let pair = match HelixParser::parse(Rule::source, &file.content) {
-                Ok(mut pairs) => {
-                    let pair = pairs
-                        .next()
-                        .ok_or_else(|| ParserError::from("Empty input"))?;
-                    pair
-                }
+                Ok(mut pairs) => pairs
+                    .next()
+                    .ok_or_else(|| ParserError::from("Empty input"))?,
                 Err(e) => {
                     return Err(ParserError::from(e));
                 }
@@ -925,7 +913,7 @@ impl HelixParser {
     fn parse_field_type(
         &self,
         field: Pair<Rule>,
-        schema: Option<&Source>,
+        _schema: Option<&Source>,
     ) -> Result<FieldType, ParserError> {
         match field.as_rule() {
             Rule::named_type => {
@@ -948,7 +936,7 @@ impl HelixParser {
                 }
             }
             Rule::array => {
-                return Ok(FieldType::Array(Box::new(
+                Ok(FieldType::Array(Box::new(
                     self.parse_field_type(
                         // unwraps the array type because grammar type is
                         // { array { param_type { array | object | named_type } } }
@@ -959,9 +947,9 @@ impl HelixParser {
                             .into_inner()
                             .next()
                             .unwrap(),
-                        schema,
+                        _schema,
                     )?,
-                )));
+                )))
             }
             Rule::object => {
                 let mut fields = HashMap::new();
@@ -1281,7 +1269,6 @@ impl HelixParser {
             Rule::object_destructuring => {
                 let fields = argument
                     .into_inner()
-                    .into_iter()
                     .map(|p| (p.loc(), p.as_str().to_string()))
                     .collect();
                 ForLoopVars::ObjectDestructuring {
@@ -1730,8 +1717,8 @@ impl HelixParser {
             }
         }
         Ok(EdgeConnection {
-            from_id: from_id,
-            to_id: to_id,
+            from_id,
+            to_id,
             loc: pair.loc(),
         })
     }
@@ -2005,8 +1992,7 @@ impl HelixParser {
                                         },
                                         other => {
                                             panic!(
-                                                "Should be identifier or string literal: {:?}",
-                                                other
+                                                "Should be identifier or string literal: {other:?}"
                                             )
                                         }
                                     },
@@ -2082,7 +2068,7 @@ impl HelixParser {
                                                 loc: id.loc(),
                                             },
                                             other => {
-                                                println!("{:?}", other);
+                                                println!("{other:?}");
                                                 panic!("Should be identifier or string literal")
                                             }
                                         }
@@ -2177,14 +2163,8 @@ impl HelixParser {
     fn parse_range(&self, pair: Pair<Rule>) -> Result<(Expression, Expression), ParserError> {
         let mut inner = pair.into_inner().next().unwrap().into_inner();
         // println!("inner: {:?}", inner);
-        let start = match self.parse_expression(inner.next().unwrap()) {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        };
-        let end = match self.parse_expression(inner.next().unwrap()) {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        };
+        let start = self.parse_expression(inner.next().unwrap())?;
+        let end = self.parse_expression(inner.next().unwrap())?;
 
         Ok((start, end))
     }
@@ -2554,7 +2534,7 @@ impl HelixParser {
                     },
                     _ => self.parse_new_field_value(p)?,
                 },
-                None if prop_key.len() > 0 => FieldValue {
+                None if !prop_key.is_empty() => FieldValue {
                     loc: p.loc(),
                     value: FieldValueType::Identifier(prop_key.clone()),
                 },
@@ -2612,7 +2592,7 @@ pub fn write_to_temp_file(content: Vec<&str>) -> Content {
     }
     Content {
         content: String::new(),
-        files: files,
+        files,
         source: Source::default(),
     }
 }

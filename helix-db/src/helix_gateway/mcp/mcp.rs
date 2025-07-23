@@ -19,6 +19,12 @@ pub struct McpConnections {
     pub connections: HashMap<String, MCPConnection>,
 }
 
+impl Default for McpConnections {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl McpConnections {
     pub fn new() -> Self {
         Self {
@@ -126,7 +132,7 @@ pub struct InitRequest {
 }
 
 #[mcp_handler]
-pub fn init<'a>(input: &'a mut MCPToolInput) -> Result<Response, GraphError> {
+pub fn init(input: &mut MCPToolInput) -> Result<Response, GraphError> {
     let connection_id = uuid::Uuid::from_u128(v6_uuid()).to_string();
     let mut connections = input.mcp_connections.lock().unwrap();
     connections.add_connection(MCPConnection::new(
@@ -143,7 +149,7 @@ pub struct NextRequest {
 }
 
 #[mcp_handler]
-pub fn next<'a>(input: &'a mut MCPToolInput) -> Result<Response, GraphError> {
+pub fn next(input: &mut MCPToolInput) -> Result<Response, GraphError> {
     let data: NextRequest = match sonic_rs::from_slice(&input.request.body) {
         Ok(data) => data,
         Err(e) => return Err(GraphError::from(e)),
@@ -178,7 +184,7 @@ pub struct CollectRequest {
 }
 
 #[mcp_handler]
-pub fn collect<'a>(input: &'a mut MCPToolInput) -> Result<Response, GraphError> {
+pub fn collect(input: &mut MCPToolInput) -> Result<Response, GraphError> {
     let data: CollectRequest = match sonic_rs::from_slice(&input.request.body) {
         Ok(data) => data,
         Err(e) => return Err(GraphError::from(e)),
@@ -213,7 +219,7 @@ pub fn collect<'a>(input: &'a mut MCPToolInput) -> Result<Response, GraphError> 
 }
 
 #[mcp_handler]
-pub fn schema_resource<'a>(input: &'a mut MCPToolInput) -> Result<Response, GraphError> {
+pub fn schema_resource(input: &mut MCPToolInput) -> Result<Response, GraphError> {
     let data: ResourceCallRequest = match sonic_rs::from_slice(&input.request.body) {
         Ok(data) => data,
         Err(e) => return Err(GraphError::from(e)),

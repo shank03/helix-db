@@ -26,7 +26,7 @@ impl Iterator for InsertVIterator {
 pub trait InsertVAdapter<'a, 'b>: Iterator<Item = Result<TraversalVal, GraphError>> {
     fn insert_v<F>(
         self,
-        query: &Vec<f64>,
+        query: &[f64],
         label: &str,
         fields: Option<Vec<(String, Value)>>,
     ) -> RwTraversalIterator<'a, 'b, impl Iterator<Item = Result<TraversalVal, GraphError>>>
@@ -35,7 +35,7 @@ pub trait InsertVAdapter<'a, 'b>: Iterator<Item = Result<TraversalVal, GraphErro
 
     fn insert_vs<F>(
         self,
-        queries: &Vec<Vec<f64>>,
+        queries: &[Vec<f64>],
         fields: Option<Vec<(String, Value)>>,
     ) -> RwTraversalIterator<'a, 'b, impl Iterator<Item = Result<TraversalVal, GraphError>>>
     where
@@ -47,7 +47,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> InsertVAdapte
 {
     fn insert_v<F>(
         self,
-        query: &Vec<f64>,
+        query: &[f64],
         label: &str,
         fields: Option<Vec<(String, Value)>>,
     ) -> RwTraversalIterator<'a, 'b, impl Iterator<Item = Result<TraversalVal, GraphError>>>
@@ -65,7 +65,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> InsertVAdapte
                 (String::from("is_deleted"), Value::Boolean(false)),
             ]),
         };
-        let vector = self.storage.vectors.insert::<F>(self.txn, &query, fields);
+        let vector = self.storage.vectors.insert::<F>(self.txn, query, fields);
 
         let result = match vector {
             Ok(vector) => Ok(TraversalVal::Vector(vector)),
@@ -81,7 +81,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> InsertVAdapte
 
     fn insert_vs<F>(
         self,
-        queries: &Vec<Vec<f64>>,
+        queries: &[Vec<f64>],
         fields: Option<Vec<(String, Value)>>,
     ) -> RwTraversalIterator<'a, 'b, impl Iterator<Item = Result<TraversalVal, GraphError>>>
     where
@@ -92,7 +92,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> InsertVAdapte
         let iter = queries
             .iter()
             .map(|vec| {
-                let vector = storage.vectors.insert::<F>(txn, &vec, fields.clone()); // TODO: remove clone
+                let vector = storage.vectors.insert::<F>(txn, vec, fields.clone()); // TODO: remove clone
                 match vector {
                     Ok(vector) => Ok(TraversalVal::Vector(vector)),
                     Err(e) => Err(GraphError::from(e)),

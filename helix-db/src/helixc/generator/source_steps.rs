@@ -95,7 +95,7 @@ impl Display for SearchV {
         let f_str = self
             .f
             .iter()
-            .map(|f| format!("{}", f))
+            .map(|f| format!("{f}"))
             .collect::<Vec<_>>()
             .join(", ");
         write!(
@@ -166,17 +166,17 @@ impl Display for SourceStep {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             SourceStep::Identifier(_) => write!(f, ""),
-            SourceStep::AddN(add_n) => write!(f, "{}", add_n),
-            SourceStep::AddE(add_e) => write!(f, "{}", add_e),
-            SourceStep::AddV(add_v) => write!(f, "{}", add_v),
-            SourceStep::SearchV(search_v) => write!(f, "{}", search_v),
-            SourceStep::NFromID(n_from_id) => write!(f, "{}", n_from_id),
-            SourceStep::NFromIndex(n_from_index) => write!(f, "{}", n_from_index),
-            SourceStep::NFromType(n_from_type) => write!(f, "{}", n_from_type),
-            SourceStep::EFromID(e_from_id) => write!(f, "{}", e_from_id),
-            SourceStep::EFromType(e_from_type) => write!(f, "{}", e_from_type),
-            SourceStep::SearchVector(search_vector) => write!(f, "{}", search_vector),
-            SourceStep::SearchBM25(search_bm25) => write!(f, "{}", search_bm25),
+            SourceStep::AddN(add_n) => write!(f, "{add_n}"),
+            SourceStep::AddE(add_e) => write!(f, "{add_e}"),
+            SourceStep::AddV(add_v) => write!(f, "{add_v}"),
+            SourceStep::SearchV(search_v) => write!(f, "{search_v}"),
+            SourceStep::NFromID(n_from_id) => write!(f, "{n_from_id}"),
+            SourceStep::NFromIndex(n_from_index) => write!(f, "{n_from_index}"),
+            SourceStep::NFromType(n_from_type) => write!(f, "{n_from_type}"),
+            SourceStep::EFromID(e_from_id) => write!(f, "{e_from_id}"),
+            SourceStep::EFromType(e_from_type) => write!(f, "{e_from_type}"),
+            SourceStep::SearchVector(search_vector) => write!(f, "{search_vector}"),
+            SourceStep::SearchBM25(search_bm25) => write!(f, "{search_bm25}"),
             SourceStep::Anonymous => write!(f, ""),
             SourceStep::Empty => panic!("Should not be empty"),
         }
@@ -200,7 +200,7 @@ impl Display for SearchVector {
                 self.k,
                 pre_filter
                     .iter()
-                    .map(|f| format!("|v: &HVector, txn: &RoTxn| {}", f))
+                    .map(|f| format!("|v: &HVector, txn: &RoTxn| {f}"))
                     .collect::<Vec<_>>()
                     .join(", ")
             ),

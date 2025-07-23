@@ -4,12 +4,12 @@ pub struct Exist<I> {
     pub iter: I,
 }
 
-impl<'a, I> Exist<I>
+impl<I> Exist<I>
 where
     I: Iterator<Item = Result<TraversalVal, GraphError>>,
 {
     pub fn exists(iter: &mut I) -> bool {
-        while let Some(item) = iter.next() {
+        for item in iter.by_ref() {
             match item {
                 Ok(_) => return true,
                 Err(_) => continue,

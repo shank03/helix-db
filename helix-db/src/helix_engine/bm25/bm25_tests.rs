@@ -70,9 +70,7 @@ mod tests {
         let tokens = bm25.tokenize::<true>(text);
 
         // Should filter out words with length <= 2 and normalize to lowercase
-        let expected = vec![
-            "the", "quick", "brown", "fox", "jumps", "over", "the", "lazy", "dog", "was", "amazing",
-        ];
+        let expected = ["the", "quick", "brown", "fox", "jumps", "over", "the", "lazy", "dog", "was", "amazing"];
         assert_eq!(tokens.len(), expected.len());
 
         for (i, token) in tokens.iter().enumerate() {
@@ -88,7 +86,7 @@ mod tests {
         let tokens = bm25.tokenize::<false>(text);
 
         // should not filter out short words
-        let expected = vec!["a", "b", "cd", "efg"];
+        let expected = ["a", "b", "cd", "efg"];
         assert_eq!(tokens.len(), expected.len());
 
         for (i, token) in tokens.iter().enumerate() {
@@ -188,7 +186,7 @@ mod tests {
         let rtxn = bm25.graph_env.read_txn().unwrap();
         let results = bm25.search(&rtxn, "fox", 10).unwrap();
 
-        println!("results: {:?}", results);
+        println!("results: {results:?}");
 
         // should return documents 1 and 3 (both contain "fox")
         assert_eq!(results.len(), 2);
@@ -234,7 +232,7 @@ mod tests {
         let rtxn = bm25.graph_env.read_txn().unwrap();
         let results = bm25.search(&rtxn, "machine learning", 10).unwrap();
 
-        println!("results: {:?}", results);
+        println!("results: {results:?}");
 
         // documents 1 and 3 should score highest (contain both terms)
         assert!(results.len() >= 2);
@@ -618,7 +616,7 @@ mod tests {
         let rtxn = bm25.graph_env.read_txn().unwrap();
         let results = bm25.search(&rtxn, "science", 10).unwrap();
 
-        println!("results: {:?}", results);
+        println!("results: {results:?}");
 
         assert!(results.len() >= 2);
 
@@ -646,7 +644,7 @@ mod tests {
             8.0, // average doc length
         );
 
-        println!("score {}", score);
+        println!("score {score}");
 
         // Score should be finite and reasonable
         assert!(score.is_finite());
@@ -724,7 +722,7 @@ mod tests {
 
         // insert many documents containing the same term
         for i in 1..=10 {
-            let doc = format!("document {} contains test content", i);
+            let doc = format!("document {i} contains test content");
             bm25.insert_doc(&mut wtxn, i as u128, &doc).unwrap();
         }
         wtxn.commit().unwrap();
