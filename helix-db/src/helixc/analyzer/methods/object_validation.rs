@@ -1,29 +1,35 @@
 //! Semantic analyzer for Helix‑QL.
-use crate::helixc::{
-    analyzer::{
-        analyzer::Ctx,
-        errors::push_query_err,
-        methods::{infer_expr_type::infer_expr_type, traversal_validation::validate_traversal},
-        types::Type,
-        utils::{
-            FieldLookup, Variable, VariableAccess, gen_property_access, is_valid_identifier,
-            type_in_scope, validate_field_name_existence_for_item_type,
+use crate::helixc::analyzer::error_codes::ErrorCode;
+use crate::{
+    generate_error,
+    helixc::{
+        analyzer::{
+            analyzer::Ctx,
+            errors::push_query_err,
+            methods::{infer_expr_type::infer_expr_type, traversal_validation::validate_traversal},
+            types::Type,
+            utils::{
+                FieldLookup, Variable, VariableAccess, gen_property_access, is_valid_identifier,
+             validate_field_name_existence_for_item_type,
+            },
         },
+        generator::{
+            generator_types::{Query as GeneratedQuery, Statement},
+            object_remapping_generation::{
+                ExistsRemapping, IdentifierRemapping, ObjectRemapping, Remapping, RemappingType,
+                TraversalRemapping, ValueRemapping,
+            },
+            source_steps::SourceStep,
+            traversal_steps::{
+                ShouldCollect, Step as GeneratedStep, Traversal as GeneratedTraversal,
+                TraversalType,
+            },
+            utils::{GenRef, Separator},
+        },
+        parser::{helix_parser::*, location::Loc},
     },
-    generator::{
-        generator_types::{Query as GeneratedQuery, Statement},
-        object_remapping_generation::{
-            ExistsRemapping, IdentifierRemapping, ObjectRemapping, Remapping, RemappingType,
-            TraversalRemapping, ValueRemapping,
-        },
-        source_steps::SourceStep,
-        traversal_steps::{
-            ShouldCollect, Step as GeneratedStep, Traversal as GeneratedTraversal, TraversalType,
-        },
-        utils::{GenRef, Separator},
-    },
-    parser::{helix_parser::*, location::Loc},
 };
+use paste::paste;
 use std::{borrow::Cow, collections::HashMap};
 
 /// Validates the object step (e.g. `::{ name }`)
@@ -107,12 +113,12 @@ pub(crate) fn validate_object<'a>(
             );
         }
         _ => {
-            push_query_err(
+            generate_error!(
                 ctx,
                 original_query,
                 obj.fields[0].value.loc.clone(),
-                "cannot access properties on this type".to_string(),
-                "property access is only valid on nodes, edges and vectors",
+                E203,
+                &obj.fields[0].value.loc.span
             );
         }
     }
@@ -351,16 +357,14 @@ pub(crate) fn parse_object_remapping<'a>(
                                 should_spread,
                             }),
                             false => {
-                                push_query_err(
+                                generate_error!(
                                     ctx,
                                     original_query,
                                     expr.loc.clone(),
-                                    format!(
-                                        "`{}` is not a field of type `{}` or is not a variable in scope",
-                                        identifier, item_type
-                                    ),
-                                    "check the schema field names or declare the variable"
-                                        .to_string(),
+                                    E202,
+                                    &identifier,
+                                    &parent_ty.kind_str(),
+                                    &item_type
                                 );
                                 RemappingType::Empty
                             }
@@ -368,12 +372,12 @@ pub(crate) fn parse_object_remapping<'a>(
                     }
                 }
                 _ => {
-                    push_query_err(
+                    generate_error!(
                         ctx,
                         original_query,
                         expr.loc.clone(),
-                        "invalid expression".to_string(),
-                        "invalid expression".to_string(),
+                        E601,
+                        &expr.expr.to_string()
                     );
                     RemappingType::Empty
                 }
@@ -438,15 +442,14 @@ pub(crate) fn parse_object_remapping<'a>(
                             should_spread,
                         }),
                         false => {
-                            push_query_err(
+                            generate_error!(
                                 ctx,
                                 original_query,
                                 value.loc.clone(),
-                                format!(
-                                    "`{}` is not a field of type `{}` or is not a variable in scope",
-                                    identifier, item_type
-                                ),
-                                "check the schema field names or declare the variable".to_string(),
+                                E202,
+                                &identifier,
+                                &parent_ty.kind_str(),
+                                &item_type
                             );
                             RemappingType::Empty
                         }
@@ -473,13 +476,7 @@ pub(crate) fn parse_object_remapping<'a>(
                 })
             } // object or closure
             FieldValueType::Empty => {
-                push_query_err(
-                    ctx,
-                    original_query,
-                    obj[0].loc.clone(),
-                    "field value is empty".to_string(),
-                    "field value must be a literal, identifier, traversal,or object".to_string(),
-                );
+                generate_error!(ctx, original_query, obj[0].loc.clone(), E646);
                 RemappingType::Empty
             } // err
         };
@@ -519,9 +516,8 @@ fn validate_property_access<'a>(
     cur_ty: &Type,
     fields: Option<HashMap<&'a str, Cow<'a, Field>>>,
 ) {
-    assert!(fields.is_some());
     match fields {
-        Some(field) => {
+        Some(_) => {
             // if there is only one field then it is a property access
             // e.g. N<User>::{name}
             if obj.fields.len() == 1
@@ -592,22 +588,16 @@ fn validate_property_access<'a>(
                     .push(Separator::Period(GeneratedStep::Remapping(remapping)));
             } else {
                 // error
-                push_query_err(
-                    ctx,
-                    original_query,
-                    obj.fields[0].value.loc.clone(),
-                    "object must have at least one field".to_string(),
-                    "object must have at least one field".to_string(),
-                );
+                generate_error!(ctx, original_query, obj.fields[0].value.loc.clone(), E645);
             }
         }
         None => {
-            push_query_err(
+            generate_error!(
                 ctx,
                 original_query,
                 obj.fields[0].value.loc.clone(),
-                format!("`{}` refers to unknown type", cur_ty.get_type_name()),
-                "declare the type in the schema".to_string(),
+                E201,
+                &cur_ty.get_type_name()
             );
         }
     }

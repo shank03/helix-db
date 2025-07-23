@@ -52,8 +52,7 @@ pub fn handler(args: TokenStream, item: TokenStream) -> TokenStream {
     let expanded = quote! {
         #[allow(non_camel_case_types)]
         #vis #sig {
-            let (helix_in_fmt, helix_out_fmt) = Format::from_headers(&input.request.headers);
-            let data = &*helix_in_fmt.deserialize::<#input_data_name>(&input.request.body)?;
+            let data = input.request.in_fmt.deserialize::<#input_data_name>(&input.request.body)?;
 
             let mut remapping_vals = RemappingMap::new();
             let db = Arc::clone(&input.graph.storage);
@@ -63,9 +62,8 @@ pub fn handler(args: TokenStream, item: TokenStream) -> TokenStream {
             #(#query_stmts)*
 
             txn.commit().unwrap();
-            response.value = Some((helix_out_fmt, return_vals));
 
-            Ok(())
+            Ok(input.request.out_fmt.create_response(&return_vals))
         }
 
         #[doc(hidden)]
@@ -74,37 +72,6 @@ pub fn handler(args: TokenStream, item: TokenStream) -> TokenStream {
             inventory::submit! {
                 ::helix_db::helix_gateway::router::router::HandlerSubmission(
                     ::helix_db::helix_gateway::router::router::Handler::new(
-                        #fn_name_str,
-                        #fn_name
-                    )
-                )
-            }
-        };
-    };
-    expanded.into()
-}
-
-#[proc_macro_attribute]
-pub fn local_handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    let input_fn = parse_macro_input!(item as ItemFn);
-    let fn_name = &input_fn.sig.ident;
-    let fn_name_str = fn_name.to_string();
-    println!("fn_name_str: {}", fn_name_str);
-    // Create a unique static name for each handler
-    let static_name = quote::format_ident!(
-        "_LOCAL_HANDLER_REGISTRATION_{}",
-        fn_name.to_string().to_uppercase()
-    );
-
-    let expanded = quote! {
-        #input_fn
-
-        #[doc(hidden)]
-        #[used]
-        static #static_name: () = {
-            inventory::submit! {
-                ::helix_gateway::router::router::HandlerSubmission(
-                    ::helix_gateway::router::router::Handler::new(
                         #fn_name_str,
                         #fn_name
                     )
@@ -135,36 +102,6 @@ pub fn mcp_handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
             inventory::submit! {
                 MCPHandlerSubmission(
                     MCPHandler::new(
-                        #fn_name_str,
-                        #fn_name
-                    )
-                )
-            }
-        };
-    };
-    expanded.into()
-}
-
-#[proc_macro_attribute]
-pub fn query_mcp_handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    let input_fn = parse_macro_input!(item as ItemFn);
-    let fn_name = &input_fn.sig.ident;
-    let fn_name_str = fn_name.to_string();
-    // Create a unique static name for each handler
-    let static_name = quote::format_ident!(
-        "_MCP_HANDLER_REGISTRATION_{}",
-        fn_name.to_string().to_uppercase()
-    );
-
-    let expanded = quote! {
-        #input_fn
-
-        #[doc(hidden)]
-        #[used]
-        static #static_name: () = {
-            inventory::submit! {
-                ::helixdb::helix_gateway::mcp::mcp::MCPHandlerSubmission(
-                    ::helixdb::helix_gateway::mcp::mcp::MCPHandler::new(
                         #fn_name_str,
                         #fn_name
                     )
@@ -298,12 +235,8 @@ pub fn tool_calls(_attr: TokenStream, input: TokenStream) -> TokenStream {
                 #[allow(non_camel_case_types)]
                 pub fn #fn_name<'a>(
                     input: &'a mut MCPToolInput,
-                    response: &mut Response,
-                ) -> Result<(), GraphError> {
-                    let data: #struct_name = match sonic_rs::from_slice(&input.request.body) {
-                        Ok(data) => data,
-                        Err(err) => return Err(GraphError::from(err)),
-                    };
+                ) -> Result<Response, GraphError> {
+                    let data = input.request.in_fmt.deserialize_owned::<#struct_name>(&input.request.body)?;
 
                     let mut connections = input.mcp_connections.lock().unwrap();
                     let mut connection = match connections.remove_connection(&data.connection_id) {
@@ -323,8 +256,7 @@ pub fn tool_calls(_attr: TokenStream, input: TokenStream) -> TokenStream {
                     connections.add_connection(connection);
                     drop(connections);
 
-                    response.body = sonic_rs::to_vec(&ReturnValue::from(first)).unwrap();
-                    Ok(())
+                    Ok(crate::protocol::format::Format::Json.create_response(&ReturnValue::from(first)))
                 }
             };
 
@@ -405,12 +337,8 @@ pub fn tool_call(args: TokenStream, input: TokenStream) -> TokenStream {
         #[allow(non_camel_case_types)]
         pub fn #mcp_function_name<'a>(
             input: &'a mut MCPToolInput,
-            response: &mut Response,
-        ) -> Result<(), GraphError> {
-            let data: #mcp_struct_name = match sonic_rs::from_slice(&input.request.body) {
-                Ok(data) => data,
-                Err(err) => return Err(GraphError::from(err)),
-            };
+        ) -> Result<Response, GraphError> {
+            let data = &*input.request.in_fmt.deserialize::<#mcp_struct_name>(&input.request.body)?;
 
             let mut connections = input.mcp_connections.lock().unwrap();
             let mut connection = match connections.remove_connection(&data.connection_id) {
@@ -423,12 +351,11 @@ pub fn tool_call(args: TokenStream, input: TokenStream) -> TokenStream {
 
             let first = result.next().unwrap_or(TraversalVal::Empty);
 
-            response.body = sonic_rs::to_vec(&ReturnValue::from(first)).unwrap();
             connection.iter = result.into_iter();
             let mut connections = input.mcp_connections.lock().unwrap();
             connections.add_connection(connection);
             drop(connections);
-            Ok(())
+            Ok(crate::protocol::format::Format::Json.create_response(&ReturnValue::from(first)))
         }
     };
 

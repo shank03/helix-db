@@ -256,7 +256,7 @@ impl Display for Query {
         // prints the function signature
         write!(
             f,
-            "pub fn {} (input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {{\n",
+            "pub fn {} (input: &HandlerInput) -> Result<Response, GraphError> {{\n",
             self.name
         )?;
         write!(f, "{{\n")?;
@@ -281,7 +281,6 @@ impl Display for Query {
         }
 
         write!(f, "}}\n")?;
-        write!(f, "    Ok(())\n")?;
         write!(f, "}}\n")
     }
 }
@@ -415,7 +414,7 @@ impl Display for ForLoopInVariable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ForLoopInVariable::Identifier(identifier) => write!(f, "{}", identifier),
-            ForLoopInVariable::Parameter(parameter) => write!(f, "data.{}", parameter),
+            ForLoopInVariable::Parameter(parameter) => write!(f, "&data.{}", parameter),
             ForLoopInVariable::Empty => {
                 assert!(false, "For loop in variable is empty");
                 write!(f, "_")

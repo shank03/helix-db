@@ -1,6 +1,6 @@
 [package]
 name = "helix-macros"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2024"
 authors = ["HelixDB Team"]
 repository = "https://github.com/HelixDB/helix-db"

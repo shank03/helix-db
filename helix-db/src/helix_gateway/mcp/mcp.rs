@@ -4,7 +4,7 @@ use crate::{
         types::GraphError,
     },
     helix_gateway::mcp::tools::ToolArgs,
-    protocol::{request::Request, response::Response, return_values::ReturnValue},
+    protocol::{Format, Request, Response, return_values::ReturnValue},
     utils::id::v6_uuid,
 };
 use helix_macros::mcp_handler;
@@ -96,13 +96,11 @@ pub struct MCPToolInput {
 }
 
 // basic type for function pointer
-pub type BasicMCPHandlerFn =
-    for<'a> fn(&'a mut MCPToolInput, &mut Response) -> Result<(), GraphError>;
+pub type BasicMCPHandlerFn = for<'a> fn(&'a mut MCPToolInput) -> Result<Response, GraphError>;
 
 // thread safe type for multi threaded use
-pub type MCPHandlerFn = Arc<
-    dyn for<'a> Fn(&'a mut MCPToolInput, &mut Response) -> Result<(), GraphError> + Send + Sync,
->;
+pub type MCPHandlerFn =
+    Arc<dyn for<'a> Fn(&'a mut MCPToolInput) -> Result<Response, GraphError> + Send + Sync>;
 
 #[derive(Clone, Debug)]
 pub struct MCPHandlerSubmission(pub MCPHandler);
@@ -128,7 +126,7 @@ pub struct InitRequest {
 }
 
 #[mcp_handler]
-pub fn init<'a>(input: &'a mut MCPToolInput, response: &mut Response) -> Result<(), GraphError> {
+pub fn init<'a>(input: &'a mut MCPToolInput) -> Result<Response, GraphError> {
     let connection_id = uuid::Uuid::from_u128(v6_uuid()).to_string();
     let mut connections = input.mcp_connections.lock().unwrap();
     connections.add_connection(MCPConnection::new(
@@ -136,9 +134,7 @@ pub fn init<'a>(input: &'a mut MCPToolInput, response: &mut Response) -> Result<
         vec![].into_iter(),
     ));
     drop(connections);
-    response.body = sonic_rs::to_vec(&ReturnValue::from(connection_id)).unwrap();
-
-    Ok(())
+    Ok(Format::Json.create_response(&ReturnValue::from(connection_id)))
 }
 
 #[derive(Deserialize)]
@@ -147,7 +143,7 @@ pub struct NextRequest {
 }
 
 #[mcp_handler]
-pub fn next<'a>(input: &'a mut MCPToolInput, response: &mut Response) -> Result<(), GraphError> {
+pub fn next<'a>(input: &'a mut MCPToolInput) -> Result<Response, GraphError> {
     let data: NextRequest = match sonic_rs::from_slice(&input.request.body) {
         Ok(data) => data,
         Err(e) => return Err(GraphError::from(e)),
@@ -166,8 +162,7 @@ pub fn next<'a>(input: &'a mut MCPToolInput, response: &mut Response) -> Result<
         .clone();
     drop(connections);
 
-    response.body = sonic_rs::to_vec(&ReturnValue::from(next))?;
-    Ok(())
+    Ok(Format::Json.create_response(&ReturnValue::from(next)))
 }
 
 #[derive(Deserialize)]
@@ -183,7 +178,7 @@ pub struct CollectRequest {
 }
 
 #[mcp_handler]
-pub fn collect<'a>(input: &'a mut MCPToolInput, response: &mut Response) -> Result<(), GraphError> {
+pub fn collect<'a>(input: &'a mut MCPToolInput) -> Result<Response, GraphError> {
     let data: CollectRequest = match sonic_rs::from_slice(&input.request.body) {
         Ok(data) => data,
         Err(e) => return Err(GraphError::from(e)),
@@ -214,15 +209,11 @@ pub fn collect<'a>(input: &'a mut MCPToolInput, response: &mut Response) -> Resu
     ));
     drop(connections);
 
-    response.body = sonic_rs::to_vec(&ReturnValue::from(values))?;
-    Ok(())
+    Ok(Format::Json.create_response(&ReturnValue::from(values)))
 }
 
 #[mcp_handler]
-pub fn schema_resource<'a>(
-    input: &'a mut MCPToolInput,
-    response: &mut Response,
-) -> Result<(), GraphError> {
+pub fn schema_resource<'a>(input: &'a mut MCPToolInput) -> Result<Response, GraphError> {
     let data: ResourceCallRequest = match sonic_rs::from_slice(&input.request.body) {
         Ok(data) => data,
         Err(e) => return Err(GraphError::from(e)),
@@ -239,13 +230,10 @@ pub fn schema_resource<'a>(
     };
 
     if input.schema.is_some() {
-        response.body = sonic_rs::to_vec(&ReturnValue::from(
+        Ok(Format::Json.create_response(&ReturnValue::from(
             input.schema.as_ref().unwrap().to_string(),
-        ))
-        .unwrap();
+        )))
     } else {
-        response.body = sonic_rs::to_vec(&ReturnValue::from("no schema".to_string())).unwrap();
+        Ok(Format::Json.create_response(&ReturnValue::from("no schema".to_string())))
     }
-
-    Ok(())
 }

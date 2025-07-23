@@ -1,24 +1,29 @@
 //! Semantic analyzer for Helix‑QL.
 
-use crate::helixc::{
-    analyzer::{
-        analyzer::Ctx, errors::push_query_err, methods::infer_expr_type::infer_expr_type,
-        types::Type, utils::is_valid_identifier,
-    },
-    generator::{
-        generator_types::{
-            Assignment as GeneratedAssignment, Drop as GeneratedDrop, ForEach as GeneratedForEach,
-            ForLoopInVariable, ForVariable, Query as GeneratedQuery,
-            Statement as GeneratedStatement,
+use crate::helixc::analyzer::error_codes::ErrorCode;
+use crate::{
+    generate_error,
+    helixc::{
+        analyzer::{
+            analyzer::Ctx, errors::push_query_err, methods::infer_expr_type::infer_expr_type,
+            types::Type, utils::is_valid_identifier,
         },
-        utils::GenRef,
+        generator::{
+            generator_types::{
+                Assignment as GeneratedAssignment, Drop as GeneratedDrop,
+                ForEach as GeneratedForEach, ForLoopInVariable, ForVariable,
+                Query as GeneratedQuery, Statement as GeneratedStatement,
+            },
+            utils::GenRef,
+        },
+        parser::helix_parser::*,
     },
-    parser::helix_parser::*,
 };
+use paste::paste;
 use std::collections::HashMap;
 
 /// Validates the statements in the query used at the highest level to generate each statement in the query
-/// 
+///
 /// # Arguments
 ///
 /// * `ctx` - The context of the query
@@ -29,7 +34,7 @@ use std::collections::HashMap;
 ///
 /// # Returns
 ///
-/// * `Option<GeneratedStatement>` - The validated statement to generate rust code for 
+/// * `Option<GeneratedStatement>` - The validated statement to generate rust code for
 pub(crate) fn validate_statements<'a>(
     ctx: &mut Ctx<'a>,
     scope: &mut HashMap<&'a str, Type>,
@@ -41,16 +46,17 @@ pub(crate) fn validate_statements<'a>(
     match &statement.statement {
         Assignment(assign) => {
             if scope.contains_key(assign.variable.as_str()) {
-                push_query_err(
+                generate_error!(
                     ctx,
                     original_query,
                     assign.loc.clone(),
-                    format!("variable `{}` is already declared", assign.variable),
-                    "rename the new variable or remove the previous definition",
+                    E302,
+                    &assign.variable
                 );
             }
 
-            let (rhs_ty, stmt) = infer_expr_type(ctx, &assign.value, scope, original_query, None, query);
+            let (rhs_ty, stmt) =
+                infer_expr_type(ctx, &assign.value, scope, original_query, None, query);
             scope.insert(assign.variable.as_str(), rhs_ty);
             assert!(stmt.is_some(), "Assignment statement should be generated");
 
@@ -80,19 +86,48 @@ pub(crate) fn validate_statements<'a>(
         ForLoop(fl) => {
             // Ensure the collection exists
             if !scope.contains_key(fl.in_variable.1.as_str()) {
-                push_query_err(
-                    ctx,
-                    original_query,
-                    fl.loc.clone(),
-                    format!("`{}` is not defined in the current scope", fl.in_variable.1),
-                    "add a statement assigning it before the loop",
-                );
+                generate_error!(ctx, original_query, fl.loc.clone(), E301, &fl.in_variable.1);
             }
             // Add loop vars to new child scope and walk the body
             let mut body_scope = HashMap::new();
             let mut for_loop_in_variable: ForLoopInVariable = ForLoopInVariable::Empty;
-            // find param from fl.in_variable
-            let param = original_query.parameters.iter().find(|p| p.name.1 == fl.in_variable.1);
+
+            // check if fl.in_variable is a valid parameter
+            let param = original_query
+                .parameters
+                .iter()
+                .find(|p| p.name.1 == fl.in_variable.1);
+            let _ = match param {
+                Some(param) => {
+                    for_loop_in_variable =
+                        ForLoopInVariable::Parameter(GenRef::Std(fl.in_variable.1.clone()));
+                    Type::from(param.param_type.1.clone())
+                }
+                None => match scope.get(fl.in_variable.1.as_str()) {
+                    Some(fl_in_var_ty) => {
+                        is_valid_identifier(
+                            ctx,
+                            original_query,
+                            fl.loc.clone(),
+                            fl.in_variable.1.as_str(),
+                        );
+
+                        for_loop_in_variable =
+                            ForLoopInVariable::Identifier(GenRef::Std(fl.in_variable.1.clone()));
+                        fl_in_var_ty.clone()
+                    }
+                    None => {
+                        generate_error!(
+                            ctx,
+                            original_query,
+                            fl.loc.clone(),
+                            E301,
+                            &fl.in_variable.1
+                        );
+                        Type::Unknown
+                    }
+                },
+            };
 
             let mut for_variable: ForVariable = ForVariable::Empty;
 
@@ -124,18 +159,13 @@ pub(crate) fn validate_statements<'a>(
                                     FieldType::Object(param_fields) => {
                                         for (field_loc, field_name) in fields {
                                             if !param_fields.contains_key(field_name.as_str()) {
-                                                push_query_err(
+                                                generate_error!(
                                                     ctx,
                                                     original_query,
                                                     field_loc.clone(),
-                                                    format!(
-                                                        "`{}` is not a field of the inner type of `{}`",
-                                                        field_name, fl.in_variable.1
-                                                    ),
-                                                    format!(
-                                                        "check the object fields of the parameter `{}`",
-                                                        fl.in_variable.1
-                                                    ),
+                                                    E652,
+                                                    [field_name, &fl.in_variable.1],
+                                                    [field_name, &fl.in_variable.1]
                                                 );
                                             }
                                             body_scope.insert(field_name.as_str(), Type::Unknown);
@@ -149,26 +179,24 @@ pub(crate) fn validate_statements<'a>(
                                         );
                                     }
                                     _ => {
-                                        push_query_err(
+                                        generate_error!(
                                             ctx,
                                             original_query,
                                             fl.in_variable.0.clone(),
-                                            format!(
-                                                "the inner type of `{}` is not an object",
-                                                fl.in_variable.1
-                                            ),
-                                            "object destructuring only works with arrays of objects",
+                                            E653,
+                                            [&fl.in_variable.1],
+                                            [&fl.in_variable.1]
                                         );
                                     }
                                 },
 
                                 _ => {
-                                    push_query_err(
+                                    generate_error!(
                                         ctx,
                                         original_query,
                                         fl.in_variable.0.clone(),
-                                        format!("`{}` is not an array", fl.in_variable.1),
-                                        "object destructuring only works with arrays of objects",
+                                        E651,
+                                        &fl.in_variable.1
                                     );
                                 }
                             }
@@ -191,15 +219,12 @@ pub(crate) fn validate_statements<'a>(
                                 );
                             }
                             false => {
-                                push_query_err(
+                                generate_error!(
                                     ctx,
                                     original_query,
                                     fl.in_variable.0.clone(),
-                                    format!(
-                                        "`{}` is not defined in the current scope",
-                                        fl.in_variable.1
-                                    ),
-                                    "add a statement assigning it before the loop",
+                                    E301,
+                                    &fl.in_variable.1
                                 );
                             }
                         },

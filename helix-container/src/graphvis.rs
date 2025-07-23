@@ -1,31 +1,25 @@
-use helix_macros::get_handler;
 use helix_db::{
-    helix_engine::{
-        storage_core::graph_visualization::GraphVisualization,
-        types::GraphError,
-    },
+    helix_engine::{storage_core::graph_visualization::GraphVisualization, types::GraphError},
     helix_gateway::router::router::HandlerInput,
     protocol::response::Response,
 };
+use helix_macros::get_handler;
 use serde_json::Value;
 use std::sync::Arc;
 
-#[get_handler]
+// #[get_handler]
 pub fn graphvis(input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
     let db = Arc::clone(&input.graph.storage);
     let txn = db.graph_env.read_txn()?;
 
-    let json_ne: String = match db.nodes_edges_to_json(
-        &txn,
-        None,
-        db.storage_config.graphvis_node_label.clone(),
-    ) {
-        Ok(value) => value,
-        Err(e) => {
-            println!("error with json: {}", e);
-            return Ok(());
-        }
-    };
+    let json_ne: String =
+        match db.nodes_edges_to_json(&txn, None, db.storage_config.graphvis_node_label.clone()) {
+            Ok(value) => value,
+            Err(e) => {
+                println!("error with json: {}", e);
+                return Ok(());
+            }
+        };
     let json_ne_m = modify_graph_json(&json_ne).unwrap();
 
     let db_counts: String = match db.get_db_stats_json(&txn) {
@@ -42,7 +36,10 @@ pub fn graphvis(input: &HandlerInput, response: &mut Response) -> Result<(), Gra
             return Ok(());
         }
     };
-    let num_nodes = json_ne_m["nodes"].as_array().map(|arr| arr.len()).unwrap_or(0);
+    let num_nodes = json_ne_m["nodes"]
+        .as_array()
+        .map(|arr| arr.len())
+        .unwrap_or(0);
 
     let html_template = include_str!("graphvis.html");
     let html_content = html_template
@@ -66,14 +63,11 @@ pub fn graphvis(input: &HandlerInput, response: &mut Response) -> Result<(), Gra
             "{NUM_VECTORS}",
             &serde_json::to_string(&db_counts_m["num_vectors"]).unwrap(),
         )
-        .replace(
-            "{NUM_NODES_SHOWING}",
-            &num_nodes.to_string(),
-        );
+        .replace("{NUM_NODES_SHOWING}", &num_nodes.to_string());
 
-    response
-        .headers
-        .insert("Content-Type".to_string(), "text/html".to_string());
+    // response
+    //     .headers
+    //     .insert("Content-Type".to_string(), "text/html".to_string());
     response.body = html_content.as_bytes().to_vec();
     Ok(())
 }
@@ -100,4 +94,3 @@ fn modify_graph_json(input: &str) -> Result<Value, serde_json::Error> {
 
     Ok(json)
 }
-
