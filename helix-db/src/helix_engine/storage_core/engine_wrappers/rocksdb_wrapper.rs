@@ -2,9 +2,9 @@
 use crate::helix_engine::storage_core::engine_wrapper::{Database, Table};
 use crate::helix_engine::storage_core::engine_wrapper::{HelixIterator, RTxn, Storage, WTxn};
 use crate::helix_engine::types::GraphError;
-use std::marker::PhantomData;
 #[cfg(feature = "rocks")]
 use num_cpus;
+use std::marker::PhantomData;
 
 #[cfg(feature = "rocks")]
 pub enum U128 {}
@@ -12,9 +12,42 @@ pub enum U128 {}
 #[cfg(feature = "rocks")]
 pub enum Bytes {}
 
+#[cfg(feature = "rocksdb")]
+impl<'a> RTxn<'a> {
+    pub fn get_txn(
+        &'a self,
+    ) -> &'a rocksdb::Transaction<'a, rocksdb::TransactionDB<rocksdb::SingleThreaded>> {
+        return &self.txn;
+    }
+}
+
 #[cfg(feature = "rocks")]
-impl<'a> Storage<'a> for rocksdb::ColumnFamilyRef<'a> {
-    fn get_data(&self, txn: &'a RTxn<'a>, key: &[u8]) -> Result<Option<Vec<u8>>, GraphError> {
+impl<'env> Storage for rocksdb::ColumnFamilyRef<'env> {
+    type Key<'a> = &'a [u8];
+    type Value<'a> = &'a [u8];
+    type BasicIter<'a>
+        = rocksdb::DBIteratorWithThreadMode<
+        'a,
+        rocksdb::Transaction<'a, rocksdb::TransactionDB<rocksdb::SingleThreaded>>,
+    >
+    where
+        Self: 'a;
+    type PrefixIter<'a>
+        = rocksdb::DBIteratorWithThreadMode<
+        'a,
+        rocksdb::Transaction<'a, rocksdb::TransactionDB<rocksdb::SingleThreaded>>,
+    >
+    where
+        Self: 'a;
+    type DuplicateIter<'a>
+        = rocksdb::DBIteratorWithThreadMode<
+        'a,
+        rocksdb::Transaction<'a, rocksdb::TransactionDB<rocksdb::SingleThreaded>>,
+    >
+    where
+        Self: 'a;
+
+    fn get_data<'a>(&self, txn: &'a RTxn<'a>, key: Self::Key<'a>) -> Result<Option<Vec<u8>>, GraphError> {
         match txn
             .txn
             .get_pinned_cf(self, key) // TODO: Use a generic function to convert to bytes
@@ -26,24 +59,51 @@ impl<'a> Storage<'a> for rocksdb::ColumnFamilyRef<'a> {
         }
     }
 
-    fn put_data(&self, txn: &mut WTxn, key: &[u8], value: &[u8]) -> Result<(), GraphError> {
+    fn put_data<'a>(
+        &self,
+        txn: &'a mut WTxn<'a>,
+        key: Self::Key<'a>,
+        value: Self::Value<'a>,
+    ) -> Result<(), GraphError> {
         txn.txn
             .put_cf(self, key, value)
             .map_err(|e| GraphError::from(e))
     }
 
-    fn delete_data(&self, txn: &mut WTxn, key: &[u8]) -> Result<(), GraphError> {
+    fn delete_data<'a>(&self, txn: &'a mut WTxn<'a>, key: &[u8]) -> Result<(), GraphError> {
         txn.txn
             .delete_cf(self, key)
             .map_err(|e| GraphError::from(e))
     }
 
-    fn iter_data<M>(
-        &self,
+    fn iter_data<'a>(
+        &'a self,
         txn: &'a RTxn<'a>,
-    ) -> Result<HelixIterator<&'a [u8], &'a [u8], M>, GraphError> {
+    ) -> Result<HelixIterator<'a, Self::BasicIter<'a>>, GraphError> {
         Ok(HelixIterator {
             iter: txn.txn.iterator_cf(self, rocksdb::IteratorMode::Start),
+            _phantom: PhantomData,
+        })
+    }
+
+    fn prefix_iter_data<'a>(
+        &'a self,
+        txn: &'a RTxn<'a>,
+        prefix: Self::Key<'a>,
+    ) -> Result<HelixIterator<'a, Self::PrefixIter<'a>>, GraphError> {
+        Ok(HelixIterator {
+            iter: txn.txn.prefix_iterator_cf(self, prefix),
+            _phantom: PhantomData,
+        })
+    }
+
+    fn get_duplicate_data<'a>(
+        &'a self,
+        txn: &'a RTxn<'a>,
+        key: Self::Key<'a>,
+    ) -> Result<HelixIterator<'a, Self::DuplicateIter<'a>>, GraphError> {
+        Ok(HelixIterator {
+            iter: txn.txn.prefix_iterator_cf(self, key),
             _phantom: PhantomData,
         })
     }
@@ -123,7 +183,6 @@ impl Database for rocksdb::TransactionDB<rocksdb::SingleThreaded> {
         })
     }
 
-    
     fn config() -> rocksdb::Options {
         let mut opts = rocksdb::Options::default();
         opts.create_if_missing(true);

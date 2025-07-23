@@ -7,24 +7,27 @@ use serde::{Deserialize, de::DeserializeOwned};
 #[cfg(feature = "rocksdb")]
 use crate::helix_engine::storage_core::engine_wrappers::rocksdb_wrapper::{Bytes, U128};
 
+#[cfg(feature = "lmdb")]
+use crate::helix_engine::storage_core::engine_wrappers::lmdb_wrapper::{Bytes, U128};
+
 use crate::helix_engine::types::GraphError;
 
-pub(crate) trait Txn<'a>: Sized {
+pub trait Txn<'a>: Sized {
     fn commit_txn(self) -> Result<(), GraphError>;
     fn abort_txn(self) -> Result<(), GraphError>;
 }
 
-pub(crate) struct HelixIterator<'a, K, V, M> {
+pub struct HelixIterator<'a, I: Iterator> {
     #[cfg(feature = "rocksdb")]
     pub iter: rocksdb::DBIteratorWithThreadMode<
         'a,
         rocksdb::Transaction<'a, rocksdb::TransactionDB<rocksdb::SingleThreaded>>,
     >,
     #[cfg(feature = "lmdb")]
-    pub iter: heed3::RoIter<'a, Bytes, heed3::types::LazyDecode<Bytes>, M>,
+    pub iter: I,
     #[cfg(feature = "in_memory")]
     pub iter: skipdb::Iter<'a, K, V>,
-    pub(super) _phantom: PhantomData<(K, V, M)>,
+    pub(super) _phantom: PhantomData<(&'a I)>,
 }
 
 pub struct RTxn<'a> {
@@ -39,31 +42,6 @@ pub struct RTxn<'a> {
         OptimisticDb<&'a [u8], &'a [u8]>,
         txn_core::sync::HashCm<&'a [u8]>,
     >,
-}
-impl<'a> RTxn<'a> {
-    #[cfg(feature = "lmdb")]
-    pub fn get_txn(&'a self) -> &'a heed3::RoTxn<'a> {
-        return &self.txn;
-    }
-
-    #[cfg(feature = "rocksdb")]
-    pub fn get_txn(
-        &'a self,
-    ) -> &'a rocksdb::Transaction<'a, rocksdb::TransactionDB<rocksdb::SingleThreaded>> {
-        return &self.txn;
-    }
-
-    #[cfg(feature = "in_memory")]
-    pub fn get_txn(
-        &'a self,
-    ) -> &'a skipdb::ReadTransaction<
-        &'a [u8],
-        &'a [u8],
-        OptimisticDb<&'a [u8], &'a [u8]>,
-        txn_core::sync::HashCm<&'a [u8]>,
-    > {
-        return &self.txn;
-    }
 }
 
 pub struct WTxn<'a> {
@@ -124,13 +102,37 @@ impl<'a> Txn<'a> for RTxn<'a> {
     }
 }
 
-pub trait Storage<'a, K, V> {
-    fn get_data(&self, txn: &'a RTxn<'a>, key: K) -> Result<Option<Vec<u8>>, GraphError>;
+pub trait Storage {
+    type Key<'a>;
+    type Value<'a>;
+    type BasicIter<'a>: Iterator
+    where
+        Self: 'a;
+    type PrefixIter<'a>: Iterator
+    where
+        Self: 'a;
+    type DuplicateIter<'a>: Iterator
+    where
+        Self: 'a;
 
-    fn put_data(&self, txn: &'a mut WTxn<'a>, key: K, value: V) -> Result<(), GraphError>;
-    fn delete_data(&self, txn: &'a mut WTxn<'a>, key: K) -> Result<(), GraphError>;
-    fn iter_data<M>(&self, txn: &'a RTxn<'a>)
-    -> Result<HelixIterator<K, V, M>, GraphError>;
+    fn get_data<'a>(&self, txn: &'a RTxn<'a>, key: Self::Key<'a>) -> Result<Option<Vec<u8>>, GraphError>;
+    fn put_data<'a>(&self, txn: &'a mut WTxn<'a>, key: Self::Key<'a>, value: Self::Value<'a>)
+    -> Result<(), GraphError>;
+    fn delete_data<'a>(&self, txn: &'a mut WTxn<'a>, key: Self::Key<'a>) -> Result<(), GraphError>;
+    fn iter_data<'a>(
+        &'a self,
+        txn: &'a RTxn<'a>,
+    ) -> Result<HelixIterator<'a, Self::BasicIter<'a>>, GraphError>;
+    fn prefix_iter_data<'a>(
+        &'a self,
+        txn: &'a RTxn<'a>,
+        prefix: Self::Key<'a>,
+    ) -> Result<HelixIterator<'a, Self::PrefixIter<'a>>, GraphError>;
+    fn get_duplicate_data<'a>(
+        &'a self,
+        txn: &'a RTxn<'a>,
+        key: Self::Key<'a>,
+    ) -> Result<HelixIterator<'a, Self::DuplicateIter<'a>>, GraphError>;
 }
 
 pub struct Table<'a, K, V> {
@@ -175,12 +177,8 @@ pub const INDICES_DB: &str = "indices";
 pub const OUT_EDGES_DB: &str = "out_edges";
 pub const IN_EDGES_DB: &str = "in_edges";
 
-#[cfg(feature = "lmdb")]
-pub type U128 = heed3::types::U128<heed3::byteorder::BE>;
 #[cfg(feature = "in_memory")]
 pub enum U128 {}
 
-#[cfg(feature = "lmdb")]
-pub type Bytes = heed3::types::Bytes;
 #[cfg(feature = "in_memory")]
 pub enum Bytes {}
