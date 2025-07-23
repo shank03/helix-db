@@ -1203,21 +1203,7 @@ dependencies = [
 name = "helix-container"
 version = "0.1.0"
 dependencies = [
- "async-trait",
- "chrono",
- "dirs 5.0.1",
- "heed3",
  "helix-db",
- "helix-macros",
- "inventory",
- "rand 0.9.1",
- "serde",
- "serde_json",
- "sonic-rs",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
 ]
 
 [[package]]
@@ -1229,6 +1215,7 @@ dependencies = [
  "bincode",
  "chrono",
  "core_affinity",
+ "dirs 6.0.0",
  "flume",
  "heed3",
  "helix-macros",
@@ -1250,6 +1237,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+ "tracing-subscriber",
  "twox-hash",
  "url",
  "uuid",

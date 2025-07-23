@@ -1,17 +1,4 @@
-use helix_db::helix_engine::graph_core::config::Config;
-use helix_db::helix_engine::graph_core::graph_core::{HelixGraphEngine, HelixGraphEngineOpts};
-use helix_db::helix_gateway::mcp::mcp::{MCPHandlerFn, MCPHandlerSubmission};
-use helix_db::helix_gateway::{
-    gateway::{GatewayOpts, HelixGateway},
-    router::router::{HandlerFn, HandlerSubmission},
-};
-use inventory;
-use std::{collections::HashMap, sync::Arc};
-use tracing::Level;
-use tracing_subscriber::util::SubscriberInitExt;
-
-mod graphvis;
-mod queries;
+use helix_db::helixc::prelude::bin::*;
 
 fn main() {
     tracing_subscriber::fmt()
@@ -63,23 +50,6 @@ fn main() {
             (handler.name.to_string(), func)
         })
         .collect();
-
-    // collect GET routes
-    // let get_routes: HashMap<(String, String), HandlerFn> = inventory::iter::<HandlerSubmission>
-    //     .into_iter()
-    //     .map(|submission| {
-    //         println!("Processing GET submission for handler: {}", submission.0.name);
-    //         let handler = &submission.0;
-    //         let func: HandlerFn = Arc::new(move |input, response| (handler.func)(input, response));
-    //         (
-    //             (
-    //                 "GET".to_string(),
-    //                 format!("/get/{}", handler.name.to_string()),
-    //             ),
-    //             func,
-    //         )
-    //     })
-    // .collect();
 
     let mcp_routes = inventory::iter::<MCPHandlerSubmission>
         .into_iter()
