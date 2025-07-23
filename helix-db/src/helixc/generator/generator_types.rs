@@ -280,9 +280,8 @@ impl Display for Query {
             }
         }
 
-        writeln!(f, "}}")?;
-        writeln!(f, "    Ok(())")?;
-        writeln!(f, "}}")
+        write!(f, "}}\n")?;
+        write!(f, "}}\n")
     }
 }
 impl Default for Query {

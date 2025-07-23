@@ -516,7 +516,6 @@ fn validate_property_access<'a>(
     cur_ty: &Type,
     fields: Option<HashMap<&'a str, Cow<'a, Field>>>,
 ) {
-    assert!(fields.is_some());
     match fields {
         Some(_) => {
             // if there is only one field then it is a property access
@@ -592,6 +591,14 @@ fn validate_property_access<'a>(
                 generate_error!(ctx, original_query, obj.fields[0].value.loc.clone(), E645);
             }
         }
-        None => unreachable!(),
+        None => {
+            generate_error!(
+                ctx,
+                original_query,
+                obj.fields[0].value.loc.clone(),
+                E201,
+                &cur_ty.get_type_name()
+            );
+        }
     }
 }

@@ -52,7 +52,7 @@ pub fn handler(args: TokenStream, item: TokenStream) -> TokenStream {
     let expanded = quote! {
         #[allow(non_camel_case_types)]
         #vis #sig {
-            let data = &*input.request.in_fmt.deserialize::<#input_data_name>(&input.request.body)?;
+            let data = input.request.in_fmt.deserialize::<#input_data_name>(&input.request.body)?;
 
             let mut remapping_vals = RemappingMap::new();
             let db = Arc::clone(&input.graph.storage);
@@ -236,10 +236,7 @@ pub fn tool_calls(_attr: TokenStream, input: TokenStream) -> TokenStream {
                 pub fn #fn_name<'a>(
                     input: &'a mut MCPToolInput,
                 ) -> Result<Response, GraphError> {
-                    let data: #struct_name = match sonic_rs::from_slice(&input.request.body) {
-                        Ok(data) => data,
-                        Err(err) => return Err(GraphError::from(err)),
-                    };
+                    let data = input.request.in_fmt.deserialize_owned::<#struct_name>(&input.request.body)?;
 
                     let mut connections = input.mcp_connections.lock().unwrap();
                     let mut connection = match connections.remove_connection(&data.connection_id) {
@@ -341,10 +338,7 @@ pub fn tool_call(args: TokenStream, input: TokenStream) -> TokenStream {
         pub fn #mcp_function_name<'a>(
             input: &'a mut MCPToolInput,
         ) -> Result<Response, GraphError> {
-            let data: #mcp_struct_name = match sonic_rs::from_slice(&input.request.body) {
-                Ok(data) => data,
-                Err(err) => return Err(GraphError::from(err)),
-            };
+            let data = &*input.request.in_fmt.deserialize::<#mcp_struct_name>(&input.request.body)?;
 
             let mut connections = input.mcp_connections.lock().unwrap();
             let mut connection = match connections.remove_connection(&data.connection_id) {
