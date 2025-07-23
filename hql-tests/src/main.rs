@@ -339,7 +339,7 @@ async fn main() -> Result<()> {
         }
 
         process_file_parallel(*file_num, &current_dir, &temp_repo, &github_config).await?;
-        println!("✅ Successfully processed file{}", file_num);
+        println!("✅ Successfully processed file{file_num}");
     } else if let Some(batch_args) = matches.get_many::<u32>("batch") {
         // Process in batch mode
         let batch_values: Vec<u32> = batch_args.copied().collect();
@@ -396,14 +396,14 @@ async fn main() -> Result<()> {
             let file_num = start_file + i as u32;
             match task.await {
                 Ok(Ok(())) => {
-                    println!("Successfully processed file{}", file_num);
+                    println!("Successfully processed file{file_num}");
                 }
                 Ok(Err(e)) => {
-                    eprintln!("Error processing file{}: {}", file_num, e);
+                    eprintln!("Error processing file{file_num}: {e}");
                     failed_files.push(file_num);
                 }
                 Err(e) => {
-                    eprintln!("Task error for file{}: {}", file_num, e);
+                    eprintln!("Task error for file{file_num}: {e}");
                     failed_files.push(file_num);
                 }
             }
@@ -419,8 +419,7 @@ async fn main() -> Result<()> {
         }
 
         println!(
-            "✅ Finished processing batch {}/{} successfully",
-            current_batch, total_batches
+            "✅ Finished processing batch {current_batch}/{total_batches} successfully"
         );
     } else {
         // Process all files in parallel (default behavior)
@@ -443,14 +442,14 @@ async fn main() -> Result<()> {
             let file_num = i as u32 + 1;
             match task.await {
                 Ok(Ok(())) => {
-                    println!("Successfully processed file{}", file_num);
+                    println!("Successfully processed file{file_num}");
                 }
                 Ok(Err(e)) => {
-                    eprintln!("Error processing file{}: {}", file_num, e);
+                    eprintln!("Error processing file{file_num}: {e}");
                     failed_files.push(file_num);
                 }
                 Err(e) => {
-                    eprintln!("Task error for file{}: {}", file_num, e);
+                    eprintln!("Task error for file{file_num}: {e}");
                     failed_files.push(file_num);
                 }
             }
@@ -540,8 +539,7 @@ async fn process_file_parallel(
         let stdout = String::from_utf8_lossy(&output.stdout);
         // For helix compilation, we'll show the raw output since it's not cargo format
         let error_message = format!(
-            "❌ HELIX COMPILE FAILED for file{}\nStderr: {}\nStdout: {}",
-            file_num, stderr, stdout
+            "❌ HELIX COMPILE FAILED for file{file_num}\nStderr: {stderr}\nStdout: {stdout}"
         );
 
         // Create GitHub issue if configuration is available
@@ -591,7 +589,7 @@ async fn process_file_parallel(
             let stderr = String::from_utf8_lossy(&output.stderr);
             let _stdout = String::from_utf8_lossy(&output.stdout);
             // let filtered_errors = extract_cargo_errors(&stderr, &stdout);
-            let error_message = format!("❌ CARGO CHECK FAILED for file{}\n{}", file_num, stderr);
+            let error_message = format!("❌ CARGO CHECK FAILED for file{file_num}\n{stderr}");
 
             // Create GitHub issue if configuration is available
             if let Some(config) = github_config {

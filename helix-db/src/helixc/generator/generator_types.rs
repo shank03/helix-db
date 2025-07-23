@@ -280,8 +280,8 @@ impl Display for Query {
             }
         }
 
-        write!(f, "}}\n")?;
-        write!(f, "}}\n")
+        writeln!(f, "}}")?;
+        writeln!(f, "}}")
     }
 }
 impl Default for Query {
