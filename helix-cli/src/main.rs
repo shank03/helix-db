@@ -679,8 +679,19 @@ async fn main() -> Result<(), ()> {
             let instance_manager = InstanceManager::new().unwrap();
             let iid = &command.cluster;
 
+            if iid.is_none() && !command.all {
+                println!("{}", "Need to pass either an instance or `--all`!".red().bold());
+                return Err(());
+            }
+
+            if instance_manager.list_instances().unwrap().len() == 0 {
+                println!("{}", "No instances running!".yellow().bold());
+                return Err(());
+            }
+
             if !command.all {
-                match instance_manager.get_instance(iid) {
+                let iid = iid.as_ref().unwrap();
+                match instance_manager.get_instance(&iid) {
                     Ok(Some(_)) => println!("{}", "Helix instance found!".green().bold()),
                     Ok(None) => {
                         println!(
@@ -694,16 +705,6 @@ async fn main() -> Result<(), ()> {
                         println!("{} {}", "Error:".red().bold(), e);
                         return Err(());
                     }
-                }
-
-                match instance_manager.stop_instance(iid) {
-                    Ok(true) => println!(
-                        "{} {}",
-                        "Stopped instance".green().bold(),
-                        iid.green().bold()
-                    ),
-                    Ok(false) => {}
-                    Err(e) => println!("{} {}", "Error while stopping instance".red().bold(), e),
                 }
             }
 
@@ -723,10 +724,27 @@ async fn main() -> Result<(), ()> {
                         to_delete.push(inst.id.to_string());
                     }
                 } else {
+                    let iid = match iid {
+                        Some(val) => val,
+                        None => {
+                            println!("{}", "Need to pass either an instance or `--all`!".red().bold());
+                            return Err(());
+                        },
+                    };
                     to_delete.push(iid.to_string());
                 }
 
                 for del_iid in to_delete {
+                    match instance_manager.stop_instance(&del_iid) {
+                        Ok(true) => println!(
+                            "{} {}",
+                            "Stopped instance".green().bold(),
+                            del_iid.green().bold()
+                        ),
+                        Ok(false) => {}
+                        Err(e) => println!("{} {}", "Error while stopping instance".red().bold(), e),
+                    }
+
                     match instance_manager.delete_instance(&del_iid) {
                         Ok(_) => println!("{}", "Deleted Helix instance".green().bold()),
                         Err(e) => println!("{} {}", "Error while deleting instance".red().bold(), e),
