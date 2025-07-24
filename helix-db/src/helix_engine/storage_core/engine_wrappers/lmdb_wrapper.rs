@@ -52,13 +52,26 @@ impl<'a> HelixEnv<'a> {
     }
 }
 
+trait EncodeShim<'a>: BytesEncode<'a> {
+    fn to_eitem(&'a self) -> &'a Self::EItem;
+}
+
+impl<'a, T> EncodeShim<'a> for T
+where
+    T: BytesEncode<'a, EItem = T>,
+{
+    fn to_eitem(&'a self) -> &'a Self::EItem {
+        self
+    }
+}
+
 #[cfg(feature = "lmdb")]
 impl<'a, K> Storage<'a> for Table<'a, K, Bytes>
 where
-    K: BytesEncode<'a> + BytesDecode<'a>,
+    K: EncodeShim<'a> + BytesDecode<'a>,
 {
-    type Key = K;
-    type Value = Bytes;
+    type Key = &'a K;
+    type Value = &'a [u8];
     type BasicIter
         = heed3::RoIter<'a, K, heed3::types::LazyDecode<Bytes>>
     where
@@ -72,8 +85,12 @@ where
     where
         Self: 'a;
 
-    fn get_data(&self, txn: &'a RTxn<'a>, key: K ) -> Result<Option<&'a [u8]>, GraphError> {
-        Ok(self.table.get(txn.get_txn(), &key)?)
+    fn get_data(
+        &self,
+        txn: &'a RTxn<'a>,
+        key: Self::Key,
+    ) -> Result<Option<Self::Value>, GraphError> {
+        Ok(self.table.get(txn.get_txn(), key.to_eitem())?)
     }
 
     fn put_data<'tx>(
