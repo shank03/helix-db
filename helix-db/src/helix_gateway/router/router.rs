@@ -118,7 +118,7 @@ impl HelixRouter {
                     request,
                     graph: graph_access.clone(),
                 };
-                return graphvis::graphvis_inner(&input).map_err(Into::into);
+                return graphvis::graphvis_inner(&input);
             }
         }
 
