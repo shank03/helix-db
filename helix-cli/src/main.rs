@@ -82,7 +82,6 @@ async fn main() -> Result<(), ()> {
                 .unwrap_or_else(|| PathBuf::from("./"))
                 .join(".helix/repo/helix-db/helix-container");
             let start_port = command.port.unwrap_or(6969);
-            
 
             let path = get_cfg_deploy_path(command.path.clone());
             let files = match check_and_read_files(&path) {
@@ -653,62 +652,95 @@ async fn main() -> Result<(), ()> {
             let instance_manager = InstanceManager::new().unwrap();
             let iid = &command.cluster;
 
-            match instance_manager.get_instance(iid) {
-                Ok(Some(_)) => println!("{}", "Helix instance found!".green().bold()),
-                Ok(None) => {
-                    println!(
-                        "{} {}",
-                        "No Helix instance found with id".red().bold(),
-                        iid.red().bold()
-                    );
-                    return Err(());
-                }
-                Err(e) => {
-                    println!("{} {}", "Error:".red().bold(), e);
-                    return Err(());
-                }
+            if iid.is_none() && !command.all {
+                println!("{}", "Need to pass either an instance or `--all`!".red().bold());
+                return Err(());
             }
 
-            match instance_manager.stop_instance(iid) {
-                Ok(true) => println!(
-                    "{} {}",
-                    "Stopped instance".green().bold(),
-                    iid.green().bold()
-                ),
-                Ok(false) => {}
-                Err(e) => println!("{} {}", "Error while stopping instance".red().bold(), e),
+            if instance_manager.list_instances().unwrap().is_empty() {
+                println!("{}", "No instances running!".yellow().bold());
+                return Err(());
+            }
+
+            if !command.all {
+                let iid = iid.as_ref().unwrap();
+                match instance_manager.get_instance(iid) {
+                    Ok(Some(_)) => println!("{}", "Helix instance found!".green().bold()),
+                    Ok(None) => {
+                        println!(
+                            "{} {}",
+                            "No Helix instance found with id".red().bold(),
+                            iid.red().bold()
+                        );
+                        return Err(());
+                    }
+                    Err(e) => {
+                        println!("{} {}", "Error:".red().bold(), e);
+                        return Err(());
+                    }
+                }
             }
 
             let mut _del_prompt: bool = false;
-            print!("Are you sure you want to delete the instance and its data? (y/n): ");
+            print!("Are you sure you want to delete the specified instances and their data? (y/n): ");
             std::io::stdout().flush().unwrap();
             let mut input = String::new();
             std::io::stdin().read_line(&mut input).unwrap();
             _del_prompt = input.trim().to_lowercase() == "y";
 
             if _del_prompt {
-                match instance_manager.delete_instance(iid) {
-                    Ok(_) => println!("{}", "Deleted Helix instance".green().bold()),
-                    Err(e) => println!("{} {}", "Error while deleting instance".red().bold(), e),
+                let mut to_delete: Vec<String> = vec![];
+
+                if command.all {
+                    let instances = instance_manager.list_instances().unwrap();
+                    for inst in instances {
+                        to_delete.push(inst.id.to_string());
+                    }
+                } else {
+                    let iid = match iid {
+                        Some(val) => val,
+                        None => {
+                            println!("{}", "Need to pass either an instance or `--all`!".red().bold());
+                            return Err(());
+                        },
+                    };
+                    to_delete.push(iid.to_string());
                 }
 
-                let home_dir =
-                    std::env::var("HOME").expect("Failed to get HOME environment variable");
-                let instance_path = format!("{home_dir}/.helix/cached_builds/data/{iid}");
-                let binary_path = format!("{home_dir}/.helix/cached_builds/{iid}");
-                let log_path = format!("{home_dir}/.helix/logs/instance_{iid}.log");
-                let error_log_path = format!("{home_dir}/.helix/logs/instance_{iid}_error.log");
+                for del_iid in to_delete {
+                    match instance_manager.stop_instance(&del_iid) {
+                        Ok(true) => println!(
+                            "{} {}",
+                            "Stopped instance".green().bold(),
+                            del_iid.green().bold()
+                        ),
+                        Ok(false) => {}
+                        Err(e) => println!("{} {}", "Error while stopping instance".red().bold(), e),
+                    }
 
-                let mut runner = Command::new("rm");
-                runner.arg("-r");
-                runner.arg(instance_path);
-                runner.arg(binary_path);
-                runner.arg(log_path);
-                runner.arg(error_log_path);
+                    match instance_manager.delete_instance(&del_iid) {
+                        Ok(_) => println!("{}", "Deleted Helix instance".green().bold()),
+                        Err(e) => println!("{} {}", "Error while deleting instance".red().bold(), e),
+                    }
 
-                match runner.output() {
-                    Ok(_) => println!("{}", "Deleted Helix instance data".green().bold()),
-                    Err(e) => println!("{} {}", "Error while deleting data:".red().bold(), e),
+                    let home_dir =
+                        std::env::var("HOME").expect("Failed to get HOME environment variable");
+                    let instance_path = format!("{home_dir}/.helix/cached_builds/data/{del_iid}");
+                    let binary_path = format!("{home_dir}/.helix/cached_builds/{del_iid}");
+                    let log_path = format!("{home_dir}/.helix/logs/instance_{del_iid}.log");
+                    let error_log_path = format!("{home_dir}/.helix/logs/instance_{del_iid}_error.log");
+
+                    let mut runner = Command::new("rm");
+                    runner.arg("-r");
+                    runner.arg(instance_path);
+                    runner.arg(binary_path);
+                    runner.arg(log_path);
+                    runner.arg(error_log_path);
+
+                    match runner.output() {
+                        Ok(_) => println!("{}", "Deleted Helix instance data".green().bold()),
+                        Err(e) => println!("{} {}", "Error while deleting data:".red().bold(), e),
+                    }
                 }
             }
         }
