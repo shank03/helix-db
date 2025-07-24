@@ -1,7 +1,7 @@
 use crate::{
     helix_engine::{storage_core::graph_visualization::GraphVisualization, types::GraphError},
     helix_gateway::{router::router::HandlerInput, worker_pool::WorkerPool},
-    protocol::{self, HelixError},
+    protocol::{self, HelixError, request::RequestType},
 };
 use axum::{body::Body, extract::State, http::HeaderValue, response::IntoResponse};
 use serde_json::Value;
@@ -10,8 +10,9 @@ use tracing::info;
 
 pub async fn graphvis_handler(
     State(pool): State<Arc<WorkerPool>>,
-    req: protocol::request::Request,
+    mut req: protocol::request::Request,
 ) -> axum::http::Response<Body> {
+    req.req_type = RequestType::GraphVis;
     let res = pool.process(req).await;
 
     match res {
