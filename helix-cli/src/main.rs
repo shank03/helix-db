@@ -664,7 +664,7 @@ async fn main() -> Result<(), ()> {
 
             if !command.all {
                 let iid = iid.as_ref().unwrap();
-                match instance_manager.get_instance(&iid) {
+                match instance_manager.get_instance(iid) {
                     Ok(Some(_)) => println!("{}", "Helix instance found!".green().bold()),
                     Ok(None) => {
                         println!(
@@ -725,10 +725,10 @@ async fn main() -> Result<(), ()> {
 
                     let home_dir =
                         std::env::var("HOME").expect("Failed to get HOME environment variable");
-                    let instance_path = format!("{}/.helix/cached_builds/data/{}", home_dir, del_iid);
-                    let binary_path = format!("{}/.helix/cached_builds/{}", home_dir, del_iid);
-                    let log_path = format!("{}/.helix/logs/instance_{}.log", home_dir, del_iid);
-                    let error_log_path = format!("{}/.helix/logs/instance_{}_error.log", home_dir, del_iid);
+                    let instance_path = format!("{home_dir}/.helix/cached_builds/data/{del_iid}");
+                    let binary_path = format!("{home_dir}/.helix/cached_builds/{del_iid}");
+                    let log_path = format!("{home_dir}/.helix/logs/instance_{del_iid}.log");
+                    let error_log_path = format!("{home_dir}/.helix/logs/instance_{del_iid}_error.log");
 
                     let mut runner = Command::new("rm");
                     runner.arg("-r");
