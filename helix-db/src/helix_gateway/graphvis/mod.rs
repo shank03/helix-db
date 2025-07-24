@@ -1,42 +1,45 @@
-use helix_db::{
+use crate::{
     helix_engine::{storage_core::graph_visualization::GraphVisualization, types::GraphError},
-    helix_gateway::router::router::HandlerInput,
-    protocol::response::Response,
+    helix_gateway::{router::router::HandlerInput, worker_pool::WorkerPool},
+    protocol::{self, HelixError},
 };
-// use helix_macros::get_handler;
+use axum::{body::Body, extract::State, http::HeaderValue, response::IntoResponse};
 use serde_json::Value;
 use std::sync::Arc;
+use tracing::info;
 
-// #[get_handler]
-#[allow(unused)]
-pub fn graphvis(input: &HandlerInput, response: &mut Response) -> Result<(), GraphError> {
+pub async fn graphvis_handler(
+    State(pool): State<Arc<WorkerPool>>,
+    req: protocol::request::Request,
+) -> axum::http::Response<Body> {
+    let res = pool.process(req).await;
+
+    match res {
+        Ok(r) => {
+            let mut out = r.into_response();
+            out.headers_mut()
+                .insert("Content-Type", HeaderValue::from_static("text/html"));
+            out
+        }
+        Err(e) => {
+            info!(?e, "Got error");
+            e.into_response()
+        }
+    }
+}
+
+pub fn graphvis_inner(input: &HandlerInput) -> Result<protocol::Response, HelixError> {
     let db = Arc::clone(&input.graph.storage);
-    let txn = db.graph_env.read_txn()?;
+    let txn = db.graph_env.read_txn().map_err(GraphError::from)?;
 
     let json_ne: String =
-        match db.nodes_edges_to_json(&txn, None, db.storage_config.graphvis_node_label.clone()) {
-            Ok(value) => value,
-            Err(e) => {
-                println!("error with json: {e}");
-                return Ok(());
-            }
-        };
+        db.nodes_edges_to_json(&txn, None, db.storage_config.graphvis_node_label.clone())?;
+
     let json_ne_m = modify_graph_json(&json_ne).unwrap();
 
-    let db_counts: String = match db.get_db_stats_json(&txn) {
-        Ok(value) => value,
-        Err(e) => {
-            println!("error with json: {e:?}");
-            return Ok(());
-        }
-    };
-    let db_counts_m: Value = match serde_json::from_str(&db_counts) {
-        Ok(value) => value,
-        Err(e) => {
-            println!("error with json: {e:?}");
-            return Ok(());
-        }
-    };
+    let db_counts: String = db.get_db_stats_json(&txn)?;
+    let db_counts_m: Value =
+        serde_json::from_str(&db_counts).map_err(|e| GraphError::New(e.to_string()))?;
     let num_nodes = json_ne_m["nodes"]
         .as_array()
         .map(|arr| arr.len())
@@ -66,11 +69,11 @@ pub fn graphvis(input: &HandlerInput, response: &mut Response) -> Result<(), Gra
         )
         .replace("{NUM_NODES_SHOWING}", &num_nodes.to_string());
 
-    // response
-    //     .headers
-    //     .insert("Content-Type".to_string(), "text/html".to_string());
-    response.body = html_content.as_bytes().to_vec();
-    Ok(())
+    // This is a hack for the moment
+    Ok(protocol::Response {
+        body: html_content.into_bytes(),
+        fmt: Default::default(),
+    })
 }
 
 fn modify_graph_json(input: &str) -> Result<Value, serde_json::Error> {
