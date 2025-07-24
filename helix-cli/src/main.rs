@@ -93,6 +93,7 @@ async fn main() -> Result<(), ()> {
             };
 
             let path = get_cfg_deploy_path(command.path.clone());
+            println!("looking in path {path}");
             let files = match check_and_read_files(&path) {
                 Ok(files) if !files.is_empty() => files,
                 Ok(_) => {
@@ -104,6 +105,8 @@ async fn main() -> Result<(), ()> {
                     return Err(());
                 }
             };
+
+            println!("got files {files:?}");
 
             if !command.remote {
                 let code = match compile_and_build_helix(path, &output, files) {

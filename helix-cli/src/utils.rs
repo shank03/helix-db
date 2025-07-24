@@ -557,6 +557,8 @@ pub fn compile_and_build_helix(
     output: &PathBuf,
     files: Vec<DirEntry>,
 ) -> Result<Content, String> {
+    println!("compile and build called");
+
     let mut sp = Spinner::new(Spinners::Dots9, "Compiling Helix queries".into());
 
     let num_files = files.len();
@@ -580,7 +582,6 @@ pub fn compile_and_build_helix(
     let cache_dir = PathBuf::from(&output);
     fs::create_dir_all(&cache_dir).unwrap();
 
-    let file_path = PathBuf::from(&output).join("src/queries.rs");
     let mut generated_rust_code = String::from(BIN_TEMPLATE);
 
     match write!(
@@ -616,20 +617,30 @@ pub fn compile_and_build_helix(
     let schema_path = PathBuf::from(&output).join("src/schema.hx");
     fs::copy(PathBuf::from(path.to_string() + "/schema.hx"), schema_path).unwrap();
 
-    let mut runner = Command::new("rustc");
-    runner
-        .arg("-")
+    let mut cmd = Command::new("rustc");
+
+    let build_dir_path = "/Users/rd/Coding/HelixDB/helix-db/target/release";
+
+    cmd.arg("-")
         .args(["-C", "link-args=-rdynamic"])
         .arg("--extern")
-        .arg(format!(
-            "helix_db={}",
-            "/Users/rd/Coding/HelixDB/helix-db/target/release/libhelix_db.rlib"
-        ))
+        .arg(format!("helix_db={build_dir_path}/libhelix_db.rlib",))
+        .arg("-L")
+        .arg(format!("dependency={build_dir_path}/deps",))
+        .arg("-L")
+        .arg(format!("dependency={build_dir_path}/",))
         .arg("-o")
         .arg("instance")
         .stdin(std::process::Stdio::piped());
 
-    let res = runner.spawn().unwrap().wait_with_output().unwrap();
+    let mut child = cmd.spawn().unwrap();
+
+    {
+        let mut stdin = child.stdin.take().unwrap();
+        stdin.write_all(generated_rust_code.as_bytes()).unwrap();
+    }
+
+    let status = child.wait_with_output().unwrap();
 
     todo!();
 

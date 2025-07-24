@@ -1,3 +1,4 @@
+extern crate helix_db;
 use helix_db::helixc::prelude::bin::*;
 
 fn main() {
