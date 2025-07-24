@@ -243,9 +243,9 @@ impl VectorCore {
         F: Fn(&HVector, &RoTxn) -> bool,
     {
         let m: usize = if level == 0 {
-            self.config.m
-        } else {
             self.config.m_max_0
+        } else {
+            self.config.m
         };
         let mut visited: HashSet<String> = HashSet::new();
         if should_extend {
@@ -485,18 +485,11 @@ impl HNSW for VectorCore {
             for e in neighbors {
                 let id = e.get_id();
                 let e_conns = self.get_neighbors::<F>(txn, id, level, None)?;
-                if e_conns.len()
-                    > if level == 0 {
-                        self.config.m_max_0
-                    } else {
-                        self.config.m_max_0
-                    }
-                {
-                    let e_conns = BinaryHeap::from(e_conns);
-                    let e_new_conn =
-                        self.select_neighbors::<F>(txn, &query, e_conns, level, true, None)?;
-                    self.set_neighbours(txn, id, &e_new_conn, level)?;
-                }
+
+                let e_conns = BinaryHeap::from(e_conns);
+                let e_new_conn =
+                    self.select_neighbors::<F>(txn, &query, e_conns, level, true, None)?;
+                self.set_neighbours(txn, id, &e_new_conn, level)?;
             }
         }
 
