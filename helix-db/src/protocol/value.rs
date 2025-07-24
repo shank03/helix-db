@@ -1,18 +1,16 @@
+use crate::utils::id::ID;
 use crate::{helix_engine::types::GraphError, helixc::generator::utils::GenRef};
 use chrono::Utc;
 use serde::{
     Deserializer, Serializer,
     de::{DeserializeSeed, VariantAccess, Visitor},
 };
-use serde_json::Value as JsonValue;
 use sonic_rs::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
     collections::HashMap,
     fmt::{self, Display},
 };
-use crate::utils::id::ID;
-
 
 /// A flexible value type that can represent various property values in nodes and edges.
 /// Handles both JSON and binary serialisation formats via custom implementaions of the Serialize and Deserialize traits.
@@ -901,29 +899,6 @@ impl From<Value> for String {
         match v {
             Value::String(s) => s,
             _ => panic!("Value is not a string"),
-        }
-    }
-}
-impl From<JsonValue> for Value {
-    #[inline]
-    fn from(v: JsonValue) -> Self {
-        match v {
-            JsonValue::String(s) => Value::String(s),
-            JsonValue::Number(n) => {
-                if n.is_u64() {
-                    Value::U64(n.as_u64().unwrap())
-                } else if n.is_i64() {
-                    Value::I64(n.as_i64().unwrap())
-                } else {
-                    Value::F64(n.as_f64().unwrap())
-                }
-            }
-            JsonValue::Bool(b) => Value::Boolean(b),
-            JsonValue::Array(a) => Value::Array(a.into_iter().map(|v| v.into()).collect()),
-            JsonValue::Object(o) => {
-                Value::Object(o.into_iter().map(|(k, v)| (k, v.into())).collect())
-            }
-            JsonValue::Null => Value::Empty,
         }
     }
 }
