@@ -7,10 +7,10 @@ use crate::{
             },
             traversal_iter::RoTraversalIterator,
         },
-        storage_core::{storage_core::HelixGraphStorage, storage_methods::StorageMethods},
+        storage_core::{engine_wrapper::{HelixDB, HelixDBMethods, RTxn, Storage}, storage_core::HelixGraphStorage, storage_methods::StorageMethods},
         types::GraphError,
     },
-    utils::label_hash::hash_label,
+    utils::{items::Node, label_hash::hash_label},
 };
 use helix_macros::debug_trace;
 use heed3::{types::Bytes, RoTxn};
@@ -23,12 +23,12 @@ pub struct OutNodesIterator<'a, T> {
         heed3::types::LazyDecode<Bytes>,
         heed3::iteration_method::MoveOnCurrentKeyDuplicates,
     >,
-    pub storage: Arc<HelixGraphStorage>,
+    pub storage: Arc<HelixDB<'a>>,
     pub edge_type: EdgeType,
     pub txn: &'a T,
 }
 
-impl<'a> Iterator for OutNodesIterator<'a, RoTxn<'a>> {
+impl<'a> Iterator for OutNodesIterator<'a, RTxn<'a>> {
     type Item = Result<TraversalVal, GraphError>;
 
     #[debug_trace("OUT")]
@@ -45,12 +45,12 @@ impl<'a> Iterator for OutNodesIterator<'a, RoTxn<'a>> {
                     };
                     match self.edge_type {
                         EdgeType::Node => {
-                            if let Ok(node) = self.storage.get_node(self.txn, &item_id) {
+                            if let Ok(Some(node)) = self.storage.nodes_db().get_and_decode_data::<Node>(self.txn, &item_id) {
                                 return Some(Ok(TraversalVal::Node(node)));
                             }
                         }
                         EdgeType::Vec => {
-                            if let Ok(vector) = self.storage.get_vector(self.txn, &item_id) {
+                            if let Ok(vector) = self.storage.vectors_db().get_and_decode_data::<HVector>(self.txn, &item_id) {
                                 return Some(Ok(TraversalVal::Vector(vector)));
                             }
                         }

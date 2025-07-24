@@ -1,7 +1,10 @@
+use heed3::WithTls;
 #[cfg(feature = "lmdb")]
 use heed3::iteration_method::MoveOnCurrentKeyDuplicates;
 #[cfg(feature = "lmdb")]
 use heed3::{Database, DatabaseFlags, EnvOpenOptions};
+#[cfg(feature = "lmdb")]
+use serde::de::DeserializeOwned;
 
 use crate::helix_engine::bm25::bm25::HBM25Config;
 use crate::helix_engine::graph_core::config::Config;
@@ -11,14 +14,18 @@ use crate::helix_engine::storage_core::engine_wrapper::{
 #[cfg(feature = "rocksdb")]
 use crate::helix_engine::storage_core::engine_wrapper::{Database, Table};
 #[cfg(feature = "lmdb")]
-use crate::helix_engine::storage_core::engine_wrapper::{HelixEnv, Table};
+use crate::helix_engine::storage_core::engine_wrapper::{HelixEnv, Table, Txn};
 use crate::helix_engine::storage_core::storage_core::StorageConfig;
 use crate::helix_engine::types::GraphError;
 use crate::helix_engine::vector_core::vector_core::{HNSWConfig, VectorCore};
 #[cfg(feature = "lmdb")]
+use crate::protocol::item_serdes::ItemSerdes;
+#[cfg(feature = "lmdb")]
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::marker::PhantomData;
+#[cfg(feature = "lmdb")]
+use std::ops::Deref;
 use std::path::Path;
 
 #[cfg(feature = "lmdb")]
@@ -27,10 +34,62 @@ pub type U128 = heed3::types::U128<heed3::byteorder::BE>;
 #[cfg(feature = "lmdb")]
 pub type Bytes = heed3::types::Bytes;
 
-#[cfg(feature = "lmdb")]
-impl<'a> RTxn<'a> {
-    pub fn get_txn(&'a self) -> &'a heed3::RoTxn<'a> {
-        return &self.txn;
+// #[cfg(feature = "lmdb")]
+// impl<'a> RTxn<'a> {
+//     pub fn get_txn(&'a self) -> &'a heed3::RoTxn<'a> {
+//         return &self.txn;
+//     }
+// }
+
+impl<'a> Txn<'a> for RTxn<'a> {
+    type TxnType = heed3::RoTxn<'a>;
+    fn get_txn(&'a self) -> &'a Self::TxnType {
+        &self.txn
+    }
+
+    fn commit_txn(self) -> Result<(), GraphError> {
+        self.txn.commit().map_err(|e| GraphError::from(e))?;
+        Ok(())
+    }
+
+    fn abort_txn(self) -> Result<(), GraphError> {
+        self.txn.commit().map_err(|e| GraphError::from(e))?;
+        Ok(())
+    }
+}
+
+impl<'env> Txn<'env> for WTxn<'env> {
+    type TxnType = heed3::RoTxn<'env>;
+    fn get_txn(&'env self) -> &'env Self::TxnType {
+        &self.txn
+    }
+
+    fn commit_txn(self) -> Result<(), GraphError> {
+        self.txn.commit().map_err(|e| GraphError::from(e))?;
+        Ok(())
+    }
+
+    fn abort_txn(self) -> Result<(), GraphError> {
+        self.txn.commit().map_err(|e| GraphError::from(e))?;
+        Ok(())
+    }
+}
+
+impl<'a> AsRef<heed3::RoTxn<'a>> for RTxn<'a> {
+    fn as_ref(&self) -> &heed3::RoTxn<'a> {
+        &self.txn
+    }
+}
+
+impl<'a> AsMut<heed3::RwTxn<'a>> for WTxn<'a> {
+    fn as_mut(&mut self) -> &mut heed3::RwTxn<'a> {
+        &mut self.txn
+    }
+}
+
+impl<'a> AsRef<heed3::RoTxn<'a>> for WTxn<'a> {
+    fn as_ref(&self) -> &heed3::RoTxn<'a> {
+        &self.txn
     }
 }
 
@@ -51,8 +110,10 @@ impl HelixEnv {
     }
 }
 
+type Ro<'a> = heed3::RoTxn<'a>;
+type Rw<'a> = heed3::RwTxn<'a>;
 #[cfg(feature = "lmdb")]
-impl<'a, 't> Storage<'a> for Table<'t, U128, Bytes> {
+impl<'a> Storage<'a, heed3::RoTxn<'a>, heed3::RwTxn<'a>> for Table<U128, Bytes> {
     type Key = &'a u128;
     type Value = &'a [u8];
     type BasicIter = heed3::RoIter<'a, U128, heed3::types::LazyDecode<Bytes>>;
@@ -60,15 +121,28 @@ impl<'a, 't> Storage<'a> for Table<'t, U128, Bytes> {
     type DuplicateIter =
         heed3::RoIter<'a, U128, heed3::types::LazyDecode<Bytes>, MoveOnCurrentKeyDuplicates>;
 
-    fn get_data<'tx>(
+    fn get_data<'tx, T: AsRef<Ro<'tx>>>(
         &self,
-        txn: &'a RTxn<'tx>,
+        txn: &'tx T,
         key: Self::Key,
     ) -> Result<Option<Cow<'a, [u8]>>, GraphError> {
         Ok(self
             .table
-            .get(txn.get_txn(), key)?
-            .map(|v| Cow::Borrowed(v)))
+            .get(txn.as_ref(), key)?
+            .map(|v| Cow::Owned(v.to_vec())))
+    }
+
+    fn get_and_decode_data<'tx, T: AsRef<Ro<'tx>>, D: ItemSerdes>(
+        &self,
+        txn: &'tx T,
+        key: Self::Key,
+    ) -> Result<Option<D>, GraphError> {
+        match self.table.get(txn.as_ref(), key)? {
+            Some(v) => D::decode(v, *key)
+                .map_err(|e| GraphError::from(e))
+                .map(Some),
+            None => Ok(None),
+        }
     }
 
     fn put_data<'tx>(
@@ -77,7 +151,7 @@ impl<'a, 't> Storage<'a> for Table<'t, U128, Bytes> {
         key: Self::Key,
         value: Self::Value,
     ) -> Result<(), GraphError> {
-        Ok(self.table.put(txn.get_txn(), key, value)?)
+        Ok(self.table.put(txn.as_mut(), key, value)?)
     }
 
     fn put_data_with_duplicate<'tx>(
@@ -90,7 +164,7 @@ impl<'a, 't> Storage<'a> for Table<'t, U128, Bytes> {
 
         Ok(self
             .table
-            .put_with_flags(txn.get_txn(), PutFlags::APPEND_DUP, key, value)?)
+            .put_with_flags(txn.as_mut(), PutFlags::APPEND_DUP, key, value)?)
     }
 
     fn put_data_in_order<'tx>(
@@ -103,10 +177,10 @@ impl<'a, 't> Storage<'a> for Table<'t, U128, Bytes> {
 
         Ok(self
             .table
-            .put_with_flags(txn.get_txn(), PutFlags::APPEND, key, value)?)
+            .put_with_flags(txn.as_mut(), PutFlags::APPEND, key, value)?)
     }
     fn delete_data<'tx>(&self, txn: &'a mut WTxn<'tx>, key: Self::Key) -> Result<(), GraphError> {
-        self.table.delete(txn.get_txn(), key)?;
+        self.table.delete(txn.as_mut(), key)?;
         Ok(())
     }
 
@@ -116,47 +190,59 @@ impl<'a, 't> Storage<'a> for Table<'t, U128, Bytes> {
         key: Self::Key,
         value: Self::Value,
     ) -> Result<(), GraphError> {
-        self.table.delete_one_duplicate(txn.get_txn(), key, value)?;
+        self.table.delete_one_duplicate(txn.as_mut(), key, value)?;
         Ok(())
     }
 
-    fn iter_data<'tx>(
+    fn iter_data<'tx, T>(
         &self,
-        txn: &'a RTxn<'tx>,
-    ) -> Result<HelixIterator<'a, Self::BasicIter>, GraphError> {
+        txn: &'tx T,
+    ) -> Result<HelixIterator<'a, Self::BasicIter>, GraphError>
+    where
+        T: AsRef<Ro<'tx>>,
+        'tx: 'a,
+    {
         Ok(HelixIterator {
             iter: self
                 .table
                 .lazily_decode_data()
-                .iter(txn.get_txn())
+                .iter(txn.as_ref())
                 .map_err(|e| GraphError::from(e))?,
             _phantom: PhantomData,
         })
     }
 
-    fn prefix_iter_data<'tx>(
+    fn prefix_iter_data<'tx, T>(
         &self,
-        txn: &'a RTxn<'tx>,
+        txn: &'tx T,
         prefix: Self::Key,
-    ) -> Result<HelixIterator<'a, Self::PrefixIter>, GraphError> {
+    ) -> Result<HelixIterator<'a, Self::PrefixIter>, GraphError>
+    where
+        T: AsRef<Ro<'tx>>,
+        'tx: 'a,
+    {
         Ok(HelixIterator {
             iter: self
                 .table
                 .lazily_decode_data()
-                .prefix_iter(txn.get_txn(), prefix)?,
+                .prefix_iter(txn.as_ref(), prefix)?,
             _phantom: PhantomData,
         })
     }
 
-    fn get_duplicate_data<'tx>(
+    fn get_duplicate_data<'tx, T>(
         &self,
-        txn: &'a RTxn<'tx>,
+        txn: &'tx T,
         key: Self::Key,
-    ) -> Result<HelixIterator<'a, Self::DuplicateIter>, GraphError> {
+    ) -> Result<HelixIterator<'a, Self::DuplicateIter>, GraphError>
+    where
+        T: AsRef<Ro<'tx>>,
+        'tx: 'a,
+    {
         let duplicate_iter = match self
             .table
             .lazily_decode_data()
-            .get_duplicates(txn.get_txn(), key)?
+            .get_duplicates(txn.as_ref(), key)?
         {
             Some(iter) => iter,
             None => return Err(GraphError::from("No duplicates found")),
@@ -170,7 +256,7 @@ impl<'a, 't> Storage<'a> for Table<'t, U128, Bytes> {
 }
 
 #[cfg(feature = "lmdb")]
-impl<'a, 't> Storage<'a> for Table<'t, Bytes, Bytes> {
+impl<'a> Storage<'a, Ro<'a>, Rw<'a>> for Table<Bytes, Bytes> {
     type Key = &'a [u8];
     type Value = &'a [u8];
     type BasicIter = heed3::RoIter<'a, Bytes, heed3::types::LazyDecode<Bytes>>;
@@ -178,15 +264,23 @@ impl<'a, 't> Storage<'a> for Table<'t, Bytes, Bytes> {
     type DuplicateIter =
         heed3::RoIter<'a, Bytes, heed3::types::LazyDecode<Bytes>, MoveOnCurrentKeyDuplicates>;
 
-    fn get_data<'tx>(
+    fn get_data<'tx, T: AsRef<Ro<'tx>>>(
         &self,
-        txn: &'a RTxn<'tx>,
+        txn: &'tx T,
         key: Self::Key,
     ) -> Result<Option<Cow<'a, [u8]>>, GraphError> {
         Ok(self
             .table
-            .get(txn.get_txn(), key)?
+            .get(txn.as_ref(), key)?
             .map(|v| Cow::Borrowed(v)))
+    }
+
+    fn get_and_decode_data<'tx, D: ItemSerdes>(
+        &self,
+        txn: &'a RTxn<'tx>,
+        key: Self::Key,
+    ) -> Result<Option<D>, GraphError> {
+        unimplemented!()
     }
 
     fn put_data<'tx>(
@@ -288,8 +382,10 @@ impl<'a, 't> Storage<'a> for Table<'t, Bytes, Bytes> {
 }
 
 #[cfg(feature = "lmdb")]
-impl<'t> HelixDB<'t> {
-    pub fn new(path: &str, config: Config) -> Result<HelixDB<'t>, GraphError> {
+impl HelixDB {
+    pub fn new(path: &str, config: Config) -> Result<HelixDB, GraphError> {
+        use crate::helix_engine::storage_core::engine_wrapper::Txn;
+
         std::fs::create_dir_all(path)?;
 
         let db_size = if config.db_max_size_gb.unwrap_or(100) >= 9999 {
@@ -306,13 +402,15 @@ impl<'t> HelixDB<'t> {
                 .open(Path::new(path))?
         };
 
-        let mut wtxn = env.write_txn()?;
+        let mut wtxn = WTxn {
+            txn: env.write_txn()?,
+        };
 
         let nodes_db = env
             .database_options()
             .types::<U128, Bytes>()
             .name(DB_NODES)
-            .create(&mut wtxn)?;
+            .create(wtxn.get_txn())?;
 
         // Edges: [edge_id]->[bytes array of edge data]
         //        [16 bytes]->[dynamic]
@@ -320,7 +418,7 @@ impl<'t> HelixDB<'t> {
             .database_options()
             .types::<U128, Bytes>()
             .name(DB_EDGES)
-            .create(&mut wtxn)?;
+            .create(wtxn.get_txn())?;
 
         // Out edges: [from_node_id + label]->[edge_id + to_node_id]  (edge first because value is ordered by byte size)
         //                    [20 + 4 bytes]->[16 + 16 bytes]
@@ -332,7 +430,7 @@ impl<'t> HelixDB<'t> {
             .types::<Bytes, Bytes>()
             .flags(DatabaseFlags::DUP_SORT | DatabaseFlags::DUP_FIXED)
             .name(DB_OUT_EDGES)
-            .create(&mut wtxn)?;
+            .create(wtxn.get_txn())?;
 
         // In edges: [to_node_id + label]->[edge_id + from_node_id]  (edge first because value is ordered by byte size)
         //                 [20 + 4 bytes]->[16 + 16 bytes]
@@ -344,7 +442,7 @@ impl<'t> HelixDB<'t> {
             .types::<Bytes, Bytes>()
             .flags(DatabaseFlags::DUP_SORT | DatabaseFlags::DUP_FIXED)
             .name(DB_IN_EDGES)
-            .create(&mut wtxn)?;
+            .create(wtxn.get_txn())?;
 
         let mut secondary_indices = HashMap::new();
         if let Some(indexes) = config.get_graph_config().secondary_indices {
@@ -355,7 +453,7 @@ impl<'t> HelixDB<'t> {
                         .types::<Bytes, U128>()
                         .flags(DatabaseFlags::DUP_SORT) // DUP_SORT used to store all duplicated node keys under a single key. Saves on space and requires a single read to get all values.
                         .name(&index)
-                        .create(&mut wtxn)?,
+                        .create(wtxn.get_txn())?,
                 );
             }
         }
@@ -373,7 +471,7 @@ impl<'t> HelixDB<'t> {
 
         let bm25 = config
             .get_bm25()
-            .then(|| HBM25Config::new(&env, &mut wtxn))
+            .then(|| HBM25Config::new(&env, wtxn.get_txn()))
             .transpose()?;
 
         let storage_config = StorageConfig::new(
@@ -382,7 +480,7 @@ impl<'t> HelixDB<'t> {
             config.embedding_model,
         );
 
-        wtxn.commit()?;
+        wtxn.commit_txn()?;
 
         Ok(HelixDB {
             env: HelixEnv::new_lmdb(env),
@@ -395,9 +493,8 @@ impl<'t> HelixDB<'t> {
                 .into_iter()
                 .map(|(k, v)| (k, Table::new_lmdb(v)))
                 .collect(),
-            // vectors,
-            // bm25,
-            // storage_config,
+            vectors,
+            bm25,
         })
     }
 }

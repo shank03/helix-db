@@ -198,3 +198,9 @@ impl From<bincode::Error> for VectorError {
         VectorError::ConversionError(format!("bincode error: {}", error.to_string()))
     }
 }
+
+impl From<GraphError> for VectorError {
+    fn from(error: GraphError) -> Self {
+        VectorError::VectorCoreError(format!("GraphError: {}", error.to_string()))
+    }
+}

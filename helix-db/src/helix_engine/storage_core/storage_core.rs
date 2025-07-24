@@ -34,6 +34,21 @@ pub struct StorageConfig {
     pub embedding_model: Option<String>,
 }
 
+impl StorageConfig {
+    pub fn new(
+        schema: String,
+        graphvis_node_label: Option<String>,
+        embedding_model: Option<String>,
+    ) -> StorageConfig {
+        Self {
+            schema,
+            graphvis_node_label,
+            embedding_model,
+        }
+    }
+}
+
+
 pub struct HelixGraphStorage {
     pub graph_env: Env,
 
@@ -245,19 +260,6 @@ impl HelixGraphStorage {
     }
 }
 
-impl StorageConfig {
-    pub fn new(
-        schema: String,
-        graphvis_node_label: Option<String>,
-        embedding_model: Option<String>,
-    ) -> StorageConfig {
-        Self {
-            schema,
-            graphvis_node_label,
-            embedding_model,
-        }
-    }
-}
 
 impl DBMethods for HelixGraphStorage {
     /// Creates a secondary index lmdb db (table) for a given index name

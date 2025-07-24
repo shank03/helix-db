@@ -2,29 +2,19 @@ use crate::{
     debug_println,
     helix_engine::{
         graph_core::ops::{
-            g::G,
-            in_::{
+            bm25::search_bm25::SearchBM25Adapter, g::G, in_::{
                 in_::{InAdapter, InNodesIterator},
                 in_e::{InEdgesAdapter, InEdgesIterator},
-            },
-            out::{
+            }, out::{
                 out::{OutAdapter, OutNodesIterator},
                 out_e::{OutEdgesAdapter, OutEdgesIterator},
-            },
-            source::{add_e::EdgeType, e_from_type::EFromType, n_from_type::NFromType},
-            vectors::search::SearchVAdapter,
-            bm25::search_bm25::SearchBM25Adapter,
-            tr_val::{TraversalVal, Traversable},
-        },
-        types::GraphError,
-        storage_core::storage_core::HelixGraphStorage,
-        vector_core::vector::HVector,
+            }, source::{add_e::EdgeType, e_from_type::EFromType, n_from_type::NFromType}, tr_val::{Traversable, TraversalVal}, vectors::search::SearchVAdapter
+        }, storage_core::{engine_wrapper::{HelixDB, RTxn, Storage}, storage_core::HelixGraphStorage}, types::GraphError, vector_core::vector::HVector
     },
     helix_gateway::{
         embedding_providers::embedding_providers::{get_embedding_model, EmbeddingModel},
         mcp::mcp::{
-            MCPConnection, McpBackend,
-            MCPHandler, MCPHandlerSubmission, MCPToolInput
+            MCPConnection, MCPHandler, MCPHandlerSubmission, MCPToolInput, McpBackend
         },
     },
     protocol::{
@@ -72,7 +62,7 @@ pub enum ToolArgs {
 trait McpTools<'a> {
     fn out_step(
         &'a self,
-        txn: &'a RoTxn,
+        txn: &'a RTxn,
         connection: &'a MCPConnection,
         edge_label: String,
         edge_type: EdgeType,
@@ -80,14 +70,14 @@ trait McpTools<'a> {
 
     fn out_e_step(
         &'a self,
-        txn: &'a RoTxn,
+        txn: &'a RTxn,
         connection: &'a MCPConnection,
         edge_label: String,
     ) -> Result<Vec<TraversalVal>, GraphError>;
 
     fn in_step(
         &'a self,
-        txn: &'a RoTxn,
+        txn: &'a RTxn,
         connection: &'a MCPConnection,
         edge_label: String,
         edge_type: EdgeType,
@@ -95,21 +85,21 @@ trait McpTools<'a> {
 
     fn in_e_step(
         &'a self,
-        txn: &'a RoTxn,
+        txn: &'a RTxn,
         connection: &'a MCPConnection,
         edge_label: String,
     ) -> Result<Vec<TraversalVal>, GraphError>;
 
     fn n_from_type(
         &'a self,
-        txn: &'a RoTxn,
+        txn: &'a RTxn,
         connection: &'a MCPConnection,
         node_type: String,
     ) -> Result<Vec<TraversalVal>, GraphError>;
 
     fn e_from_type(
         &'a self,
-        txn: &'a RoTxn,
+        txn: &'a RTxn,
         connection: &'a MCPConnection,
         edge_type: String,
     ) -> Result<Vec<TraversalVal>, GraphError>;
@@ -118,7 +108,7 @@ trait McpTools<'a> {
     /// a node or edge needs to have been search first though
     fn filter_items(
         &'a self,
-        txn: &'a RoTxn,
+        txn: &'a RTxn,
         connection: &'a MCPConnection,
         properties: Option<Vec<(String, String)>>,
         filter_traversals: Option<Vec<ToolArgs>>,
@@ -127,7 +117,7 @@ trait McpTools<'a> {
     /// BM25
     fn search_keyword(
         &'a self,
-        txn: &'a RoTxn,
+        txn: &'a RTxn,
         connection: &'a MCPConnection,
         query: String,
         limit: usize,
@@ -136,16 +126,16 @@ trait McpTools<'a> {
     /// HNSW Search with built int embedding model
     fn search_vector_text(
         &'a self,
-        txn: &'a RoTxn,
+        txn: &'a RTxn,
         connection: &'a MCPConnection,
         query: String,
     ) -> Result<Vec<TraversalVal>, GraphError>;
 }
 
-impl<'a> McpTools<'a> for McpBackend {
+impl<'a, 't> McpTools<'a> for McpBackend<'t> {
     fn out_step(
         &'a self,
-        txn: &'a RoTxn,
+        txn: &'a RTxn,
         connection: &'a MCPConnection,
         edge_label: String,
         edge_type: EdgeType,
@@ -160,11 +150,10 @@ impl<'a> McpTools<'a> for McpBackend {
                 let prefix = HelixGraphStorage::out_edge_key(&item.id(), &edge_label_hash);
                 match db
                     .out_edges_db
-                    .lazily_decode_data()
-                    .get_duplicates(&txn, &prefix)
+                    .get_duplicate_data(&txn, &prefix)
                 {
-                    Ok(Some(iter)) => Some(OutNodesIterator {
-                        iter,
+                    Ok(iter) => Some(OutNodesIterator {
+                        iter: iter.iter,
                         storage: Arc::clone(&db),
                         edge_type: edge_type.clone(),
                         txn,

@@ -1,6 +1,6 @@
 use crate::{
     helix_engine::{
-        graph_core::ops::tr_val::TraversalVal, storage_core::storage_core::HelixGraphStorage,
+            graph_core::ops::tr_val::TraversalVal, storage_core::engine_wrapper::HelixDB,
         types::GraphError,
     },
     helix_gateway::mcp::tools::ToolArgs,
@@ -51,8 +51,8 @@ impl McpConnections {
         self.connections.remove(connection_id)
     }
 }
-pub struct McpBackend {
-    pub db: Arc<HelixGraphStorage>,
+pub struct McpBackend<'t> {
+    pub db: Arc<HelixDB<'t>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -68,8 +68,8 @@ pub struct ResourceCallRequest {
     pub connection_id: String,
 }
 
-impl McpBackend {
-    pub fn new(db: Arc<HelixGraphStorage>) -> Self {
+impl<'t> McpBackend<'t> {
+    pub fn new(db: Arc<HelixDB<'t>>) -> Self {
         Self { db }
     }
 }
@@ -88,9 +88,9 @@ impl MCPConnection {
     }
 }
 
-pub struct MCPToolInput {
+pub struct MCPToolInput<'t> {
     pub request: Request,
-    pub mcp_backend: Arc<McpBackend>,
+    pub mcp_backend: Arc<McpBackend<'t>>,
     pub mcp_connections: Arc<Mutex<McpConnections>>,
     pub schema: Option<String>,
 }
