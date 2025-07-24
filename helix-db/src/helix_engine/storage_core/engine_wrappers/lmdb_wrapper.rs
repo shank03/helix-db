@@ -52,10 +52,12 @@ impl<'a> HelixEnv<'a> {
     }
 }
 
+#[cfg(feature = "lmdb")]
 trait EncodeShim<'a>: BytesEncode<'a> {
     fn to_eitem(&'a self) -> &'a Self::EItem;
 }
 
+#[cfg(feature = "lmdb")]
 impl<'a, T> EncodeShim<'a> for T
 where
     T: BytesEncode<'a, EItem = T>,
