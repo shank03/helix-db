@@ -99,11 +99,11 @@ where
         key: Self::Key,
         value: Self::Value,
     ) -> Result<(), GraphError> {
-        Ok(self.table.put(txn.get_txn(), &key, &value)?)
+        Ok(self.table.put(txn.get_txn(), key.to_eitem(), &value)?)
     }
 
     fn delete_data(&self, txn: &'a mut WTxn<'a>, key: Self::Key) -> Result<(), GraphError> {
-        self.table.delete(txn.get_txn(), &key)?;
+        self.table.delete(txn.get_txn(), key.to_eitem())?;
         Ok(())
     }
 
@@ -114,7 +114,7 @@ where
         value: Self::Value,
     ) -> Result<(), GraphError> {
         self.table
-            .delete_one_duplicate(txn.get_txn(), &key, &value)?;
+            .delete_one_duplicate(txn.get_txn(), key.to_eitem(), &value)?;
         Ok(())
     }
 
@@ -141,7 +141,7 @@ where
             iter: self
                 .table
                 .lazily_decode_data()
-                .prefix_iter(txn.get_txn(), &prefix)?,
+                .prefix_iter(txn.get_txn(), prefix.to_eitem())?,
             _phantom: PhantomData,
         })
     }
@@ -154,7 +154,7 @@ where
         let duplicate_iter = match self
             .table
             .lazily_decode_data()
-            .get_duplicates(txn.get_txn(), &key)?
+            .get_duplicates(txn.get_txn(), key.to_eitem())?
         {
             Some(iter) => iter,
             None => return Err(GraphError::from("No duplicates found")),
