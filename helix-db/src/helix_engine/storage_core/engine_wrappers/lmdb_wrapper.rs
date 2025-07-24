@@ -1,14 +1,12 @@
 #[cfg(feature = "lmdb")]
-use heed3::iteration_method::{MoveOnCurrentKeyDuplicates, MoveThroughDuplicateValues};
+use heed3::iteration_method::MoveOnCurrentKeyDuplicates;
 #[cfg(feature = "lmdb")]
-use heed3::{BytesDecode, BytesEncode};
 use heed3::{Database, DatabaseFlags, EnvOpenOptions};
 
 use crate::helix_engine::bm25::bm25::HBM25Config;
 use crate::helix_engine::graph_core::config::Config;
 use crate::helix_engine::storage_core::engine_wrapper::{
-    DB_EDGES, DB_IN_EDGES, DB_NODES, DB_OUT_EDGES, Encode, HelixDB, HelixIterator, RTxn, Storage,
-    WTxn,
+    DB_EDGES, DB_IN_EDGES, DB_NODES, DB_OUT_EDGES, HelixDB, HelixIterator, RTxn, Storage, WTxn,
 };
 #[cfg(feature = "rocksdb")]
 use crate::helix_engine::storage_core::engine_wrapper::{Database, Table};
@@ -17,7 +15,6 @@ use crate::helix_engine::storage_core::engine_wrapper::{HelixEnv, Table};
 use crate::helix_engine::storage_core::storage_core::StorageConfig;
 use crate::helix_engine::types::GraphError;
 use crate::helix_engine::vector_core::vector_core::{HNSWConfig, VectorCore};
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::path::Path;
@@ -36,15 +33,15 @@ impl<'a> RTxn<'a> {
 }
 
 #[cfg(feature = "lmdb")]
-impl<'a> HelixEnv<'a> {
-    pub fn read_txn(&'a self) -> Result<RTxn<'a>, GraphError> {
+impl HelixEnv {
+    pub fn read_txn(&self) -> Result<RTxn, GraphError> {
         self.env
             .read_txn()
             .map(|txn| RTxn { txn })
             .map_err(|e| GraphError::from(e))
     }
 
-    pub fn write_txn(&'a self) -> Result<WTxn<'a>, GraphError> {
+    pub fn write_txn(&self) -> Result<WTxn, GraphError> {
         self.env
             .write_txn()
             .map(|txn| WTxn { txn })
@@ -53,46 +50,28 @@ impl<'a> HelixEnv<'a> {
 }
 
 #[cfg(feature = "lmdb")]
-trait EncodeShim<'a>: BytesEncode<'a> {
-    fn to_eitem(&'a self) -> &'a Self::EItem;
-}
-
-#[cfg(feature = "lmdb")]
-impl<'a, T> EncodeShim<'a> for T
-where
-    T: BytesEncode<'a, EItem = T>,
-{
-    fn to_eitem(&'a self) -> &'a Self::EItem {
-        self
-    }
-}
-
-#[cfg(feature = "lmdb")]
-impl<'a, K> Storage<'a> for Table<'a, K, Bytes>
-where
-    K: EncodeShim<'a> + BytesDecode<'a>,
-{
-    type Key = &'a K;
+impl<'a> Storage<'a> for Table<U128, Bytes> {
+    type Key = &'a u128;
     type Value = &'a [u8];
     type BasicIter
-        = heed3::RoIter<'a, K, heed3::types::LazyDecode<Bytes>>
+        = heed3::RoIter<'a, U128, heed3::types::LazyDecode<Bytes>>
     where
         Self: 'a;
     type PrefixIter
-        = heed3::RoPrefix<'a, K, heed3::types::LazyDecode<Bytes>>
+        = heed3::RoPrefix<'a, U128, heed3::types::LazyDecode<Bytes>>
     where
         Self: 'a;
     type DuplicateIter
-        = heed3::RoIter<'a, K, heed3::types::LazyDecode<Bytes>, MoveOnCurrentKeyDuplicates>
+        = heed3::RoIter<'a, U128, heed3::types::LazyDecode<Bytes>, MoveOnCurrentKeyDuplicates>
     where
         Self: 'a;
 
-    fn get_data(
+    fn get_data<'tx>(
         &self,
-        txn: &'a RTxn<'a>,
+        txn: &'a RTxn<'tx>,
         key: Self::Key,
-    ) -> Result<Option<Self::Value>, GraphError> {
-        Ok(self.table.get(txn.get_txn(), key.to_eitem())?)
+    ) -> Result<Option<&'a [u8]>, GraphError> {
+        Ok(self.table.get(txn.get_txn(), key)?)
     }
 
     fn put_data<'tx>(
@@ -101,28 +80,52 @@ where
         key: Self::Key,
         value: Self::Value,
     ) -> Result<(), GraphError> {
-        Ok(self.table.put(txn.get_txn(), key.to_eitem(), &value)?)
+        Ok(self.table.put(txn.get_txn(), key, value)?)
     }
 
-    fn delete_data(&self, txn: &'a mut WTxn<'a>, key: Self::Key) -> Result<(), GraphError> {
-        self.table.delete(txn.get_txn(), key.to_eitem())?;
-        Ok(())
-    }
-
-    fn delete_duplicate(
+    fn put_data_with_duplicate<'tx>(
         &self,
-        txn: &'a mut WTxn<'a>,
+        txn: &'a mut WTxn<'tx>,
         key: Self::Key,
         value: Self::Value,
     ) -> Result<(), GraphError> {
-        self.table
-            .delete_one_duplicate(txn.get_txn(), key.to_eitem(), &value)?;
+        use heed3::PutFlags;
+
+        Ok(self
+            .table
+            .put_with_flags(txn.get_txn(), PutFlags::APPEND_DUP, key, value)?)
+    }
+
+    fn put_data_in_order<'tx>(
+        &self,
+        txn: &'a mut WTxn<'tx>,
+        key: Self::Key,
+        value: Self::Value,
+    ) -> Result<(), GraphError> {
+        use heed3::PutFlags;
+
+        Ok(self
+            .table
+            .put_with_flags(txn.get_txn(), PutFlags::APPEND, key, value)?)
+    }
+    fn delete_data<'tx>(&self, txn: &'a mut WTxn<'tx>, key: Self::Key) -> Result<(), GraphError> {
+        self.table.delete(txn.get_txn(), key)?;
         Ok(())
     }
 
-    fn iter_data(
-        &'a self,
-        txn: &'a RTxn<'a>,
+    fn delete_duplicate<'tx>(
+        &self,
+        txn: &'a mut WTxn<'tx>,
+        key: Self::Key,
+        value: Self::Value,
+    ) -> Result<(), GraphError> {
+        self.table.delete_one_duplicate(txn.get_txn(), key, value)?;
+        Ok(())
+    }
+
+    fn iter_data<'tx>(
+        &self,
+        txn: &'a RTxn<'tx>,
     ) -> Result<HelixIterator<'a, Self::BasicIter>, GraphError> {
         Ok(HelixIterator {
             iter: self
@@ -134,29 +137,29 @@ where
         })
     }
 
-    fn prefix_iter_data(
-        &'a self,
-        txn: &'a RTxn<'a>,
+    fn prefix_iter_data<'tx>(
+        &self,
+        txn: &'a RTxn<'tx>,
         prefix: Self::Key,
     ) -> Result<HelixIterator<'a, Self::PrefixIter>, GraphError> {
         Ok(HelixIterator {
             iter: self
                 .table
                 .lazily_decode_data()
-                .prefix_iter(txn.get_txn(), prefix.to_eitem())?,
+                .prefix_iter(txn.get_txn(), prefix)?,
             _phantom: PhantomData,
         })
     }
 
-    fn get_duplicate_data(
-        &'a self,
-        txn: &'a RTxn<'a>,
+    fn get_duplicate_data<'tx>(
+        &self,
+        txn: &'a RTxn<'tx>,
         key: Self::Key,
     ) -> Result<HelixIterator<'a, Self::DuplicateIter>, GraphError> {
         let duplicate_iter = match self
             .table
             .lazily_decode_data()
-            .get_duplicates(txn.get_txn(), key.to_eitem())?
+            .get_duplicates(txn.get_txn(), key)?
         {
             Some(iter) => iter,
             None => return Err(GraphError::from("No duplicates found")),
@@ -169,8 +172,8 @@ where
     }
 }
 
-impl<'a> HelixDB<'a> {
-    pub fn new(path: &str, config: Config) -> Result<HelixDB<'a>, GraphError> {
+impl HelixDB {
+    pub fn new(path: &str, config: Config) -> Result<HelixDB, GraphError> {
         std::fs::create_dir_all(path)?;
 
         let db_size = if config.db_max_size_gb.unwrap_or(100) >= 9999 {

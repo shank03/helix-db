@@ -38,7 +38,6 @@ pub const DB_EDGES: &str = "edges"; // for edge data (e:)
 pub const DB_OUT_EDGES: &str = "out_edges"; // for outgoing edge indices (o:)
 pub const DB_IN_EDGES: &str = "in_edges"; // for incoming edge indices (i:)
 
-
 pub trait Txn<'a>: Sized {
     fn commit_txn(self) -> Result<(), GraphError>;
     fn abort_txn(self) -> Result<(), GraphError>;
@@ -152,108 +151,116 @@ impl<'env> Txn<'env> for WTxn<'env> {
     }
 }
 
-pub trait Storage<'a> {
+pub trait Storage<'a>{
     type Key;
     type Value;
-    type BasicIter: Iterator
-    where
-        Self: 'a;
-    type PrefixIter: Iterator
-    where
-        Self: 'a;
-    type DuplicateIter: Iterator
-    where
-        Self: 'a;
+    type BasicIter: Iterator;
+    type PrefixIter: Iterator;
+    type DuplicateIter: Iterator;
 
-    fn get_data(&self, txn: &'a RTxn<'a>, key: Self::Key) -> Result<Option<Self::Value>, GraphError>;
-    fn put_data(
+    fn get_data<'tx>(&self, txn: &'a RTxn<'tx>, key: Self::Key) -> Result<Option<&'a [u8]>, GraphError>;
+    fn put_data<'tx>(
         &self,
-        txn: &'a mut WTxn<'a>,
+        txn: &'a mut WTxn<'tx>,
         key: Self::Key,
         value: Self::Value,
     ) -> Result<(), GraphError>;
-    fn delete_data(&self, txn: &'a mut WTxn<'a>, key: Self::Key) -> Result<(), GraphError>;
-    fn delete_duplicate(
+    fn put_data_with_duplicate<'tx>(
         &self,
-        txn: &'a mut WTxn<'a>,
+        txn: &'a mut WTxn<'tx>,
         key: Self::Key,
         value: Self::Value,
     ) -> Result<(), GraphError>;
-    fn iter_data(
-        &'a self,
-        txn: &'a RTxn<'a>,
+    fn put_data_in_order<'tx>(
+        &self,
+        txn: &'a mut WTxn<'tx>,
+        key: Self::Key,
+        value: Self::Value,
+    ) -> Result<(), GraphError>;
+    fn delete_data<'tx>(&self, txn: &'a mut WTxn<'tx>, key: Self::Key) -> Result<(), GraphError>;
+    fn delete_duplicate<'tx>(
+        &self,
+        txn: &'a mut WTxn<'tx>,
+        key: Self::Key,
+        value: Self::Value,
+    ) -> Result<(), GraphError>;
+    fn iter_data<'tx>(
+        &self,
+        txn: &'a RTxn<'tx>,
     ) -> Result<HelixIterator<'a, Self::BasicIter>, GraphError>;
-    fn prefix_iter_data(
-        &'a self,
-        txn: &'a RTxn<'a>,
+    fn prefix_iter_data<'tx>(
+        &self,
+        txn: &'a RTxn<'tx>,
         prefix: Self::Key,
     ) -> Result<HelixIterator<'a, Self::PrefixIter>, GraphError>;
-    fn get_duplicate_data(
-        &'a self,
-        txn: &'a RTxn<'a>,
+    fn get_duplicate_data<'tx>(
+        &self,
+        txn: &'a RTxn<'tx>,
         key: Self::Key,
     ) -> Result<HelixIterator<'a, Self::DuplicateIter>, GraphError>;
 }
 
-pub struct Table<'a, K, V> {
+pub struct Table<K, V> {
     #[cfg(feature = "rocksdb")]
     pub table: rocksdb::ColumnFamilyRef<'a>,
     #[cfg(feature = "lmdb")]
     pub table: heed3::Database<K, V>,
     #[cfg(feature = "in_memory")]
     pub table: skipdb::DB<K>,
-    pub _phantom: PhantomData<(&'a K, &'a V)>,
 }
 
-impl<'a, K, V> Table<'a, K, V> {
+impl<K, V> Table<K, V> {
     #[cfg(feature = "lmdb")]
-    pub fn new_lmdb(table: heed3::Database<K, V>) -> Table<'a, K, V> {
-        Table { table, _phantom: PhantomData }
+    pub fn new_lmdb(table: heed3::Database<K, V>) -> Table<K, V> {
+        Table { table }
     }
 
     #[cfg(feature = "rocksdb")]
     pub fn new_rocksdb(table: rocksdb::ColumnFamilyRef<'a>) -> Table<'a, K, V> {
-        Table { table, _phantom: PhantomData }
+        Table {
+            table,
+            _phantom: PhantomData,
+        }
     }
 
     #[cfg(feature = "in_memory")]
     pub fn new_in_memory(table: skipdb::DB<K, V>) -> Table<'a, K, V> {
-        Table { table, _phantom: PhantomData }
+        Table {
+            table,
+            _phantom: PhantomData,
+        }
     }
 }
 
-
-pub struct HelixEnv<'a> {
+pub struct HelixEnv {
     #[cfg(feature = "lmdb")]
     pub env: heed3::Env<WithTls>,
     #[cfg(feature = "rocksdb")]
     pub env: rocksdb::DB,
     #[cfg(feature = "in_memory")]
     pub env: skipdb::DB<K, V>,
-
-    _phantom: PhantomData<&'a ()>,
 }
 
-impl<'a> HelixEnv<'a> {
+impl HelixEnv {
     #[cfg(feature = "lmdb")]
-    pub fn new_lmdb(env: heed3::Env<WithTls>) -> HelixEnv<'a> {
-        HelixEnv { env, _phantom: PhantomData }
+    pub fn new_lmdb(env: heed3::Env<WithTls>) -> HelixEnv {
+        HelixEnv { env }
     }
 
     #[cfg(feature = "rocksdb")]
-    pub fn new_rocksdb(env: rocksdb::DB) -> HelixEnv<'a> {
-        HelixEnv { env, _phantom: PhantomData }
+    pub fn new_rocksdb(env: rocksdb::DB) -> HelixEnv {
+        HelixEnv { env }
     }
 }
 
-pub struct HelixDB<'a> {
-    pub env: HelixEnv<'a>,
+pub struct HelixDB {
+    pub env: HelixEnv,
     pub storage_config: StorageConfig,
-    pub nodes_db: Table<'a, U128, Bytes>,
-    pub edges_db: Table<'a, U128, Bytes>,
-    pub out_edges_db: Table<'a, Bytes, Bytes>,
-    pub in_edges_db: Table<'a, Bytes, Bytes>,
-    pub secondary_indices: HashMap<String, Table<'a, Bytes, U128>>,
+    pub nodes_db: Table<U128, Bytes>,
+    pub edges_db: Table<U128, Bytes>,
+    pub out_edges_db: Table<Bytes, Bytes>,
+    pub in_edges_db: Table<Bytes, Bytes>,
+    pub secondary_indices: HashMap<String, Table<Bytes, U128>>,
 }
 
 pub trait HelixDBMethods: Sized {
@@ -272,7 +279,7 @@ pub trait HelixDBMethods: Sized {
     // fn secondary_indices(&self) -> HashMap<String, HelixTable<Bytes, U128>>;
 }
 
-impl<'a> HelixDBMethods for HelixDB<'a> {
+impl HelixDBMethods for HelixDB {
     fn read_txn(&self) -> Result<RTxn, GraphError> {
         self.env.read_txn()
     }
@@ -303,4 +310,3 @@ pub enum U128 {}
 
 #[cfg(feature = "in_memory")]
 pub enum Bytes {}
-
