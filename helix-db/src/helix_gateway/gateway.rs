@@ -5,11 +5,12 @@ use std::{collections::HashMap, sync::Arc};
 use axum::body::Body;
 use axum::extract::State;
 use axum::response::IntoResponse;
-use axum::routing::post;
+use axum::routing::{get, post};
 use core_affinity::{CoreId, set_for_current};
 use tracing::{info, trace, warn};
 
 use super::router::router::{HandlerFn, HelixRouter};
+use crate::helix_gateway::graphvis;
 use crate::helix_gateway::worker_pool::WorkerPool;
 use crate::protocol;
 use crate::{
@@ -97,6 +98,7 @@ impl HelixGateway {
 
         let axum_app = axum::Router::new()
             .route("/{*path}", post(post_handler))
+            .route("/graphvis", get(graphvis::graphvis_handler))
             .with_state(Arc::new(worker_pool));
 
         rt.block_on(async move {

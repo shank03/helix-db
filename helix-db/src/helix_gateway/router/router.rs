@@ -9,8 +9,11 @@
 
 use crate::{
     helix_engine::{graph_core::graph_core::HelixGraphEngine, types::GraphError},
-    helix_gateway::mcp::mcp::{MCPHandlerFn, MCPToolInput},
-    protocol::HelixError,
+    helix_gateway::{
+        graphvis,
+        mcp::mcp::{MCPHandlerFn, MCPToolInput},
+    },
+    protocol::{HelixError, request::RequestType},
 };
 use core::fmt;
 use std::{collections::HashMap, sync::Arc};
@@ -89,23 +92,35 @@ impl HelixRouter {
         graph_access: Arc<HelixGraphEngine>,
         request: Request,
     ) -> Result<Response, HelixError> {
-        if let Some(handler) = self.routes.get(&request.name) {
-            let input = HandlerInput {
-                request,
-                graph: Arc::clone(&graph_access),
-            };
-            return handler(&input).map_err(Into::into);
+        match request.req_type {
+            RequestType::Query => {
+                if let Some(handler) = self.routes.get(&request.name) {
+                    let input = HandlerInput {
+                        request,
+                        graph: Arc::clone(&graph_access),
+                    };
+                    return handler(&input).map_err(Into::into);
+                }
+            }
+            RequestType::MCP => {
+                if let Some(mcp_handler) = self.mcp_routes.get(&request.name) {
+                    let mut mcp_input = MCPToolInput {
+                        request,
+                        mcp_backend: Arc::clone(graph_access.mcp_backend.as_ref().unwrap()),
+                        mcp_connections: Arc::clone(graph_access.mcp_connections.as_ref().unwrap()),
+                        schema: Some(graph_access.storage.storage_config.schema.clone()),
+                    };
+                    return mcp_handler(&mut mcp_input).map_err(Into::into);
+                };
+            }
+            RequestType::GraphVis => {
+                let input = HandlerInput {
+                    request,
+                    graph: graph_access.clone(),
+                };
+                return graphvis::graphvis_inner(&input);
+            }
         }
-
-        if let Some(mcp_handler) = self.mcp_routes.get(&request.name) {
-            let mut mcp_input = MCPToolInput {
-                request,
-                mcp_backend: Arc::clone(graph_access.mcp_backend.as_ref().unwrap()),
-                mcp_connections: Arc::clone(graph_access.mcp_connections.as_ref().unwrap()),
-                schema: Some(graph_access.storage.storage_config.schema.clone()),
-            };
-            return mcp_handler(&mut mcp_input).map_err(Into::into);
-        };
 
         Err(HelixError::NotFound {
             ty: request.req_type,

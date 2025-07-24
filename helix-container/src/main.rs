@@ -8,7 +8,6 @@ use std::{collections::HashMap, sync::Arc};
 use tracing::Level;
 use tracing_subscriber::util::SubscriberInitExt;
 
-mod graphvis;
 mod queries;
 
 fn main() {
