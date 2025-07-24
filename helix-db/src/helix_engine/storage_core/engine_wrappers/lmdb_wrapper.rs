@@ -15,6 +15,8 @@ use crate::helix_engine::storage_core::engine_wrapper::{HelixEnv, Table};
 use crate::helix_engine::storage_core::storage_core::StorageConfig;
 use crate::helix_engine::types::GraphError;
 use crate::helix_engine::vector_core::vector_core::{HNSWConfig, VectorCore};
+#[cfg(feature = "lmdb")]
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::path::Path;
@@ -50,28 +52,23 @@ impl HelixEnv {
 }
 
 #[cfg(feature = "lmdb")]
-impl<'a> Storage<'a> for Table<U128, Bytes> {
+impl<'a, 't> Storage<'a> for Table<'t, U128, Bytes> {
     type Key = &'a u128;
     type Value = &'a [u8];
-    type BasicIter
-        = heed3::RoIter<'a, U128, heed3::types::LazyDecode<Bytes>>
-    where
-        Self: 'a;
-    type PrefixIter
-        = heed3::RoPrefix<'a, U128, heed3::types::LazyDecode<Bytes>>
-    where
-        Self: 'a;
-    type DuplicateIter
-        = heed3::RoIter<'a, U128, heed3::types::LazyDecode<Bytes>, MoveOnCurrentKeyDuplicates>
-    where
-        Self: 'a;
+    type BasicIter = heed3::RoIter<'a, U128, heed3::types::LazyDecode<Bytes>>;
+    type PrefixIter = heed3::RoPrefix<'a, U128, heed3::types::LazyDecode<Bytes>>;
+    type DuplicateIter =
+        heed3::RoIter<'a, U128, heed3::types::LazyDecode<Bytes>, MoveOnCurrentKeyDuplicates>;
 
     fn get_data<'tx>(
         &self,
         txn: &'a RTxn<'tx>,
         key: Self::Key,
-    ) -> Result<Option<&'a [u8]>, GraphError> {
-        Ok(self.table.get(txn.get_txn(), key)?)
+    ) -> Result<Option<Cow<'a, [u8]>>, GraphError> {
+        Ok(self
+            .table
+            .get(txn.get_txn(), key)?
+            .map(|v| Cow::Borrowed(v)))
     }
 
     fn put_data<'tx>(
@@ -172,8 +169,127 @@ impl<'a> Storage<'a> for Table<U128, Bytes> {
     }
 }
 
-impl HelixDB {
-    pub fn new(path: &str, config: Config) -> Result<HelixDB, GraphError> {
+#[cfg(feature = "lmdb")]
+impl<'a, 't> Storage<'a> for Table<'t, Bytes, Bytes> {
+    type Key = &'a [u8];
+    type Value = &'a [u8];
+    type BasicIter = heed3::RoIter<'a, Bytes, heed3::types::LazyDecode<Bytes>>;
+    type PrefixIter = heed3::RoPrefix<'a, Bytes, heed3::types::LazyDecode<Bytes>>;
+    type DuplicateIter =
+        heed3::RoIter<'a, Bytes, heed3::types::LazyDecode<Bytes>, MoveOnCurrentKeyDuplicates>;
+
+    fn get_data<'tx>(
+        &self,
+        txn: &'a RTxn<'tx>,
+        key: Self::Key,
+    ) -> Result<Option<Cow<'a, [u8]>>, GraphError> {
+        Ok(self
+            .table
+            .get(txn.get_txn(), key)?
+            .map(|v| Cow::Borrowed(v)))
+    }
+
+    fn put_data<'tx>(
+        &self,
+        txn: &'a mut WTxn<'tx>,
+        key: Self::Key,
+        value: Self::Value,
+    ) -> Result<(), GraphError> {
+        Ok(self.table.put(txn.get_txn(), key, value)?)
+    }
+
+    fn put_data_with_duplicate<'tx>(
+        &self,
+        txn: &'a mut WTxn<'tx>,
+        key: Self::Key,
+        value: Self::Value,
+    ) -> Result<(), GraphError> {
+        use heed3::PutFlags;
+
+        Ok(self
+            .table
+            .put_with_flags(txn.get_txn(), PutFlags::APPEND_DUP, key, value)?)
+    }
+
+    fn put_data_in_order<'tx>(
+        &self,
+        txn: &'a mut WTxn<'tx>,
+        key: Self::Key,
+        value: Self::Value,
+    ) -> Result<(), GraphError> {
+        use heed3::PutFlags;
+
+        Ok(self
+            .table
+            .put_with_flags(txn.get_txn(), PutFlags::APPEND, key, value)?)
+    }
+    fn delete_data<'tx>(&self, txn: &'a mut WTxn<'tx>, key: Self::Key) -> Result<(), GraphError> {
+        self.table.delete(txn.get_txn(), key)?;
+        Ok(())
+    }
+
+    fn delete_duplicate<'tx>(
+        &self,
+        txn: &'a mut WTxn<'tx>,
+        key: Self::Key,
+        value: Self::Value,
+    ) -> Result<(), GraphError> {
+        self.table.delete_one_duplicate(txn.get_txn(), key, value)?;
+        Ok(())
+    }
+
+    fn iter_data<'tx>(
+        &self,
+        txn: &'a RTxn<'tx>,
+    ) -> Result<HelixIterator<'a, Self::BasicIter>, GraphError> {
+        Ok(HelixIterator {
+            iter: self
+                .table
+                .lazily_decode_data()
+                .iter(txn.get_txn())
+                .map_err(|e| GraphError::from(e))?,
+            _phantom: PhantomData,
+        })
+    }
+
+    fn prefix_iter_data<'tx>(
+        &self,
+        txn: &'a RTxn<'tx>,
+        prefix: Self::Key,
+    ) -> Result<HelixIterator<'a, Self::PrefixIter>, GraphError> {
+        Ok(HelixIterator {
+            iter: self
+                .table
+                .lazily_decode_data()
+                .prefix_iter(txn.get_txn(), prefix)?,
+            _phantom: PhantomData,
+        })
+    }
+
+    fn get_duplicate_data<'tx>(
+        &self,
+        txn: &'a RTxn<'tx>,
+        key: Self::Key,
+    ) -> Result<HelixIterator<'a, Self::DuplicateIter>, GraphError> {
+        let duplicate_iter = match self
+            .table
+            .lazily_decode_data()
+            .get_duplicates(txn.get_txn(), key)?
+        {
+            Some(iter) => iter,
+            None => return Err(GraphError::from("No duplicates found")),
+        };
+
+        Ok(HelixIterator {
+            iter: duplicate_iter,
+            _phantom: PhantomData,
+        })
+    }
+}
+
+#[cfg(feature = "lmdb")]
+impl<'t> HelixDB<'t> {
+    pub fn new(path: &str, config: Config) -> Result<HelixDB<'t>, GraphError> {
         std::fs::create_dir_all(path)?;
 
         let db_size = if config.db_max_size_gb.unwrap_or(100) >= 9999 {

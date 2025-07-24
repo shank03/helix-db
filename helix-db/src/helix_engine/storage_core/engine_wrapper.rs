@@ -1,7 +1,6 @@
-#[cfg(feature = "rocksdb")]
-use std::borrow::Cow;
 use std::{borrow::Cow, collections::HashMap, marker::PhantomData, path::Path};
 
+#[cfg(feature = "lmdb")]
 use heed3::EnvOpenOptions;
 #[cfg(feature = "lmdb")]
 use heed3::{AnyTls, WithTls};
@@ -13,24 +12,18 @@ use crate::helix_engine::storage_core::engine_wrappers::rocksdb_wrapper::{Bytes,
 #[cfg(feature = "lmdb")]
 use crate::helix_engine::storage_core::engine_wrappers::lmdb_wrapper::{Bytes, U128};
 
-use super::storage_methods::DBMethods;
 use crate::{
     helix_engine::{
-        bm25::bm25::HBM25Config,
-        graph_core::config::{Config, GraphConfig},
-        storage_core::{storage_core::StorageConfig, storage_methods::StorageMethods},
+        storage_core::storage_core::StorageConfig,
         types::GraphError,
-        vector_core::{
-            hnsw::HNSW,
-            vector::HVector,
-            vector_core::{HNSWConfig, VectorCore},
-        },
     },
     utils::{
         items::{Edge, Node},
         label_hash::hash_label,
     },
 };
+
+#[cfg(feature = "lmdb")]
 use heed3::{Database, DatabaseFlags, RoTxn, RwTxn, byteorder::BE, types::*};
 
 pub const DB_NODES: &str = "nodes"; // for node data (n:)
@@ -72,7 +65,7 @@ pub struct RTxn<'a> {
 
 pub struct WTxn<'env> {
     #[cfg(feature = "rocksdb")]
-    pub txn: rocksdb::Transaction<'a, rocksdb::TransactionDB<rocksdb::SingleThreaded>>,
+    pub txn: rocksdb::Transaction<'env, rocksdb::TransactionDB<rocksdb::SingleThreaded>>,
     #[cfg(feature = "lmdb")]
     pub txn: heed3::RwTxn<'env>,
     #[cfg(feature = "in_memory")]
@@ -86,9 +79,9 @@ impl<'env> WTxn<'env> {
     }
 
     #[cfg(feature = "rocksdb")]
-    pub fn get_txn(
-        &'a self,
-    ) -> &'a rocksdb::Transaction<'a, rocksdb::TransactionDB<rocksdb::SingleThreaded>> {
+    pub fn get_txn<'tx>(
+        &'tx self,
+    ) -> &'tx rocksdb::Transaction<'env, rocksdb::TransactionDB<rocksdb::SingleThreaded>> {
         return &self.txn;
     }
 
@@ -151,14 +144,18 @@ impl<'env> Txn<'env> for WTxn<'env> {
     }
 }
 
-pub trait Storage<'a>{
+pub trait Storage<'a> {
     type Key;
     type Value;
     type BasicIter: Iterator;
     type PrefixIter: Iterator;
     type DuplicateIter: Iterator;
 
-    fn get_data<'tx>(&self, txn: &'a RTxn<'tx>, key: Self::Key) -> Result<Option<&'a [u8]>, GraphError>;
+    fn get_data<'tx>(
+        &self,
+        txn: &'a RTxn<'tx>,
+        key: Self::Key,
+    ) -> Result<Option<Cow<'a, [u8]>>, GraphError>;
     fn put_data<'tx>(
         &self,
         txn: &'a mut WTxn<'tx>,
@@ -200,23 +197,27 @@ pub trait Storage<'a>{
     ) -> Result<HelixIterator<'a, Self::DuplicateIter>, GraphError>;
 }
 
-pub struct Table<K, V> {
+pub struct Table<'t, K, V> {
     #[cfg(feature = "rocksdb")]
-    pub table: rocksdb::ColumnFamilyRef<'a>,
+    pub table: rocksdb::ColumnFamilyRef<'t>,
     #[cfg(feature = "lmdb")]
     pub table: heed3::Database<K, V>,
     #[cfg(feature = "in_memory")]
     pub table: skipdb::DB<K>,
+    pub _phantom: PhantomData<(&'t K, V)>,
 }
 
-impl<K, V> Table<K, V> {
+impl<'t, K, V> Table<'t, K, V> {
     #[cfg(feature = "lmdb")]
-    pub fn new_lmdb(table: heed3::Database<K, V>) -> Table<K, V> {
-        Table { table }
+    pub fn new_lmdb(table: heed3::Database<K, V>) -> Table<'t, K, V> {
+        Table {
+            table,
+            _phantom: PhantomData,
+        }
     }
 
     #[cfg(feature = "rocksdb")]
-    pub fn new_rocksdb(table: rocksdb::ColumnFamilyRef<'a>) -> Table<'a, K, V> {
+    pub fn new_rocksdb(table: rocksdb::ColumnFamilyRef<'t>) -> Table<'t, K, V> {
         Table {
             table,
             _phantom: PhantomData,
@@ -236,7 +237,7 @@ pub struct HelixEnv {
     #[cfg(feature = "lmdb")]
     pub env: heed3::Env<WithTls>,
     #[cfg(feature = "rocksdb")]
-    pub env: rocksdb::DB,
+    pub env: rocksdb::TransactionDB<rocksdb::SingleThreaded>,
     #[cfg(feature = "in_memory")]
     pub env: skipdb::DB<K, V>,
 }
@@ -248,26 +249,26 @@ impl HelixEnv {
     }
 
     #[cfg(feature = "rocksdb")]
-    pub fn new_rocksdb(env: rocksdb::DB) -> HelixEnv {
+    pub fn new_rocksdb(env: rocksdb::TransactionDB<rocksdb::SingleThreaded>) -> HelixEnv {
         HelixEnv { env }
     }
 }
 
-pub struct HelixDB {
+pub struct HelixDB<'t> {
     pub env: HelixEnv,
     pub storage_config: StorageConfig,
-    pub nodes_db: Table<U128, Bytes>,
-    pub edges_db: Table<U128, Bytes>,
-    pub out_edges_db: Table<Bytes, Bytes>,
-    pub in_edges_db: Table<Bytes, Bytes>,
-    pub secondary_indices: HashMap<String, Table<Bytes, U128>>,
+    pub nodes_db: Table<'t, U128, Bytes>,
+    pub edges_db: Table<'t, U128, Bytes>,
+    pub out_edges_db: Table<'t, Bytes, Bytes>,
+    pub in_edges_db: Table<'t, Bytes, Bytes>,
+    pub secondary_indices: HashMap<String, Table<'t, Bytes, U128>>,
 }
 
 pub trait HelixDBMethods: Sized {
-    #[cfg(feature = "rocksdb")]
-    fn config() -> rocksdb::Options;
-    #[cfg(feature = "rocksdb")]
-    fn new(path: &str, opts: rocksdb::Options) -> Result<Self, GraphError>;
+    // #[cfg(feature = "rocksdb")]
+    // fn config() -> rocksdb::Options;
+    // #[cfg(feature = "rocksdb")]
+    // fn new(path: &str, opts: rocksdb::Options) -> Result<Self, GraphError>;
 
     fn read_txn(&self) -> Result<RTxn, GraphError>;
     fn write_txn(&self) -> Result<WTxn, GraphError>;
@@ -279,7 +280,7 @@ pub trait HelixDBMethods: Sized {
     // fn secondary_indices(&self) -> HashMap<String, HelixTable<Bytes, U128>>;
 }
 
-impl HelixDBMethods for HelixDB {
+impl<'t> HelixDBMethods for HelixDB<'t> {
     fn read_txn(&self) -> Result<RTxn, GraphError> {
         self.env.read_txn()
     }

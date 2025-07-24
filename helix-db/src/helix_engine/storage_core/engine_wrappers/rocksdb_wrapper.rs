@@ -1,9 +1,15 @@
+#[cfg(feature = "rocksdb")]
+use crate::helix_engine::graph_core::config::Config;
+#[cfg(feature = "rocksdb")]
+use crate::helix_engine::storage_core::engine_wrapper::{HelixDB, HelixEnv};
 #[cfg(feature = "rocks")]
-use crate::helix_engine::storage_core::engine_wrapper::{Database, Table};
+use crate::helix_engine::storage_core::engine_wrapper::{HelixDBMethods, Table};
 use crate::helix_engine::storage_core::engine_wrapper::{HelixIterator, RTxn, Storage, WTxn};
 use crate::helix_engine::types::GraphError;
 #[cfg(feature = "rocks")]
 use num_cpus;
+#[cfg(feature = "rocks")]
+use std::borrow::Cow;
 use std::marker::PhantomData;
 
 #[cfg(feature = "rocks")]
@@ -21,169 +27,269 @@ impl<'a> RTxn<'a> {
     }
 }
 
-#[cfg(feature = "rocks")]
-impl<'env> Storage for rocksdb::ColumnFamilyRef<'env> {
-    type Key<'a> = &'a [u8];
-    type Value<'a> = &'a [u8];
-    type BasicIter<'a>
-        = rocksdb::DBIteratorWithThreadMode<
-        'a,
-        rocksdb::Transaction<'a, rocksdb::TransactionDB<rocksdb::SingleThreaded>>,
-    >
-    where
-        Self: 'a;
-    type PrefixIter<'a>
-        = rocksdb::DBIteratorWithThreadMode<
-        'a,
-        rocksdb::Transaction<'a, rocksdb::TransactionDB<rocksdb::SingleThreaded>>,
-    >
-    where
-        Self: 'a;
-    type DuplicateIter<'a>
-        = rocksdb::DBIteratorWithThreadMode<
-        'a,
-        rocksdb::Transaction<'a, rocksdb::TransactionDB<rocksdb::SingleThreaded>>,
-    >
-    where
-        Self: 'a;
+#[cfg(feature = "rocksdb")]
+impl HelixEnv {
+    pub fn read_txn(&self) -> Result<RTxn, GraphError> {
+        Ok(RTxn {
+            txn: self.env.transaction(),
+        })
+    }
 
-    fn get_data<'a>(&self, txn: &'a RTxn<'a>, key: Self::Key<'a>) -> Result<Option<Vec<u8>>, GraphError> {
+    pub fn write_txn(&self) -> Result<WTxn, GraphError> {
+        Ok(WTxn {
+            txn: self.env.transaction(),
+        })
+    }
+}
+
+#[cfg(feature = "rocks")]
+impl<'a, 't> Storage<'a> for Table<'t, U128, Bytes> {
+    type Key = &'a u128;
+    type Value = &'a [u8];
+    type BasicIter = rocksdb::DBIteratorWithThreadMode<
+        'a,
+        rocksdb::Transaction<'a, rocksdb::TransactionDB<rocksdb::SingleThreaded>>,
+    >;
+    type PrefixIter = rocksdb::DBIteratorWithThreadMode<
+        'a,
+        rocksdb::Transaction<'a, rocksdb::TransactionDB<rocksdb::SingleThreaded>>,
+    >;
+    type DuplicateIter = rocksdb::DBIteratorWithThreadMode<
+        'a,
+        rocksdb::Transaction<'a, rocksdb::TransactionDB<rocksdb::SingleThreaded>>,
+    >;
+
+    fn get_data<'tx>(
+        &self,
+        txn: &'a RTxn<'tx>,
+        key: Self::Key,
+    ) -> Result<Option<Cow<'a, [u8]>>, GraphError> {
         match txn
             .txn
-            .get_pinned_cf(self, key) // TODO: Use a generic function to convert to bytes
+            .get_pinned_cf(&self.table, key.to_be_bytes())
             .map_err(|e| GraphError::from(e))
         {
-            Ok(Some(value)) => Ok(Some(value.to_vec())),
+            Ok(Some(value)) => Ok(Some(Cow::Owned(value.to_vec()))),
             Ok(None) => Ok(None),
             Err(e) => Err(GraphError::from(e)),
         }
     }
 
-    fn put_data<'a>(
+    fn put_data<'tx>(
         &self,
-        txn: &'a mut WTxn<'a>,
-        key: Self::Key<'a>,
-        value: Self::Value<'a>,
+        txn: &'a mut WTxn<'tx>,
+        key: Self::Key,
+        value: Self::Value,
     ) -> Result<(), GraphError> {
         txn.txn
-            .put_cf(self, key, value)
+            .put_cf(&self.table, key.to_be_bytes(), value)
             .map_err(|e| GraphError::from(e))
     }
 
-    fn delete_data<'a>(&self, txn: &'a mut WTxn<'a>, key: &[u8]) -> Result<(), GraphError> {
+    fn put_data_with_duplicate<'tx>(
+        &self,
+        txn: &'a mut WTxn<'tx>,
+        key: Self::Key,
+        value: Self::Value,
+    ) -> Result<(), GraphError> {
         txn.txn
-            .delete_cf(self, key)
+            .put_cf(&self.table, key.to_be_bytes(), value)
             .map_err(|e| GraphError::from(e))
     }
 
-    fn iter_data<'a>(
-        &'a self,
-        txn: &'a RTxn<'a>,
-    ) -> Result<HelixIterator<'a, Self::BasicIter<'a>>, GraphError> {
+    fn put_data_in_order<'tx>(
+        &self,
+        txn: &'a mut WTxn<'tx>,
+        key: Self::Key,
+        value: Self::Value,
+    ) -> Result<(), GraphError> {
+        txn.txn
+            .put_cf(&self.table, key.to_be_bytes(), value)
+            .map_err(|e| GraphError::from(e))
+    }
+
+    fn delete_data<'tx>(&self, txn: &'a mut WTxn<'tx>, key: Self::Key) -> Result<(), GraphError> {
+        txn.txn
+            .delete_cf(&self.table, key.to_be_bytes())
+            .map_err(|e| GraphError::from(e))
+    }
+
+    fn delete_duplicate<'tx>(
+        &self,
+        txn: &'a mut WTxn<'tx>,
+        key: Self::Key,
+        _value: Self::Value,
+    ) -> Result<(), GraphError> {
+        txn.txn
+            .delete_cf(&self.table, key.to_be_bytes())
+            .map_err(|e| GraphError::from(e))
+    }
+
+    fn iter_data<'tx>(
+        &self,
+        txn: &'a RTxn<'tx>,
+    ) -> Result<HelixIterator<'a, Self::BasicIter>, GraphError> {
         Ok(HelixIterator {
-            iter: txn.txn.iterator_cf(self, rocksdb::IteratorMode::Start),
+            iter: txn
+                .txn
+                .iterator_cf(&self.table, rocksdb::IteratorMode::Start),
             _phantom: PhantomData,
         })
     }
 
-    fn prefix_iter_data<'a>(
-        &'a self,
-        txn: &'a RTxn<'a>,
-        prefix: Self::Key<'a>,
-    ) -> Result<HelixIterator<'a, Self::PrefixIter<'a>>, GraphError> {
+    fn prefix_iter_data<'tx>(
+        &self,
+        txn: &'a RTxn<'tx>,
+        prefix: Self::Key,
+    ) -> Result<HelixIterator<'a, Self::PrefixIter>, GraphError> {
         Ok(HelixIterator {
-            iter: txn.txn.prefix_iterator_cf(self, prefix),
+            iter: txn
+                .txn
+                .prefix_iterator_cf(&self.table, prefix.to_be_bytes()),
             _phantom: PhantomData,
         })
     }
 
-    fn get_duplicate_data<'a>(
-        &'a self,
-        txn: &'a RTxn<'a>,
-        key: Self::Key<'a>,
-    ) -> Result<HelixIterator<'a, Self::DuplicateIter<'a>>, GraphError> {
+    fn get_duplicate_data<'tx>(
+        &self,
+        txn: &'a RTxn<'tx>,
+        key: Self::Key,
+    ) -> Result<HelixIterator<'a, Self::DuplicateIter>, GraphError> {
         Ok(HelixIterator {
-            iter: txn.txn.prefix_iterator_cf(self, key),
+            iter: txn.txn.prefix_iterator_cf(&self.table, key.to_be_bytes()),
+            _phantom: PhantomData,
+        })
+    }
+}
+
+#[cfg(feature = "rocks")]
+impl<'a, 't> Storage<'a> for Table<'t, Bytes, Bytes> {
+    type Key = &'a [u8];
+    type Value = &'a [u8];
+    type BasicIter = rocksdb::DBIteratorWithThreadMode<
+        'a,
+        rocksdb::Transaction<'a, rocksdb::TransactionDB<rocksdb::SingleThreaded>>,
+    >;
+    type PrefixIter = rocksdb::DBIteratorWithThreadMode<
+        'a,
+        rocksdb::Transaction<'a, rocksdb::TransactionDB<rocksdb::SingleThreaded>>,
+    >;
+    type DuplicateIter = rocksdb::DBIteratorWithThreadMode<
+        'a,
+        rocksdb::Transaction<'a, rocksdb::TransactionDB<rocksdb::SingleThreaded>>,
+    >;
+
+    fn get_data<'tx>(
+        &self,
+        txn: &'a RTxn<'tx>,
+        key: Self::Key,
+    ) -> Result<Option<Cow<'a, [u8]>>, GraphError> {
+        match txn
+            .txn
+            .get_pinned_cf(&self.table, key) // TODO: Use a generic function to convert to bytes
+            .map_err(|e| GraphError::from(e))
+        {
+            Ok(Some(value)) => Ok(Some(Cow::Owned(value.to_vec()))),
+            Ok(None) => Ok(None),
+            Err(e) => Err(GraphError::from(e)),
+        }
+    }
+
+    fn put_data<'tx>(
+        &self,
+        txn: &'a mut WTxn<'tx>,
+        key: Self::Key,
+        value: Self::Value,
+    ) -> Result<(), GraphError> {
+        txn.txn
+            .put_cf(&self.table, key, value)
+            .map_err(|e| GraphError::from(e))
+    }
+
+    fn put_data_with_duplicate<'tx>(
+        &self,
+        txn: &'a mut WTxn<'tx>,
+        key: Self::Key,
+        value: Self::Value,
+    ) -> Result<(), GraphError> {
+        txn.txn
+            .put_cf(&self.table, key, value)
+            .map_err(|e| GraphError::from(e))
+    }
+
+    fn put_data_in_order<'tx>(
+        &self,
+        txn: &'a mut WTxn<'tx>,
+        key: Self::Key,
+        value: Self::Value,
+    ) -> Result<(), GraphError> {
+        txn.txn
+            .put_cf(&self.table, key, value)
+            .map_err(|e| GraphError::from(e))
+    }
+
+    fn delete_data<'tx>(&self, txn: &'a mut WTxn<'tx>, key: Self::Key) -> Result<(), GraphError> {
+        txn.txn
+            .delete_cf(&self.table, key)
+            .map_err(|e| GraphError::from(e))
+    }
+
+    fn delete_duplicate<'tx>(
+        &self,
+        txn: &'a mut WTxn<'tx>,
+        key: Self::Key,
+        _value: Self::Value,
+    ) -> Result<(), GraphError> {
+        txn.txn
+            .delete_cf(&self.table, key)
+            .map_err(|e| GraphError::from(e))
+    }
+
+    fn iter_data<'tx>(
+        &self,
+        txn: &'a RTxn<'tx>,
+    ) -> Result<HelixIterator<'a, Self::BasicIter>, GraphError> {
+        Ok(HelixIterator {
+            iter: txn
+                .txn
+                .iterator_cf(&self.table, rocksdb::IteratorMode::Start),
+            _phantom: PhantomData,
+        })
+    }
+
+    fn prefix_iter_data<'tx>(
+        &self,
+        txn: &'a RTxn<'tx>,
+        prefix: Self::Key,
+    ) -> Result<HelixIterator<'a, Self::PrefixIter>, GraphError> {
+        Ok(HelixIterator {
+            iter: txn.txn.prefix_iterator_cf(&self.table, prefix),
+            _phantom: PhantomData,
+        })
+    }
+
+    fn get_duplicate_data<'tx>(
+        &self,
+        txn: &'a RTxn<'tx>,
+        key: Self::Key,
+    ) -> Result<HelixIterator<'a, Self::DuplicateIter>, GraphError> {
+        Ok(HelixIterator {
+            iter: txn.txn.prefix_iterator_cf(&self.table, key),
             _phantom: PhantomData,
         })
     }
 }
 
 #[cfg(feature = "rocksdb")]
-impl Database for rocksdb::TransactionDB<rocksdb::SingleThreaded> {
-    fn read_txn(&self) -> RTxn {
-        RTxn {
-            txn: self.transaction(),
-        }
-    }
+impl<'t> HelixDB<'t> {
+    pub fn new(path: &str, config: Config) -> Result<Self, GraphError> {
+        use std::collections::HashMap;
 
-    fn write_txn(&self) -> WTxn {
-        WTxn {
-            txn: self.transaction(),
-        }
-    }
+        use crate::helix_engine::storage_core::{
+            engine_wrapper::{DB_EDGES, DB_IN_EDGES, DB_NODES, DB_OUT_EDGES, HelixEnv},
+            storage_core::StorageConfig,
+        };
 
-    fn nodes_db(&self) -> Result<Table<U128, Bytes>, GraphError> {
-        use crate::helix_engine::storage_core::engine_wrapper::NODES_DB;
-
-        let cf = self
-            .cf_handle(NODES_DB)
-            .ok_or(GraphError::TableNotFound(NODES_DB))?;
-        Ok(Table {
-            table: cf,
-            _phantom: PhantomData,
-        })
-    }
-
-    fn edges_db(&self) -> Result<Table<U128, Bytes>, GraphError> {
-        use crate::helix_engine::storage_core::engine_wrapper::EDGES_DB;
-
-        let cf = self
-            .cf_handle(EDGES_DB)
-            .ok_or(GraphError::TableNotFound(EDGES_DB))?;
-        Ok(Table {
-            table: cf,
-            _phantom: PhantomData,
-        })
-    }
-
-    fn indices_db(&self) -> Result<Table<Bytes, U128>, GraphError> {
-        use crate::helix_engine::storage_core::engine_wrapper::INDICES_DB;
-
-        let cf = self
-            .cf_handle(INDICES_DB)
-            .ok_or(GraphError::TableNotFound(INDICES_DB))?;
-        Ok(Table {
-            table: cf,
-            _phantom: PhantomData,
-        })
-    }
-
-    fn out_edges_db(&self) -> Result<Table<Bytes, Bytes>, GraphError> {
-        use crate::helix_engine::storage_core::engine_wrapper::OUT_EDGES_DB;
-
-        let cf = self
-            .cf_handle(OUT_EDGES_DB)
-            .ok_or(GraphError::TableNotFound(OUT_EDGES_DB))?;
-        Ok(Table {
-            table: cf,
-            _phantom: PhantomData,
-        })
-    }
-
-    fn in_edges_db(&self) -> Result<Table<Bytes, Bytes>, GraphError> {
-        use crate::helix_engine::storage_core::engine_wrapper::IN_EDGES_DB;
-
-        let cf = self
-            .cf_handle(IN_EDGES_DB)
-            .ok_or(GraphError::TableNotFound(IN_EDGES_DB))?;
-        Ok(Table {
-            table: cf,
-            _phantom: PhantomData,
-        })
-    }
-
-    fn config() -> rocksdb::Options {
         let mut opts = rocksdb::Options::default();
         opts.create_if_missing(true);
 
@@ -215,14 +321,11 @@ impl Database for rocksdb::TransactionDB<rocksdb::SingleThreaded> {
         // Increase read performance at cost of space
         opts.set_optimize_filters_for_hits(true);
         opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(8));
-
-        opts
-    }
-    fn new(path: &str, opts: rocksdb::Options) -> Result<Self, GraphError> {
         // Setup column families with specific options
         let mut node_opts = rocksdb::Options::default();
         let mut edge_opts = rocksdb::Options::default();
-        let mut index_opts = rocksdb::Options::default();
+        let mut out_edges_opts = rocksdb::Options::default();
+        let mut in_edges_opts = rocksdb::Options::default();
 
         // Node CF optimizations
         let node_cache = rocksdb::Cache::new_lru_cache(1 * 1024 * 1024 * 1024); // 4GB cache
@@ -242,20 +345,50 @@ impl Database for rocksdb::TransactionDB<rocksdb::SingleThreaded> {
         edge_block_opts.set_bloom_filter(10.0, false);
         edge_opts.set_block_based_table_factory(&edge_block_opts);
 
-        // Index CF optimizations (for edge indices)
-        let index_cache = rocksdb::Cache::new_lru_cache(1 * 1024 * 1024 * 1024); // 2GB cache
-        let mut index_block_opts = rocksdb::BlockBasedOptions::default();
-        index_block_opts.set_block_cache(&index_cache);
-        index_block_opts.set_block_size(16 * 1024); // 16KB blocks
-        index_block_opts.set_cache_index_and_filter_blocks(true);
-        index_block_opts.set_bloom_filter(10.0, false);
-        index_opts.set_block_based_table_factory(&index_block_opts);
+        // Out Edges CF optimizations (for out_edges indices)
+        let out_edges_cache = rocksdb::Cache::new_lru_cache(1 * 1024 * 1024 * 1024); // 2GB cache
+        let mut out_edges_block_opts = rocksdb::BlockBasedOptions::default();
+        out_edges_block_opts.set_block_cache(&out_edges_cache);
+        out_edges_block_opts.set_block_size(16 * 1024); // 16KB blocks
+        out_edges_block_opts.set_cache_index_and_filter_blocks(true);
+        out_edges_block_opts.set_bloom_filter(10.0, false);
+        out_edges_opts.set_block_based_table_factory(&out_edges_block_opts);
 
-        let cf_descriptors: Vec<rocksdb::ColumnFamilyDescriptor> = vec![
-            // rocksdb::ColumnFamilyDescriptor::new(CF_NODES, node_opts),
-            // rocksdb::ColumnFamilyDescriptor::new(CF_EDGES, edge_opts),
-            // rocksdb::ColumnFamilyDescriptor::new(CF_INDICES, index_opts),
+        // In Edges CF optimizations (for in_edges indices)
+        let in_edges_cache = rocksdb::Cache::new_lru_cache(1 * 1024 * 1024 * 1024); // 2GB cache
+        let mut in_edges_block_opts = rocksdb::BlockBasedOptions::default();
+        in_edges_block_opts.set_block_cache(&in_edges_cache);
+        in_edges_block_opts.set_block_size(16 * 1024); // 16KB blocks
+        in_edges_block_opts.set_cache_index_and_filter_blocks(true);
+        in_edges_block_opts.set_bloom_filter(10.0, false);
+        in_edges_opts.set_block_based_table_factory(&in_edges_block_opts);
+
+        let mut secondary_indices = HashMap::new();
+        if let Some(indices) = config.get_graph_config().secondary_indices {
+            for index in indices {
+                let mut index_opts = rocksdb::Options::default();
+                let index_cache = rocksdb::Cache::new_lru_cache(1 * 1024 * 1024 * 1024); // 2GB cache
+                let mut index_block_opts = rocksdb::BlockBasedOptions::default();
+                index_block_opts.set_block_cache(&index_cache);
+                index_block_opts.set_block_size(16 * 1024); // 16KB blocks
+                index_block_opts.set_cache_index_and_filter_blocks(true);
+                index_block_opts.set_bloom_filter(10.0, false);
+                index_opts.set_block_based_table_factory(&index_block_opts);
+                secondary_indices.insert(
+                    index,
+                    rocksdb::ColumnFamilyDescriptor::new(index, index_opts),
+                );
+            }
+        }
+
+        let mut cf_descriptors: Vec<rocksdb::ColumnFamilyDescriptor> = vec![
+            rocksdb::ColumnFamilyDescriptor::new(DB_NODES, node_opts),
+            rocksdb::ColumnFamilyDescriptor::new(DB_EDGES, edge_opts),
+            rocksdb::ColumnFamilyDescriptor::new(DB_OUT_EDGES, out_edges_opts),
+            rocksdb::ColumnFamilyDescriptor::new(DB_IN_EDGES, in_edges_opts),
         ];
+
+        cf_descriptors.extend(secondary_indices.into_iter().map(|(_, cf)| cf));
 
         let txn_opts = rocksdb::TransactionDBOptions::default();
         let db: rocksdb::TransactionDB<rocksdb::SingleThreaded> =
@@ -287,7 +420,28 @@ impl Database for rocksdb::TransactionDB<rocksdb::SingleThreaded> {
         // )?;
 
         // drop(cf_edges);
+        let storage_config = StorageConfig::new(
+            config.schema.unwrap_or("".to_string()),
+            config.graphvis_node_label,
+            config.embedding_model,
+        );
 
-        Ok(db)
+        Ok(HelixDB {
+            storage_config,
+            nodes_db: Table::new_rocksdb(db.cf_handle("nodes").unwrap()),
+            edges_db: Table::new_rocksdb(db.cf_handle("edges").unwrap()),
+            out_edges_db: Table::new_rocksdb(db.cf_handle("out_edges").unwrap()),
+            in_edges_db: Table::new_rocksdb(db.cf_handle("in_edges").unwrap()),
+            secondary_indices: secondary_indices
+                .into_iter()
+                .map(|(_, cf)| {
+                    (
+                        cf.name().to_string(),
+                        Table::new_rocksdb(db.cf_handle(cf.name()).unwrap()),
+                    )
+                })
+                .collect(),
+            env: HelixEnv::new_rocksdb(db),
+        })
     }
 }

@@ -13,6 +13,6 @@ fn test_lmdb_wrapper() {
 
     let txn = db.read_txn().unwrap();
     let value = db.nodes_db.get_data(&txn, &2).unwrap().unwrap();
-    assert_eq!(value, b"test_value");
+    assert_eq!(*value, *b"test_value");
     txn.abort_txn().unwrap();
 }
