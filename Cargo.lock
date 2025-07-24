@@ -1200,13 +1200,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "helix-container"
-version = "0.1.0"
-dependencies = [
- "helix-db",
-]
-
-[[package]]
 name = "helix-db"
 version = "1.0.120"
 dependencies = [

@@ -1,11 +1,5 @@
 [workspace]
-members = [
-    "helix-db",
-    "helix-container",
-    "helix-macros",
-    "helix-cli",
-    "hql-tests"
-]
+members = ["helix-db", "helix-macros", "helix-cli", "hql-tests"]
 resolver = "2"
 
 [profile.release]
