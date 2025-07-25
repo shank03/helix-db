@@ -1,4 +1,4 @@
-use crate::helix_engine::types::GraphError;
+use crate::{helix_engine::types::GraphError, helixc::analyzer::analyzer::INTROSPECTION_DATA};
 use serde::{Deserialize, Serialize};
 use std::{fmt, path::PathBuf};
 
@@ -218,7 +218,13 @@ impl fmt::Display for Config {
         )?;
         write!(f, "mcp: Some({}),", self.mcp.unwrap_or(true))?;
         write!(f, "bm25: Some({}),", self.bm25.unwrap_or(true))?;
-        write!(f, "schema: None,")?;
+        if let Some(data) = INTROSPECTION_DATA.get()
+            && let Ok(stringified) = sonic_rs::to_string(data)
+        {
+            write!(f, r#"schema: Some("{stringified}"),"#)?;
+        } else {
+            write!(f, r#"schema: None,"#)?;
+        }
         write!(
             f,
             "embedding_model: {},",
