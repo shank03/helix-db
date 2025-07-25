@@ -1,5 +1,5 @@
 use crate::helix_engine::{
-    storage_core::engine_wrapper::{RTxn, ReadWriteTxn, Storage, Table, WTxn},
+    storage_core::engine_wrapper::{RTxn, ReadMethods, ReadWriteTxn, Storage, Table, WTxn},
     types::VectorError,
     vector_core::{
         hnsw::HNSW,
@@ -9,8 +9,7 @@ use crate::helix_engine::{
 };
 use crate::protocol::value::Value;
 use heed3::{
-    Database, Env,
-    types::{Bytes, Unit},
+    types::{Bytes, Unit}, Database, Env, RoTxn
 };
 use itertools::Itertools;
 use rand::prelude::Rng;
@@ -343,12 +342,12 @@ impl HNSW for VectorCore {
         with_data: bool,
     ) -> Result<HVector, VectorError> {
         let key = Self::vector_key(id, level);
-        let vector = match self.vectors_db.get(txn, key.as_ref())? {
+        let vector = match self.vectors_db.get_data(txn, key.as_ref())? {
             Some(bytes) => {
                 let vector = match with_data {
                     true => {
                         let mut vector = HVector::from_bytes(id, level, &bytes)?;
-                        vector.properties = match self.vector_data_db.get(txn, &id.to_be_bytes())? {
+                        vector.properties = match self.vector_data_db.get_data(txn, &id.to_be_bytes())? {
                             Some(bytes) => {
                                 Some(bincode::deserialize(&bytes).map_err(VectorError::from)?)
                             }

@@ -7,8 +7,8 @@ use crate::{
             },
             traversal_iter::RoTraversalIterator,
         },
-        storage_core::{engine_wrapper::{HelixDB, HelixDBMethods, RTxn, Storage}, storage_core::HelixGraphStorage, storage_methods::StorageMethods},
-        types::GraphError,
+        storage_core::{engine_wrapper::{HelixDB, HelixDBMethods, RTxn, ReadMethods}, storage_core::HelixGraphStorage, storage_methods::StorageMethods},
+        types::GraphError, vector_core::hnsw::HNSW,
     },
     utils::{items::Node, label_hash::hash_label},
 };
@@ -23,7 +23,7 @@ pub struct OutNodesIterator<'a, T> {
         heed3::types::LazyDecode<Bytes>,
         heed3::iteration_method::MoveOnCurrentKeyDuplicates,
     >,
-    pub storage: Arc<HelixDB<'a>>,
+    pub storage: Arc<HelixDB>,
     pub edge_type: EdgeType,
     pub txn: &'a T,
 }
@@ -50,7 +50,7 @@ impl<'a> Iterator for OutNodesIterator<'a, RTxn<'a>> {
                             }
                         }
                         EdgeType::Vec => {
-                            if let Ok(vector) = self.storage.vectors_db().get_and_decode_data::<HVector>(self.txn, &item_id) {
+                            if let Ok(vector) = self.storage.vectors.get_vector(self.txn, &item_id) {
                                 return Some(Ok(TraversalVal::Vector(vector)));
                             }
                         }
@@ -80,7 +80,7 @@ pub trait OutAdapter<'a, T>: Iterator<Item = Result<TraversalVal, GraphError>> {
     ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>;
 }
 
-impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> OutAdapter<'a, RoTxn<'a>>
+impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> OutAdapter<'a, RTxn<'a>>
     for RoTraversalIterator<'a, I>
 {
     #[inline]

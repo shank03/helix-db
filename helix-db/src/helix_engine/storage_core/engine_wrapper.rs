@@ -83,76 +83,72 @@ pub struct WTxn<'env> {
     pub txn: skipdb::optimistic::OptimisticTransaction<&'a [u8], &'a [u8]>,
 }
 
-pub trait Storage<'a, Ro, Rw> {
+pub trait ReadMethods<'a, T: Txn<'a, TxnType = Self::Ro>> {
     type Key;
     type Value;
     type BasicIter: Iterator;
     type PrefixIter: Iterator;
     type DuplicateIter: Iterator;
+    type Ro;
 
-    fn get_data<'tx, T>(
-        &self,
-        txn: &'tx T,
-        key: Self::Key,
-    ) -> Result<Option<Cow<'a, [u8]>>, GraphError>
-    where
-        T: AsRef<Ro>;
+    fn get_data(&self, txn: &'a T, key: Self::Key) -> Result<Option<Cow<'a, [u8]>>, GraphError>;
 
-    fn get_and_decode_data<'tx, T, D: ItemSerdes>(
+    fn get_and_decode_data<D: ItemSerdes>(
         &self,
-        txn: &'tx T,
+        txn: &'a T,
         key: Self::Key,
     ) -> Result<Option<D>, GraphError>
     where
-        T: AsRef<Ro>;
+        D: ItemSerdes;
 
-    fn put_data<'tx>(
+    fn iter_data(&self, txn: &'a T) -> Result<HelixIterator<'a, Self::BasicIter>, GraphError>;
+
+    fn prefix_iter_data(
         &self,
-        txn: &'a mut WTxn<'tx>,
-        key: Self::Key,
-        value: Self::Value,
-    ) -> Result<(), GraphError>;
-    fn put_data_with_duplicate<'tx>(
-        &self,
-        txn: &'a mut WTxn<'tx>,
-        key: Self::Key,
-        value: Self::Value,
-    ) -> Result<(), GraphError>;
-    fn put_data_in_order<'tx>(
-        &self,
-        txn: &'a mut WTxn<'tx>,
-        key: Self::Key,
-        value: Self::Value,
-    ) -> Result<(), GraphError>;
-    fn delete_data<'tx>(&self, txn: &'a mut WTxn<'tx>, key: Self::Key) -> Result<(), GraphError>;
-    fn delete_duplicate<'tx>(
-        &self,
-        txn: &'a mut WTxn<'tx>,
-        key: Self::Key,
-        value: Self::Value,
-    ) -> Result<(), GraphError>;
-    fn iter_data<'tx, T: AsRef<heed3::RoTxn<'tx>>>(
-        &self,
-        txn: &'tx T,
-    ) -> Result<HelixIterator<'a, Self::BasicIter>, GraphError>
-    where
-        'tx: 'a;
-    fn prefix_iter_data<'tx, T: AsRef<heed3::RoTxn<'tx>>>(
-        &self,
-        txn: &'tx T,
+        txn: &'a T,
         prefix: Self::Key,
-    ) -> Result<HelixIterator<'a, Self::PrefixIter>, GraphError>
-    where
-        T: AsRef<heed3::RoTxn<'tx>>,
-        'tx: 'a;
-    fn get_duplicate_data<'tx, T: AsRef<heed3::RoTxn<'tx>>>(
+    ) -> Result<HelixIterator<'a, Self::PrefixIter>, GraphError>;
+
+    fn get_duplicate_data(
         &self,
-        txn: &'tx T,
+        txn: &'a T,
         key: Self::Key,
-    ) -> Result<HelixIterator<'a, Self::DuplicateIter>, GraphError>
-    where
-        T: AsRef<heed3::RoTxn<'tx>>,
-        'tx: 'a;
+    ) -> Result<HelixIterator<'a, Self::DuplicateIter>, GraphError>;
+}
+
+pub trait WriteMethods<'a> {
+    type Key;
+    type Value;
+
+    fn put_data<'tx, I: ItemSerdes>(
+        &self,
+        txn: &'a mut WTxn<'tx>,
+        key: Self::Key,
+        value: &I,
+    ) -> Result<(), GraphError>;
+
+    fn put_data_with_duplicate<'tx, I: ItemSerdes>(
+        &self,
+        txn: &'a mut WTxn<'tx>,
+        key: Self::Key,
+        value: &I,
+    ) -> Result<(), GraphError>;
+
+    fn put_data_in_order<'tx, I: ItemSerdes>(
+        &self,
+        txn: &'a mut WTxn<'tx>,
+        key: Self::Key,
+        value: &I,
+    ) -> Result<(), GraphError>;
+
+    fn delete_data<'tx>(&self, txn: &'a mut WTxn<'tx>, key: Self::Key) -> Result<(), GraphError>;
+
+    fn delete_duplicate<'tx, I: ItemSerdes>(
+        &self,
+        txn: &'a mut WTxn<'tx>,
+        key: Self::Key,
+        value: &I,
+    ) -> Result<(), GraphError>;
 }
 
 pub struct Table<K, V> {
