@@ -10,6 +10,7 @@ use core_affinity::{CoreId, set_for_current};
 use tracing::{info, trace, warn};
 
 use super::router::router::{HandlerFn, HelixRouter};
+use crate::helix_engine::graph_core::graph_core::HelixGraphEngineOpts;
 use crate::helix_gateway::graphvis;
 use crate::helix_gateway::worker_pool::WorkerPool;
 use crate::protocol;
@@ -29,6 +30,7 @@ pub struct HelixGateway {
     io_size: usize,
     graph_access: Arc<HelixGraphEngine>,
     router: Arc<HelixRouter>,
+    opts: Option<HelixGraphEngineOpts>,
 }
 
 impl HelixGateway {
@@ -39,6 +41,7 @@ impl HelixGateway {
         io_size: usize,
         routes: Option<HashMap<String, HandlerFn>>,
         mcp_routes: Option<HashMap<String, MCPHandlerFn>>,
+        opts: Option<HelixGraphEngineOpts>,
     ) -> HelixGateway {
         let router = Arc::new(HelixRouter::new(routes, mcp_routes));
         HelixGateway {
@@ -47,6 +50,7 @@ impl HelixGateway {
             router,
             worker_size,
             io_size,
+            opts,
         }
     }
 
@@ -99,7 +103,8 @@ impl HelixGateway {
         let axum_app = axum::Router::new()
             .route("/{*path}", post(post_handler))
             .route("/graphvis", get(graphvis::graphvis_handler))
-            .with_state(Arc::new(worker_pool));
+            .with_state(Arc::new(worker_pool))
+            .with_state(Arc::new(self.opts));
 
         rt.block_on(async move {
             let listener = tokio::net::TcpListener::bind(self.address).await.unwrap();

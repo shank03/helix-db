@@ -42,7 +42,7 @@ fn main() {
         config,
     };
 
-    let graph = Arc::new(HelixGraphEngine::new(opts).unwrap());
+    let graph = Arc::new(HelixGraphEngine::new(opts.clone()).unwrap());
 
     // generates routes from handler proc macro
     let submissions: Vec<_> = inventory::iter::<HandlerSubmission>.into_iter().collect();
@@ -96,6 +96,7 @@ fn main() {
         2,
         Some(query_routes),
         Some(mcp_routes),
+        Some(opts),
     );
 
     gateway.run().unwrap()

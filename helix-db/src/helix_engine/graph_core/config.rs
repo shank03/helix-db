@@ -19,14 +19,12 @@ impl Default for VectorConfig {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[derive(Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct GraphConfig {
     pub secondary_indices: Option<Vec<String>>,
 }
 
-
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
     pub vector_config: Option<VectorConfig>,
     pub graph_config: Option<GraphConfig>,
@@ -113,9 +111,7 @@ impl Config {
     }
 
     pub fn get_vector_config(&self) -> VectorConfig {
-        self.vector_config
-            .clone()
-            .unwrap_or_default()
+        self.vector_config.clone().unwrap_or_default()
     }
 
     pub fn get_graph_config(&self) -> GraphConfig {

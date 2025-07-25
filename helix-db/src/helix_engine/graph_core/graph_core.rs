@@ -18,7 +18,7 @@ pub struct HelixGraphEngine {
     pub mcp_connections: Option<Arc<Mutex<McpConnections>>>,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct HelixGraphEngineOpts {
     pub path: String,
     pub config: Config,
