@@ -1,6 +1,6 @@
 use crate::{
     helix_engine::{storage_core::graph_visualization::GraphVisualization, types::GraphError},
-    helix_gateway::{router::router::HandlerInput, worker_pool::WorkerPool},
+    helix_gateway::{gateway::AppState, router::router::HandlerInput},
     protocol::{self, HelixError, request::RequestType},
 };
 use axum::{body::Body, extract::State, http::HeaderValue, response::IntoResponse};
@@ -9,11 +9,11 @@ use std::sync::Arc;
 use tracing::info;
 
 pub async fn graphvis_handler(
-    State(pool): State<Arc<WorkerPool>>,
+    State(state): State<Arc<AppState>>,
     mut req: protocol::request::Request,
 ) -> axum::http::Response<Body> {
     req.req_type = RequestType::GraphVis;
-    let res = pool.process(req).await;
+    let res = state.worker_pool.process(req).await;
 
     match res {
         Ok(r) => {
