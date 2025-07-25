@@ -12,6 +12,7 @@ use tracing::{info, trace, warn};
 use super::router::router::{HandlerFn, HelixRouter};
 use crate::helix_engine::graph_core::graph_core::HelixGraphEngineOpts;
 use crate::helix_gateway::graphvis;
+use crate::helix_gateway::introspect_schema::introspect_schema_handler;
 use crate::helix_gateway::worker_pool::WorkerPool;
 use crate::protocol;
 use crate::{
@@ -103,6 +104,7 @@ impl HelixGateway {
         let axum_app = axum::Router::new()
             .route("/{*path}", post(post_handler))
             .route("/graphvis", get(graphvis::graphvis_handler))
+            .route("/introspect", get(introspect_schema_handler))
             .with_state(Arc::new(worker_pool))
             .with_state(Arc::new(self.opts));
 
