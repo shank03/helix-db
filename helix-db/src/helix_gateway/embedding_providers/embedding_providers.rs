@@ -1,6 +1,7 @@
 use crate::helix_engine::types::GraphError;
 use reqwest::blocking::Client;
-use serde_json::json;
+use sonic_rs::JsonValueTrait;
+use sonic_rs::{JsonContainerTrait, json};
 #[cfg(feature = "embed_openai")]
 use std::env;
 #[cfg(feature = "embed_local")]
@@ -52,7 +53,7 @@ impl EmbeddingModel for EmbeddingModelImpl {
             }))
             .send()
             .map_err(|e| GraphError::from(format!("Failed to send request: {e}")))?
-            .json::<serde_json::Value>()
+            .json::<sonic_rs::Value>()
             .map_err(|e| GraphError::from(format!("Failed to parse response: {e}")))?;
 
         let embedding = response["data"][0]["embedding"]
@@ -103,7 +104,7 @@ impl EmbeddingModel for EmbeddingModelImpl {
             }))
             .send()
             .map_err(|e| GraphError::from(format!("Request failed: {}", e)))?
-            .json::<serde_json::Value>()
+            .json::<sonic_rs::Value>()
             .map_err(|e| GraphError::from(format!("Failed to parse response: {}", e)))?;
 
         let embedding = response["embedding"]

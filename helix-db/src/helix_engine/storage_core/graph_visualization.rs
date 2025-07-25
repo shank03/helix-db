@@ -82,7 +82,7 @@ impl GraphVisualization for HelixGraphStorage {
         });
         debug_println!("db stats json: {:?}", result);
 
-        serde_json::to_string(&result).map_err(|e| GraphError::New(e.to_string()))
+        sonic_rs::to_string(&result).map_err(|e| GraphError::New(e.to_string()))
     }
 }
 
