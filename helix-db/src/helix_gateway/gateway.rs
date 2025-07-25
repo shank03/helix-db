@@ -107,7 +107,7 @@ impl HelixGateway {
             .route("/introspect", get(introspect_schema_handler))
             .with_state(Arc::new(AppState {
                 worker_pool,
-                schema_json: self.opts.map(|o| o.config.schema).flatten(),
+                schema_json: self.opts.and_then(|o| o.config.schema),
             }));
 
         rt.block_on(async move {
