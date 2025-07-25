@@ -4,8 +4,8 @@
 //!
 //! Nodes and edges are serialised without enum variant names in JSON format.
 
-use crate::protocol::value::Value;
 use crate::helix_engine::types::GraphError;
+use crate::protocol::value::Value;
 use sonic_rs::{Deserialize, Serialize};
 use std::{cmp::Ordering, collections::HashMap};
 
@@ -20,6 +20,8 @@ pub struct Node {
     pub id: u128,
     /// The label of the node.
     pub label: String,
+    ///
+    pub version: u8,
     /// The properties of the node.
     ///
     /// Properties are optional and can be None.
@@ -43,6 +45,7 @@ impl Node {
             Ok(node) => Ok(Node {
                 id,
                 label: node.label,
+                version: node.version,
                 properties: node.properties,
             }),
             Err(e) => Err(GraphError::ConversionError(format!(
@@ -152,7 +155,6 @@ impl Edge {
     }
 }
 
-
 // Core trait implementations for Edge
 impl std::fmt::Display for Edge {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -191,5 +193,3 @@ impl PartialOrd for Edge {
         Some(self.cmp(other))
     }
 }
-
-

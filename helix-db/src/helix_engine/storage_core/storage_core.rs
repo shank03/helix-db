@@ -275,9 +275,7 @@ impl DBMethods for HelixGraphStorage {
         let db = self
             .secondary_indices
             .get(name)
-            .ok_or(GraphError::New(format!(
-                "Secondary Index {name} not found"
-            )))?;
+            .ok_or(GraphError::New(format!("Secondary Index {name} not found")))?;
         db.clear(&mut wtxn)?;
         wtxn.commit()?;
         self.secondary_indices.remove(name);
@@ -298,7 +296,7 @@ impl StorageMethods for HelixGraphStorage {
             None => return Err(GraphError::NodeNotFound),
         };
         let node: Node = Node::decode_node(node, *id)?;
-        Ok(node)
+        // Ok(node)
     }
 
     #[inline(always)]
