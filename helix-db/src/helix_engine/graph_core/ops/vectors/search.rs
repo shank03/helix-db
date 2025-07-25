@@ -24,32 +24,36 @@ impl<I: Iterator<Item = Result<TraversalVal, GraphError>>> Iterator for SearchV<
 }
 
 pub trait SearchVAdapter<'a>: Iterator<Item = Result<TraversalVal, GraphError>> {
-    fn search_v<F>(
+    fn search_v<F, K>(
         self,
         query: &[f64],
-        k: usize,
+        k: K,
         filter: Option<&[F]>,
     ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>
     where
-        F: Fn(&HVector, &RoTxn) -> bool;
+        F: Fn(&HVector, &RoTxn) -> bool,
+        K: TryInto<usize>,
+        K::Error: std::fmt::Debug;
 }
 
 impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> SearchVAdapter<'a>
     for RoTraversalIterator<'a, I>
 {
-    fn search_v<F>(
+    fn search_v<F, K>(
         self,
         query: &[f64],
-        k: usize,
+        k: K,
         filter: Option<&[F]>,
     ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>
     where
         F: Fn(&HVector, &RoTxn) -> bool,
+        K: TryInto<usize>,
+        K::Error: std::fmt::Debug,
     {
         let vectors = self
             .storage
             .vectors
-            .search(self.txn, query, k, filter, false);
+            .search(self.txn, query, k.try_into().unwrap(), filter, false);
 
         let iter = match vectors {
             Ok(vectors) => vectors

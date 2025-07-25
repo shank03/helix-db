@@ -377,6 +377,6 @@ pub struct SearchVectorStep {
 }
 impl Display for SearchVectorStep {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "brute_force_search_v({}, {})", self.vec, self.k)
+        write!(f, "brute_force_search_v({}, {} as usize)", self.vec, self.k)
     }
 }

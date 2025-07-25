@@ -14,7 +14,6 @@ pub enum SourceStep {
     AddN(AddN),
     AddE(AddE),
     AddV(AddV),
-    SearchV(SearchV),
     NFromID(NFromID),
     NFromIndex(NFromIndex),
     NFromType(NFromType),
@@ -82,29 +81,6 @@ impl Display for AddV {
     }
 }
 
-/// where F: Fn(&HVector) -> bool;
-#[derive(Clone)]
-pub struct SearchV {
-    pub vec: VecData,
-    pub properties: Option<Vec<(String, GeneratedValue)>>,
-    pub f: Vec<BoExp>,
-}
-impl Display for SearchV {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let properties = write_properties(&self.properties);
-        let f_str = self
-            .f
-            .iter()
-            .map(|f| format!("{f}"))
-            .collect::<Vec<_>>()
-            .join(", ");
-        write!(
-            f,
-            "search_v::<fn(&HVector, &RoTxn) -> bool>({}, {}, {})",
-            self.vec, properties, f_str
-        )
-    }
-}
 
 #[derive(Clone)]
 pub struct NFromID {
@@ -169,7 +145,6 @@ impl Display for SourceStep {
             SourceStep::AddN(add_n) => write!(f, "{add_n}"),
             SourceStep::AddE(add_e) => write!(f, "{add_e}"),
             SourceStep::AddV(add_v) => write!(f, "{add_v}"),
-            SourceStep::SearchV(search_v) => write!(f, "{search_v}"),
             SourceStep::NFromID(n_from_id) => write!(f, "{n_from_id}"),
             SourceStep::NFromIndex(n_from_index) => write!(f, "{n_from_index}"),
             SourceStep::NFromType(n_from_type) => write!(f, "{n_from_type}"),
@@ -195,7 +170,7 @@ impl Display for SearchVector {
         match &self.pre_filter {
             Some(pre_filter) => write!(
                 f,
-                "search_v::<fn(&HVector, &RoTxn) -> bool>({}, {}, Some(&[{}]))",
+                "search_v::<fn(&HVector, &RoTxn) -> bool, _>({}, {}, Some(&[{}]))",
                 self.vec,
                 self.k,
                 pre_filter
@@ -206,7 +181,7 @@ impl Display for SearchVector {
             ),
             None => write!(
                 f,
-                "search_v::<fn(&HVector, &RoTxn) -> bool>({}, {}, None)",
+                "search_v::<fn(&HVector, &RoTxn) -> bool, _>({}, {}, None)",
                 self.vec, self.k
             ),
         }
