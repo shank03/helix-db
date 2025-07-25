@@ -1,4 +1,4 @@
-use crate::helix_engine::types::GraphError;
+use crate::{helix_engine::types::GraphError, helixc::analyzer::analyzer::INTROSPECTION_DATA};
 use serde::{Deserialize, Serialize};
 use std::{fmt, path::PathBuf};
 
@@ -19,14 +19,12 @@ impl Default for VectorConfig {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[derive(Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct GraphConfig {
     pub secondary_indices: Option<Vec<String>>,
 }
 
-
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
     pub vector_config: Option<VectorConfig>,
     pub graph_config: Option<GraphConfig>,
@@ -113,9 +111,7 @@ impl Config {
     }
 
     pub fn get_vector_config(&self) -> VectorConfig {
-        self.vector_config
-            .clone()
-            .unwrap_or_default()
+        self.vector_config.clone().unwrap_or_default()
     }
 
     pub fn get_graph_config(&self) -> GraphConfig {
@@ -222,7 +218,13 @@ impl fmt::Display for Config {
         )?;
         write!(f, "mcp: Some({}),", self.mcp.unwrap_or(true))?;
         write!(f, "bm25: Some({}),", self.bm25.unwrap_or(true))?;
-        write!(f, "schema: None,")?;
+        if let Some(data) = INTROSPECTION_DATA.get()
+            && let Ok(stringified) = sonic_rs::to_string(data)
+        {
+            write!(f, r#"schema: Some("{stringified}"),"#)?;
+        } else {
+            write!(f, r#"schema: None,"#)?;
+        }
         write!(
             f,
             "embedding_model: {},",
