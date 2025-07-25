@@ -2,7 +2,10 @@ use super::storage_methods::DBMethods;
 use crate::{
     helix_engine::{
         bm25::bm25::HBM25Config,
-        graph_core::config::Config,
+        graph_core::{
+            config::Config,
+            ops::version_info::{self, VersionInfo},
+        },
         storage_core::storage_methods::StorageMethods,
         types::GraphError,
         vector_core::{
@@ -44,6 +47,7 @@ pub struct HelixGraphStorage {
     pub secondary_indices: HashMap<String, Database<Bytes, U128<BE>>>,
     pub vectors: VectorCore,
     pub bm25: Option<HBM25Config>,
+    pub version_info: VersionInfo,
 
     pub storage_config: StorageConfig,
 }
@@ -296,7 +300,8 @@ impl StorageMethods for HelixGraphStorage {
             None => return Err(GraphError::NodeNotFound),
         };
         let node: Node = Node::decode_node(node, *id)?;
-        // Ok(node)
+        let node = self.version_info.upgrade_to_latest(node);
+        Ok(node)
     }
 
     #[inline(always)]

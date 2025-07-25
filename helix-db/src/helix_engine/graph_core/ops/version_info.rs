@@ -4,6 +4,17 @@ use crate::{protocol::value::Value, utils::items::Node};
 
 pub struct VersionInfo(HashMap<String, ItemInfo>);
 
+impl VersionInfo {
+    pub fn upgrade_to_latest(&self, node: Node) -> Node {
+        let item_info = self
+            .0
+            .get(&node.label)
+            .expect("All nodes should have version info");
+
+        item_info.upgrade_to_latest(node)
+    }
+}
+
 type NodeProps = HashMap<String, Value>;
 
 struct ItemInfo {
