@@ -105,8 +105,10 @@ impl HelixGateway {
             .route("/{*path}", post(post_handler))
             .route("/graphvis", get(graphvis::graphvis_handler))
             .route("/introspect", get(introspect_schema_handler))
-            .with_state(Arc::new(worker_pool))
-            .with_state(Arc::new(self.opts));
+            .with_state(Arc::new(AppState {
+                worker_pool,
+                schema_json: self.opts.map(|o| o.config.schema).flatten(),
+            }));
 
         rt.block_on(async move {
             let listener = tokio::net::TcpListener::bind(self.address).await.unwrap();
@@ -119,10 +121,10 @@ impl HelixGateway {
 }
 
 async fn post_handler(
-    State(pool): State<Arc<WorkerPool>>,
+    State(state): State<Arc<AppState>>,
     req: protocol::request::Request,
 ) -> axum::http::Response<Body> {
-    let res = pool.process(req).await;
+    let res = state.worker_pool.process(req).await;
 
     match res {
         Ok(r) => r.into_response(),
@@ -131,6 +133,11 @@ async fn post_handler(
             e.into_response()
         }
     }
+}
+
+pub struct AppState {
+    pub worker_pool: WorkerPool,
+    pub schema_json: Option<String>,
 }
 
 #[derive(Clone)]
