@@ -3,6 +3,7 @@ use std::{borrow::Cow, collections::HashMap, marker::PhantomData, path::Path};
 
 #[cfg(feature = "lmdb")]
 use heed3::EnvOpenOptions;
+#[cfg(feature = "lmdb")]
 use heed3::WithoutTls;
 #[cfg(feature = "lmdb")]
 use heed3::{AnyTls, WithTls};
@@ -42,16 +43,8 @@ pub trait Txn<'a>: AsRef<Self::TxnType> {
 }
 
 pub struct HelixIterator<'a, I: Iterator> {
-    #[cfg(feature = "rocksdb")]
-    pub iter: rocksdb::DBIteratorWithThreadMode<
-        'a,
-        rocksdb::Transaction<'a, rocksdb::TransactionDB<rocksdb::SingleThreaded>>,
-    >,
-    #[cfg(feature = "lmdb")]
     pub iter: I,
-    #[cfg(feature = "in_memory")]
-    pub iter: skipdb::Iter<'a, K, V>,
-    pub(super) _phantom: PhantomData<(&'a I)>,
+    pub _phantom: PhantomData<&'a I>,
 }
 impl<'a, I: Iterator> Iterator for HelixIterator<'a, I> {
     type Item = I::Item;
@@ -171,7 +164,7 @@ impl<K, V> Table<K, V> {
     }
 
     #[cfg(feature = "rocksdb")]
-    pub fn new_rocksdb(table: rocksdb::ColumnFamilyRef<'t>) -> Table<'t, K, V> {
+    pub fn new_rocksdb(table: rocksdb::ColumnFamilyRef<'static>) -> Table<K, V> {
         Table {
             table,
             _phantom: PhantomData,
