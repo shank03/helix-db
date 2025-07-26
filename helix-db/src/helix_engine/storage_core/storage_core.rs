@@ -155,6 +155,7 @@ impl HelixGraphStorage {
 
         wtxn.commit()?;
         Ok(Self {
+            version_info: VersionInfo(HashMap::new()),
             graph_env,
             nodes_db,
             edges_db,
@@ -311,7 +312,8 @@ impl StorageMethods for HelixGraphStorage {
             None => return Err(GraphError::EdgeNotFound),
         };
         let edge: Edge = Edge::decode_edge(edge, *id)?;
-        self.version_info.Ok(edge)
+        let edge = self.version_info.upgrade_to_edge_latest(edge);
+        Ok(edge)
     }
 
     fn drop_node(&self, txn: &mut RwTxn, id: &u128) -> Result<(), GraphError> {

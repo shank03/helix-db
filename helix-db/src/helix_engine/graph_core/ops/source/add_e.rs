@@ -75,6 +75,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddEAdapter<'
             properties: properties.map(|props| props.into_iter().collect()),
             from_node,
             to_node,
+            version: 0,
         };
 
         let mut result: Result<TraversalVal, GraphError> = Ok(TraversalVal::Empty);

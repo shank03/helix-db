@@ -5,7 +5,7 @@ use crate::{
     utils::items::{Edge, Node},
 };
 
-pub struct VersionInfo(HashMap<String, ItemInfo>);
+pub struct VersionInfo(pub HashMap<String, ItemInfo>);
 
 impl VersionInfo {
     pub fn upgrade_to_node_latest(&self, node: Node) -> Node {
@@ -29,7 +29,7 @@ impl VersionInfo {
 
 type NodeProps = HashMap<String, Value>;
 
-struct ItemInfo {
+pub struct ItemInfo {
     /// The latest version of this item
     /// All writes should be done with this version
     latest: u8,
