@@ -39,9 +39,7 @@ impl Default for HelixParser {
         HelixParser {
             source: Source {
                 source: String::new(),
-                node_schemas: Vec::new(),
-                edge_schemas: Vec::new(),
-                vector_schemas: Vec::new(),
+                schema: HashMap::new(),
                 migrations: Vec::new(),
                 queries: Vec::new(),
             },
@@ -53,11 +51,29 @@ impl Default for HelixParser {
 #[derive(Debug, Clone, Default)]
 pub struct Source {
     pub source: String,
+    pub schema: HashMap<usize, Schema>,
+    pub migrations: Vec<Migration>,
+    pub queries: Vec<Query>,
+}
+
+impl Source {
+    pub fn get_latest_schema(&self) -> &Schema {
+        let latest_schema = self.schema
+            .iter()
+            .max_by(|a, b| a.1.version.1.cmp(&b.1.version.1))
+            .map(|(_, schema)| schema);
+        assert!(latest_schema.is_some());
+        latest_schema.unwrap()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Schema {
+    pub loc: Loc,
+    pub version: (Loc, usize),
     pub node_schemas: Vec<NodeSchema>,
     pub edge_schemas: Vec<EdgeSchema>,
     pub vector_schemas: Vec<VectorSchema>,
-    pub migrations: Vec<Migration>,
-    pub queries: Vec<Query>,
 }
 
 #[derive(Debug, Clone)]
@@ -835,9 +851,7 @@ impl HelixParser {
     pub fn parse_source(input: &Content) -> Result<Source, ParserError> {
         let mut source = Source {
             source: String::new(),
-            node_schemas: Vec::new(),
-            edge_schemas: Vec::new(),
-            vector_schemas: Vec::new(),
+            schema: HashMap::new(),
             migrations: Vec::new(),
             queries: Vec::new(),
         };
@@ -875,7 +889,8 @@ impl HelixParser {
                                         .next()
                                         .unwrap()
                                         .as_str()
-                                        .to_string()
+                                        .parse::<usize>()
+                                        .unwrap()
                                 } else {
                                     return Err(ParserError::from("Expected schema version"));
                                 }
@@ -887,18 +902,57 @@ impl HelixParser {
                             match pair.as_rule() {
                                 Rule::node_def => {
                                     let node_schema =
-                                        parser.parse_node_def(pair, file.name.clone())?;
-                                    parser.source.node_schemas.push(node_schema);
+                                        parser.parse_node_def(pair.clone(), file.name.clone())?;
+                                    parser
+                                        .source
+                                        .schema
+                                        .entry(schema_version)
+                                        .and_modify(|schema| {
+                                            schema.node_schemas.push(node_schema.clone())
+                                        })
+                                        .or_insert(Schema {
+                                            loc: pair.loc(),
+                                            version: (pair.loc(), schema_version),
+                                            node_schemas: vec![node_schema],
+                                            edge_schemas: vec![],
+                                            vector_schemas: vec![],
+                                        });
                                 }
                                 Rule::edge_def => {
                                     let edge_schema =
-                                        parser.parse_edge_def(pair, file.name.clone())?;
-                                    parser.source.edge_schemas.push(edge_schema);
+                                        parser.parse_edge_def(pair.clone(), file.name.clone())?;
+                                    parser
+                                        .source
+                                        .schema
+                                        .entry(schema_version)
+                                        .and_modify(|schema| {
+                                            schema.edge_schemas.push(edge_schema.clone())
+                                        })
+                                        .or_insert(Schema {
+                                            loc: pair.loc(),
+                                            version: (pair.loc(), schema_version),
+                                            node_schemas: vec![],
+                                            edge_schemas: vec![edge_schema],
+                                            vector_schemas: vec![],
+                                        });
                                 }
                                 Rule::vector_def => {
                                     let vector_schema =
-                                        parser.parse_vector_def(pair, file.name.clone())?;
-                                    parser.source.vector_schemas.push(vector_schema);
+                                        parser.parse_vector_def(pair.clone(), file.name.clone())?;
+                                    parser
+                                        .source
+                                        .schema
+                                        .entry(schema_version)
+                                        .and_modify(|schema| {
+                                            schema.vector_schemas.push(vector_schema.clone())
+                                        })
+                                        .or_insert(Schema {
+                                            loc: pair.loc(),
+                                            version: (pair.loc(), schema_version),
+                                            node_schemas: vec![],
+                                            edge_schemas: vec![],
+                                            vector_schemas: vec![vector_schema],
+                                        });
                                 }
                                 _ => return Err(ParserError::from("Unexpected rule encountered")),
                             }
@@ -930,10 +984,7 @@ impl HelixParser {
             }
 
             // parse all schemas first then parse queries using self
-            source.node_schemas.extend(parser.source.node_schemas);
-            source.edge_schemas.extend(parser.source.edge_schemas);
-            source.vector_schemas.extend(parser.source.vector_schemas);
-            source.queries.extend(parser.source.queries);
+            source.schema.extend(parser.source.schema);
             Ok(())
         })?;
 

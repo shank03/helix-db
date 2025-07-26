@@ -11,10 +11,9 @@ use crate::helixc::{
         utils::{gen_identifier_or_param, is_valid_identifier},
     },
     generator::{
-        generator_types::{
-            Parameter as GeneratedParameter, Query as GeneratedQuery, ReturnValue, ReturnValueExpr,
-            Statement as GeneratedStatement,
-        },
+        queries::{Parameter as GeneratedParameter, Query as GeneratedQuery},
+        return_values::{ReturnValue, ReturnValueExpr},
+        statements::Statement as GeneratedStatement,
         source_steps::SourceStep,
         traversal_steps::ShouldCollect,
         utils::{GenRef, GeneratedValue},

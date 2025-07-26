@@ -8,7 +8,7 @@ use crate::helixc::{
         },
         types::Type,
     },
-    generator::generator_types::Source as GeneratedSource,
+    generator::Source as GeneratedSource,
     parser::helix_parser::{EdgeSchema, Field, Source},
 };
 use std::{
@@ -49,9 +49,10 @@ impl<'a> Ctx<'a> {
         };
 
         Self {
-            node_set: src.node_schemas.iter().map(|n| n.name.1.as_str()).collect(),
-            vector_set: src.vector_schemas.iter().map(|v| v.name.as_str()).collect(),
+            node_set: src.get_latest_schema().node_schemas.iter().map(|n| n.name.1.as_str()).collect(),
+            vector_set: src.get_latest_schema().vector_schemas.iter().map(|v| v.name.as_str()).collect(),
             edge_map: src
+                .get_latest_schema()
                 .edge_schemas
                 .iter()
                 .map(|e| (e.name.1.as_str(), e))

@@ -13,7 +13,7 @@ type FieldLookup<'a> = HashMap<&'a str, HashMap<&'a str, Cow<'a, Field>>>;
 pub(crate) fn build_field_lookups<'a>(
     src: &'a Source,
 ) -> (FieldLookup<'a>, FieldLookup<'a>, FieldLookup<'a>) {
-    let node_fields = src
+    let node_fields = src.get_latest_schema()
         .node_schemas
         .iter()
         .map(|n| {
@@ -27,7 +27,7 @@ pub(crate) fn build_field_lookups<'a>(
         })
         .collect();
 
-    let edge_fields = src
+    let edge_fields = src.get_latest_schema()
         .edge_schemas
         .iter()
         .map(|e| {
@@ -54,7 +54,7 @@ pub(crate) fn build_field_lookups<'a>(
         })
         .collect();
 
-    let vector_fields = src
+    let vector_fields = src.get_latest_schema()
         .vector_schemas
         .iter()
         .map(|v| {
@@ -81,7 +81,7 @@ pub(crate) fn build_field_lookups<'a>(
 }
 
 pub(crate) fn check_schema(ctx: &mut Ctx) {
-    for edge in &ctx.src.edge_schemas {
+    for edge in &ctx.src.get_latest_schema().edge_schemas {
         if !ctx.node_set.contains(edge.from.1.as_str())
             && !ctx.vector_set.contains(edge.from.1.as_str())
         {
@@ -131,7 +131,7 @@ pub(crate) fn check_schema(ctx: &mut Ctx) {
         }
         ctx.output.edges.push(edge.clone().into());
     }
-    for node in &ctx.src.node_schemas {
+    for node in &ctx.src.get_latest_schema().node_schemas {
         node.fields.iter().for_each(|f| {
             if f.name.to_lowercase() == "id" {
                 push_schema_err(
@@ -145,7 +145,7 @@ pub(crate) fn check_schema(ctx: &mut Ctx) {
         });
         ctx.output.nodes.push(node.clone().into());
     }
-    for vector in &ctx.src.vector_schemas {
+    for vector in &ctx.src.get_latest_schema().vector_schemas {
         vector.fields.iter().for_each(|f: &Field| {
             if f.name.to_lowercase() == "id" {
                 push_schema_err(

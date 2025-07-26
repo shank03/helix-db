@@ -13,10 +13,12 @@ use crate::{
             },
         },
         generator::{
-            generator_types::{BoExp, Query as GeneratedQuery, Statement as GeneratedStatement},
+            bool_op::BoExp,
+            queries::Query as GeneratedQuery,
             source_steps::{
                 AddE, AddN, AddV, SearchBM25, SearchVector as GeneratedSearchVector, SourceStep,
             },
+            statements::Statement as GeneratedStatement,
             traversal_steps::{
                 ShouldCollect, Step as GeneratedStep, Traversal as GeneratedTraversal,
                 TraversalType, Where, WhereRef,
