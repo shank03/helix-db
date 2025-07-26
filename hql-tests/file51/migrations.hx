@@ -4,7 +4,7 @@ MIGRATION schema::1 => schema::2 {
     E::Knows => _::{
         Properties: {
             created_at: since,
-            updated_at: DEFAULT NOW,
+            updated_at: since,
         }
     }
 }

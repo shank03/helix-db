@@ -1011,7 +1011,7 @@ impl HelixParser {
     fn parse_migration_item_mapping(
         &self,
         pair: Pair<Rule>,
-    ) -> Result<MigrationItemMapping, ParserError> {        
+    ) -> Result<MigrationItemMapping, ParserError> {
         let mut pairs = pair.clone().into_inner();
         let from_item_type = pairs.next().unwrap().into_inner().next().unwrap();
         let to_item_type = match pairs.next() {
@@ -1034,12 +1034,28 @@ impl HelixParser {
             },
             None => return Err(ParserError::from("Expected item_def")),
         };
-        let remappings = pairs
-            .next()
-            .unwrap()
-            .into_inner()
-            .map(|p| self.parse_field_migration(p))
-            .collect::<Result<Vec<_>, _>>()?;
+        let remappings = match pairs.next() {
+            Some(p) => match p.as_rule() {
+                Rule::node_migration => p
+                    .into_inner()
+                    .map(|p| self.parse_field_migration(p.into_inner().next().unwrap()))
+                    .collect::<Result<Vec<_>, _>>()?,
+                Rule::edge_migration => p
+                    .into_inner()
+                    .map(|p| self.parse_field_migration(p.into_inner().next().unwrap()))
+                    .collect::<Result<Vec<_>, _>>()?,
+                _ => {
+                    return Err(ParserError::from(
+                        "Expected node_migration or edge_migration",
+                    ));
+                }
+            },
+            None => {
+                return Err(ParserError::from(
+                    "Expected node_migration or edge_migration",
+                ));
+            }
+        };
 
         Ok(MigrationItemMapping {
             from_item_type: (from_item_type.loc(), from_item_type.as_str().to_string()),
