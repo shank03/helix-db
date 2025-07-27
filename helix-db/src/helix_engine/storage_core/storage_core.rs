@@ -11,7 +11,9 @@ use crate::{
             vector_core::{HNSWConfig, VectorCore},
         },
     },
+    protocol::value::Value,
     utils::{
+        filterable::Filterable,
         items::{Edge, Node},
         label_hash::hash_label,
     },
@@ -240,8 +242,16 @@ impl HelixGraphStorage {
     }
 
     /// Gets a vector from level 0 of HNSW index (because that's where all are stored)
-    pub fn get_vector(&self, txn: &RoTxn, id: &u128) -> Result<HVector, GraphError> {
-        Ok(self.vectors.get_vector(txn, *id, 0, true)?)
+    pub fn get_vector(&self, txn: &RoTxn, id: &u128) -> Result<Option<HVector>, GraphError> {
+        let vector = self.vectors.get_vector(txn, *id, 0, true)?;
+        if let Ok(is_deleted) = vector.check_property("is_deleted") {
+            if let Value::Boolean(is_deleted) = is_deleted.as_ref() {
+                if *is_deleted {
+                    return Ok(None);
+                }
+            }
+        }
+        Ok(Some(vector))
     }
 }
 

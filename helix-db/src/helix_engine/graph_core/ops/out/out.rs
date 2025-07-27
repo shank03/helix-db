@@ -51,7 +51,11 @@ impl<'a> Iterator for OutNodesIterator<'a, RoTxn<'a>> {
                         }
                         EdgeType::Vec => {
                             if let Ok(vector) = self.storage.get_vector(self.txn, &item_id) {
-                                return Some(Ok(TraversalVal::Vector(vector)));
+                                if let Some(vector) = vector {
+                                    return Some(Ok(TraversalVal::Vector(vector)));
+                                } else {
+                                    continue;
+                                }
                             }
                         }
                     }

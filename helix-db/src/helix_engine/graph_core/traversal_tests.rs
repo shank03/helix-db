@@ -2184,7 +2184,11 @@ fn test_delete_vector() {
 
     let txn = storage.graph_env.read_txn().unwrap();
     let traversal = G::new(Arc::clone(&storage), &txn)
-        .search_v::<fn(&HVector, &RoTxn) -> bool, usize>(&[1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 2000, None)
+        .search_v::<fn(&HVector, &RoTxn) -> bool, usize>(
+            &[1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+            2000,
+            None,
+        )
         .collect_to::<Vec<_>>();
 
     txn.commit().unwrap();
@@ -2195,7 +2199,11 @@ fn test_delete_vector() {
 
     Drop::drop_traversal(
         G::new(Arc::clone(&storage), &txn)
-            .search_v::<fn(&HVector, &RoTxn) -> bool, _>(&[1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 2000, None)
+            .search_v::<fn(&HVector, &RoTxn) -> bool, _>(
+                &[1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+                2000,
+                None,
+            )
             .collect_to::<Vec<_>>(),
         Arc::clone(&storage),
         &mut txn,
@@ -2206,14 +2214,195 @@ fn test_delete_vector() {
 
     let txn = storage.graph_env.read_txn().unwrap();
     let traversal = G::new(Arc::clone(&storage), &txn)
-        .search_v::<fn(&HVector, &RoTxn) -> bool, usize>(&[1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 2000, None)
+        .search_v::<fn(&HVector, &RoTxn) -> bool, usize>(
+            &[1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+            2000,
+            None,
+        )
         .collect_to::<Vec<_>>();
 
     assert_eq!(traversal.len(), 0);
-
 
     let traversal = G::new(Arc::clone(&storage), &txn)
         .e_from_type("knows")
         .collect_to::<Vec<_>>();
     assert_eq!(traversal.len(), 0);
+}
+
+/*
+QUERY updateEntity (entity_id: ID, name: String, name_embedding: [F64], group_id: String, summary: String, created_at: Date, labels: [String], attributes: String) =>
+    entity <- N<Entity>(entity_id)::UPDATE({name: name, group_id: group_id, summary: summary, created_at: created_at, labels: labels, attributes: attributes})
+    DROP N<Entity>(entity_id)::Out<Entity_to_Embedding>
+    DROP N<Entity>(entity_id)::OutE<Entity_to_Embedding>
+    embedding <- AddV<Entity_Embedding>(name_embedding, {name_embedding: name_embedding})
+    edge <- AddE<Entity_to_Embedding>({group_id: group_id})::From(entity)::To(embedding)
+    RETURN entity
+*/
+#[test]
+fn test_drop_vectors_then_add_them_back() {
+    let (storage, _temp_dir) = setup_test_db();
+    let mut txn = storage.graph_env.write_txn().unwrap();
+
+    let entity = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_n("Entity", Some(props! { "name" => "entity1" }), None)
+        .collect_to_val();
+
+    let embedding = G::new_mut(Arc::clone(&storage), &mut txn)
+        .insert_v::<fn(&HVector, &RoTxn) -> bool>(&[1.0, 1.0, 1.0, 1.0, 1.0, 1.0], "vector", None)
+        .collect_to_val();
+
+    let _ = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_e(
+            "Entity_to_Embedding",
+            Some(props! { "group_id" => "group1" }),
+            entity.id(),
+            embedding.id(),
+            false,
+            EdgeType::Node,
+        )
+        .collect_to_val();
+
+    txn.commit().unwrap();
+
+    let mut txn = storage.graph_env.write_txn().unwrap();
+    let entity = {
+        let update_tr = G::new(Arc::clone(&storage), &txn)
+            .n_from_id(&entity.id())
+            .collect_to::<Vec<_>>();
+        G::new_mut_from(Arc::clone(&storage), &mut txn, update_tr)
+            .update(Some(props! { "name" => "entity2" }))
+            .collect_to_obj()
+    };
+    Drop::<Vec<_>>::drop_traversal(
+        G::new(Arc::clone(&storage), &txn)
+            .n_from_id(&entity.id())
+            .out("Entity_to_Embedding", &EdgeType::Vec)
+            .collect_to::<Vec<_>>(),
+        Arc::clone(&storage),
+        &mut txn,
+    )
+    .unwrap();
+
+    // check no vectors are left
+    let traversal = G::new(Arc::clone(&storage), &txn)
+        .n_from_id(&entity.id())
+        .out_e("Entity_to_Embedding")
+        .collect_to::<Vec<_>>();
+    assert_eq!(traversal.len(), 0);
+
+    let embedding = G::new_mut(Arc::clone(&storage), &mut txn)
+        .insert_v::<fn(&HVector, &RoTxn) -> bool>(
+            &[1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+            "Entity_Embedding",
+            Some(props! { "name_embedding" => [1.0, 1.0, 1.0, 1.0, 1.0, 1.0].to_vec() }),
+        )
+        .collect_to_obj();
+    let edge = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_e(
+            "Entity_to_Embedding",
+            Some(props! { "group_id" => "group2" }),
+            entity.id(),
+            embedding.id(),
+            true,
+            EdgeType::Node,
+        )
+        .collect_to_obj();
+
+    txn.commit().unwrap();
+
+    let txn = storage.graph_env.read_txn().unwrap();
+    let traversal = G::new(Arc::clone(&storage), &txn)
+        .search_v::<fn(&HVector, &RoTxn) -> bool, usize>(
+            &[1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+            2000,
+            None,
+        )
+        .collect_to::<Vec<_>>();
+    assert_eq!(traversal.len(), 1);
+    assert_eq!(traversal[0].id(), embedding.id());
+
+    let traversal = G::new(Arc::clone(&storage), &txn)
+        .e_from_type("Entity_to_Embedding")
+        .collect_to::<Vec<_>>();
+    assert_eq!(traversal.len(), 1);
+    assert_eq!(traversal[0].id(), edge.id());
+
+    txn.commit().unwrap();
+
+    let mut txn = storage.graph_env.write_txn().unwrap();
+
+    let embedding = G::new_mut(Arc::clone(&storage), &mut txn)
+        .insert_v::<fn(&HVector, &RoTxn) -> bool>(&[1.0, 1.0, 1.0, 1.0, 1.0, 1.0], "vector", None)
+        .collect_to_val();
+
+    let _ = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_e(
+            "Entity_to_Embedding",
+            Some(props! { "group_id" => "group1" }),
+            entity.id(),
+            embedding.id(),
+            false,
+            EdgeType::Node,
+        )
+        .collect_to_val();
+
+    txn.commit().unwrap();
+
+    let mut txn = storage.graph_env.write_txn().unwrap();
+    let entity = {
+        let update_tr = G::new(Arc::clone(&storage), &txn)
+            .n_from_id(&entity.id())
+            .collect_to::<Vec<_>>();
+        G::new_mut_from(Arc::clone(&storage), &mut txn, update_tr)
+            .update(Some(props! { "name" => "entity2" }))
+            .collect_to_obj()
+    };
+    Drop::<Vec<_>>::drop_traversal(
+        G::new(Arc::clone(&storage), &txn)
+            .n_from_id(&entity.id())
+            .out("Entity_to_Embedding", &EdgeType::Vec)
+            .collect_to::<Vec<_>>(),
+        Arc::clone(&storage),
+        &mut txn,
+    )
+    .unwrap();
+
+    let embedding = G::new_mut(Arc::clone(&storage), &mut txn)
+        .insert_v::<fn(&HVector, &RoTxn) -> bool>(
+            &[1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+            "Entity_Embedding",
+            Some(props! { "name_embedding" => [1.0, 1.0, 1.0, 1.0, 1.0, 1.0].to_vec() }),
+        )
+        .collect_to_obj();
+    let edge = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_e(
+            "Entity_to_Embedding",
+            Some(props! { "group_id" => "group2" }),
+            entity.id(),
+            embedding.id(),
+            true,
+            EdgeType::Node,
+        )
+        .collect_to_obj();
+
+    txn.commit().unwrap();
+
+    let txn = storage.graph_env.read_txn().unwrap();
+    let traversal = G::new(Arc::clone(&storage), &txn)
+        .search_v::<fn(&HVector, &RoTxn) -> bool, usize>(
+            &[1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+            2000,
+            None,
+        )
+        .collect_to::<Vec<_>>();
+    assert_eq!(traversal.len(), 1);
+    assert_eq!(traversal[0].id(), embedding.id());
+
+    let traversal = G::new(Arc::clone(&storage), &txn)
+        .e_from_type("Entity_to_Embedding")
+        .collect_to::<Vec<_>>();
+    assert_eq!(traversal.len(), 1);
+    assert_eq!(traversal[0].id(), edge.id());
+
+    txn.commit().unwrap();
 }
