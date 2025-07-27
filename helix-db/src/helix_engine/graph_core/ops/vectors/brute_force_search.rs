@@ -20,21 +20,28 @@ impl<I: Iterator<Item = Result<TraversalVal, GraphError>>> Iterator for BruteFor
 }
 
 pub trait BruteForceSearchVAdapter<'a>: Iterator<Item = Result<TraversalVal, GraphError>> {
-    fn brute_force_search_v(
+    fn brute_force_search_v<K>(
         self,
         query: &[f64],
-        k: usize,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>;
+        k: K,
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>
+    where
+        K: TryInto<usize>,
+        K::Error: std::fmt::Debug;
 }
 
 impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> BruteForceSearchVAdapter<'a>
     for RoTraversalIterator<'a, I>
 {
-    fn brute_force_search_v(
+    fn brute_force_search_v<K>(
         self,
         query: &[f64],
-        k: usize,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>> {
+        k: K,
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>
+    where
+        K: TryInto<usize>,
+        K::Error: std::fmt::Debug,
+    {
         let mut iter = self.inner.collect::<Vec<_>>();
         println!("iter: {iter:?}");
         iter = iter
@@ -59,7 +66,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> BruteForceSe
             _ => panic!("expected vector traversal values"),
         });
 
-        let iter = iter.into_iter().take(k);
+        let iter = iter.into_iter().take(k.try_into().unwrap());
 
         RoTraversalIterator {
             inner: iter.into_iter(),
