@@ -12,8 +12,8 @@ use crate::{
     },
     utils::label_hash::hash_label,
 };
+use heed3::{RoTxn, types::Bytes};
 use helix_macros::debug_trace;
-use heed3::{types::Bytes, RoTxn};
 use std::sync::Arc;
 
 pub struct OutNodesIterator<'a, T> {
@@ -51,11 +51,7 @@ impl<'a> Iterator for OutNodesIterator<'a, RoTxn<'a>> {
                         }
                         EdgeType::Vec => {
                             if let Ok(vector) = self.storage.get_vector(self.txn, &item_id) {
-                                if let Some(vector) = vector {
-                                    return Some(Ok(TraversalVal::Vector(vector)));
-                                } else {
-                                    continue;
-                                }
+                                return Some(Ok(TraversalVal::Vector(vector)));
                             }
                         }
                     }

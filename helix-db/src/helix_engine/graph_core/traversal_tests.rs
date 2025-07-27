@@ -2286,8 +2286,13 @@ fn test_drop_vectors_then_add_them_back() {
     // check no vectors are left
     let traversal = G::new(Arc::clone(&storage), &txn)
         .n_from_id(&entity.id())
-        .out_e("Entity_to_Embedding")
+        .out("Entity_to_Embedding", &EdgeType::Vec)
         .collect_to::<Vec<_>>();
+    
+    let out_edges = storage.out_edges_db.prefix_iter(&txn,&entity.id().to_be_bytes()).unwrap().count();
+    let in_edges = storage.in_edges_db.prefix_iter(&txn,&entity.id().to_be_bytes()).unwrap().count();
+    assert_eq!(out_edges, 0);
+    assert_eq!(in_edges, 0);
     assert_eq!(traversal.len(), 0);
 
     let embedding = G::new_mut(Arc::clone(&storage), &mut txn)

@@ -51,11 +51,7 @@ impl<'a> Iterator for InNodesIterator<'a, RoTxn<'a>> {
                         }
                         EdgeType::Vec => {
                             if let Ok(vector) = self.storage.get_vector(self.txn, &node_id) {
-                                if let Some(vector) = vector {
-                                    return Some(Ok(TraversalVal::Vector(vector)));
-                                } else {
-                                    continue;
-                                }
+                                return Some(Ok(TraversalVal::Vector(vector)));
                             }
                         }
                     }

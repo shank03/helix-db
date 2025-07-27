@@ -27,11 +27,7 @@ where
             Some(item) => match item {
                 Ok(TraversalVal::Edge(item)) => Some(Ok(TraversalVal::Vector(
                     match self.storage.get_vector(self.txn, &item.from_node) {
-                        Ok(Some(vector)) => vector,
-                        Ok(None) => {
-                            println!("Vector not found");
-                            return None;
-                        }
+                        Ok(vector) => vector,
                         Err(e) => {
                             println!("Error getting vector: {e:?}");
                             return Some(Err(e));

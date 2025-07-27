@@ -19,7 +19,11 @@ use crate::{
     },
 };
 use heed3::{Database, DatabaseFlags, Env, EnvOpenOptions, RoTxn, RwTxn, byteorder::BE, types::*};
-use std::{collections::HashMap, fs, path::Path};
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    path::Path,
+};
 
 // database names for different stores
 const DB_NODES: &str = "nodes"; // for node data (n:)
@@ -242,16 +246,8 @@ impl HelixGraphStorage {
     }
 
     /// Gets a vector from level 0 of HNSW index (because that's where all are stored)
-    pub fn get_vector(&self, txn: &RoTxn, id: &u128) -> Result<Option<HVector>, GraphError> {
-        let vector = self.vectors.get_vector(txn, *id, 0, true)?;
-        if let Ok(is_deleted) = vector.check_property("is_deleted") {
-            if let Value::Boolean(is_deleted) = is_deleted.as_ref() {
-                if *is_deleted {
-                    return Ok(None);
-                }
-            }
-        }
-        Ok(Some(vector))
+    pub fn get_vector(&self, txn: &RoTxn, id: &u128) -> Result<HVector, GraphError> {
+        Ok(self.vectors.get_vector(txn, *id, 0, true)?)
     }
 }
 
@@ -322,62 +318,66 @@ impl StorageMethods for HelixGraphStorage {
     fn drop_node(&self, txn: &mut RwTxn, id: &u128) -> Result<(), GraphError> {
         // Get node to get its label
         //let node = self.get_node(txn, id)?;
+        let mut edges = HashSet::new();
+        let mut out_edges = HashSet::new();
+        let mut in_edges = HashSet::new();
 
+        let mut other_out_edges = Vec::new();
+        let mut other_in_edges = Vec::new();
         // Delete outgoing edges
-        let out_edges = {
-            let iter = self.out_edges_db.prefix_iter(txn, &id.to_be_bytes())?;
-            let capacity = match iter.size_hint() {
-                (_, Some(upper)) => upper,
-                (lower, None) => lower,
-            };
-            let mut out_edges = Vec::with_capacity(capacity);
 
-            for result in iter {
-                let (key, value) = result?;
-                assert_eq!(key.len(), 20);
-                let mut label = [0u8; 4];
-                label.copy_from_slice(&key[16..20]);
-                let (edge_id, _) = Self::unpack_adj_edge_data(value)?;
-                out_edges.push((edge_id, label));
-            }
-            out_edges
-        };
+        let iter = self.out_edges_db.prefix_iter(txn, &id.to_be_bytes())?;
+
+        for result in iter {
+            let (key, value) = result?;
+            assert_eq!(key.len(), 20);
+            let mut label = [0u8; 4];
+            label.copy_from_slice(&key[16..20]);
+            let (edge_id, to_node_id) = Self::unpack_adj_edge_data(value)?;
+            edges.insert(edge_id);
+            out_edges.insert(label);
+            other_in_edges.push((to_node_id, label, edge_id));
+        }
 
         // Delete incoming edges
 
-        let in_edges = {
-            let iter = self.in_edges_db.prefix_iter(txn, &id.to_be_bytes())?;
-            let capacity = match iter.size_hint() {
-                (_, Some(c)) => c,
-                (c, None) => c,
-            };
-            let mut in_edges = Vec::with_capacity(capacity);
+        let iter = self.in_edges_db.prefix_iter(txn, &id.to_be_bytes())?;
 
-            for result in iter {
-                let (key, value) = result?;
-                assert_eq!(key.len(), 20);
-                let mut label = [0u8; 4];
-                label.copy_from_slice(&key[16..20]);
-                let (edge_id, node_id) = Self::unpack_adj_edge_data(value)?;
-                in_edges.push((edge_id, label, node_id));
-            }
+        for result in iter {
+            let (key, value) = result?;
+            assert_eq!(key.len(), 20);
+            let mut label = [0u8; 4];
+            label.copy_from_slice(&key[16..20]);
+            let (edge_id, from_node_id) = Self::unpack_adj_edge_data(value)?;
+            in_edges.insert(label);
+            edges.insert(edge_id);
+            other_out_edges.push((from_node_id, label, edge_id));
+        }
 
-            in_edges
-        };
+        // println!("In edges: {}", in_edges.len());
 
+        // println!("Deleting edges: {}", );
         // Delete all related data
-        for (out_edge_id, label_bytes) in out_edges.iter() {
-            // Delete edge data
-            self.edges_db.delete(txn, Self::edge_key(out_edge_id))?;
+        for edge in edges {
+            self.edges_db.delete(txn, Self::edge_key(&edge))?;
+        }
+        for label_bytes in out_edges.iter() {
             self.out_edges_db
                 .delete(txn, &Self::out_edge_key(id, label_bytes))?;
         }
-        for (in_edge_id, label_bytes, other_id) in in_edges.iter() {
-            self.edges_db.delete(txn, Self::edge_key(in_edge_id))?;
+        for label_bytes in in_edges.iter() {
             self.in_edges_db
-                .delete(txn, &Self::in_edge_key(other_id, label_bytes))?;
+                .delete(txn, &Self::in_edge_key(id, label_bytes))?;
         }
 
+        for (other_node_id, label_bytes, edge_id) in other_out_edges.iter() {
+            self.out_edges_db
+                .delete_one_duplicate(txn, &Self::out_edge_key(other_node_id, label_bytes), &Self::pack_edge_data(edge_id, id))?;
+        }
+        for (other_node_id, label_bytes, edge_id) in other_in_edges.iter() {
+            self.in_edges_db
+                .delete_one_duplicate(txn, &Self::in_edge_key(other_node_id, label_bytes), &Self::pack_edge_data(edge_id, id))?;
+        }
         // Delete node data and label
         self.nodes_db.delete(txn, Self::node_key(id))?;
 
@@ -392,70 +392,84 @@ impl StorageMethods for HelixGraphStorage {
         };
         let edge: Edge = bincode::deserialize(edge_data)?;
         let label_hash = hash_label(&edge.label, None);
+        let out_edge_value = Self::pack_edge_data(edge_id, &edge.to_node);
+        let in_edge_value = Self::pack_edge_data(edge_id, &edge.from_node);
         // Delete all edge-related data
         self.edges_db.delete(txn, Self::edge_key(edge_id))?;
-        self.out_edges_db
-            .delete(txn, &Self::out_edge_key(&edge.from_node, &label_hash))?;
-        self.in_edges_db
-            .delete(txn, &Self::in_edge_key(&edge.to_node, &label_hash))?;
+        self.out_edges_db.delete_one_duplicate(
+            txn,
+            &Self::out_edge_key(&edge.from_node, &label_hash),
+            &out_edge_value,
+        )?;
+        self.in_edges_db.delete_one_duplicate(
+            txn,
+            &Self::in_edge_key(&edge.to_node, &label_hash),
+            &in_edge_value,
+        )?;
 
         Ok(())
     }
 
     fn drop_vector(&self, txn: &mut RwTxn, id: &u128) -> Result<(), GraphError> {
-        // Delete outgoing edges
-        let out_edges = {
-            let iter = self.out_edges_db.prefix_iter(txn, &id.to_be_bytes())?;
-            let capacity = match iter.size_hint() {
-                (_, Some(upper)) => upper,
-                (lower, None) => lower,
-            };
-            let mut out_edges = Vec::with_capacity(capacity);
+        let mut edges = HashSet::new();
+        let mut out_edges = HashSet::new();
+        let mut in_edges = HashSet::new();
 
-            for result in iter {
-                let (key, value) = result?;
-                assert_eq!(key.len(), 20);
-                let mut label = [0u8; 4];
-                label.copy_from_slice(&key[16..20]);
-                let (edge_id, _) = Self::unpack_adj_edge_data(value)?;
-                out_edges.push((edge_id, label));
-            }
-            out_edges
-        };
+        let mut other_out_edges = Vec::new();
+        let mut other_in_edges = Vec::new();
+        // Delete outgoing edges
+
+        let iter = self.out_edges_db.prefix_iter(txn, &id.to_be_bytes())?;
+
+        for result in iter {
+            let (key, value) = result?;
+            assert_eq!(key.len(), 20);
+            let mut label = [0u8; 4];
+            label.copy_from_slice(&key[16..20]);
+            let (edge_id, to_node_id) = Self::unpack_adj_edge_data(value)?;
+            edges.insert(edge_id);
+            out_edges.insert(label);
+            other_in_edges.push((to_node_id, label, edge_id));
+        }
 
         // Delete incoming edges
 
-        let in_edges = {
-            let iter = self.in_edges_db.prefix_iter(txn, &id.to_be_bytes())?;
-            let capacity = match iter.size_hint() {
-                (_, Some(c)) => c,
-                (c, None) => c,
-            };
-            let mut in_edges = Vec::with_capacity(capacity);
+        let iter = self.in_edges_db.prefix_iter(txn, &id.to_be_bytes())?;
 
-            for result in iter {
-                let (key, value) = result?;
-                assert_eq!(key.len(), 20);
-                let mut label = [0u8; 4];
-                label.copy_from_slice(&key[16..20]);
-                let (edge_id, node_id) = Self::unpack_adj_edge_data(value)?;
-                in_edges.push((edge_id, label, node_id));
-            }
+        for result in iter {
+            let (key, value) = result?;
+            assert_eq!(key.len(), 20);
+            let mut label = [0u8; 4];
+            label.copy_from_slice(&key[16..20]);
+            let (edge_id, from_node_id) = Self::unpack_adj_edge_data(value)?;
+            in_edges.insert(label);
+            edges.insert(edge_id);
+            other_out_edges.push((from_node_id, label, edge_id));
+        }
 
-            in_edges
-        };
+        // println!("In edges: {}", in_edges.len());
 
+        // println!("Deleting edges: {}", );
         // Delete all related data
-        for (out_edge_id, label_bytes) in out_edges.iter() {
-            // Delete edge data
-            self.edges_db.delete(txn, Self::edge_key(out_edge_id))?;
+        for edge in edges {
+            self.edges_db.delete(txn, Self::edge_key(&edge))?;
+        }
+        for label_bytes in out_edges.iter() {
             self.out_edges_db
                 .delete(txn, &Self::out_edge_key(id, label_bytes))?;
         }
-        for (in_edge_id, label_bytes, other_id) in in_edges.iter() {
-            self.edges_db.delete(txn, Self::edge_key(in_edge_id))?;
+        for label_bytes in in_edges.iter() {
             self.in_edges_db
-                .delete(txn, &Self::in_edge_key(other_id, label_bytes))?;
+                .delete(txn, &Self::in_edge_key(id, label_bytes))?;
+        }
+
+        for (other_node_id, label_bytes, edge_id) in other_out_edges.iter() {
+            self.out_edges_db
+                .delete_one_duplicate(txn, &Self::out_edge_key(other_node_id, label_bytes), &Self::pack_edge_data(edge_id, id))?;
+        }
+        for (other_node_id, label_bytes, edge_id) in other_in_edges.iter() {
+            self.in_edges_db
+                .delete_one_duplicate(txn, &Self::in_edge_key(other_node_id, label_bytes), &Self::pack_edge_data(edge_id, id))?;
         }
 
         // Delete vector data
