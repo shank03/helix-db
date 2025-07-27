@@ -250,7 +250,6 @@ pub(crate) fn validate_traversal<'a>(
                     label: GenRef::Literal(edge_type.clone()),
                 }));
                 gen_traversal.traversal_type = TraversalType::Ref;
-                gen_traversal.should_collect = ShouldCollect::ToVal;
                 Type::Edges(Some(edge_type.to_string()))
             }
         }
