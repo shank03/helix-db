@@ -2173,6 +2173,12 @@ fn test_delete_vector() {
     let vector = G::new_mut(Arc::clone(&storage), &mut txn)
         .insert_v::<fn(&HVector, &RoTxn) -> bool>(&[1.0, 1.0, 1.0, 1.0, 1.0, 1.0], "vector", None)
         .collect_to_val();
+    let node = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_n("person", None, None)
+        .collect_to_val();
+    let _ = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_e("knows", None, node.id(), vector.id(), false, EdgeType::Vec)
+        .collect_to_val();
 
     txn.commit().unwrap();
 
@@ -2203,5 +2209,11 @@ fn test_delete_vector() {
         .search_v::<fn(&HVector, &RoTxn) -> bool, usize>(&[1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 2000, None)
         .collect_to::<Vec<_>>();
 
+    assert_eq!(traversal.len(), 0);
+
+
+    let traversal = G::new(Arc::clone(&storage), &txn)
+        .e_from_type("knows")
+        .collect_to::<Vec<_>>();
     assert_eq!(traversal.len(), 0);
 }

@@ -40,7 +40,7 @@ where
                         Ok(_) => Ok(()),
                         Err(e) => Err(e),
                     },
-                    TraversalVal::Vector(vector) => match storage.vectors.delete(txn, vector.id) {
+                    TraversalVal::Vector(vector) => match storage.drop_vector(txn, &vector.id) {
                         Ok(_) => Ok(()),
                         Err(e) => Err(e.into()),
                     },
