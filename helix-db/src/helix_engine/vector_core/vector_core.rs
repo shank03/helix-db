@@ -14,10 +14,7 @@ use heed3::{
 use itertools::Itertools;
 use rand::prelude::Rng;
 use serde::{Deserialize, Serialize};
-use std::{
-    cmp::Ordering,
-    collections::{BinaryHeap, HashMap, HashSet},
-};
+use std::collections::{BinaryHeap, HashMap, HashSet};
 
 const DB_VECTORS: &str = "vectors"; // for vector data (v:)
 const DB_VECTOR_DATA: &str = "vector_data"; // for vector data (v:)
@@ -100,8 +97,8 @@ impl VectorCore {
         // Should instead using an atomic mutable seed and the XOR shift algorithm
         let mut rng = rand::rng();
         let r: f64 = rng.random::<f64>();
-        let level = (-r.ln() * self.config.m_l).floor() as usize;
-        level
+
+        (-r.ln() * self.config.m_l).floor() as usize
     }
 
     #[inline]
@@ -166,20 +163,19 @@ impl VectorCore {
 
         let prefix_len = out_key.len();
 
-        for result in iter {
-            if let Ok((key, _)) = result {
-                // TODO: fix here because not working at all
-                let mut arr = [0u8; 16];
-                let len = std::cmp::min(key.len(), 16);
-                arr[..len].copy_from_slice(&key[prefix_len..(prefix_len + len)]);
-                let neighbor_id = u128::from_be_bytes(arr);
+        for result in iter.flatten() {
+            let (key, _) = result;
+            // TODO: fix here because not working at all
+            let mut arr = [0u8; 16];
+            let len = std::cmp::min(key.len(), 16);
+            arr[..len].copy_from_slice(&key[prefix_len..(prefix_len + len)]);
+            let neighbor_id = u128::from_be_bytes(arr);
 
-                if neighbor_id != id {
-                    if let Ok(vector) = self.get_vector(txn, neighbor_id, level, true) {
-                        // TODO: look at implementing a macro that actually just runs each function rather than iterating through
-                        if filter.is_none() || filter.unwrap().iter().all(|f| f(&vector, txn)) {
-                            neighbors.push(vector);
-                        }
+            if neighbor_id != id {
+                if let Ok(vector) = self.get_vector(txn, neighbor_id, level, true) {
+                    // TODO: look at implementing a macro that actually just runs each function rather than iterating through
+                    if filter.is_none() || filter.unwrap().iter().all(|f| f(&vector, txn)) {
+                        neighbors.push(vector);
                     }
                 }
             }
@@ -190,11 +186,11 @@ impl VectorCore {
     }
 
     #[inline(always)]
-    fn set_neighbours<'a>(
+    fn set_neighbours(
         &self,
         txn: &mut RwTxn,
         id: u128,
-        neighbors: &'a BinaryHeap<HVector>,
+        neighbors: &BinaryHeap<HVector>,
         level: usize,
     ) -> Result<(), VectorError> {
         let prefix = Self::out_edges_key(id, level, None);
@@ -243,9 +239,9 @@ impl VectorCore {
         F: Fn(&HVector, &RoTxn) -> bool,
     {
         let m: usize = if level == 0 {
-            self.config.m
-        } else {
             self.config.m_max_0
+        } else {
+            self.config.m
         };
         let mut visited: HashSet<String> = HashSet::new();
         if should_extend {
@@ -296,7 +292,7 @@ impl VectorCore {
             if results.len() >= ef
                 && results
                     .get_max()
-                    .map_or(false, |f| curr_cand.distance > f.get_distance())
+                    .is_some_and(|f| curr_cand.distance > f.get_distance())
             {
                 break;
             }
@@ -312,7 +308,7 @@ impl VectorCore {
                 .filter(|neighbor| visited.insert(neighbor.get_id()))
                 .filter_map(|mut neighbor| {
                     let distance = neighbor.distance_to(query).ok()?;
-                    if max_distance.map_or(true, |max| distance < max) {
+                    if max_distance.is_none_or(|max| distance < max) {
                         neighbor.set_distance(distance);
                         Some((neighbor, distance))
                     } else {
@@ -348,17 +344,17 @@ impl HNSW for VectorCore {
             Some(bytes) => {
                 let vector = match with_data {
                     true => {
-                        let mut vector = HVector::from_bytes(id, level, &bytes)?;
+                        let mut vector = HVector::from_bytes(id, level, bytes)?;
                         vector.properties = match self.vector_data_db.get(txn, &id.to_be_bytes())? {
                             Some(bytes) => {
-                                Some(bincode::deserialize(&bytes).map_err(VectorError::from)?)
+                                Some(bincode::deserialize(bytes).map_err(VectorError::from)?)
                             }
                             None => None,
                         };
 
                         vector
                     }
-                    false => HVector::from_bytes(id, level, &bytes)?,
+                    false => HVector::from_bytes(id, level, bytes)?,
                 };
                 Ok(vector)
             }
@@ -423,7 +419,7 @@ impl HNSW for VectorCore {
                 .vector_data_db
                 .get(txn, &result.get_id().to_be_bytes())?
             {
-                Some(bytes) => Some(bincode::deserialize(&bytes).map_err(VectorError::from)?),
+                Some(bytes) => Some(bincode::deserialize(bytes).map_err(VectorError::from)?),
                 None => None, // Maybe should be an error?
             };
         }
@@ -485,12 +481,6 @@ impl HNSW for VectorCore {
             for e in neighbors {
                 let id = e.get_id();
                 let e_conns = self.get_neighbors::<F>(txn, id, level, None)?;
-                if e_conns.len()
-                    > if level == 0 {
-                        self.config.m_max_0
-                    } else {
-                        self.config.m_max_0
-                    }
                 {
                     let e_conns = BinaryHeap::from(e_conns);
                     let e_new_conn =
@@ -517,21 +507,19 @@ impl HNSW for VectorCore {
     fn delete(&self, txn: &mut RwTxn, id: u128) -> Result<(), VectorError> {
         let properties: Option<HashMap<String, Value>> =
             match self.vector_data_db.get(txn, &id.to_be_bytes())? {
-                Some(bytes) => Some(bincode::deserialize(&bytes).map_err(VectorError::from)?),
+                Some(bytes) => Some(bincode::deserialize(bytes).map_err(VectorError::from)?),
                 None => None,
             };
 
-        println!("properties: {:?}", properties);
+        println!("properties: {properties:?}");
         if let Some(mut properties) = properties {
-            if let Some(is_deleted) = properties.get("is_deleted") {
-                if let Value::Boolean(is_deleted) = is_deleted {
-                    if *is_deleted {
-                        return Err(VectorError::VectorAlreadyDeleted(id.to_string()));
-                    }
-                }
+            if let Some(Value::Boolean(is_deleted)) = properties.get("is_deleted")
+                && *is_deleted
+            {
+                return Err(VectorError::VectorAlreadyDeleted(id.to_string()));
             }
             properties.insert("is_deleted".to_string(), Value::Boolean(true));
-            println!("properties: {:?}", properties);
+            println!("properties: {properties:?}");
             self.vector_data_db
                 .put(txn, &id.to_be_bytes(), &bincode::serialize(&properties)?)?;
         }
@@ -548,9 +536,9 @@ impl HNSW for VectorCore {
             .map(|result| {
                 result
                     .map_err(VectorError::from)
-                    .and_then(|(_, value)| bincode::deserialize(&value).map_err(VectorError::from))
+                    .and_then(|(_, value)| bincode::deserialize(value).map_err(VectorError::from))
             })
-            .filter_ok(|vector: &HVector| level.map_or(true, |l| vector.level == l))
+            .filter_ok(|vector: &HVector| level.is_none_or(|l| vector.level == l))
             .collect()
     }
 }

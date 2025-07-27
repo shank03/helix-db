@@ -18,8 +18,8 @@ where
     type Item = I::Item;
     #[debug_trace("FILTER_REF")]
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(item) = self.iter.next() {
-            match (self.f)(&item, &self.txn) {
+        for item in self.iter.by_ref() {
+            match (self.f)(&item, self.txn) {
                 Ok(result) => {
                     if result {
                         return Some(item);

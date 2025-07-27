@@ -1174,7 +1174,7 @@ dependencies = [
 
 [[package]]
 name = "helix-cli"
-version = "1.0.120"
+version = "1.0.121"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1222,7 +1222,7 @@ dependencies = [
 
 [[package]]
 name = "helix-db"
-version = "1.0.120"
+version = "1.0.121"
 dependencies = [
  "async-trait",
  "axum",
@@ -1243,7 +1243,6 @@ dependencies = [
  "rand 0.9.1",
  "reqwest",
  "serde",
- "serde_json",
  "sonic-rs",
  "tempfile",
  "thiserror 2.0.12",

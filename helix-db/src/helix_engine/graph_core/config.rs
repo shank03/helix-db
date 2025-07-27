@@ -1,4 +1,4 @@
-use crate::helix_engine::types::GraphError;
+use crate::{helix_engine::types::GraphError, helixc::analyzer::analyzer::INTROSPECTION_DATA};
 use serde::{Deserialize, Serialize};
 use std::{fmt, path::PathBuf};
 
@@ -19,20 +19,12 @@ impl Default for VectorConfig {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct GraphConfig {
     pub secondary_indices: Option<Vec<String>>,
 }
 
-impl Default for GraphConfig {
-    fn default() -> Self {
-        Self {
-            secondary_indices: None,
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
     pub vector_config: Option<VectorConfig>,
     pub graph_config: Option<GraphConfig>,
@@ -119,13 +111,11 @@ impl Config {
     }
 
     pub fn get_vector_config(&self) -> VectorConfig {
-        self.vector_config
-            .clone()
-            .unwrap_or(VectorConfig::default())
+        self.vector_config.clone().unwrap_or_default()
     }
 
     pub fn get_graph_config(&self) -> GraphConfig {
-        self.graph_config.clone().unwrap_or(GraphConfig::default())
+        self.graph_config.clone().unwrap_or_default()
     }
 
     pub fn get_db_max_size_gb(&self) -> usize {
@@ -168,10 +158,10 @@ impl Default for Config {
 
 impl fmt::Display for Config {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "pub fn config() -> Option<Config> {{")?;
-        write!(f, "return Some(Config {{")?;
-        write!(f, "vector_config: Some(VectorConfig {{")?;
-        write!(
+        writeln!(f, "pub fn config() -> Option<Config> {{")?;
+        writeln!(f, "return Some(Config {{")?;
+        writeln!(f, "vector_config: Some(VectorConfig {{")?;
+        writeln!(
             f,
             "m: Some({}),",
             self.vector_config
@@ -180,7 +170,7 @@ impl fmt::Display for Config {
                 .m
                 .unwrap_or(16)
         )?;
-        write!(
+        writeln!(
             f,
             "ef_construction: Some({}),",
             self.vector_config
@@ -189,7 +179,7 @@ impl fmt::Display for Config {
                 .ef_construction
                 .unwrap_or(128)
         )?;
-        write!(
+        writeln!(
             f,
             "ef_search: Some({}),",
             self.vector_config
@@ -198,9 +188,9 @@ impl fmt::Display for Config {
                 .ef_search
                 .unwrap_or(768)
         )?;
-        write!(f, "}}),")?;
-        write!(f, "graph_config: Some(GraphConfig {{")?;
-        write!(
+        writeln!(f, "}}),")?;
+        writeln!(f, "graph_config: Some(GraphConfig {{")?;
+        writeln!(
             f,
             "secondary_indices: {},",
             match &self
@@ -213,40 +203,46 @@ impl fmt::Display for Config {
                     "Some(vec![{}])",
                     indices
                         .iter()
-                        .map(|s| format!("\"{}\".to_string()", s))
+                        .map(|s| format!("\"{s}\".to_string()"))
                         .collect::<Vec<_>>()
                         .join(", ")
                 ),
                 None => "None".to_string(),
             }
         )?;
-        write!(f, "}}),")?;
-        write!(
+        writeln!(f, "}}),")?;
+        writeln!(
             f,
             "db_max_size_gb: Some({}),",
             self.db_max_size_gb.unwrap_or(10)
         )?;
-        write!(f, "mcp: Some({}),", self.mcp.unwrap_or(true))?;
-        write!(f, "bm25: Some({}),", self.bm25.unwrap_or(true))?;
-        write!(f, "schema: None,")?;
-        write!(
+        writeln!(f, "mcp: Some({}),", self.mcp.unwrap_or(true))?;
+        writeln!(f, "bm25: Some({}),", self.bm25.unwrap_or(true))?;
+        if let Some(data) = INTROSPECTION_DATA.get()
+            && let Ok(stringified) = sonic_rs::to_string_pretty(data)
+        {
+            writeln!(f, "schema: Some(r#\"{stringified}\"#.to_string()),")?;
+        } else {
+            writeln!(f, "schema: None,")?;
+        }
+        writeln!(
             f,
             "embedding_model: {},",
             match &self.embedding_model {
-                Some(model) => format!("Some(\"{}\".to_string())", model),
+                Some(model) => format!("Some(\"{model}\".to_string())"),
                 None => "None".to_string(),
             }
         )?;
-        write!(
+        writeln!(
             f,
             "graphvis_node_label: {},",
             match &self.graphvis_node_label {
-                Some(label) => format!("Some(\"{}\".to_string())", label),
+                Some(label) => format!("Some(\"{label}\".to_string())"),
                 None => "None".to_string(),
             }
         )?;
-        write!(f, "}})")?;
-        write!(f, "}}")?;
+        writeln!(f, "}})")?;
+        writeln!(f, "}}")?;
         Ok(())
     }
 }

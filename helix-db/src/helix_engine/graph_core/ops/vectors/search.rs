@@ -24,32 +24,36 @@ impl<I: Iterator<Item = Result<TraversalVal, GraphError>>> Iterator for SearchV<
 }
 
 pub trait SearchVAdapter<'a>: Iterator<Item = Result<TraversalVal, GraphError>> {
-    fn search_v<F>(
+    fn search_v<F, K>(
         self,
-        query: &Vec<f64>,
-        k: usize,
+        query: &[f64],
+        k: K,
         filter: Option<&[F]>,
     ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>
     where
-        F: Fn(&HVector, &RoTxn) -> bool;
+        F: Fn(&HVector, &RoTxn) -> bool,
+        K: TryInto<usize>,
+        K::Error: std::fmt::Debug;
 }
 
 impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> SearchVAdapter<'a>
     for RoTraversalIterator<'a, I>
 {
-    fn search_v<F>(
+    fn search_v<F, K>(
         self,
-        query: &Vec<f64>,
-        k: usize,
+        query: &[f64],
+        k: K,
         filter: Option<&[F]>,
     ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>
     where
         F: Fn(&HVector, &RoTxn) -> bool,
+        K: TryInto<usize>,
+        K::Error: std::fmt::Debug,
     {
         let vectors = self
             .storage
             .vectors
-            .search(self.txn, &query, k, filter, false);
+            .search(self.txn, query, k.try_into().unwrap(), filter, false);
 
         let iter = match vectors {
             Ok(vectors) => vectors
@@ -58,7 +62,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> SearchVAdapt
                 .collect::<Vec<_>>()
                 .into_iter(),
             Err(VectorError::VectorNotFound(id)) => {
-                let error = GraphError::VectorError(format!("vector not found for id {}", id));
+                let error = GraphError::VectorError(format!("vector not found for id {id}"));
                 once(Err(error)).collect::<Vec<_>>().into_iter()
             }
             Err(VectorError::InvalidVectorData) => {
@@ -71,11 +75,11 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> SearchVAdapt
                 once(Err(error)).collect::<Vec<_>>().into_iter()
             }
             Err(VectorError::ConversionError(e)) => {
-                let error = GraphError::VectorError(format!("conversion error: {}", e));
+                let error = GraphError::VectorError(format!("conversion error: {e}"));
                 once(Err(error)).collect::<Vec<_>>().into_iter()
             }
             Err(VectorError::VectorCoreError(e)) => {
-                let error = GraphError::VectorError(format!("vector core error: {}", e));
+                let error = GraphError::VectorError(format!("vector core error: {e}"));
                 once(Err(error)).collect::<Vec<_>>().into_iter()
             }
             Err(VectorError::InvalidVectorLength) => {
@@ -83,8 +87,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> SearchVAdapt
                 once(Err(error)).collect::<Vec<_>>().into_iter()
             }
             Err(VectorError::VectorAlreadyDeleted(id)) => {
-                let error =
-                    GraphError::VectorError(format!("vector already deleted for id {}", id));
+                let error = GraphError::VectorError(format!("vector already deleted for id {id}"));
                 once(Err(error)).collect::<Vec<_>>().into_iter()
             }
             .collect::<Vec<_>>()

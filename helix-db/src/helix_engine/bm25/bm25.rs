@@ -279,9 +279,9 @@ impl BM25 for HBM25Config {
         let tf_component = (tf * (self.k1 + 1.0))
             / (tf + self.k1 * (1.0 - self.b + self.b * (doc_len.abs() / avgdl)));
 
-        let score = (idf * tf_component) as f32;
+        
 
-        score
+        (idf * tf_component) as f32
     }
 
     fn search(
@@ -429,7 +429,7 @@ impl BM25Flatten for HashMap<String, Value> {
         self.iter()
             .fold(String::with_capacity(self.len() * 4), |mut s, (k, v)| {
                 s.push_str(k);
-                s.push_str(" ");
+                s.push(' ');
                 s.push_str(&v.to_string());
                 s
             })

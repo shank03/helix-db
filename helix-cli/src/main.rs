@@ -4,15 +4,15 @@ use crate::{
     types::*,
     utils::*,
 };
+use clap::Parser;
 use helix_db::{helix_engine::graph_core::config::Config, utils::styled_string::StyledString};
 use spinners::{Spinner, Spinners};
-use clap::Parser;
 use std::{
     fmt::Write,
     fs::{self, OpenOptions, read_to_string},
-    io::{Write as iWrite},
+    io::Write as iWrite,
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, ExitCode},
 };
 
 mod args;
@@ -21,7 +21,7 @@ mod types;
 mod utils;
 
 #[tokio::main]
-async fn main() -> Result<(), ()> {
+async fn main() -> ExitCode {
     check_helix_version().await;
 
     let args = HelixCli::parse();
@@ -31,7 +31,7 @@ async fn main() -> Result<(), ()> {
                 Ok(_) => {}
                 Err(_) => {
                     println!("{}", "Cargo is not installed".red().bold());
-                    return Err(());
+                    return ExitCode::FAILURE;
                 }
             };
 
@@ -44,84 +44,82 @@ async fn main() -> Result<(), ()> {
                             .red()
                             .bold()
                     );
-                    return Err(());
+                    return ExitCode::FAILURE;
                 }
             };
 
             if command.path.is_none()
-                && !Path::new(&format!("./{}", DB_DIR)).is_dir()
+                && !Path::new(&format!("./{DB_DIR}")).is_dir()
                 && command.cluster.is_none()
             {
                 println!("{}", "No path or instance specified!".red().bold());
-                return Err(());
+                return ExitCode::FAILURE;
             }
 
             // -- helix start --
             if command.cluster.is_some()
                 && command.path.is_none()
-                && !Path::new(&format!("./{}", DB_DIR)).is_dir()
+                && !Path::new(&format!("./{DB_DIR}")).is_dir()
             {
                 let instance_manager = InstanceManager::new().unwrap();
                 let mut sp = Spinner::new(Spinners::Dots9, "Starting Helix instance".into());
 
                 match instance_manager.start_instance(&command.cluster.unwrap(), None) {
                     Ok(instance) => {
-                        sp.stop_with_message(format!(
-                                "{}",
-                                "Successfully started Helix instance".green().bold()
-                        ));
+                        sp.stop_with_message(
+                            "Successfully started Helix instance"
+                                .green()
+                                .bold()
+                                .to_string(),
+                        );
                         print_instance(&instance);
                     }
                     Err(e) => {
-                        sp.stop_with_message(format!("{}", "Failed to start instance".red().bold()));
+                        sp.stop_with_message("Failed to start instance".red().bold().to_string());
                         println!("└── {} {}", "Error:".red().bold(), e);
-                        return Err(());
+                        return ExitCode::FAILURE;
                     }
                 }
-                return Ok(());
+                return ExitCode::SUCCESS;
             }
 
             let output = dirs::home_dir()
                 .unwrap_or_else(|| PathBuf::from("./"))
                 .join(".helix/repo/helix-db/helix-container");
-            let start_port = match command.port {
-                Some(port) => port,
-                None => 6969,
-            };
-            
+            let start_port = command.port.unwrap_or(6969);
 
             let path = get_cfg_deploy_path(command.path.clone());
             let files = match check_and_read_files(&path) {
                 Ok(files) if !files.is_empty() => files,
                 Ok(_) => {
                     println!("{}", "No queries found, nothing to compile".red().bold());
-                    return Err(());
+                    return ExitCode::FAILURE;
                 }
                 Err(e) => {
                     println!("{} {}", "Error:".red().bold(), e);
-                    return Err(());
+                    return ExitCode::FAILURE;
                 }
             };
 
             if !command.remote {
                 let code = match compile_and_build_helix(path, &output, files) {
                     Ok(code) => code,
-                    Err(_) => return Err(()),
+                    Err(_) => return ExitCode::FAILURE,
                 };
 
-                if command.cluster.is_some() &&
-                    (command.path.is_some() || Path::new(&format!("./{}", DB_DIR)).is_dir())
+                if command.cluster.is_some()
+                    && (command.path.is_some() || Path::new(&format!("./{DB_DIR}")).is_dir())
                 {
                     match redeploy_helix(command.cluster.unwrap(), code) {
                         Ok(_) => {}
-                        Err(_) => return Err(()),
+                        Err(_) => return ExitCode::FAILURE,
                     }
-                    return Err(());
+                    return ExitCode::FAILURE;
                 }
 
                 // -- helix deploy --
-                if command.cluster.is_none() &&
-                    (command.path.is_some() || Path::new(&format!("./{}", DB_DIR)).is_dir())
+                if command.cluster.is_none()
+                    && (command.path.is_some() || Path::new(&format!("./{DB_DIR}")).is_dir())
                 {
                     let port = match find_available_port(start_port) {
                         Some(port) => {
@@ -143,28 +141,28 @@ async fn main() -> Result<(), ()> {
                                 "No available ports found starting from".red().bold(),
                                 start_port
                             );
-                            return Err(());
+                            return ExitCode::FAILURE;
                         }
                     };
                     match deploy_helix(port, code, None) {
                         Ok(_) => {}
-                        Err(_) => return Err(()),
+                        Err(_) => return ExitCode::FAILURE,
                     }
-                    return Err(());
+                    return ExitCode::FAILURE;
+                }
+            } else if let Some(cluster) = command.cluster {
+                match redeploy_helix_remote(cluster, path, files).await {
+                    Ok(_) => {}
+                    Err(_) => return ExitCode::FAILURE,
                 }
             } else {
-                if let Some(cluster) = command.cluster {
-                    match redeploy_helix_remote(cluster, path, files).await {
-                        Ok(_) => {}
-                        Err(_) => return Err(()),
-                    }
-                } else {
-                    println!("{}",
-                        "Need to pass in a cluster id when redeploying a remote instance!"
-                        .red().bold()
-                    );
-                    return Err(());
-                }
+                println!(
+                    "{}",
+                    "Need to pass in a cluster id when redeploying a remote instance!"
+                        .red()
+                        .bold()
+                );
+                return ExitCode::FAILURE;
             }
         }
 
@@ -175,10 +173,10 @@ async fn main() -> Result<(), ()> {
                     println!(
                         "{}",
                         "Helix is not installed. Please run `helix install` first."
-                        .red()
-                        .bold()
+                            .red()
+                            .bold()
                     );
-                    return Err(());
+                    return ExitCode::FAILURE;
                 }
             };
 
@@ -187,7 +185,7 @@ async fn main() -> Result<(), ()> {
                     Some(dir) => dir,
                     None => {
                         println!("{}", "Could not determine home directory".red().bold());
-                        return Err(());
+                        return ExitCode::FAILURE;
                     }
                 };
                 home_dir.join(".helix/repo/helix-db/helix-db")
@@ -196,7 +194,7 @@ async fn main() -> Result<(), ()> {
             if !check_cargo_version() {
                 match Command::new("rustup").arg("update").output() {
                     Ok(_) => println!("{}", "Updating cargo!".green().bold()),
-                    Err(e) => println!("{} {}", "Error updating cargo!", e),
+                    Err(e) => println!("Error updating cargo! {e}"),
                 }
             } else {
                 println!("{}", "cargo up-to-date!".green().bold());
@@ -205,32 +203,28 @@ async fn main() -> Result<(), ()> {
             let local_cli_version = match get_cli_version() {
                 Ok(val) => val,
                 Err(e) => {
-                    println!("{} {}",
+                    println!(
+                        "{} {}",
                         "Failed fetching the local cli version".red().bold(),
                         e
                     );
-                    return Err(());
+                    return ExitCode::FAILURE;
                 }
             };
             let local_helix_version = match get_crate_version(&repo_path) {
                 Ok(val) => val,
                 Err(e) => {
-                    println!("{} {}",
+                    println!(
+                        "{} {}",
                         "Failed fetching the local db version".red().bold(),
                         e
                     );
-                    return Err(());
+                    return ExitCode::FAILURE;
                 }
             };
             let remote_helix_version = get_remote_helix_version().await.unwrap();
             println!(
-                "{} {}, {} {}, {} {}",
-                "local helix-cli version:",
-                local_cli_version,
-                "local helix-db version:",
-                local_helix_version,
-                "remote helix version:",
-                remote_helix_version,
+                "local helix-cli version: {local_cli_version}, local helix-db version: {local_helix_version}, remote helix version: {remote_helix_version}",
             );
 
             if local_helix_version < remote_helix_version {
@@ -244,15 +238,19 @@ async fn main() -> Result<(), ()> {
                         println!(
                             "{} {}",
                             "Error while reseting installed helix-db version:"
-                            .red()
-                            .bold(),
+                                .red()
+                                .bold(),
                             e
                         );
-                        return Err(());
+                        return ExitCode::FAILURE;
                     }
                 }
 
-                match Command::new("git").arg("pull").current_dir(&repo_path).output() {
+                match Command::new("git")
+                    .arg("pull")
+                    .current_dir(&repo_path)
+                    .output()
+                {
                     Ok(_) => println!(
                         "{}",
                         "New helix-db version successfully pulled!".green().bold()
@@ -263,7 +261,7 @@ async fn main() -> Result<(), ()> {
                             "Error while pulling new helix-db version:".red().bold(),
                             e
                         );
-                        return Err(());
+                        return ExitCode::FAILURE;
                     }
                 }
 
@@ -271,8 +269,8 @@ async fn main() -> Result<(), ()> {
                     Ok(_) => println!(
                         "{}",
                         "New helix-cli version successfully installed!"
-                        .green()
-                        .bold()
+                            .green()
+                            .bold()
                     ),
                     Err(e) => {
                         println!(
@@ -280,7 +278,7 @@ async fn main() -> Result<(), ()> {
                             "Error while installing new helix-cli version:".red().bold(),
                             e
                         );
-                        return Err(());
+                        return ExitCode::FAILURE;
                     }
                 }
             } else {
@@ -306,28 +304,30 @@ async fn main() -> Result<(), ()> {
             };
 
             let mut sp = Spinner::new(Spinners::Dots9, "Compiling Helix queries".into());
-            let files = match check_and_read_files(&path) {
+            let files = match check_and_read_files(path) {
                 Ok(files) => files,
                 Err(e) => {
-                    sp.stop_with_message(format!("{}", "Failed to read files".red().bold()));
-                    println!("└── {}", e);
-                    return Err(());
+                    sp.stop_with_message("Failed to read files".red().bold().to_string());
+                    println!("└── {e}");
+                    return ExitCode::FAILURE;
                 }
             };
 
             if files.is_empty() {
-                sp.stop_with_message(format!(
-                    "{}",
-                    "No queries found, nothing to compile".red().bold()
-                ));
-                return Err(());
+                sp.stop_with_message(
+                    "No queries found, nothing to compile"
+                        .red()
+                        .bold()
+                        .to_string(),
+                );
+                return ExitCode::FAILURE;
             }
 
-            let analyzed_source = match generate(&files, &path) {
+            let analyzed_source = match generate(&files, path) {
                 Ok((_, analyzed_source)) => analyzed_source,
                 Err(e) => {
-                    sp.stop_with_message(format!("{}", e.to_string().red().bold()));
-                    return Err(());
+                    sp.stop_with_message(e.to_string().red().bold().to_string());
+                    return ExitCode::FAILURE;
                 }
             };
 
@@ -337,22 +337,21 @@ async fn main() -> Result<(), ()> {
                     Err(e) => {
                         println!("{} {}", "Failed to write typescript types".red().bold(), e);
                         println!("└── {} {}", "Error:".red().bold(), e);
-                        return Err(());
+                        return ExitCode::FAILURE;
                     }
                 };
             }
 
             let file_path = PathBuf::from(&output).join("queries.rs");
             let mut generated_rust_code = String::new();
-            match write!(&mut generated_rust_code, "{}", analyzed_source) {
-                Ok(_) => sp.stop_with_message(format!(
-                        "{}",
-                        "Successfully transpiled queries".green().bold()
-                )),
+            match write!(&mut generated_rust_code, "{analyzed_source}") {
+                Ok(_) => sp.stop_with_message(
+                    "Successfully transpiled queries".green().bold().to_string(),
+                ),
                 Err(e) => {
                     println!("{}", "Failed to transpile queries".red().bold());
                     println!("└── {} {}", "Error:".red().bold(), e);
-                    return Err(());
+                    return ExitCode::FAILURE;
                 }
             }
 
@@ -365,7 +364,7 @@ async fn main() -> Result<(), ()> {
                 Err(e) => {
                     println!("{} {}", "Failed to write queries file".red().bold(), e);
                     println!("└── {} {}", "Error:".red().bold(), e);
-                    return Err(());
+                    return ExitCode::FAILURE;
                 }
             }
         }
@@ -384,38 +383,40 @@ async fn main() -> Result<(), ()> {
 
             let mut sp = Spinner::new(Spinners::Dots9, "Checking Helix queries".into());
 
-            let files = match check_and_read_files(&path) {
+            let files = match check_and_read_files(path) {
                 Ok(files) => files,
                 Err(e) => {
-                    sp.stop_with_message(format!("{}", "Error checking files".red().bold()));
-                    println!("└── {}", e);
-                    return Err(());
+                    sp.stop_with_message("Error checking files".red().bold().to_string());
+                    println!("└── {e}");
+                    return ExitCode::FAILURE;
                 }
             };
 
             if files.is_empty() {
-                sp.stop_with_message(format!(
-                    "{}",
-                    "No queries found, nothing to compile".red().bold()
-                ));
-                return Err(());
+                sp.stop_with_message(
+                    "No queries found, nothing to compile"
+                        .red()
+                        .bold()
+                        .to_string(),
+                );
+                return ExitCode::FAILURE;
             }
 
-            match generate(&files, &path) {
+            match generate(&files, path) {
                 Ok(_) => {}
                 Err(e) => {
-                    sp.stop_with_message(format!("{}", "Failed to generate queries".red().bold()));
-                    println!("└── {}", e);
-                    return Err(());
+                    sp.stop_with_message("Failed to generate queries".red().bold().to_string());
+                    println!("└── {e}");
+                    return ExitCode::FAILURE;
                 }
             }
 
-            sp.stop_with_message(format!(
-                "{}",
+            sp.stop_with_message(
                 "Helix-QL schema and queries validated successfully with zero errors"
                     .green()
                     .bold()
-            ));
+                    .to_string(),
+            );
         }
 
         CommandType::Install(command) => {
@@ -423,7 +424,7 @@ async fn main() -> Result<(), ()> {
                 Ok(_) => {}
                 Err(_) => {
                     println!("{}", "Cargo is not installed".red().bold());
-                    return Err(());
+                    return ExitCode::FAILURE;
                 }
             }
 
@@ -431,18 +432,18 @@ async fn main() -> Result<(), ()> {
                 Ok(_) => {}
                 Err(_) => {
                     println!("{}", "Git is not installed".red().bold());
-                    return Err(());
+                    return ExitCode::FAILURE;
                 }
             }
 
             let repo_path = {
                 // check if helix repo exists
                 let home_dir = match dirs::home_dir() {
-                        Some(dir) => dir,
-                        None => {
-                            println!("{}", "Could not determine home directory".red().bold());
-                            return Err(());
-                        }
+                    Some(dir) => dir,
+                    None => {
+                        println!("{}", "Could not determine home directory".red().bold());
+                        return ExitCode::FAILURE;
+                    }
                 };
                 home_dir.join(".helix/repo")
             };
@@ -460,7 +461,7 @@ async fn main() -> Result<(), ()> {
                         .yellow()
                         .bold(),
                 );
-                return Err(());
+                return ExitCode::FAILURE;
             }
 
             match fs::create_dir_all(&repo_path) {
@@ -472,8 +473,8 @@ async fn main() -> Result<(), ()> {
                 Err(e) => {
                     println!("{}", "Failed to create directory structure".red().bold());
                     println!("|");
-                    println!("└── {}", e);
-                    return Err(());
+                    println!("└── {e}");
+                    return ExitCode::FAILURE;
                 }
             }
 
@@ -481,9 +482,7 @@ async fn main() -> Result<(), ()> {
             runner.arg("clone");
             runner.arg("https://github.com/HelixDB/helix-db.git");
             if command.dev {
-                runner
-                    .arg("--branch")
-                    .arg("dev");
+                runner.arg("--branch").arg("dev");
             }
             runner.current_dir(&repo_path);
 
@@ -509,8 +508,8 @@ async fn main() -> Result<(), ()> {
                 Err(e) => {
                     println!("{}", "Failed to install Helix repo".red().bold());
                     println!("|");
-                    println!("└── {}", e);
-                    return Err(());
+                    println!("└── {e}");
+                    return ExitCode::FAILURE;
                 }
             }
         }
@@ -523,14 +522,14 @@ async fn main() -> Result<(), ()> {
             };
             let path_str = path.to_str().unwrap();
 
-            let _ = match check_and_read_files(path_str) {
+            match check_and_read_files(path_str) {
                 Ok(files) if !files.is_empty() => {
                     println!(
                         "{} {}",
                         "Queries already exist in".yellow().bold(),
                         path_str
                     );
-                    return Err(());
+                    return ExitCode::FAILURE;
                 }
                 Ok(_) => {}
                 Err(_) => {}
@@ -560,14 +559,14 @@ async fn main() -> Result<(), ()> {
                 Ok(instances) => {
                     if instances.is_empty() {
                         println!("{}", "No running Helix instances".yellow().bold());
-                        return Err(());
+                        return ExitCode::FAILURE;
                     }
                     for instance in instances {
                         print_instance(&instance);
                         println!();
                     }
                 }
-                Err(e) => println!("{} {}", "Failed to list instances:".red().bold(), e)
+                Err(e) => println!("{} {}", "Failed to list instances:".red().bold(), e),
             }
         }
 
@@ -577,7 +576,7 @@ async fn main() -> Result<(), ()> {
                 Ok(instances) => {
                     if !instance_manager.running_instances().unwrap() {
                         println!("{}", "No running Helix instances".bold());
-                        return Err(());
+                        return ExitCode::FAILURE;
                     }
                     if command.all {
                         println!("{}", "Stopping all running Helix instances".bold());
@@ -611,8 +610,9 @@ async fn main() -> Result<(), ()> {
                                     cluster_id
                                 )
                             }
-                            Ok(true) =>
-                                println!("{} {}", "Stopped instance".green().bold(), cluster_id),
+                            Ok(true) => {
+                                println!("{} {}", "Stopped instance".green().bold(), cluster_id)
+                            }
                             Err(e) => println!("{} {}", "Failed to stop instance:".red().bold(), e),
                         }
                     } else {
@@ -646,20 +646,20 @@ async fn main() -> Result<(), ()> {
                         "No Helix instance found with id".red().bold(),
                         iid.red().bold()
                     );
-                    return Err(());
+                    return ExitCode::FAILURE;
                 }
                 Err(e) => {
                     println!("{} {}", "Error:".red().bold(), e);
-                    return Err(());
+                    return ExitCode::FAILURE;
                 }
             }
 
             let output_path = match command.output {
-                Some(output) => format!("{}helix_instance_{}", output, iid),
-                None => format!("helix_instance_{}", iid),
+                Some(output) => format!("{output}helix_instance_{iid}"),
+                None => format!("helix_instance_{iid}"),
             };
             let home_dir = std::env::var("HOME").expect("Failed to get HOME environment variable");
-            let instance_path = format!("{}/.helix/cached_builds/data/{}/user", home_dir, iid);
+            let instance_path = format!("{home_dir}/.helix/cached_builds/data/{iid}/user");
 
             let mut runner = Command::new("cp");
             runner.arg("-r");
@@ -679,106 +679,152 @@ async fn main() -> Result<(), ()> {
             let instance_manager = InstanceManager::new().unwrap();
             let iid = &command.cluster;
 
-            match instance_manager.get_instance(iid) {
-                Ok(Some(_)) => println!("{}", "Helix instance found!".green().bold()),
-                Ok(None) => {
-                    println!(
-                        "{} {}",
-                        "No Helix instance found with id".red().bold(),
-                        iid.red().bold()
-                    );
-                    return Err(());
-                }
-                Err(e) => {
-                    println!("{} {}", "Error:".red().bold(), e);
-                    return Err(());
-                }
+            if iid.is_none() && !command.all {
+                println!(
+                    "{}",
+                    "Need to pass either an instance or `--all`!".red().bold()
+                );
+                return ExitCode::FAILURE;
             }
 
-            match instance_manager.stop_instance(iid) {
-                Ok(true) => println!(
-                    "{} {}",
-                    "Stopped instance".green().bold(),
-                    iid.green().bold()
-                ),
-                Ok(false) => {}
-                Err(e) => println!("{} {}", "Error while stopping instance".red().bold(), e),
+            if instance_manager.list_instances().unwrap().is_empty() {
+                println!("{}", "No instances running!".yellow().bold());
+                return ExitCode::FAILURE;
+            }
+
+            if !command.all {
+                let iid = iid.as_ref().unwrap();
+                match instance_manager.get_instance(iid) {
+                    Ok(Some(_)) => println!("{}", "Helix instance found!".green().bold()),
+                    Ok(None) => {
+                        println!(
+                            "{} {}",
+                            "No Helix instance found with id".red().bold(),
+                            iid.red().bold()
+                        );
+                        return ExitCode::FAILURE;
+                    }
+                    Err(e) => {
+                        println!("{} {}", "Error:".red().bold(), e);
+                        return ExitCode::FAILURE;
+                    }
+                }
             }
 
             let mut _del_prompt: bool = false;
-            print!("Are you sure you want to delete the instance and its data? (y/n): ");
+            print!(
+                "Are you sure you want to delete the specified instances and their data? (y/n): "
+            );
             std::io::stdout().flush().unwrap();
             let mut input = String::new();
             std::io::stdin().read_line(&mut input).unwrap();
             _del_prompt = input.trim().to_lowercase() == "y";
 
             if _del_prompt {
-                match instance_manager.delete_instance(iid) {
-                    Ok(_) => println!("{}", "Deleted Helix instance".green().bold()),
-                    Err(e) => println!("{} {}", "Error while deleting instance".red().bold(), e),
-                }
+                let mut to_delete: Vec<String> = vec![];
 
-                let home_dir =
-                    std::env::var("HOME").expect("Failed to get HOME environment variable");
-                let instance_path = format!("{}/.helix/cached_builds/data/{}", home_dir, iid);
-                let binary_path = format!("{}/.helix/cached_builds/{}", home_dir, iid);
-                let log_path = format!("{}/.helix/logs/instance_{}.log", home_dir, iid);
-                let error_log_path = format!("{}/.helix/logs/instance_{}_error.log", home_dir, iid);
-
-                let mut runner = Command::new("rm");
-                runner.arg("-r");
-                runner.arg(instance_path);
-                runner.arg(binary_path);
-                runner.arg(log_path);
-                runner.arg(error_log_path);
-
-                match runner.output() {
-                    Ok(_) => println!("{}", "Deleted Helix instance data".green().bold()),
-                    Err(e) => println!("{} {}", "Error while deleting data:".red().bold(), e),
-                }
-            }
-        }
-
-        CommandType::Version => {
-            match check_helix_installation() {
-                Some(_) => {
-                    let repo_path = {
-                        let home_dir = match dirs::home_dir() {
-                            Some(dir) => dir,
-                            None => {
-                                println!("{}",
-                                    "helix-db: not installed (could not determine home directory)"
-                                    .red().bold()
-                                );
-                                return Err(());
-                            }
-                        };
-                        home_dir.join(".helix/repo/helix-db/helix-db")
-                    };
-
-                    match get_crate_version(repo_path) {
-                        Ok(local_db_version) => {
-                            let local_cli_version = match get_cli_version() {
-                                Ok(val) => val,
-                                Err(e) => {
-                                    println!("{} {}",
-                                        "Error while fetching the local cli version!".red().bold(),
-                                        e
-                                    );
-                                    return Err(());
-                                }
-                            };
+                if command.all {
+                    let instances = instance_manager.list_instances().unwrap();
+                    for inst in instances {
+                        to_delete.push(inst.id.to_string());
+                    }
+                } else {
+                    let iid = match iid {
+                        Some(val) => val,
+                        None => {
                             println!(
-                                "helix-cli version: {}, helix-db version: {}",
-                                local_cli_version, local_db_version
+                                "{}",
+                                "Need to pass either an instance or `--all`!".red().bold()
                             );
+                            return ExitCode::FAILURE;
                         }
-                        Err(_) => println!("helix-db: installed but version could not be determined"),
+                    };
+                    to_delete.push(iid.to_string());
+                }
+
+                for del_iid in to_delete {
+                    match instance_manager.stop_instance(&del_iid) {
+                        Ok(true) => println!(
+                            "{} {}",
+                            "Stopped instance".green().bold(),
+                            del_iid.green().bold()
+                        ),
+                        Ok(false) => {}
+                        Err(e) => {
+                            println!("{} {}", "Error while stopping instance".red().bold(), e)
+                        }
+                    }
+
+                    match instance_manager.delete_instance(&del_iid) {
+                        Ok(_) => println!("{}", "Deleted Helix instance".green().bold()),
+                        Err(e) => {
+                            println!("{} {}", "Error while deleting instance".red().bold(), e)
+                        }
+                    }
+
+                    let home_dir =
+                        std::env::var("HOME").expect("Failed to get HOME environment variable");
+                    let instance_path = format!("{home_dir}/.helix/cached_builds/data/{del_iid}");
+                    let binary_path = format!("{home_dir}/.helix/cached_builds/{del_iid}");
+                    let log_path = format!("{home_dir}/.helix/logs/instance_{del_iid}.log");
+                    let error_log_path =
+                        format!("{home_dir}/.helix/logs/instance_{del_iid}_error.log");
+
+                    let mut runner = Command::new("rm");
+                    runner.arg("-r");
+                    runner.arg(instance_path);
+                    runner.arg(binary_path);
+                    runner.arg(log_path);
+                    runner.arg(error_log_path);
+
+                    match runner.output() {
+                        Ok(_) => println!("{}", "Deleted Helix instance data".green().bold()),
+                        Err(e) => println!("{} {}", "Error while deleting data:".red().bold(), e),
                     }
                 }
-                None => println!("helix-db: not installed (run 'helix install' to install)"),
             }
         }
+
+        CommandType::Version => match check_helix_installation() {
+            Some(_) => {
+                let repo_path = {
+                    let home_dir = match dirs::home_dir() {
+                        Some(dir) => dir,
+                        None => {
+                            println!(
+                                "{}",
+                                "helix-db: not installed (could not determine home directory)"
+                                    .red()
+                                    .bold()
+                            );
+                            return ExitCode::FAILURE;
+                        }
+                    };
+                    home_dir.join(".helix/repo/helix-db/helix-db")
+                };
+
+                match get_crate_version(repo_path) {
+                    Ok(local_db_version) => {
+                        let local_cli_version = match get_cli_version() {
+                            Ok(val) => val,
+                            Err(e) => {
+                                println!(
+                                    "{} {}",
+                                    "Error while fetching the local cli version!".red().bold(),
+                                    e
+                                );
+                                return ExitCode::FAILURE;
+                            }
+                        };
+                        println!(
+                            "helix-cli version: {local_cli_version}, helix-db version: {local_db_version}"
+                        );
+                    }
+                    Err(_) => println!("helix-db: installed but version could not be determined"),
+                }
+            }
+            None => println!("helix-db: not installed (run 'helix install' to install)"),
+        },
 
         CommandType::Visualize(command) => {
             let instance_manager = InstanceManager::new().unwrap();
@@ -788,7 +834,7 @@ async fn main() -> Result<(), ()> {
                 Ok(Some(instance)) => {
                     println!("{}", "Helix instance found!".green().bold());
                     let port = instance.port;
-                    let url = format!("http://localhost:{}/get/graphvis", port);
+                    let url = format!("http://localhost:{port}/get/graphvis");
 
                     if webbrowser::open(&url).is_ok() {
                     } else {
@@ -797,7 +843,7 @@ async fn main() -> Result<(), ()> {
                             "Failed to open graph visualizer for instance".red().bold(),
                             iid.red().bold()
                         );
-                        return Err(());
+                        return ExitCode::FAILURE;
                     }
                 }
                 Ok(None) => {
@@ -806,18 +852,18 @@ async fn main() -> Result<(), ()> {
                         "No Helix instance found with id".red().bold(),
                         iid.red().bold()
                     );
-                    return Err(());
+                    return ExitCode::FAILURE;
                 }
                 Err(e) => {
                     println!("{} {}", "Error:".red().bold(), e);
-                    return Err(());
+                    return ExitCode::FAILURE;
                 }
             };
         }
 
         CommandType::Login => {
             let home_dir = std::env::var("HOME").unwrap_or("~/".to_string());
-            let config_path = &format!("{}/.helix", home_dir);
+            let config_path = &format!("{home_dir}/.helix");
             let config_path = Path::new(config_path);
             if !config_path.exists() {
                 fs::create_dir_all(config_path).unwrap();
@@ -844,7 +890,9 @@ async fn main() -> Result<(), ()> {
                 .open(cred_path)
                 .unwrap();
 
-            if let Err(e) = cred_file.write_all(&format!("helix_user_id={user_id}\nhelix_user_key={key}").into_bytes()) {
+            if let Err(e) = cred_file
+                .write_all(&format!("helix_user_id={user_id}\nhelix_user_key={key}").into_bytes())
+            {
                 println!(
                     "Got error when writing key: {}\nYou're key is: {}",
                     e.to_string().red(),
@@ -855,7 +903,7 @@ async fn main() -> Result<(), ()> {
 
         CommandType::Logout => {
             let home_dir = std::env::var("HOME").unwrap_or("~/".to_string());
-            let config_path = &format!("{}/.helix", home_dir);
+            let config_path = &format!("{home_dir}/.helix");
             let config_path = Path::new(config_path);
             if !config_path.exists() {
                 fs::create_dir_all(config_path).unwrap();
@@ -868,6 +916,5 @@ async fn main() -> Result<(), ()> {
         }
     }
 
-    Ok(())
+    ExitCode::SUCCESS
 }
-

@@ -14,13 +14,16 @@ impl Eq for Candidate {}
 
 impl PartialOrd for Candidate {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        other.distance.partial_cmp(&self.distance)
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for Candidate {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap_or(Ordering::Equal)
+        other
+            .distance
+            .partial_cmp(&self.distance)
+            .unwrap_or(Ordering::Equal)
     }
 }
 
@@ -34,11 +37,6 @@ pub(super) trait HeapOps<T> {
     /// Take the top k elements from the heap
     /// Used because using `.iter()` does not keep the order
     fn take_inord(&mut self, k: usize) -> BinaryHeap<T>
-    where
-        T: Ord;
-
-    /// Take the top k elements from the heap and return a vector
-    fn to_vec(&mut self, k: usize) -> Vec<T>
     where
         T: Ord;
 
@@ -76,22 +74,6 @@ impl<T> HeapOps<T> for BinaryHeap<T> {
         T: Ord,
     {
         let mut result = BinaryHeap::with_capacity(k);
-        for _ in 0..k {
-            if let Some(item) = self.pop() {
-                result.push(item);
-            } else {
-                break;
-            }
-        }
-        result
-    }
-
-    #[inline(always)]
-    fn to_vec(&mut self, k: usize) -> Vec<T>
-    where
-        T: Ord,
-    {
-        let mut result = Vec::with_capacity(k);
         for _ in 0..k {
             if let Some(item) = self.pop() {
                 result.push(item);

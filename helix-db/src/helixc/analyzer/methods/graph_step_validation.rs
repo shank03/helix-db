@@ -122,7 +122,7 @@ pub(crate) fn apply_graph_step<'a>(
             | Type::Vector(Some(node_label)),
         ) => {
             let edge_type = match ctx.edge_map.get(label.as_str()) {
-                Some(ref edge) => {
+                Some(edge) => {
                     if ctx.node_set.contains(edge.to.1.as_str()) {
                         EdgeType::Node
                     } else if ctx.vector_set.contains(edge.to.1.as_str()) {
@@ -183,7 +183,7 @@ pub(crate) fn apply_graph_step<'a>(
             | Type::Vector(Some(node_label)),
         ) => {
             let edge_type = match ctx.edge_map.get(label.as_str()) {
-                Some(ref edge) => {
+                Some(edge) => {
                     if ctx.node_set.contains(edge.from.1.as_str()) {
                         EdgeType::Node
                     } else if ctx.vector_set.contains(edge.from.1.as_str()) {
@@ -318,10 +318,7 @@ pub(crate) fn apply_graph_step<'a>(
             new_ty
         }
         (ShortestPath(sp), Type::Nodes(_) | Type::Node(_)) => {
-            let type_arg = match sp.type_arg.clone() {
-                Some(type_arg) => Some(GenRef::Literal(type_arg)),
-                None => None,
-            };
+            let type_arg = sp.type_arg.clone().map(GenRef::Literal);
             // check edge type is valid
             traversal
                 .steps
@@ -379,12 +376,12 @@ pub(crate) fn apply_graph_step<'a>(
                     is_valid_identifier(ctx, original_query, sv.loc.clone(), i.as_str());
                     // if is in params then use data.
                     let _ = type_in_scope(ctx, original_query, sv.loc.clone(), scope, i.as_str());
-                    let value = gen_identifier_or_param(original_query, i.as_str(), true, false);
+                    let value = gen_identifier_or_param(original_query, i.as_str(), false, true);
                     VecData::Standard(value)
                 }
                 Some(VectorData::Embed(e)) => match &e.value {
                     EvaluatesToString::Identifier(i) => {
-                        VecData::Embed(gen_identifier_or_param(original_query, &i, true, false))
+                        VecData::Embed(gen_identifier_or_param(original_query, i, false, true))
                     }
                     EvaluatesToString::StringLiteral(s) => {
                         VecData::Embed(GeneratedValue::Literal(GenRef::Ref(s.clone())))
@@ -433,12 +430,7 @@ pub(crate) fn apply_graph_step<'a>(
                     }
                     EvaluatesToNumberType::Identifier(i) => {
                         is_valid_identifier(ctx, original_query, sv.loc.clone(), i.as_str());
-                        // is param
-                        if let Some(_) = original_query.parameters.iter().find(|p| p.name.1 == *i) {
-                            GeneratedValue::Identifier(GenRef::Std(format!("data.{} as usize", i)))
-                        } else {
-                            GeneratedValue::Identifier(GenRef::Std(i.to_string()))
-                        }
+                        gen_identifier_or_param(original_query, i, false, true)
                     }
                     _ => {
                         generate_error!(

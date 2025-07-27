@@ -38,7 +38,7 @@ use std::collections::HashMap;
 /// This method also builds the generated traversal (`gen_traversal`) as it analyzes the traversal
 ///
 /// - `gen_query`: is used to set the query to being a mutating query if necessary.
-///                This is then used to determine the transaction type to use.
+///   This is then used to determine the transaction type to use.
 ///
 /// - `parent_ty`: is used with anonymous traversals to keep track of the parent type that the anonymous traversal is nested in.
 pub(crate) fn validate_traversal<'a>(
@@ -84,22 +84,20 @@ pub(crate) fn validate_traversal<'a>(
                                                 [&index.to_string(), node_type],
                                                 [node_type]
                                             );
-                                        } else {
-                                            if let ValueType::Literal { ref value, ref loc } =
-                                                *value
-                                            {
-                                                if !field.field_type.eq(value) {
-                                                    generate_error!(
-                                                        ctx,
-                                                        original_query,
-                                                        loc.clone(),
-                                                        E205,
-                                                        &value.to_string(),
-                                                        &field.field_type.to_string(),
-                                                        "node",
-                                                        node_type
-                                                    );
-                                                }
+                                        } else if let ValueType::Literal { ref value, ref loc } =
+                                            *value
+                                        {
+                                            if !field.field_type.eq(value) {
+                                                generate_error!(
+                                                    ctx,
+                                                    original_query,
+                                                    loc.clone(),
+                                                    E205,
+                                                    &value.to_string(),
+                                                    &field.field_type.to_string(),
+                                                    "node",
+                                                    node_type
+                                                );
                                             }
                                         }
                                     }
@@ -131,16 +129,15 @@ pub(crate) fn validate_traversal<'a>(
                                             original_query,
                                             loc.clone(),
                                             value.as_str(),
-                                        ) {
-                                            if !scope.contains_key(value.as_str()) {
-                                                generate_error!(
-                                                    ctx,
-                                                    original_query,
-                                                    loc.clone(),
-                                                    E301,
-                                                    value.as_str()
-                                                );
-                                            }
+                                        ) && !scope.contains_key(value.as_str())
+                                        {
+                                            generate_error!(
+                                                ctx,
+                                                original_query,
+                                                loc.clone(),
+                                                E301,
+                                                value.as_str()
+                                            );
                                         }
                                         gen_identifier_or_param(
                                             original_query,
@@ -151,7 +148,7 @@ pub(crate) fn validate_traversal<'a>(
                                     }
                                     ValueType::Literal { value, loc: _ } => {
                                         GeneratedValue::Primitive(GenRef::Std(match value {
-                                            Value::String(s) => format!("\"{}\"", s),
+                                            Value::String(s) => format!("\"{s}\""),
                                             Value::I8(i) => i.to_string(),
                                             Value::I16(i) => i.to_string(),
                                             Value::I32(i) => i.to_string(),
@@ -175,14 +172,14 @@ pub(crate) fn validate_traversal<'a>(
                         Type::Node(Some(node_type.to_string()))
                     }
                     IdType::Identifier { value: i, loc } => {
-                        if is_valid_identifier(ctx, original_query, loc.clone(), i.as_str()) {
-                            if !scope.contains_key(i.as_str()) {
-                                generate_error!(ctx, original_query, loc.clone(), E301, i.as_str());
-                            }
+                        if is_valid_identifier(ctx, original_query, loc.clone(), i.as_str())
+                            && !scope.contains_key(i.as_str())
+                        {
+                            generate_error!(ctx, original_query, loc.clone(), E301, i.as_str());
                         }
                         gen_traversal.source_step =
                             Separator::Period(SourceStep::NFromID(NFromID {
-                                id: GenRef::Ref(format!("data.{}", i)),
+                                id: GenRef::Ref(format!("data.{i}")),
                                 label: GenRef::Literal(node_type.clone()),
                             }));
                         gen_traversal.traversal_type = TraversalType::Ref;
@@ -217,18 +214,12 @@ pub(crate) fn validate_traversal<'a>(
                 gen_traversal.source_step = Separator::Period(SourceStep::EFromID(EFromID {
                     id: match ids[0].clone() {
                         IdType::Identifier { value: i, loc } => {
-                            if is_valid_identifier(ctx, original_query, loc.clone(), i.as_str()) {
-                                if !scope.contains_key(i.as_str()) {
-                                    generate_error!(
-                                        ctx,
-                                        original_query,
-                                        loc.clone(),
-                                        E301,
-                                        i.as_str()
-                                    );
-                                }
+                            if is_valid_identifier(ctx, original_query, loc.clone(), i.as_str())
+                                && !scope.contains_key(i.as_str())
+                            {
+                                generate_error!(ctx, original_query, loc.clone(), E301, i.as_str());
                             }
-                            GenRef::Std(format!("&data.{}", i))
+                            GenRef::Std(format!("&data.{i}"))
                         }
                         IdType::Literal { value: s, loc: _ } => GenRef::Std(s),
                         _ => unreachable!(),
@@ -236,12 +227,14 @@ pub(crate) fn validate_traversal<'a>(
                     label: GenRef::Literal(edge_type.clone()),
                 }));
                 gen_traversal.traversal_type = TraversalType::Ref;
+                gen_traversal.should_collect = ShouldCollect::ToVal;
                 Type::Edge(Some(edge_type.to_string()))
             } else {
                 gen_traversal.source_step = Separator::Period(SourceStep::EFromType(EFromType {
                     label: GenRef::Literal(edge_type.clone()),
                 }));
                 gen_traversal.traversal_type = TraversalType::Ref;
+                gen_traversal.should_collect = ShouldCollect::ToVal;
                 Type::Edges(Some(edge_type.to_string()))
             }
         }
@@ -293,7 +286,7 @@ pub(crate) fn validate_traversal<'a>(
         let step = &graph_step.step;
         match step {
             StepType::Node(gs) | StepType::Edge(gs) => {
-                match apply_graph_step(ctx, &gs, &cur_ty, original_query, gen_traversal, scope) {
+                match apply_graph_step(ctx, gs, &cur_ty, original_query, gen_traversal, scope) {
                     Some(new_ty) => {
                         cur_ty = new_ty;
                     }
@@ -855,12 +848,12 @@ pub(crate) fn validate_traversal<'a>(
                                             GeneratedValue::Primitive(GenRef::Std(i.to_string()))
                                         }
                                         v => {
-                                            println!("ID {:?}", v);
+                                            println!("ID {v:?}");
                                             panic!("expr be primitive or value")
                                         }
                                     },
                                     v => {
-                                        println!("{:?}", v);
+                                        println!("{v:?}");
                                         panic!("Should be primitive or value")
                                     }
                                 },
@@ -895,39 +888,33 @@ pub(crate) fn validate_traversal<'a>(
                             scope,
                             i.as_str(),
                         );
-                        match ty {
-                            Some(ty) => {
-                                if !ty.is_integer() {
-                                    generate_error!(
-                                        ctx,
-                                        original_query,
-                                        start.loc.clone(),
-                                        E633,
-                                        [&start.loc.span, &ty.get_type_name()],
-                                        [i.as_str()]
-                                    );
-                                    return cur_ty.clone(); // Not sure if this should be here
-                                }
+                        if let Some(ty) = ty {
+                            if !ty.is_integer() {
+                                generate_error!(
+                                    ctx,
+                                    original_query,
+                                    start.loc.clone(),
+                                    E633,
+                                    [&start.loc.span, &ty.get_type_name()],
+                                    [i.as_str()]
+                                );
+                                return cur_ty.clone(); // Not sure if this should be here
                             }
-                            None => {}
                         };
                         let ty =
                             type_in_scope(ctx, original_query, end.loc.clone(), scope, j.as_str());
-                        match ty {
-                            Some(ty) => {
-                                if !ty.is_integer() {
-                                    generate_error!(
-                                        ctx,
-                                        original_query,
-                                        end.loc.clone(),
-                                        E633,
-                                        [&end.loc.span, &ty.get_type_name()],
-                                        [j.as_str()]
-                                    );
-                                    return cur_ty.clone(); // Not sure if this should be here
-                                }
+                        if let Some(ty) = ty {
+                            if !ty.is_integer() {
+                                generate_error!(
+                                    ctx,
+                                    original_query,
+                                    end.loc.clone(),
+                                    E633,
+                                    [&end.loc.span, &ty.get_type_name()],
+                                    [j.as_str()]
+                                );
+                                return cur_ty.clone(); // Not sure if this should be here
                             }
-                            None => {}
                         }
                         (
                             gen_identifier_or_param(original_query, i.as_str(), false, true),
@@ -948,21 +935,18 @@ pub(crate) fn validate_traversal<'a>(
                             scope,
                             i.as_str(),
                         );
-                        match ty {
-                            Some(ty) => {
-                                if !ty.is_integer() {
-                                    generate_error!(
-                                        ctx,
-                                        original_query,
-                                        start.loc.clone(),
-                                        E633,
-                                        [&start.loc.span, &ty.get_type_name()],
-                                        [i.as_str()]
-                                    );
-                                    return cur_ty.clone(); // Not sure if this should be here
-                                }
+                        if let Some(ty) = ty {
+                            if !ty.is_integer() {
+                                generate_error!(
+                                    ctx,
+                                    original_query,
+                                    start.loc.clone(),
+                                    E633,
+                                    [&start.loc.span, &ty.get_type_name()],
+                                    [i.as_str()]
+                                );
+                                return cur_ty.clone(); // Not sure if this should be here
                             }
-                            None => {}
                         }
 
                         (
@@ -974,21 +958,18 @@ pub(crate) fn validate_traversal<'a>(
                         is_valid_identifier(ctx, original_query, end.loc.clone(), j.as_str());
                         let ty =
                             type_in_scope(ctx, original_query, end.loc.clone(), scope, j.as_str());
-                        match ty {
-                            Some(ty) => {
-                                if !ty.is_integer() {
-                                    generate_error!(
-                                        ctx,
-                                        original_query,
-                                        end.loc.clone(),
-                                        E633,
-                                        [&end.loc.span, &ty.get_type_name()],
-                                        [j.as_str()]
-                                    );
-                                    return cur_ty.clone();
-                                }
+                        if let Some(ty) = ty {
+                            if !ty.is_integer() {
+                                generate_error!(
+                                    ctx,
+                                    original_query,
+                                    end.loc.clone(),
+                                    E633,
+                                    [&end.loc.span, &ty.get_type_name()],
+                                    [j.as_str()]
+                                );
+                                return cur_ty.clone();
                             }
-                            None => {}
                         }
                         (
                             GeneratedValue::Primitive(GenRef::Std(i.to_string())),
@@ -1022,8 +1003,8 @@ pub(crate) fn validate_traversal<'a>(
                 gen_traversal
                     .steps
                     .push(Separator::Period(GeneratedStep::Range(Range {
-                        start: start,
-                        end: end,
+                        start,
+                        end,
                     })));
             }
             StepType::OrderByAsc(expr) => {

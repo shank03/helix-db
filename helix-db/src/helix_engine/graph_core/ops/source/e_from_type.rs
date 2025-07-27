@@ -21,10 +21,10 @@ impl<'a> Iterator for EFromType<'a> {
 
     #[debug_trace("E_FROM_TYPE")]
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(value) = self.iter.next() {
+        for value in self.iter.by_ref() {
             let (key, value) = value.unwrap();
             match value.decode() {
-                Ok(value) => match Edge::decode_edge(&value, key) {
+                Ok(value) => match Edge::decode_edge(value, key) {
                     Ok(edge) => match &edge.label {
                         label if label == self.label => return Some(Ok(TraversalVal::Edge(edge))),
                         _ => continue,

@@ -1,16 +1,13 @@
-use helix_db::helix_engine::graph_core::config::Config;
 use helix_db::helix_engine::graph_core::graph_core::{HelixGraphEngine, HelixGraphEngineOpts};
 use helix_db::helix_gateway::mcp::mcp::{MCPHandlerFn, MCPHandlerSubmission};
 use helix_db::helix_gateway::{
     gateway::{GatewayOpts, HelixGateway},
     router::router::{HandlerFn, HandlerSubmission},
 };
-use inventory;
 use std::{collections::HashMap, sync::Arc};
 use tracing::Level;
 use tracing_subscriber::util::SubscriberInitExt;
 
-mod graphvis;
 mod queries;
 
 fn main() {
@@ -18,7 +15,7 @@ fn main() {
         .with_max_level(Level::TRACE)
         .finish()
         .init();
-    let config = queries::config().unwrap_or(Config::default());
+    let config = queries::config().unwrap_or_default();
 
     let path = match std::env::var("HELIX_DATA_DIR") {
         Ok(val) => std::path::PathBuf::from(val).join("user"),
@@ -35,9 +32,9 @@ fn main() {
     };
 
     println!("Running with the following setup:");
-    println!("\tconfig: {:?}", config);
+    println!("\tconfig: {config:?}");
     println!("\tpath: {}", path.display());
-    println!("\tport: {}", port);
+    println!("\tport: {port}");
 
     let path_str = path.to_str().expect("Could not convert path to string");
     let opts = HelixGraphEngineOpts {
@@ -45,7 +42,7 @@ fn main() {
         config,
     };
 
-    let graph = Arc::new(HelixGraphEngine::new(opts).unwrap());
+    let graph = Arc::new(HelixGraphEngine::new(opts.clone()).unwrap());
 
     // generates routes from handler proc macro
     let submissions: Vec<_> = inventory::iter::<HandlerSubmission>.into_iter().collect();
@@ -83,7 +80,6 @@ fn main() {
 
     let mcp_routes = inventory::iter::<MCPHandlerSubmission>
         .into_iter()
-        .into_iter()
         .map(|submission| {
             println!("Processing submission for handler: {}", submission.0.name);
             let handler = &submission.0;
@@ -94,12 +90,13 @@ fn main() {
 
     println!("Routes: {:?}", query_routes.keys());
     let gateway = HelixGateway::new(
-        &format!("0.0.0.0:{}", port),
+        &format!("0.0.0.0:{port}"),
         graph,
         GatewayOpts::DEFAULT_POOL_SIZE,
         2,
         Some(query_routes),
         Some(mcp_routes),
+        Some(opts),
     );
 
     gateway.run().unwrap()

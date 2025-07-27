@@ -155,7 +155,7 @@ impl<'a> McpTools<'a> for McpBackend {
                 match db
                     .out_edges_db
                     .lazily_decode_data()
-                    .get_duplicates(&txn, &prefix)
+                    .get_duplicates(txn, &prefix)
                 {
                     Ok(Some(iter)) => Some(OutNodesIterator {
                         iter,
@@ -195,7 +195,7 @@ impl<'a> McpTools<'a> for McpBackend {
                 match db
                     .out_edges_db
                     .lazily_decode_data()
-                    .get_duplicates(&txn, &prefix)
+                    .get_duplicates(txn, &prefix)
                 {
                     Ok(Some(iter)) => Some(OutEdgesIterator {
                         iter,
@@ -235,7 +235,7 @@ impl<'a> McpTools<'a> for McpBackend {
                 match db
                     .in_edges_db
                     .lazily_decode_data()
-                    .get_duplicates(&txn, &prefix)
+                    .get_duplicates(txn, &prefix)
                 {
                     Ok(Some(iter)) => Some(InNodesIterator {
                         iter,
@@ -275,7 +275,7 @@ impl<'a> McpTools<'a> for McpBackend {
                 match db
                     .in_edges_db
                     .lazily_decode_data()
-                    .get_duplicates(&txn, &prefix)
+                    .get_duplicates(txn, &prefix)
                 {
                     Ok(Some(iter)) => Some(InEdgesIterator {
                         iter,
@@ -328,9 +328,8 @@ impl<'a> McpTools<'a> for McpBackend {
             label: &edge_type,
         };
 
-        let result = iter.take(100).collect::<Result<Vec<_>, _>>();
         debug_println!("result: {:?}", result);
-        result
+        iter.take(100).collect::<Result<Vec<_>, _>>()
     }
 
     fn filter_items(
@@ -347,19 +346,16 @@ impl<'a> McpTools<'a> for McpBackend {
         debug_println!("connection: {:?}", connection.iter);
 
         let iter = match properties {
-            Some(properties) => {
-                let iter = connection
-                    .iter
-                    .clone()
-                    .filter(move |item| {
-                        properties.iter().all(|(key, value)| {
-                            item.check_property(key.as_str())
-                                .map_or(false, |v| *v == *value)
-                        })
+            Some(properties) => connection
+                .iter
+                .clone()
+                .filter(move |item| {
+                    properties.iter().all(|(key, value)| {
+                        item.check_property(key.as_str())
+                            .is_ok_and(|v| *v == *value)
                     })
-                    .collect::<Vec<_>>();
-                iter
-            }
+                })
+                .collect::<Vec<_>>(),
             None => connection.iter.clone().collect::<Vec<_>>(),
         };
 
@@ -368,7 +364,7 @@ impl<'a> McpTools<'a> for McpBackend {
         let result = iter
             .clone()
             .into_iter()
-            .filter_map(move |item| match &filter_traversals {
+            .map(move |item| match &filter_traversals {
                 Some(filter_traversals) => {
                     filter_traversals.iter().any(|filter| {
                         let result = G::new_from(Arc::clone(&db), txn, vec![item.clone()]);
@@ -387,13 +383,13 @@ impl<'a> McpTools<'a> for McpBackend {
                             ToolArgs::InEStep { edge_label } => {
                                 result.in_e(edge_label).next().is_some()
                             }
-                            _ => return false,
+                            _ => false,
                         }
                     });
 
-                    Some(item)
+                    item
                 }
-                None => Some(item),
+                None => item,
             })
             .collect::<Vec<_>>();
 
@@ -411,7 +407,7 @@ impl<'a> McpTools<'a> for McpBackend {
     ) -> Result<Vec<TraversalVal>, GraphError> {
         let db = Arc::clone(&self.db);
 
-        let results = G::new(db, &txn)
+        let results = G::new(db, txn)
             .search_bm25("mcp search", &query, limit)?
             .collect_to::<Vec<_>>();
 
@@ -430,11 +426,11 @@ impl<'a> McpTools<'a> for McpBackend {
         let result = model.fetch_embedding(&query);
         let embedding = result?;
 
-        let res = G::new(db, &txn)
-            .search_v::<fn(&HVector, &RoTxn) -> bool>(&embedding, 5, None)
+        let res = G::new(db, txn)
+            .search_v::<fn(&HVector, &RoTxn) -> bool, _>(&embedding, 5, None)
             .collect_to::<Vec<_>>();
 
-        println!("result: {:?}", res);
+        println!("result: {res:?}");
         Ok(res)
     }
 }

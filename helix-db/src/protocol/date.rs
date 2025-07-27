@@ -147,7 +147,7 @@ pub enum DateError {
 impl fmt::Display for DateError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DateError::ParseError(error) => write!(f, "{}", error),
+            DateError::ParseError(error) => write!(f, "{error}"),
         }
     }
 }

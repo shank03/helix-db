@@ -20,14 +20,3 @@ heed3 = "0.22.0"
 async-trait = "0.1"
 tracing-subscriber = "0.3.19"
 tracing = "0.1.41"
-
-[profile.release]
-strip = "debuginfo"
-lto = true
-opt-level = 3
-codegen-units = 1
-panic = "abort"
-
-[features]
-dev = ["helix-db/dev"]
-default = ["helix-db/default"]

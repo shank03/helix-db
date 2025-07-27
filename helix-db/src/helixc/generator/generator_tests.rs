@@ -1,22 +1,12 @@
-/// parse -> analyze -> generate -> compile
+//! parse -> analyze -> generate -> compile
 
 use crate::helixc::{
-    generator::generator_types::Source as GeneratedSource,
-    parser::helix_parser::{
-        Source as ParsedSource,
-        Content,
-        HelixParser,
-        HxFile,
-    },
     analyzer::analyzer::analyze,
+    generator::generator_types::Source as GeneratedSource,
+    parser::helix_parser::{Content, HelixParser, HxFile, Source as ParsedSource},
 };
 
-use std::{
-    path::PathBuf,
-    fmt::Write,
-    fs,
-    process::Command,
-};
+use std::{fmt::Write, fs, path::PathBuf, process::Command};
 
 pub fn check_helix_installation() -> Result<PathBuf, String> {
     let home_dir = PathBuf::from(std::env::var("HOME").unwrap_or("~/".to_string()));
@@ -47,9 +37,9 @@ fn generate_content(content: String) -> Content {
 }
 
 fn parse_content(content: &Content) -> Result<ParsedSource, String> {
-    let source = match HelixParser::parse_source(&content) {
+    let source = match HelixParser::parse_source(content) {
         Ok(source) => source,
-        Err(e) => return Err(format!("{}", e)),
+        Err(e) => return Err(format!("{e}")),
     };
     Ok(source)
 }
@@ -77,20 +67,20 @@ fn generate(str_content: String) -> Result<GeneratedSource, String> {
 fn compile(analyzed_source: GeneratedSource) -> Result<(), String> {
     match check_helix_installation() {
         Ok(_) => {}
-        Err(e) => return Err(format!("Error, helix is not installed: {:?}", e)),
+        Err(e) => return Err(format!("Error, helix is not installed: {e:?}")),
     };
 
     let home_dir = PathBuf::from(std::env::var("HOME").unwrap_or("~/".to_string()));
-    let output = home_dir.join(".helix/repo/helix-db/helix-container".to_string());
+    let output = home_dir.join(".helix/repo/helix-db/helix-container");
     let file_path = PathBuf::from(&output).join("src/queries.rs");
     let mut generated_rust_code = String::new();
-    match write!(&mut generated_rust_code, "{}", analyzed_source) {
+    match write!(&mut generated_rust_code, "{analyzed_source}") {
         Ok(_) => {}
-        Err(e) => return Err(format!("Failed to write queries file: {:?}", e)),
+        Err(e) => return Err(format!("Failed to write queries file: {e:?}")),
     }
     match fs::write(file_path, generated_rust_code) {
-        Ok(_) => {},
-        Err(e) => return Err(format!("Failed to write queries file: {:?}", e)),
+        Ok(_) => {}
+        Err(e) => return Err(format!("Failed to write queries file: {e:?}")),
     }
 
     let mut runner = Command::new("cargo");
@@ -103,12 +93,12 @@ fn compile(analyzed_source: GeneratedSource) -> Result<(), String> {
     match runner.output() {
         Ok(output) => {
             if output.status.success() {
-                return Ok(());
+                Ok(())
             } else {
-                return Err("failed to build helix".to_string());
+                Err("failed to build helix".to_string())
             }
         }
-        Err(e) => return Err(format!("failed to build helix: {:?}", e)),
+        Err(e) => Err(format!("failed to build helix: {e:?}")),
     }
 }
 
@@ -165,8 +155,7 @@ fn generator_test_1() {
     match compile(generate(input.to_string()).unwrap()) {
         Ok(_) => {}
         Err(e) => {
-            println!("error: {:?}", e);
-            assert!(false);
+            panic!("error: {e:?}");
         }
     };
 }
@@ -225,8 +214,7 @@ fn generator_test_2() {
     match compile(generate(input.to_string()).unwrap()) {
         Ok(_) => {}
         Err(e) => {
-            println!("error: {:?}", e);
-            assert!(false);
+            panic!("error: {e:?}");
         }
     };
 }
@@ -246,4 +234,3 @@ fn generator_test_3() {
     };
 }
 */
-

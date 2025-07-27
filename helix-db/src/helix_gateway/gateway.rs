@@ -5,11 +5,14 @@ use std::{collections::HashMap, sync::Arc};
 use axum::body::Body;
 use axum::extract::State;
 use axum::response::IntoResponse;
-use axum::routing::post;
+use axum::routing::{get, post};
 use core_affinity::{CoreId, set_for_current};
 use tracing::{info, trace, warn};
 
 use super::router::router::{HandlerFn, HelixRouter};
+use crate::helix_engine::graph_core::graph_core::HelixGraphEngineOpts;
+use crate::helix_gateway::graphvis;
+use crate::helix_gateway::introspect_schema::introspect_schema_handler;
 use crate::helix_gateway::worker_pool::WorkerPool;
 use crate::protocol;
 use crate::{
@@ -28,6 +31,7 @@ pub struct HelixGateway {
     io_size: usize,
     graph_access: Arc<HelixGraphEngine>,
     router: Arc<HelixRouter>,
+    opts: Option<HelixGraphEngineOpts>,
 }
 
 impl HelixGateway {
@@ -38,6 +42,7 @@ impl HelixGateway {
         io_size: usize,
         routes: Option<HashMap<String, HandlerFn>>,
         mcp_routes: Option<HashMap<String, MCPHandlerFn>>,
+        opts: Option<HelixGraphEngineOpts>,
     ) -> HelixGateway {
         let router = Arc::new(HelixRouter::new(routes, mcp_routes));
         HelixGateway {
@@ -46,6 +51,7 @@ impl HelixGateway {
             router,
             worker_size,
             io_size,
+            opts,
         }
     }
 
@@ -97,7 +103,12 @@ impl HelixGateway {
 
         let axum_app = axum::Router::new()
             .route("/{*path}", post(post_handler))
-            .with_state(Arc::new(worker_pool));
+            .route("/graphvis", get(graphvis::graphvis_handler))
+            .route("/introspect", get(introspect_schema_handler))
+            .with_state(Arc::new(AppState {
+                worker_pool,
+                schema_json: self.opts.and_then(|o| o.config.schema),
+            }));
 
         rt.block_on(async move {
             let listener = tokio::net::TcpListener::bind(self.address).await.unwrap();
@@ -110,10 +121,10 @@ impl HelixGateway {
 }
 
 async fn post_handler(
-    State(pool): State<Arc<WorkerPool>>,
+    State(state): State<Arc<AppState>>,
     req: protocol::request::Request,
 ) -> axum::http::Response<Body> {
-    let res = pool.process(req).await;
+    let res = state.worker_pool.process(req).await;
 
     match res {
         Ok(r) => r.into_response(),
@@ -122,6 +133,11 @@ async fn post_handler(
             e.into_response()
         }
     }
+}
+
+pub struct AppState {
+    pub worker_pool: WorkerPool,
+    pub schema_json: Option<String>,
 }
 
 #[derive(Clone)]

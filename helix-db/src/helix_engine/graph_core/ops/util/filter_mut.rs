@@ -20,7 +20,7 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.iter.next() {
-            Some(mut item) => match (self.f)(&mut item, &mut self.txn) {
+            Some(mut item) => match (self.f)(&mut item, self.txn) {
                 true => Some(item),
                 false => None,
             },

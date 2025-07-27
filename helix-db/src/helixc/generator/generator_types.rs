@@ -31,44 +31,44 @@ impl Default for Source {
 }
 impl Display for Source {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}\n", write_headers())?;
-        write!(f, "{}\n", self.config)?;
+        writeln!(f, "{}", write_headers())?;
+        writeln!(f, "{}", self.config)?;
         write!(
             f,
             "{}",
             self.nodes
                 .iter()
-                .map(|n| format!("{}", n))
+                .map(|n| format!("{n}"))
                 .collect::<Vec<_>>()
                 .join("\n")
         )?;
-        write!(f, "\n")?;
+        writeln!(f)?;
         write!(
             f,
             "{}",
             self.edges
                 .iter()
-                .map(|e| format!("{}", e))
+                .map(|e| format!("{e}"))
                 .collect::<Vec<_>>()
                 .join("\n")
         )?;
-        write!(f, "\n")?;
+        writeln!(f)?;
         write!(
             f,
             "{}",
             self.vectors
                 .iter()
-                .map(|v| format!("{}", v))
+                .map(|v| format!("{v}"))
                 .collect::<Vec<_>>()
                 .join("\n")
         )?;
-        write!(f, "\n")?;
+        writeln!(f)?;
         write!(
             f,
             "{}",
             self.queries
                 .iter()
-                .map(|q| format!("{}", q))
+                .map(|q| format!("{q}"))
                 .collect::<Vec<_>>()
                 .join("\n")
         )
@@ -82,11 +82,11 @@ pub struct NodeSchema {
 }
 impl Display for NodeSchema {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "pub struct {} {{\n", self.name)?;
+        writeln!(f, "pub struct {} {{", self.name)?;
         for property in &self.properties {
-            write!(f, "    pub {}: {},\n", property.name, property.field_type)?;
+            writeln!(f, "    pub {}: {},", property.name, property.field_type)?;
         }
-        write!(f, "}}\n")
+        writeln!(f, "}}")
     }
 }
 impl ToTypeScript for NodeSchema {
@@ -119,13 +119,13 @@ pub struct EdgeSchema {
 }
 impl Display for EdgeSchema {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "pub struct {} {{\n", self.name)?;
-        write!(f, "    pub from: {},\n", self.from)?;
-        write!(f, "    pub to: {},\n", self.to)?;
+        writeln!(f, "pub struct {} {{", self.name)?;
+        writeln!(f, "    pub from: {},", self.from)?;
+        writeln!(f, "    pub to: {},", self.to)?;
         for property in &self.properties {
-            write!(f, "    pub {}: {},\n", property.name, property.field_type)?;
+            writeln!(f, "    pub {}: {},", property.name, property.field_type)?;
         }
-        write!(f, "}}\n")
+        writeln!(f, "}}")
     }
 }
 impl ToTypeScript for VectorSchema {
@@ -156,11 +156,11 @@ pub struct VectorSchema {
 }
 impl Display for VectorSchema {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "pub struct {} {{\n", self.name)?;
+        writeln!(f, "pub struct {} {{", self.name)?;
         for property in &self.properties {
-            write!(f, "    pub {}: {},\n", property.name, property.field_type)?;
+            writeln!(f, "    pub {}: {},", property.name, property.field_type)?;
         }
-        write!(f, "}}\n")
+        writeln!(f, "}}")
     }
 }
 impl ToTypeScript for EdgeSchema {
@@ -211,11 +211,11 @@ impl Display for Query {
         // prints sub parameter structs (e.g. (docs: {doc: String, id: String}))
         for (name, parameters) in &self.sub_parameters {
             writeln!(f, "#[derive(Serialize, Deserialize)]")?;
-            write!(f, "pub struct {} {{\n", name)?;
+            writeln!(f, "pub struct {name} {{")?;
             for parameter in parameters {
-                write!(f, "    pub {}: {},\n", parameter.name, parameter.field_type)?;
+                writeln!(f, "    pub {}: {},", parameter.name, parameter.field_type)?;
             }
-            write!(f, "}}\n")?;
+            writeln!(f, "}}")?;
         }
         // prints top level parameters (e.g. (docs: {doc: String, id: String}))
         // if !self.parameters.is_empty() {
@@ -226,7 +226,7 @@ impl Display for Query {
             "{}",
             self.parameters
                 .iter()
-                .map(|p| format!("{}", p))
+                .map(|p| format!("{p}"))
                 .collect::<Vec<_>>()
                 .join(",\n")
         )?;
@@ -234,9 +234,9 @@ impl Display for Query {
         // }
 
         if let Some(mcp_handler) = &self.mcp_handler {
-            write!(
+            writeln!(
                 f,
-                "#[tool_call({}, {})]\n",
+                "#[tool_call({}, {})]",
                 mcp_handler,
                 match self.is_mut {
                     true => "with_write",
@@ -244,9 +244,9 @@ impl Display for Query {
                 }
             )?;
         }
-        write!(
+        writeln!(
             f,
-            "#[handler({})]\n",
+            "#[handler({})]",
             match self.is_mut {
                 true => "with_write",
                 false => "with_read",
@@ -254,16 +254,16 @@ impl Display for Query {
         )?; // Handler macro
 
         // prints the function signature
-        write!(
+        writeln!(
             f,
-            "pub fn {} (input: &HandlerInput) -> Result<Response, GraphError> {{\n",
+            "pub fn {} (input: &HandlerInput) -> Result<Response, GraphError> {{",
             self.name
         )?;
-        write!(f, "{{\n")?;
+        writeln!(f, "{{")?;
 
         // prints each statement
         for statement in &self.statements {
-            write!(f, "    {};\n", statement)?;
+            writeln!(f, "    {statement};")?;
         }
 
         // commit the transaction
@@ -276,12 +276,12 @@ impl Display for Query {
         )?;
         if !self.return_values.is_empty() {
             for return_value in &self.return_values {
-                write!(f, "    {}\n", return_value)?;
+                writeln!(f, "    {return_value}")?;
             }
         }
 
-        write!(f, "}}\n")?;
-        write!(f, "}}\n")
+        writeln!(f, "}}")?;
+        writeln!(f, "}}")
     }
 }
 impl Default for Query {
@@ -322,13 +322,13 @@ pub enum Statement {
 impl Display for Statement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Statement::Assignment(assignment) => write!(f, "{}", assignment),
-            Statement::Drop(drop) => write!(f, "{}", drop),
-            Statement::Traversal(traversal) => write!(f, "{}", traversal),
-            Statement::ForEach(foreach) => write!(f, "{}", foreach),
-            Statement::Literal(literal) => write!(f, "{}", literal),
-            Statement::Identifier(identifier) => write!(f, "{}", identifier),
-            Statement::BoExp(bo) => write!(f, "{}", bo),
+            Statement::Assignment(assignment) => write!(f, "{assignment}"),
+            Statement::Drop(drop) => write!(f, "{drop}"),
+            Statement::Traversal(traversal) => write!(f, "{traversal}"),
+            Statement::ForEach(foreach) => write!(f, "{foreach}"),
+            Statement::Literal(literal) => write!(f, "{literal}"),
+            Statement::Identifier(identifier) => write!(f, "{identifier}"),
+            Statement::BoExp(bo) => write!(f, "{bo}"),
             Statement::Empty => write!(f, ""),
         }
     }
@@ -368,7 +368,7 @@ impl Display for ForEach {
                     self.in_variable.inner(),
                     variables
                         .iter()
-                        .map(|v| format!("{}", v))
+                        .map(|v| format!("{v}"))
                         .collect::<Vec<_>>()
                         .join(", "),
                     self.in_variable
@@ -378,14 +378,14 @@ impl Display for ForEach {
                 write!(f, "for {} in {}", identifier, self.in_variable)?;
             }
             ForVariable::Empty => {
-                assert!(false, "For variable is empty");
+                panic!("For variable is empty");
             }
         }
-        write!(f, " {{\n")?;
+        writeln!(f, " {{")?;
         for statement in &self.statements {
-            write!(f, "    {};\n", statement)?;
+            writeln!(f, "    {statement};")?;
         }
-        write!(f, "}}\n")
+        writeln!(f, "}}")
     }
 }
 
@@ -413,11 +413,10 @@ impl ForLoopInVariable {
 impl Display for ForLoopInVariable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ForLoopInVariable::Identifier(identifier) => write!(f, "{}", identifier),
-            ForLoopInVariable::Parameter(parameter) => write!(f, "&data.{}", parameter),
+            ForLoopInVariable::Identifier(identifier) => write!(f, "{identifier}"),
+            ForLoopInVariable::Parameter(parameter) => write!(f, "&data.{parameter}"),
             ForLoopInVariable::Empty => {
-                assert!(false, "For loop in variable is empty");
-                write!(f, "_")
+                panic!("For loop in variable is empty");
             }
         }
     }
@@ -455,19 +454,19 @@ impl Display for BoExp {
             BoExp::And(traversals) => {
                 let tr = traversals
                     .iter()
-                    .map(|s| format!("{}", s))
+                    .map(|s| format!("{s}"))
                     .collect::<Vec<_>>();
                 write!(f, "{}", tr.join(" && "))
             }
             BoExp::Or(traversals) => {
                 let tr = traversals
                     .iter()
-                    .map(|s| format!("{}", s))
+                    .map(|s| format!("{s}"))
                     .collect::<Vec<_>>();
                 write!(f, "{}", tr.join(" || "))
             }
-            BoExp::Exists(traversal) => write!(f, "Exist::exists(&mut {})", traversal),
-            BoExp::Expr(traversal) => write!(f, "{}", traversal),
+            BoExp::Exists(traversal) => write!(f, "Exist::exists(&mut {traversal})"),
+            BoExp::Expr(traversal) => write!(f, "{traversal}"),
         }
     }
 }
@@ -480,30 +479,30 @@ impl Display for ReturnValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.return_type {
             ReturnType::Literal(name) => {
-                write!(
+                writeln!(
                     f,
-                    "    return_vals.insert({}.to_string(), ReturnValue::from(Value::from({})));\n",
+                    "    return_vals.insert({}.to_string(), ReturnValue::from(Value::from({})));",
                     name, self.value
                 )
             }
             ReturnType::NamedLiteral(name) => {
-                write!(
+                writeln!(
                     f,
-                    "    return_vals.insert({}.to_string(), ReturnValue::from(Value::from({})));\n",
+                    "    return_vals.insert({}.to_string(), ReturnValue::from(Value::from({})));",
                     name, self.value
                 )
             }
             ReturnType::NamedExpr(name) => {
-                write!(
+                writeln!(
                     f,
-                    "    return_vals.insert({}.to_string(), ReturnValue::from_traversal_value_array_with_mixin({}.clone(), remapping_vals.borrow_mut()));\n",
+                    "    return_vals.insert({}.to_string(), ReturnValue::from_traversal_value_array_with_mixin({}.clone(), remapping_vals.borrow_mut()));",
                     name, self.value
                 )
             }
             ReturnType::SingleExpr(name) => {
-                write!(
+                writeln!(
                     f,
-                    "    return_vals.insert({}.to_string(), ReturnValue::from_traversal_value_with_mixin({}.clone(), remapping_vals.borrow_mut()));\n",
+                    "    return_vals.insert({}.to_string(), ReturnValue::from_traversal_value_with_mixin({}.clone(), remapping_vals.borrow_mut()));",
                     name, self.value
                 )
             }
@@ -575,9 +574,9 @@ pub enum ReturnValueExpr {
 impl Display for ReturnValueExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ReturnValueExpr::Traversal(traversal) => write!(f, "{}", traversal),
-            ReturnValueExpr::Identifier(identifier) => write!(f, "{}", identifier),
-            ReturnValueExpr::Value(value) => write!(f, "{}", value),
+            ReturnValueExpr::Traversal(traversal) => write!(f, "{traversal}"),
+            ReturnValueExpr::Identifier(identifier) => write!(f, "{identifier}"),
+            ReturnValueExpr::Value(value) => write!(f, "{value}"),
         }
     }
 }

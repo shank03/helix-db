@@ -158,7 +158,7 @@ impl Display for Remapping {
                 self.variable_name,
                 self.remappings
                     .iter()
-                    .map(|remapping| format!("{}", remapping))
+                    .map(|remapping| format!("{remapping}"))
                     .collect::<Vec<String>>()
                     .join("?;")
             ),
@@ -168,7 +168,7 @@ impl Display for Remapping {
                 self.variable_name,
                 self.remappings
                     .iter()
-                    .map(|remapping| format!("{}", remapping))
+                    .map(|remapping| format!("{remapping}"))
                     .collect::<Vec<String>>()
                     .join("?;\n"),
                 self.variable_name
@@ -210,14 +210,14 @@ pub enum RemappingType {
 impl Display for RemappingType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            RemappingType::ObjectRemapping(r) => write!(f, "{}", r),
-            RemappingType::FieldRemapping(r) => write!(f, "{}", r),
-            RemappingType::ClosureFieldRemapping(r) => write!(f, "{}", r),
-            RemappingType::ExcludeField(r) => write!(f, "{}", r),
-            RemappingType::TraversalRemapping(r) => write!(f, "{}", r),
-            RemappingType::ValueRemapping(r) => write!(f, "{}", r),
-            RemappingType::IdentifierRemapping(r) => write!(f, "{}", r),
-            RemappingType::Exists(r) => write!(f, "{}", r),
+            RemappingType::ObjectRemapping(r) => write!(f, "{r}"),
+            RemappingType::FieldRemapping(r) => write!(f, "{r}"),
+            RemappingType::ClosureFieldRemapping(r) => write!(f, "{r}"),
+            RemappingType::ExcludeField(r) => write!(f, "{r}"),
+            RemappingType::TraversalRemapping(r) => write!(f, "{r}"),
+            RemappingType::ValueRemapping(r) => write!(f, "{r}"),
+            RemappingType::IdentifierRemapping(r) => write!(f, "{r}"),
+            RemappingType::Exists(r) => write!(f, "{r}"),
             RemappingType::Empty => write!(f, ""),
         }
     }

@@ -27,7 +27,7 @@ impl<'scope, 'inner> Iterator for SearchBM25<'scope, 'inner> {
                 if node.label == self.label {
                     Some(Ok(TraversalVal::Node(node)))
                 } else {
-                    return None;
+                    None
                 }
             }
             Err(e) => Some(Err(e)),
@@ -60,10 +60,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> SearchBM25Adapter
         GraphError,
     > {
         let results = match self.storage.bm25.as_ref() {
-            Some(s) => match s.search(self.txn, query, k) {
-                Ok(results) => results,
-                Err(e) => return Err(e),
-            },
+            Some(s) => s.search(self.txn, query, k)?,
             None => return Err(GraphError::from("BM25 not enabled!")),
         };
 

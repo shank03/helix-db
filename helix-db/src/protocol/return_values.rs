@@ -2,12 +2,12 @@ use super::{
     remapping::{Remapping, ResponseRemapping},
     value::Value,
 };
+use crate::helix_engine::graph_core::ops::tr_val::TraversalVal;
 use crate::utils::{
     count::Count,
     filterable::{Filterable, FilterableType},
     items::{Edge, Node},
 };
-use crate::helix_engine::graph_core::ops::tr_val::TraversalVal;
 use sonic_rs::{Deserialize, Serialize};
 use std::{cell::RefMut, collections::HashMap};
 
@@ -42,7 +42,7 @@ impl ReturnValue {
     where
         T: Filterable + Clone,
     {
-        if let Some(m) = mixin.remove(&item.id()) {
+        if let Some(m) = mixin.remove(item.id()) {
             if m.should_spread {
                 ReturnValue::from(item).mixin_remapping(m.remappings)
             } else {
@@ -78,21 +78,11 @@ impl ReturnValue {
                         let mut properties = HashMap::with_capacity(2);
                         properties.insert(
                             "nodes".to_string(),
-                            ReturnValue::Array(
-                                nodes
-                                    .into_iter()
-                                    .map(|node| ReturnValue::from(node))
-                                    .collect(),
-                            ),
+                            ReturnValue::Array(nodes.into_iter().map(ReturnValue::from).collect()),
                         );
                         properties.insert(
                             "edges".to_string(),
-                            ReturnValue::Array(
-                                edges
-                                    .into_iter()
-                                    .map(|edge| ReturnValue::from(edge))
-                                    .collect(),
-                            ),
+                            ReturnValue::Array(edges.into_iter().map(ReturnValue::from).collect()),
                         );
                         ReturnValue::Object(properties)
                     }
@@ -107,41 +97,29 @@ impl ReturnValue {
         mut mixin: RefMut<HashMap<u128, ResponseRemapping>>,
     ) -> Self {
         match traversal_value {
-                    TraversalVal::Node(node) => {
-                        println!("node processing");
-                        ReturnValue::process_items_with_mixin(node, &mut mixin)
-                    }
-                    TraversalVal::Edge(edge) => {
-                        ReturnValue::process_items_with_mixin(edge, &mut mixin)
-                    }
-                    TraversalVal::Vector(vector) => {
-                        ReturnValue::process_items_with_mixin(vector, &mut mixin)
-                    }
-                    TraversalVal::Count(count) => ReturnValue::from(count),
-                    TraversalVal::Empty => ReturnValue::Empty,
-                    TraversalVal::Value(value) => ReturnValue::from(value),
-                    TraversalVal::Path((nodes, edges)) => {
-                        let mut properties = HashMap::with_capacity(2);
-                        properties.insert(
-                            "nodes".to_string(),
-                            ReturnValue::Array(
-                                nodes
-                                    .into_iter()
-                                    .map(|node| ReturnValue::from(node))
-                                    .collect(),
-                            ),
-                        );
-                        properties.insert(
-                            "edges".to_string(),
-                            ReturnValue::Array(
-                                edges
-                                    .into_iter()
-                                    .map(|edge| ReturnValue::from(edge))
-                                    .collect(),
-                            ),
-                        );
-                        ReturnValue::Object(properties)
-                    }
+            TraversalVal::Node(node) => {
+                println!("node processing");
+                ReturnValue::process_items_with_mixin(node, &mut mixin)
+            }
+            TraversalVal::Edge(edge) => ReturnValue::process_items_with_mixin(edge, &mut mixin),
+            TraversalVal::Vector(vector) => {
+                ReturnValue::process_items_with_mixin(vector, &mut mixin)
+            }
+            TraversalVal::Count(count) => ReturnValue::from(count),
+            TraversalVal::Empty => ReturnValue::Empty,
+            TraversalVal::Value(value) => ReturnValue::from(value),
+            TraversalVal::Path((nodes, edges)) => {
+                let mut properties = HashMap::with_capacity(2);
+                properties.insert(
+                    "nodes".to_string(),
+                    ReturnValue::Array(nodes.into_iter().map(ReturnValue::from).collect()),
+                );
+                properties.insert(
+                    "edges".to_string(),
+                    ReturnValue::Array(edges.into_iter().map(ReturnValue::from).collect()),
+                );
+                ReturnValue::Object(properties)
+            }
         }
     }
 
@@ -164,9 +142,9 @@ impl ReturnValue {
     ///
     /// - If the mapping is an exclude, then the key is removed from the return value
     /// - If the mapping is a remapping from an old value to a new value, then the key
-    ///     is replaced with the new name and the value is the new value
+    ///   is replaced with the new name and the value is the new value
     /// - If the mapping is a new mapping, then the key is added to the return value
-    ///     and the value is the new value
+    ///   and the value is the new value
     /// - Otherwise, the key is left unchanged and the value is the original value
     ///
     /// Basic usage:
@@ -196,24 +174,24 @@ impl ReturnValue {
     pub fn mixin_remapping(self, remappings: HashMap<String, Remapping>) -> Self {
         match self {
             ReturnValue::Object(mut a) => {
-                println!("a1: {:?}", a);
+                println!("a1: {a:?}");
                 remappings.into_iter().for_each(|(k, v)| {
                     if v.exclude {
-                        println!("removing key: {:?}", k);
+                        println!("removing key: {k:?}");
                         let _ = a.remove(&k);
                     } else if let Some(new_name) = v.new_name {
                         if let Some(value) = a.remove(&k) {
                             a.insert(new_name, value);
                         } else {
-                            println!("no value found for key: {:?}", k);
+                            println!("no value found for key: {k:?}");
                             a.insert(k, v.return_value);
                         }
                     } else {
-                        println!("inserting value: {:?}", k);
+                        println!("inserting value: {k:?}");
                         a.insert(k, v.return_value);
                     }
                 });
-                println!("a2: {:?}", a);
+                println!("a2: {a:?}");
                 ReturnValue::Object(a)
             }
             _ => unreachable!(),

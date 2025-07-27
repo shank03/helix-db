@@ -131,12 +131,10 @@ impl Filterable for Node {
                 Some(properties) => properties
                     .get(key)
                     .ok_or(GraphError::ConversionError(format!(
-                        "Property {} not found",
-                        key
-                    ))).map(|v| Cow::Borrowed(v)),
+                        "Property {key} not found"
+                    ))).map(Cow::Borrowed),
                 None => Err(GraphError::ConversionError(format!(
-                    "Property {} not found",
-                    key
+                    "Property {key} not found"
                 ))),
             },
         }
@@ -239,12 +237,10 @@ impl Filterable for Edge {
                 Some(properties) => properties
                     .get(key)
                     .ok_or(GraphError::ConversionError(format!(
-                        "Property {} not found",
-                        key
-                    ))).map(|v| Cow::Borrowed(v)),
+                        "Property {key} not found"
+                    ))).map(Cow::Borrowed),
                 None => Err(GraphError::ConversionError(format!(
-                    "Property {} not found",
-                    key
+                    "Property {key} not found"
                 ))),
             }
         }

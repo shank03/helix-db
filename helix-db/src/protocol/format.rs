@@ -112,8 +112,8 @@ impl<'a, T> Deref for MaybeOwned<'a, T> {
 
     fn deref(&self) -> &Self::Target {
         match self {
-            MaybeOwned::Owned(v) => &v,
-            MaybeOwned::Borrowed(v) => *v,
+            MaybeOwned::Owned(v) => v,
+            MaybeOwned::Borrowed(v) => v,
         }
     }
 }

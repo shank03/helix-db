@@ -9,11 +9,13 @@ use crate::helixc::{
         types::Type,
     },
     generator::generator_types::Source as GeneratedSource,
-    parser::helix_parser::{EdgeSchema, Field, Source},
+    parser::helix_parser::{EdgeSchema, ExpressionType, Field, Query, Source},
 };
+use serde::Serialize;
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
+    sync::OnceLock,
 };
 
 pub fn analyze(src: &Source) -> (Vec<Diagnostic>, GeneratedSource) {
@@ -38,15 +40,19 @@ pub(crate) struct Ctx<'a> {
     pub(super) output: GeneratedSource,
 }
 
+pub static INTROSPECTION_DATA: OnceLock<IntrospectionData> = OnceLock::new();
+
 impl<'a> Ctx<'a> {
     pub(super) fn new(src: &'a Source) -> Self {
         // Build field look‑ups once
         let (node_fields, edge_fields, vector_fields) = build_field_lookups(src);
 
-        let mut output = GeneratedSource::default();
-        output.src = src.source.clone();
+        let output = GeneratedSource {
+            src: src.source.clone(),
+            ..Default::default()
+        };
 
-        Self {
+        let out = Self {
             node_set: src.node_schemas.iter().map(|n| n.name.1.as_str()).collect(),
             vector_set: src.vector_schemas.iter().map(|v| v.name.as_str()).collect(),
             edge_map: src
@@ -60,7 +66,13 @@ impl<'a> Ctx<'a> {
             src,
             diagnostics: Vec::new(),
             output,
-        }
+        };
+
+        INTROSPECTION_DATA
+            .set(IntrospectionData::from_schema(&out))
+            .ok();
+
+        out
     }
 
     #[allow(unused)]
@@ -89,6 +101,124 @@ impl<'a> Ctx<'a> {
     pub(super) fn check_queries(&mut self) {
         for q in &self.src.queries {
             validate_query(self, q);
+        }
+    }
+}
+
+#[derive(Serialize)]
+pub struct IntrospectionData {
+    schema: SchemaData,
+    queries: Vec<QueryData>,
+}
+
+impl IntrospectionData {
+    fn from_schema(ctx: &Ctx) -> Self {
+        let queries = ctx.src.queries.iter().map(QueryData::from_query).collect();
+        Self {
+            schema: SchemaData::from_ctx(ctx),
+            queries,
+        }
+    }
+}
+
+#[derive(Serialize)]
+pub struct SchemaData {
+    nodes: Vec<NodeData>,
+    vectors: Vec<NodeData>,
+    edges: Vec<EdgeData>,
+}
+
+impl SchemaData {
+    fn from_ctx(ctx: &Ctx) -> Self {
+        let nodes = ctx.node_fields.iter().map(NodeData::from_entry).collect();
+        let vectors = ctx.vector_fields.iter().map(NodeData::from_entry).collect();
+        let edges = ctx.edge_map.iter().map(EdgeData::from_entry).collect();
+
+        SchemaData {
+            nodes,
+            vectors,
+            edges,
+        }
+    }
+}
+
+#[derive(Serialize)]
+pub struct NodeData {
+    name: String,
+    properties: HashMap<String, String>,
+}
+
+impl NodeData {
+    fn from_entry(val: (&&str, &HashMap<&str, Cow<Field>>)) -> Self {
+        let properties = val
+            .1
+            .iter()
+            .map(|(n, f)| (n.to_string(), f.field_type.to_string()))
+            .collect();
+        NodeData {
+            name: val.0.to_string(),
+            properties,
+        }
+    }
+}
+
+#[derive(Serialize)]
+pub struct EdgeData {
+    name: String,
+    from: String,
+    to: String,
+    properties: HashMap<String, String>,
+}
+
+impl EdgeData {
+    fn from_entry((name, es): (&&str, &&EdgeSchema)) -> Self {
+        let properties = es
+            .properties
+            .iter()
+            .flatten()
+            .map(|f| (f.name.to_string(), f.field_type.to_string()))
+            .collect();
+
+        EdgeData {
+            name: name.to_string(),
+            from: es.from.1.clone(),
+            to: es.to.1.clone(),
+            properties,
+        }
+    }
+}
+
+#[derive(Serialize)]
+pub struct QueryData {
+    name: String,
+    parameters: HashMap<String, String>,
+    returns: Vec<String>,
+}
+
+impl QueryData {
+    fn from_query(query: &Query) -> Self {
+        let parameters = query
+            .parameters
+            .iter()
+            .map(|p| (p.name.1.clone(), p.param_type.1.to_string()))
+            .collect();
+
+        let returns = query
+            .return_values
+            .iter()
+            .flat_map(|e| {
+                if let ExpressionType::Identifier(ident) = &e.expr {
+                    Some(ident.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        QueryData {
+            name: query.name.to_string(),
+            parameters,
+            returns,
         }
     }
 }
