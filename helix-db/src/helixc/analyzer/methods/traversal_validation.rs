@@ -172,14 +172,30 @@ pub(crate) fn validate_traversal<'a>(
                         Type::Node(Some(node_type.to_string()))
                     }
                     IdType::Identifier { value: i, loc } => {
-                        if is_valid_identifier(ctx, original_query, loc.clone(), i.as_str())
-                            && !scope.contains_key(i.as_str())
-                        {
-                            generate_error!(ctx, original_query, loc.clone(), E301, i.as_str());
-                        }
                         gen_traversal.source_step =
                             Separator::Period(SourceStep::NFromID(NFromID {
-                                id: GenRef::Ref(format!("data.{i}")),
+                                id: {
+                                    is_valid_identifier(
+                                        ctx,
+                                        original_query,
+                                        loc.clone(),
+                                        i.as_str(),
+                                    );
+                                    let _ = type_in_scope(
+                                        ctx,
+                                        original_query,
+                                        loc.clone(),
+                                        scope,
+                                        i.as_str(),
+                                    );
+                                    let value = gen_identifier_or_param(
+                                        original_query,
+                                        i.as_str(),
+                                        true,
+                                        false,
+                                    );
+                                    value.inner().clone()
+                                },
                                 label: GenRef::Literal(node_type.clone()),
                             }));
                         gen_traversal.traversal_type = TraversalType::Ref;
@@ -214,12 +230,12 @@ pub(crate) fn validate_traversal<'a>(
                 gen_traversal.source_step = Separator::Period(SourceStep::EFromID(EFromID {
                     id: match ids[0].clone() {
                         IdType::Identifier { value: i, loc } => {
-                            if is_valid_identifier(ctx, original_query, loc.clone(), i.as_str())
-                                && !scope.contains_key(i.as_str())
-                            {
-                                generate_error!(ctx, original_query, loc.clone(), E301, i.as_str());
-                            }
-                            GenRef::Std(format!("&data.{i}"))
+                            is_valid_identifier(ctx, original_query, loc.clone(), i.as_str());
+                            let _ =
+                                type_in_scope(ctx, original_query, loc.clone(), scope, i.as_str());
+                            let value =
+                                gen_identifier_or_param(original_query, i.as_str(), true, false);
+                            value.inner().clone()
                         }
                         IdType::Literal { value: s, loc: _ } => GenRef::Std(s),
                         _ => unreachable!(),
