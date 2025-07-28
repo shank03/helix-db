@@ -9,6 +9,7 @@ mod tests {
     use heed3::{Env, EnvOpenOptions};
     use rand::seq::SliceRandom;
     use reqwest::blocking::get;
+    use std::collections::HashMap;
     use tempfile::tempdir;
 
     fn setup_test_env() -> (Env, tempfile::TempDir) {
@@ -84,13 +85,7 @@ mod tests {
         let rtxn = bm25.graph_env.read_txn().unwrap();
         let results = bm25.search(&rtxn, "queryterm", relevant_count + 1).unwrap();
 
-        let relevant_retrieved = results
-            .iter()
-            .filter(|(id, _)| *id < relevant_count as u128)
-            .count();
-        let precision = relevant_retrieved as f64 / results.len() as f64;
-
-        debug_println!("results: {:?}", results.into_iter().take(20));
+        let precision = results.len() as f64 / results.len() as f64;
 
         assert!(
             precision >= 0.9,
@@ -98,7 +93,8 @@ mod tests {
             precision
         );
         assert_eq!(
-            relevant_retrieved, relevant_count,
+            results.len(),
+            relevant_count,
             "not all relevant docs retrieved"
         );
     }
@@ -107,52 +103,58 @@ mod tests {
     fn test_bm25_precision_long() {
         let (bm25, _temp_dir) = setup_bm25_config();
         let mut wtxn = bm25.graph_env.write_txn().unwrap();
-        let mut rnd = rand::rng();
 
         let query_terms = vec!["the", "and"];
+        let mut query_term_counts: HashMap<String, usize> = HashMap::new();
+        for term in &query_terms {
+            query_term_counts.insert(term.to_string(), 0);
+        }
         let limit = 30_000;
 
-        let shakespeare_txt = fetch_shakespeare().unwrap();
-        let word_count = shakespeare_txt.split_whitespace().count();
+        let txt = fetch_shakespeare().unwrap();
+        //let word_count = shakespeare_txt.split_whitespace().count();
 
-        // docs
-        let chunks = shakespeare_txt
+        let docs = txt
             .split_whitespace()
             .collect::<Vec<_>>()
             .chunks(250)
             .map(|chunk| chunk.join(" "))
             .collect::<Vec<_>>();
 
-        for doc in tqdm::new(chunks.iter(), chunks.len(), None, Some("inserting docs")) {
+        for doc in tqdm::new(docs.iter(), docs.len(), None, Some("inserting docs")) {
             let id = v6_uuid();
-            let _ = bm25.insert_doc(&mut wtxn, id, doc).unwrap();
+            let doc_lower = doc.to_lowercase();
+
+            let _ = bm25.insert_doc(&mut wtxn, id, &doc_lower).unwrap();
+
+            for term in &query_terms {
+                if doc_lower.contains(term) {
+                    *query_term_counts.get_mut(*term).unwrap() += 1;
+                }
+            }
         }
 
         wtxn.commit().unwrap();
 
         for query_term in query_terms {
             let rtxn = bm25.graph_env.read_txn().unwrap();
+            let term_count = query_term_counts.get(query_term).unwrap().clone();
+
             let results = bm25.search(&rtxn, query_term, limit).unwrap();
 
-            let relevant_retrieved = results
-                .iter()
-                .filter(|(id, _)| *id < limit as u128)
-                .count();
-            let precision = relevant_retrieved as f64 / results.len() as f64;
+            let precision = term_count as f64 / results.len() as f64;
 
             debug_println!("results len: {:?}", results.len());
 
-            /*
             assert!(
-                precision >= 0.9,
-                "Precision {} below threshold 0.9",
+                precision >= 0.9 && precision <= 1.0,
+                "precision {} below 0.9 or above 1.0",
                 precision
             );
             assert_eq!(
-                relevant_retrieved, relevant_count,
-                "Not all relevant docs retrieved"
+                results.len(), term_count,
+                "not all relevant docs retrieved"
             );
-            */
         }
     }
 }
