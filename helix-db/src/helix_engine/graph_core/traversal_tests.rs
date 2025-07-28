@@ -55,7 +55,12 @@ use super::ops::{
 fn setup_test_db() -> (Arc<HelixGraphStorage>, TempDir) {
     let temp_dir = TempDir::new().unwrap();
     let db_path = temp_dir.path().to_str().unwrap();
-    let storage = HelixGraphStorage::new(db_path, super::config::Config::default()).unwrap();
+    let storage = HelixGraphStorage::new(
+        db_path,
+        super::config::Config::default(),
+        Default::default(),
+    )
+    .unwrap();
     (Arc::new(storage), temp_dir)
 }
 

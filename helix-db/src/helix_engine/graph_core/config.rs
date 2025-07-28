@@ -1,4 +1,4 @@
-use crate::helix_engine::types::GraphError;
+use crate::helix_engine::{graph_core::ops::version_info::VersionInfo, types::GraphError};
 use serde::{Deserialize, Serialize};
 use std::{fmt, path::PathBuf};
 
@@ -19,12 +19,10 @@ impl Default for VectorConfig {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[derive(Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct GraphConfig {
     pub secondary_indices: Option<Vec<String>>,
 }
-
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
@@ -113,9 +111,7 @@ impl Config {
     }
 
     pub fn get_vector_config(&self) -> VectorConfig {
-        self.vector_config
-            .clone()
-            .unwrap_or_default()
+        self.vector_config.clone().unwrap_or_default()
     }
 
     pub fn get_graph_config(&self) -> GraphConfig {

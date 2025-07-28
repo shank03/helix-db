@@ -53,7 +53,11 @@ pub struct HelixGraphStorage {
 }
 
 impl HelixGraphStorage {
-    pub fn new(path: &str, config: Config) -> Result<HelixGraphStorage, GraphError> {
+    pub fn new(
+        path: &str,
+        config: Config,
+        version_info: VersionInfo,
+    ) -> Result<HelixGraphStorage, GraphError> {
         fs::create_dir_all(path)?;
 
         let db_size = if config.db_max_size_gb.unwrap_or(100) >= 9999 {
@@ -164,6 +168,7 @@ impl HelixGraphStorage {
             vectors,
             bm25,
             storage_config,
+            version_info,
         })
     }
 
@@ -311,7 +316,7 @@ impl StorageMethods for HelixGraphStorage {
             None => return Err(GraphError::EdgeNotFound),
         };
         let edge: Edge = Edge::decode_edge(edge, *id)?;
-        self.version_info.Ok(edge)
+        Ok(self.version_info.upgrade_to_edge_latest(edge))
     }
 
     fn drop_node(&self, txn: &mut RwTxn, id: &u128) -> Result<(), GraphError> {

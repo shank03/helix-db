@@ -5,6 +5,7 @@ use crate::{
     utils::items::{Edge, Node},
 };
 
+#[derive(Default)]
 pub struct VersionInfo(HashMap<String, ItemInfo>);
 
 impl VersionInfo {
@@ -21,9 +22,16 @@ impl VersionInfo {
         let item_info = self
             .0
             .get(&node.label)
-            .expect("All nodes should have version info");
+            .expect("All edges should have version info");
 
         item_info.upgrade_edge_to_latest(node)
+    }
+
+    pub fn get_latest(&self, label: &str) -> u8 {
+        self.0
+            .get(label)
+            .expect("All labels should have version info")
+            .latest
     }
 }
 
