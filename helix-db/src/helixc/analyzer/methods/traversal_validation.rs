@@ -16,10 +16,11 @@ use crate::{
             },
         },
         generator::{
-            bool_op::{BoolOp, Eq, Gt, Gte, Lt, Lte, Neq},
-            generator_types::{BoExp, Query as GeneratedQuery, Statement as GeneratedStatement},
+            bool_op::{BoExp, BoolOp, Eq, Gt, Gte, Lt, Lte, Neq},
             object_remapping_generation::{ExcludeField, Remapping, RemappingType},
+            queries::Query as GeneratedQuery,
             source_steps::{EFromID, EFromType, NFromID, NFromIndex, NFromType, SourceStep},
+            statements::Statement as GeneratedStatement,
             traversal_steps::{
                 OrderBy, Range, ShouldCollect, Step as GeneratedStep,
                 Traversal as GeneratedTraversal, TraversalType, Where, WhereRef,

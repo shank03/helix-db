@@ -159,6 +159,7 @@ impl HelixGraphStorage {
 
         wtxn.commit()?;
         Ok(Self {
+            version_info: VersionInfo(HashMap::new()),
             graph_env,
             nodes_db,
             edges_db,

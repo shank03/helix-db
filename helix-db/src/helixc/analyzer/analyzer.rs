@@ -3,12 +3,11 @@ use crate::helixc::{
     analyzer::{
         diagnostic::Diagnostic,
         methods::{
-            query_validation::validate_query,
-            schema_methods::{build_field_lookups, check_schema},
+            migration_validation::validate_migration, query_validation::validate_query, schema_methods::{build_field_lookups, check_schema, SchemaVersionMap}
         },
         types::Type,
     },
-    generator::generator_types::Source as GeneratedSource,
+    generator::Source as GeneratedSource,
     parser::helix_parser::{EdgeSchema, Field, Source},
 };
 use std::{
@@ -19,6 +18,7 @@ use std::{
 pub fn analyze(src: &Source) -> (Vec<Diagnostic>, GeneratedSource) {
     let mut ctx = Ctx::new(src);
     ctx.check_schema();
+    ctx.check_schema_migrations();
     ctx.check_queries();
     (ctx.diagnostics, ctx.output)
 }
@@ -34,6 +34,7 @@ pub(crate) struct Ctx<'a> {
     pub(super) node_fields: HashMap<&'a str, HashMap<&'a str, Cow<'a, Field>>>,
     pub(super) edge_fields: HashMap<&'a str, HashMap<&'a str, Cow<'a, Field>>>,
     pub(super) vector_fields: HashMap<&'a str, HashMap<&'a str, Cow<'a, Field>>>,
+    pub(super) all_schemas: SchemaVersionMap<'a>,
     pub(super) diagnostics: Vec<Diagnostic>,
     pub(super) output: GeneratedSource,
 }
@@ -41,7 +42,8 @@ pub(crate) struct Ctx<'a> {
 impl<'a> Ctx<'a> {
     pub(super) fn new(src: &'a Source) -> Self {
         // Build field look‑ups once
-        let (node_fields, edge_fields, vector_fields) = build_field_lookups(src);
+        let all_schemas = build_field_lookups(src);
+        let (node_fields, edge_fields, vector_fields) = all_schemas.get_latest();
 
         let output = GeneratedSource {
             src: src.source.clone(),
@@ -49,9 +51,10 @@ impl<'a> Ctx<'a> {
         };
 
         Self {
-            node_set: src.node_schemas.iter().map(|n| n.name.1.as_str()).collect(),
-            vector_set: src.vector_schemas.iter().map(|v| v.name.as_str()).collect(),
+            node_set: src.get_latest_schema().node_schemas.iter().map(|n| n.name.1.as_str()).collect(),
+            vector_set: src.get_latest_schema().vector_schemas.iter().map(|v| v.name.as_str()).collect(),
             edge_map: src
+                .get_latest_schema()
                 .edge_schemas
                 .iter()
                 .map(|e| (e.name.1.as_str(), e))
@@ -59,6 +62,7 @@ impl<'a> Ctx<'a> {
             node_fields,
             edge_fields,
             vector_fields,
+            all_schemas,
             src,
             diagnostics: Vec::new(),
             output,
@@ -85,6 +89,13 @@ impl<'a> Ctx<'a> {
     /// Validate that every edge references declared node types.
     pub(super) fn check_schema(&mut self) {
         check_schema(self);
+    }
+
+    // ---------- Pass #1.5: schema migrations --------------------------
+    pub(super) fn check_schema_migrations(&mut self) {
+        for m in &self.src.migrations {
+            validate_migration(self, m);
+        }
     }
 
     // ---------- Pass #2: queries -------------------------
