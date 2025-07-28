@@ -4,6 +4,7 @@ use super::{
 };
 use crate::protocol::value::Value;
 use chrono::{DateTime, NaiveDate, Utc};
+use itertools::Itertools;
 use pest::{
     Parser as PestParser,
     iterators::{Pair, Pairs},
@@ -58,12 +59,22 @@ pub struct Source {
 
 impl Source {
     pub fn get_latest_schema(&self) -> &Schema {
-        let latest_schema = self.schema
+        let latest_schema = self
+            .schema
             .iter()
             .max_by(|a, b| a.1.version.1.cmp(&b.1.version.1))
             .map(|(_, schema)| schema);
         assert!(latest_schema.is_some());
         latest_schema.unwrap()
+    }
+
+    /// Gets the schemas in order of version, from oldest to newest.
+    pub fn get_schemas_in_order(&self) -> Vec<&Schema> {
+        self.schema
+            .iter()
+            .sorted_by(|a, b| a.1.version.1.cmp(&b.1.version.1))
+            .map(|(_, schema)| schema)
+            .collect()
     }
 }
 
@@ -101,24 +112,42 @@ pub struct EdgeSchema {
 
 #[derive(Debug, Clone)]
 pub struct Migration {
-    pub from_version: (Loc, String),
-    pub to_version: (Loc, String),
+    pub from_version: (Loc, usize),
+    pub to_version: (Loc, usize),
     pub body: Vec<MigrationItemMapping>,
     pub loc: Loc,
 }
 
 #[derive(Debug, Clone)]
+pub enum MigrationItem {
+    Node(String),
+    Edge(String),
+    Vector(String),
+}
+
+impl PartialEq<MigrationItem> for MigrationItem {
+    fn eq(&self, other: &MigrationItem) -> bool {
+        match (self, other) {
+            (MigrationItem::Node(a), MigrationItem::Node(b)) => a == b,
+            (MigrationItem::Edge(a), MigrationItem::Edge(b)) => a == b,
+            (MigrationItem::Vector(a), MigrationItem::Vector(b)) => a == b,
+            _ => false,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct MigrationItemMapping {
-    pub from_item_type: (Loc, String),
-    pub to_item_type: (Loc, String),
+    pub from_item: (Loc, MigrationItem),
+    pub to_item: (Loc, MigrationItem),
     pub remappings: Vec<MigrationPropertyMapping>,
     pub loc: Loc,
 }
 
 #[derive(Debug, Clone)]
 pub struct MigrationPropertyMapping {
-    pub from_property: (Loc, String),
-    pub to_property: (Loc, FieldValue),
+    pub property_name: (Loc, String),
+    pub property_value: FieldValue,
     pub default: Option<DefaultValue>,
     pub cast: Option<ValueCast>,
     pub loc: Loc,
@@ -316,6 +345,48 @@ impl PartialEq<Value> for FieldType {
                 println!("l: {l:?}");
                 false
             }
+        }
+    }
+}
+
+impl PartialEq<DefaultValue> for FieldType {
+    fn eq(&self, other: &DefaultValue) -> bool {
+        match (self, other) {
+            (FieldType::String, DefaultValue::String(_)) => true,
+            (FieldType::F32 | FieldType::F64, DefaultValue::F32(_) | DefaultValue::F64(_)) => true,
+            (
+                FieldType::I8
+                | FieldType::I16
+                | FieldType::I32
+                | FieldType::I64
+                | FieldType::U8
+                | FieldType::U16
+                | FieldType::U32
+                | FieldType::U64
+                | FieldType::U128,
+                DefaultValue::I8(_)
+                | DefaultValue::I16(_)
+                | DefaultValue::I32(_)
+                | DefaultValue::I64(_)
+                | DefaultValue::U8(_)
+                | DefaultValue::U16(_)
+                | DefaultValue::U32(_)
+                | DefaultValue::U64(_)
+                | DefaultValue::U128(_),
+            ) => true,
+            (FieldType::Boolean, DefaultValue::Boolean(_)) => true,
+            (FieldType::Date, DefaultValue::String(date)) => {
+                println!("date: {}, {:?}", date, date.parse::<NaiveDate>());
+                date.parse::<NaiveDate>().is_ok() || date.parse::<DateTime<Utc>>().is_ok()
+            }
+            (FieldType::Date, DefaultValue::I64(timestamp)) => {
+                DateTime::from_timestamp(*timestamp, 0).is_some()
+            }
+            (FieldType::Date, DefaultValue::U64(timestamp)) => {
+                DateTime::from_timestamp(*timestamp as i64, 0).is_some()
+            }
+            (FieldType::Date, DefaultValue::Now) => true,
+            _ => false,
         }
     }
 }
@@ -1052,8 +1123,14 @@ impl HelixParser {
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(Migration {
-            from_version: (from_version.loc(), from_version.as_str().to_string()),
-            to_version: (to_version.loc(), to_version.as_str().to_string()),
+            from_version: (
+                from_version.loc(),
+                from_version.as_str().parse::<usize>().unwrap(),
+            ),
+            to_version: (
+                to_version.loc(),
+                to_version.as_str().parse::<usize>().unwrap(),
+            ),
             body,
             loc: pair.loc_with_filepath(filepath),
         })
@@ -1064,23 +1141,34 @@ impl HelixParser {
         pair: Pair<Rule>,
     ) -> Result<MigrationItemMapping, ParserError> {
         let mut pairs = pair.clone().into_inner();
-        let from_item_type = pairs.next().unwrap().into_inner().next().unwrap();
+        let from_item_type = match pairs.next() {
+            Some(pair) => match pair.as_rule() {
+                Rule::node_decl => (pair.loc(), MigrationItem::Node(pair.as_str().to_string())),
+                Rule::edge_decl => (pair.loc(), MigrationItem::Edge(pair.as_str().to_string())),
+                Rule::vec_decl => (pair.loc(), MigrationItem::Vector(pair.as_str().to_string())),
+                _ => return Err(ParserError::from("Expected item_def")),
+            },
+            None => return Err(ParserError::from("Expected item_def")),
+        };
+
         let to_item_type = match pairs.next() {
             Some(pair) => match pair.as_rule() {
-                Rule::item_def => (
-                    pair.loc(),
-                    pair.into_inner().next().unwrap().as_str().to_string(),
-                ),
-                Rule::anon_decl => (
-                    from_item_type.loc(),
-                    from_item_type
-                        .clone()
-                        .into_inner()
-                        .next()
-                        .unwrap()
-                        .as_str()
-                        .to_string(),
-                ),
+                Rule::item_def => match &pair.into_inner().next() {
+                    Some(pair) => match pair.as_rule() {
+                        Rule::node_decl => {
+                            (pair.loc(), MigrationItem::Node(pair.as_str().to_string()))
+                        }
+                        Rule::edge_decl => {
+                            (pair.loc(), MigrationItem::Edge(pair.as_str().to_string()))
+                        }
+                        Rule::vec_decl => {
+                            (pair.loc(), MigrationItem::Vector(pair.as_str().to_string()))
+                        }
+                        _ => return Err(ParserError::from("Expected item_def")),
+                    },
+                    None => return Err(ParserError::from("Expected item_def")),
+                },
+                Rule::anon_decl => from_item_type.clone(),
                 _ => return Err(ParserError::from("Expected item_def")),
             },
             None => return Err(ParserError::from("Expected item_def")),
@@ -1109,8 +1197,8 @@ impl HelixParser {
         };
 
         Ok(MigrationItemMapping {
-            from_item_type: (from_item_type.loc(), from_item_type.as_str().to_string()),
-            to_item_type,
+            from_item: from_item_type,
+            to_item: to_item_type,
             remappings,
             loc: pair.loc(),
         })
@@ -1205,8 +1293,8 @@ impl HelixParser {
         pair: Pair<Rule>,
     ) -> Result<MigrationPropertyMapping, ParserError> {
         let mut pairs = pair.clone().into_inner();
-        let from_property = pairs.next().unwrap();
-        let to_property = pairs.next().unwrap();
+        let property_name = pairs.next().unwrap();
+        let property_value = pairs.next().unwrap();
         let cast = if let Some(cast_pair) = pairs.next() {
             self.parse_cast(cast_pair)
         } else {
@@ -1214,8 +1302,8 @@ impl HelixParser {
         };
 
         Ok(MigrationPropertyMapping {
-            from_property: (from_property.loc(), from_property.as_str().to_string()),
-            to_property: (to_property.loc(), self.parse_field_value(to_property)?),
+            property_name: (property_name.loc(), property_name.as_str().to_string()),
+            property_value: self.parse_field_value(property_value)?,
             default: None,
             cast,
             loc: pair.loc(),
