@@ -328,8 +328,9 @@ impl<'a> McpTools<'a> for McpBackend {
             label: &edge_type,
         };
 
+        let result = iter.take(100).collect::<Result<Vec<_>, _>>();
         debug_println!("result: {:?}", result);
-        iter.take(100).collect::<Result<Vec<_>, _>>()
+        result
     }
 
     fn filter_items(

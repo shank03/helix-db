@@ -11,6 +11,7 @@ mod tests {
         },
         protocol::value::Value,
     };
+
     use heed3::{Env, EnvOpenOptions, RoTxn};
     use std::collections::HashMap;
     use tempfile::tempdir;
