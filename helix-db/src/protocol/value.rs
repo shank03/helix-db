@@ -988,7 +988,7 @@ impl From<Value> for GenRef<String> {
 impl FilterValues for Value {
     fn compare(&self, value: &Value, operator: Option<Operator>) -> bool {
         debug_println!("comparing value1: {:?}, value2: {:?}", self, value);
-        match (self, value) {
+        let comparison = match (self, value) {
             (Value::Array(a1), Value::Array(a2)) => a1.iter().any(|a1_item| {
                 a2.iter()
                     .any(|a2_item| a1_item.compare(a2_item, operator.clone()))
@@ -1000,6 +1000,8 @@ impl FilterValues for Value {
                 Some(op) => op.execute(value1, value2),
                 None => value1 == value2,
             },
-        }
+        };
+        debug_println!("comparison: {:?}", comparison);
+        comparison
     }
 }
