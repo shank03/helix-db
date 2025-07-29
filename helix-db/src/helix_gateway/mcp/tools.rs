@@ -336,7 +336,6 @@ impl<'a> McpTools<'a> for McpBackend {
             label: &edge_type,
         };
 
-        debug_println!("result: {:?}", result);
         iter.take(100).collect::<Result<Vec<_>, _>>()
     }
 
