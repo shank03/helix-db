@@ -6,7 +6,9 @@ use crate::{
             utils::{Candidate, HeapOps},
             vector::HVector,
         },
-    }, protocol::value::Value, time_block, time_block_result
+    },
+    protocol::value::Value,
+    time_block, time_block_result,
 };
 use heed3::{
     Database, Env, RoTxn, RwTxn,
@@ -45,7 +47,13 @@ impl HNSWConfig {
         let m = m.unwrap_or(16).clamp(5, 48);
         let ef_construct = ef_construct.unwrap_or(128).clamp(40, 512);
         let ef = ef.unwrap_or(768).clamp(10, 512);
-        Self { m, m_max_0: 2 * m, ef_construct, m_l: 1.0 / (m as f64).ln(), ef }
+        Self {
+            m,
+            m_max_0: 2 * m,
+            ef_construct,
+            m_l: 1.0 / (m as f64).ln(),
+            ef,
+        }
     }
 }
 
@@ -113,7 +121,7 @@ impl VectorCore {
             arr[..len].copy_from_slice(&ep_id[..len]);
 
             let ep = self
-                .get_vector(txn, u128::from_be_bytes(arr), 0, true)
+                .get_vector(txn, u128::from_be_bytes(arr), 0, false)
                 .map_err(|_| VectorError::EntryPointNotFound)?;
             Ok(ep)
         } else {
@@ -173,7 +181,7 @@ impl VectorCore {
             let neighbor_id = u128::from_be_bytes(arr);
 
             if neighbor_id != id {
-                if let Ok(vector) = self.get_vector(txn, neighbor_id, level, true) {
+                if let Ok(vector) = self.get_vector(txn, neighbor_id, level, false) {
                     // TODO: look at implementing a macro that actually just runs each function rather than iterating through
                     if filter.is_none() || filter.unwrap().iter().all(|f| f(&vector, txn)) {
                         neighbors.push(vector);
@@ -351,20 +359,15 @@ impl HNSW for VectorCore {
         let key = Self::vector_key(id, level);
         let vector = match self.vectors_db.get(txn, key.as_ref())? {
             Some(bytes) => {
-                let vector = match with_data {
-                    true => {
-                        let mut vector = HVector::from_bytes(id, level, bytes)?;
-                        vector.properties = match self.vector_data_db.get(txn, &id.to_be_bytes())? {
-                            Some(bytes) => {
-                                Some(bincode::deserialize(bytes).map_err(VectorError::from)?)
-                            }
-                            None => None,
-                        };
-
-                        vector
-                    }
-                    false => HVector::from_bytes(id, level, bytes)?,
-                };
+                let mut vector = HVector::from_bytes(id, level, bytes)?;
+                if with_data {
+                    vector.properties = match self.vector_data_db.get(txn, &id.to_be_bytes())? {
+                        Some(bytes) => {
+                            Some(bincode::deserialize(bytes).map_err(VectorError::from)?)
+                        }
+                        None => None,
+                    };
+                }
                 Ok(vector)
             }
             None if level > 0 => self.get_vector(txn, id, 0, with_data),
@@ -473,12 +476,12 @@ impl HNSW for VectorCore {
 
         for level in (0..=l.min(new_level)).rev() {
             let nearest = self.search_level::<F>(
-                    txn,
-                    &query,
-                    &mut curr_ep,
-                    self.config.ef_construct,
-                    level,
-                    None,
+                txn,
+                &query,
+                &mut curr_ep,
+                self.config.ef_construct,
+                level,
+                None,
             )?;
 
             curr_ep = nearest.peek().unwrap().clone();
@@ -487,23 +490,27 @@ impl HNSW for VectorCore {
 
             self.set_neighbours(txn, query.get_id(), &neighbors, level)?;
 
-                for e in neighbors {
-                    let id = e.get_id();
-                    let e_conns = self.get_neighbors::<F>(txn, id, level, None)?;
-
-                    {
-                        let e_conns = BinaryHeap::from(e_conns);
-                        let e_new_conn =
-                            time_block_result! {
-                                println!("select_neighbors");
-                                self.select_neighbors::<F>(txn, &query, e_conns, level, true, None)?
-                            };
-                        time_block! {
-                            println!("set_neighbors");
-                            self.set_neighbours(txn, id, &e_new_conn, level)?;
-                        };
+            for e in neighbors {
+                let id = e.get_id();
+                let e_conns = self.get_neighbors::<F>(txn, id, level, None)?;
+                if e_conns.len()
+                    > if level == 0 {
+                        self.config.m_max_0
+                    } else {
+                        self.config.m
                     }
+                {
+                    let e_new_conn = time_block_result! {
+                        let ordered_conns = BinaryHeap::from(e_conns);
+                        println!("select_neighbors");
+                        self.select_neighbors::<F>(txn, &query, ordered_conns, level, true, None)?
+                    };
+                    time_block! {
+                        println!("set_neighbors");
+                        self.set_neighbours(txn, id, &e_new_conn, level)?;
+                    };
                 }
+            }
         }
 
         if new_level > l {
@@ -558,4 +565,3 @@ impl HNSW for VectorCore {
             .collect()
     }
 }
-
