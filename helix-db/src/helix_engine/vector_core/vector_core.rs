@@ -244,24 +244,29 @@ impl VectorCore {
         } else {
             self.config.m
         };
-        let mut visited: HashSet<u128> = HashSet::new();
-        if should_extend {
-            let mut result = BinaryHeap::with_capacity(m * cands.len());
-            for candidate in cands.iter() {
-                for mut neighbor in self.get_neighbors(txn, candidate.get_id(), level, filter)? {
-                    if visited.insert(neighbor.get_id()) {
-                        neighbor.set_distance(neighbor.distance_to(query)?);
-                        if filter.is_none() || filter.unwrap().iter().all(|f| f(&neighbor, txn)) {
-                            result.push(neighbor);
-                        }
-                    }
+
+        if !should_extend {
+            return Ok(cands.take_inord(m));
+        }
+
+        let estimated_unique_neighbors = (cands.len() * self.config.m).min(m * 3);
+        // TODO: TEST THIS BEFORE PUSHING (PRECISION)
+        let mut visited: HashSet<u128> = HashSet::with_capacity(estimated_unique_neighbors);
+        let mut result = BinaryHeap::with_capacity(m * cands.len());
+        for candidate in cands.iter() {
+            for mut neighbor in self.get_neighbors(txn, candidate.get_id(), level, filter)? {
+                if !visited.insert(neighbor.get_id()) {
+                    continue;
+                }
+
+                neighbor.set_distance(neighbor.distance_to(query)?);
+                if filter.is_none() || filter.unwrap().iter().all(|f| f(&neighbor, txn)) {
+                    result.push(neighbor);
                 }
             }
-            result.extend_inord(cands);
-            Ok(result.take_inord(m))
-        } else {
-            Ok(cands.take_inord(m))
         }
+        result.extend_inord(cands);
+        Ok(result.take_inord(m))
     }
 
     fn search_level<'a, F>(
@@ -482,17 +487,23 @@ impl HNSW for VectorCore {
 
             self.set_neighbours(txn, query.get_id(), &neighbors, level)?;
 
-            for e in neighbors {
-                let id = e.get_id();
-                let e_conns = self.get_neighbors::<F>(txn, id, level, None)?;
+                for e in neighbors {
+                    let id = e.get_id();
+                    let e_conns = self.get_neighbors::<F>(txn, id, level, None)?;
 
-                {
-                    let e_conns = BinaryHeap::from(e_conns);
-                    let e_new_conn =
-                        self.select_neighbors::<F>(txn, &query, e_conns, level, true, None)?;
-                    self.set_neighbours(txn, id, &e_new_conn, level)?;
+                    {
+                        let e_conns = BinaryHeap::from(e_conns);
+                        let e_new_conn =
+                            time_block_result! {
+                                println!("select_neighbors");
+                                self.select_neighbors::<F>(txn, &query, e_conns, level, true, None)?
+                            };
+                        time_block! {
+                            println!("set_neighbors");
+                            self.set_neighbours(txn, id, &e_new_conn, level)?;
+                        };
+                    }
                 }
-            }
         }
 
         if new_level > l {

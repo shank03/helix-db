@@ -278,6 +278,7 @@ mod tests {
         );
         assert!(total_recall >= 0.8, "recall not high enough!");
     }
+    */
 
     /// Test the precision of the HNSW search algorithm
     #[test]
@@ -311,10 +312,10 @@ mod tests {
             let vec = index.insert::<Filter>(&mut txn, data, None).unwrap();
             let time = start_time.elapsed();
             all_vectors.push(vec);
-            if i % 1000 == 0 {
+            //if i % 1000 == 0 {
                 println!("{} => inserting in {} ms", i, time.as_millis());
                 println!("time taken so far: {:?}", over_all_time.elapsed());
-            }
+            //}
             total_insertion_time += time;
         }
         txn.commit().unwrap();
@@ -379,5 +380,5 @@ mod tests {
         );
         assert!(total_recall >= 0.8, "recall not high enough!");
     }
-    */
 }
+
