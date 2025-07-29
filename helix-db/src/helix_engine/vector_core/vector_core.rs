@@ -34,15 +34,18 @@ pub struct HNSWConfig {
 }
 
 impl HNSWConfig {
+    /// Constructor for the configs of the HNSW vector similarity search algorithm
+    /// - m (5 <= m <= 48): max num of bi-directional links per element
+    /// - m_max_0 (2 * m): max num of links for level 0 (level that stores all vecs)
+    /// - ef_construct (40 <= ef_construct <= 512): size of the dynamic candidate list
+    ///     for construction
+    /// - m_l (ln(1/m)): level generation factor (multiplied by a random number)
+    /// - ef (10 <= ef <= 512): num of candidates to search
     pub fn new(m: Option<usize>, ef_construct: Option<usize>, ef: Option<usize>) -> Self {
-        let m = m.unwrap_or(16);
-        Self {
-            m,
-            m_max_0: 2 * m,
-            ef_construct: ef_construct.unwrap_or(128),
-            m_l: 1.0 / (m as f64).ln(),
-            ef: ef.unwrap_or(768),
-        }
+        let m = m.unwrap_or(16).clamp(5, 48);
+        let ef_construct = ef_construct.unwrap_or(128).clamp(40, 512);
+        let ef = ef.unwrap_or(768).clamp(10, 512);
+        Self { m, m_max_0: 2 * m, ef_construct, m_l: 1.0 / (m as f64).ln(), ef }
     }
 }
 
@@ -94,7 +97,6 @@ impl VectorCore {
     #[inline]
     fn get_new_level(&self) -> usize {
         // TODO: look at using the XOR shift algorithm for random number generation
-        // Storing global rng will not be threadsafe or possible as thread rng needs to be mutable
         // Should instead using an atomic mutable seed and the XOR shift algorithm
         let mut rng = rand::rng();
         let r: f64 = rng.random::<f64>();
@@ -129,8 +131,6 @@ impl VectorCore {
         Ok(())
     }
 
-    // #[inline(always)]
-    // fn get_vector_(&self, txn: &RoTxn, id: u128) -> Result<Vec<f64>, VectorError> {
     #[inline(always)]
     fn put_vector(&self, txn: &mut RwTxn, vector: &HVector) -> Result<(), VectorError> {
         self.vectors_db
@@ -244,22 +244,18 @@ impl VectorCore {
         } else {
             self.config.m
         };
-        let mut visited: HashSet<String> = HashSet::new();
+        let mut visited: HashSet<u128> = HashSet::new();
         if should_extend {
             let mut result = BinaryHeap::with_capacity(m * cands.len());
             for candidate in cands.iter() {
-                time_block! {
-                    println!("2");
-                    for mut neighbor in self.get_neighbors(txn, candidate.get_id(), level, filter)? {
-                        if visited.insert(neighbor.get_id().to_string()) {
-                            // TODO: NOT TO_STRING()
-                            neighbor.set_distance(neighbor.distance_to(query)?);
-                            if filter.is_none() || filter.unwrap().iter().all(|f| f(&neighbor, txn)) {
-                                result.push(neighbor);
-                            }
+                for mut neighbor in self.get_neighbors(txn, candidate.get_id(), level, filter)? {
+                    if visited.insert(neighbor.get_id()) {
+                        neighbor.set_distance(neighbor.distance_to(query)?);
+                        if filter.is_none() || filter.unwrap().iter().all(|f| f(&neighbor, txn)) {
+                            result.push(neighbor);
                         }
                     }
-                };
+                }
             }
             result.extend_inord(cands);
             Ok(result.take_inord(m))
@@ -331,6 +327,10 @@ impl VectorCore {
                 });
         }
         Ok(results)
+    }
+
+    pub fn num_inserted_vectors(&self, txn: &RoTxn) -> Result<u64, VectorError> {
+        Ok(self.vectors_db.len(txn)?)
     }
 }
 
@@ -486,13 +486,12 @@ impl HNSW for VectorCore {
                 let id = e.get_id();
                 let e_conns = self.get_neighbors::<F>(txn, id, level, None)?;
 
-                let e_conns = BinaryHeap::from(e_conns);
-                let e_new_conn =
-                    time_block_result! {
-                        println!("1"); // ----------
-                        self.select_neighbors::<F>(txn, &query, e_conns, level, true, None)?
-                    };
+                {
+                    let e_conns = BinaryHeap::from(e_conns);
+                    let e_new_conn =
+                        self.select_neighbors::<F>(txn, &query, e_conns, level, true, None)?;
                     self.set_neighbours(txn, id, &e_new_conn, level)?;
+                }
             }
         }
 
@@ -548,3 +547,4 @@ impl HNSW for VectorCore {
             .collect()
     }
 }
+

@@ -20,13 +20,15 @@ mod tests {
         time::Instant,
     };
 
+    type Filter = fn(&HVector, &RoTxn) -> bool;
+
     fn setup_temp_env() -> Env {
         let temp_dir = tempfile::tempdir().unwrap();
         let path = temp_dir.path().to_str().unwrap();
 
         unsafe {
             EnvOpenOptions::new()
-                .map_size(40 * 1024 * 1024 * 1024) // 20 GB
+                .map_size(20 * 1024 * 1024 * 1024) // 20 GB
                 .max_dbs(10)
                 .open(path)
                 .unwrap()
@@ -152,10 +154,130 @@ mod tests {
         Ok(all_vectors)
     }
 
+    /// Higher values of similarity make the vectors more similar
+    fn gen_sim_vecs(n: usize, dim: usize, similarity: f64) -> Vec<Vec<f64>> {
+        let mut rng = rand::rng();
+        let mut vectors = Vec::with_capacity(n);
+        let similarity = 1.0 - similarity;
+
+        let base: Vec<f64> = (0..dim).map(|_| rng.random_range(-1.0..1.0)).collect();
+
+        for _ in 0..n {
+            let mut vec = base.clone();
+            for v in vec.iter_mut() {
+                *v += rng.random_range(-similarity..similarity);
+                *v = v.clamp(-1.0, 1.0);
+            }
+            vectors.push(vec);
+        }
+
+        vectors
+    }
+
+    #[test]
+    fn bench_hnsw_search_short() {
+        //fetch_parquet_vectors().unwrap();
+        let n_base = 4_000;
+        let dims = 950;
+        let vectors = gen_sim_vecs(n_base, dims, 0.8);
+
+        let n_query = 400;
+        let mut rng = rand::rng();
+        let mut shuffled_vectors = vectors.clone();
+        shuffled_vectors.shuffle(&mut rng);
+        let base_vectors = &shuffled_vectors[..n_base - n_query];
+        let query_vectors = &shuffled_vectors[n_base - n_query..];
+
+        println!("num of base vecs: {}", base_vectors.len());
+        println!("num of query vecs: {}", query_vectors.len());
+
+        let k = 10;
+
+        let env = setup_temp_env();
+        let mut txn = env.write_txn().unwrap();
+
+        let mut total_insertion_time = std::time::Duration::from_secs(0);
+        let index = VectorCore::new(&env, &mut txn, HNSWConfig::new(None, None, None)).unwrap();
+
+        let mut all_vectors: Vec<HVector> = Vec::new();
+        let over_all_time = Instant::now();
+        for (i, data) in vectors.iter().enumerate() {
+            let start_time = Instant::now();
+            let vec = index.insert::<Filter>(&mut txn, &data, None).unwrap();
+            let time = start_time.elapsed();
+            all_vectors.push(vec);
+            if i % 1000 == 0 {
+                println!("{} => inserting in {} ms", i, time.as_millis());
+                println!("time taken so far: {:?}", over_all_time.elapsed());
+            }
+            total_insertion_time += time;
+        }
+        txn.commit().unwrap();
+
+        let txn = env.read_txn().unwrap();
+        println!("{:?}", index.config);
+
+        println!(
+            "total insertion time: {:.2?} seconds",
+            total_insertion_time.as_secs_f64()
+        );
+        println!(
+            "average insertion time per vec: {:.2?} milliseconds",
+            total_insertion_time.as_millis() as f64 / n_base as f64
+        );
+
+        println!("calculating ground truths");
+        let ground_truths = calc_ground_truths(all_vectors, query_vectors.to_vec(), k);
+
+        println!("searching and comparing...");
+        let test_id = format!("k = {} with {} queries", k, n_query);
+
+        let mut total_recall = 0.0;
+        let mut total_precision = 0.0;
+        let mut total_search_time = std::time::Duration::from_secs(0);
+        for ((_, query), gt) in query_vectors.iter().zip(ground_truths.iter()) {
+            let start_time = Instant::now();
+            let results = index.search::<Filter>(&txn, query, k, None, false).unwrap();
+            let search_duration = start_time.elapsed();
+            total_search_time += search_duration;
+
+            let result_indices: HashSet<String> = results
+                .into_iter()
+                .map(|hvector| hvector.get_id().to_string())
+                .collect();
+
+            let gt_indices: HashSet<String> = gt.iter().cloned().collect();
+            //println!("gt: {:?}\nresults: {:?}\n", gt_indices, result_indices);
+            let true_positives = result_indices.intersection(&gt_indices).count();
+
+            let recall: f64 = true_positives as f64 / gt_indices.len() as f64;
+            let precision: f64 = true_positives as f64 / result_indices.len() as f64;
+
+            total_recall += recall;
+            total_precision += precision;
+        }
+
+        println!(
+            "total search time: {:.2?} seconds",
+            total_search_time.as_secs_f64()
+        );
+        println!(
+            "average search time per query: {:.2?} milliseconds",
+            total_search_time.as_millis() as f64 / n_query as f64
+        );
+
+        total_recall = total_recall / n_query as f64;
+        total_precision = total_precision / n_query as f64;
+        println!(
+            "{}: avg. recall: {:.4?}, avg. precision: {:.4?}",
+            test_id, total_recall, total_precision
+        );
+        assert!(total_recall >= 0.8, "recall not high enough!");
+    }
+
     /// Test the precision of the HNSW search algorithm
     #[test]
     fn bench_hnsw_search_long() {
-        type Filter = fn(&HVector, &RoTxn) -> bool;
         //fetch_parquet_vectors().unwrap();
         let n_base = 70_000;
         let vectors = load_dbpedia_vectors(n_base).unwrap();
@@ -185,10 +307,10 @@ mod tests {
             let vec = index.insert::<Filter>(&mut txn, data, None).unwrap();
             let time = start_time.elapsed();
             all_vectors.push(vec);
-            //if i % 0 == 0 {
+            if i % 1000 == 0 {
                 println!("{} => inserting in {} ms", i, time.as_millis());
                 println!("time taken so far: {:?}", over_all_time.elapsed());
-            //}
+            }
             total_insertion_time += time;
         }
         txn.commit().unwrap();

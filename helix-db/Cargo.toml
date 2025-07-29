@@ -67,7 +67,7 @@ full = ["build", "compiler", "vectors"]
 dev = ["debug-output", "server"]
 default = ["server"]
 
-# benches
+# benches/tests
 [[test]]
 name = "bm25_benches"
 path = "benches/bm25_benches.rs"
