@@ -408,9 +408,8 @@ pub(super) fn _filter_items(
 ) -> Vec<TraversalVal> {
     let db = Arc::clone(&db);
 
-    debug_println!("properties: {:?}", properties);
-    debug_println!("filter_traversals: {:?}", filter_traversals);
-    debug_println!("connection: {:?}", iter);
+    debug_println!("properties: {:?}", filter);
+    debug_println!("filter_traversals: {:?}", filter.filter_traversals);;
 
     let initial_filtered_iter = match &filter.properties {
         Some(properties) => iter
@@ -430,7 +429,7 @@ pub(super) fn _filter_items(
         None => iter.collect::<Vec<_>>(),
     };
 
-    debug_println!("iter: {:?}", iter);
+    debug_println!("iter: {:?}", initial_filtered_iter);
 
     let result = initial_filtered_iter
         .into_iter()
