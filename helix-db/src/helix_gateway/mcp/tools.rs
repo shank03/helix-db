@@ -464,9 +464,9 @@ pub(super) fn _filter_items(
 
     let result = initial_filtered_iter
         .into_iter()
-        .map(move |item| match &filter.filter_traversals {
+        .filter_map(move |item| match &filter.filter_traversals {
             Some(filter_traversals) => {
-                filter_traversals.iter().all(|filter| {
+                match filter_traversals.iter().all(|filter| {
                     let result = G::new_from(Arc::clone(&db), txn, vec![item.clone()]);
                     match filter {
                         ToolArgs::OutStep {
@@ -531,11 +531,12 @@ pub(super) fn _filter_items(
                         },
                         _ => false,
                     }
-                });
-
-                item
+                }) {
+                    true => Some(item),
+                    false => None,
+                }
             }
-            None => item,
+            None => Some(item),
         })
         .collect::<Vec<_>>();
 
