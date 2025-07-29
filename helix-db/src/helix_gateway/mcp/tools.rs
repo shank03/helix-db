@@ -92,7 +92,7 @@ pub enum Operator {
 
 impl Operator {
     pub fn execute(&self, value1: &Value, value2: &Value) -> bool {
-        debug_println!("operating on value1: {:?}, value2: {:?}", value1, value2);
+        debug_println!("operating on value1: {:?}, value2: {:?}", *value1, *value2);
         match self {
             Operator::Eq => *value1 == *value2,
             Operator::Neq => *value1 != *value2,
@@ -450,22 +450,23 @@ pub(super) fn _filter_items(
                     match item.check_property(&filter.key) {
                         Ok(v) => {
                             debug_println!("item value for key: {:?} is {:?}", filter.key, v);
-                            match &filter.value {
-                                Value::Array(array) => {
-                                    debug_println!("array: {:?}", array);
-                                    array.iter().any(|value| {
-                                        debug_println!("value in array: {:?}", value);
-                                        match &filter.operator {
-                                            Some(op) => op.execute(&v, value),
-                                            None => v.compare(value, None),
-                                        }
-                                    })
-                                }
-                                _ => match &filter.operator {
-                                    Some(op) => op.execute(&v, &filter.value),
-                                    None => v.compare(&filter.value, None),
-                                },
-                            }
+                            // match &filter.value {
+                            //     // Value::Array(array) => {
+                            //     //     debug_println!("array: {:?}", array);
+                            //     //     array.iter().any(|value| {
+                            //     //         debug_println!("value in array: {:?}", value);
+                            //     //         match &filter.operator {
+                            //     //             Some(op) => op.execute(&v, value),
+                            //     //             None => v.compare(value, None),
+                            //     //         }
+                            //     //     })
+                            //     // }
+                            //     _ => match &filter.operator {
+                            //         Some(op) => op.execute(&v, &filter.value),
+                            //         None => v.compare(&filter.value, None),
+                            //     },
+                            // }
+                            v.compare(&filter.value, filter.operator)
                         }
                         Err(_) => false,
                     }
