@@ -1,4 +1,4 @@
-use crate::helix_gateway::mcp::tools::FilterValues;
+use crate::helix_gateway::mcp::tools::{FilterValues, Operator};
 use crate::protocol::date::Date;
 use crate::utils::id::ID;
 use crate::{helix_engine::types::GraphError, helixc::generator::utils::GenRef};
@@ -985,25 +985,19 @@ impl From<Value> for GenRef<String> {
 }
 
 impl FilterValues for Value {
-    fn is_match(&self, value: &Value) -> bool {
+    fn compare(&self, value: &Value, operator: Option<Operator>) -> bool {
         match (self, value) {
-            (Value::String(s1), Value::String(s2)) => s1 == s2,
-            (Value::I8(i1), Value::I8(i2)) => i1 == i2,
-            (Value::I16(i1), Value::I16(i2)) => i1 == i2,
-            (Value::I32(i1), Value::I32(i2)) => i1 == i2,
-            (Value::I64(i1), Value::I64(i2)) => i1 == i2,
-            (Value::F32(f1), Value::F32(f2)) => f1 == f2,
-            (Value::F64(f1), Value::F64(f2)) => f1 == f2,
-            (Value::U8(u1), Value::U8(u2)) => u1 == u2,
-            (Value::U16(u1), Value::U16(u2)) => u1 == u2,
-            (Value::U32(u1), Value::U32(u2)) => u1 == u2,
-            (Value::U64(u1), Value::U64(u2)) => u1 == u2,
-            (Value::U128(u1), Value::U128(u2)) => u1 == u2,
-            (Value::Date(d1), Value::Date(d2)) => d1 == d2,
-            (Value::Boolean(b1), Value::Boolean(b2)) => b1 == b2,
-            (Value::Array(a1), Value::Array(a2)) => a1
+            (Value::Array(a1), Value::Array(a2)) => a1.iter().any(|a1_item| {
+                a2.iter()
+                    .any(|a2_item| a1_item.compare(a2_item, operator.clone()))
+            }),
+            (value, Value::Array(a)) => a
                 .iter()
-                .any(|a1_item| a2.iter().any(|a2_item| a1_item.is_match(a2_item))),
+                .any(|a_item| value.compare(a_item, operator.clone())),
+            (value1, value2) => match operator {
+                Some(op) => op.execute(value1, value2),
+                None => value1 == value2,
+            },
             _ => false,
         }
     }

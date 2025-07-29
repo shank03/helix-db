@@ -74,7 +74,7 @@ pub struct FilterProperties {
     pub operator: Option<Operator>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub enum Operator {
     #[serde(rename = "==")]
     Eq,
@@ -88,6 +88,19 @@ pub enum Operator {
     Gte,
     #[serde(rename = "<=")]
     Lte,
+}
+
+impl Operator {
+    pub fn execute(&self, value1: &Value, value2: &Value) -> bool {
+        match self {
+            Operator::Eq => *value1 == *value2,
+            Operator::Neq => *value1 != *value2,
+            Operator::Gt => *value1 > *value2,
+            Operator::Lt => *value1 < *value2,
+            Operator::Gte => *value1 >= *value2,
+            Operator::Lte => *value1 <= *value2,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -414,7 +427,7 @@ impl<'a> McpTools<'a> for McpBackend {
 }
 
 pub trait FilterValues {
-    fn is_match(&self, value: &Value) -> bool;
+    fn compare(&self, value: &Value, operator: Option<Operator>) -> bool;
 }
 
 pub(super) fn _filter_items(
@@ -436,14 +449,19 @@ pub(super) fn _filter_items(
                     match item.check_property(&filter.key) {
                         Ok(v) => {
                             debug_println!("item value for key: {:?} is {:?}", filter.key, v);
-                            match filter.operator {
-                                Some(Operator::Eq) => *v == filter.value,
-                                Some(Operator::Neq) => *v != filter.value,
-                                Some(Operator::Gt) => *v > filter.value,
-                                Some(Operator::Lt) => *v < filter.value,
-                                Some(Operator::Gte) => *v >= filter.value,
-                                Some(Operator::Lte) => *v <= filter.value,
-                                None => *v == filter.value,
+                            match &filter.value {
+                                Value::Array(array) => {
+                                    array.iter().any(|value| match filter.operator {
+                                        Some(Operator::Eq) => *v == *value,
+                                        Some(Operator::Neq) => *v != *value,
+                                        Some(Operator::Gt) => *v > *value,
+                                        Some(Operator::Lt) => *v < *value,
+                                        Some(Operator::Gte) => *v >= *value,
+                                        Some(Operator::Lte) => *v <= *value,
+                                        None => *v == *value,
+                                    })
+                                }
+                                _ => *v == filter.value,
                             }
                         }
                         Err(_) => false,
