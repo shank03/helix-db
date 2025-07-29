@@ -64,5 +64,5 @@ build = ["compiler"]
 vectors = ["cosine", "embed_openai"]
 server = ["build", "compiler", "vectors"]
 full = ["build", "compiler", "vectors"]
-default = ["debug-output", "server"]
-
+dev = ["debug-output", "server"]
+default = ["server"]
