@@ -62,6 +62,13 @@ pub enum ToolArgs {
     },
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct FilterProperties {
+    pub key: String,
+    pub value: String,
+}
+
 #[tool_calls]
 trait McpTools<'a> {
     fn out_step(
@@ -114,7 +121,7 @@ trait McpTools<'a> {
         &'a self,
         txn: &'a RoTxn,
         connection: &'a MCPConnection,
-        properties: Option<Vec<(String, String)>>,
+        properties: Option<Vec<FilterProperties>>,
         filter_traversals: Option<Vec<ToolArgs>>,
     ) -> Result<Vec<TraversalVal>, GraphError>;
 
@@ -336,7 +343,7 @@ impl<'a> McpTools<'a> for McpBackend {
         &'a self,
         txn: &'a RoTxn,
         connection: &'a MCPConnection,
-        properties: Option<Vec<(String, String)>>,
+        properties: Option<Vec<FilterProperties>>,
         filter_traversals: Option<Vec<ToolArgs>>,
     ) -> Result<Vec<TraversalVal>, GraphError> {
         let db = Arc::clone(&self.db);
@@ -350,9 +357,9 @@ impl<'a> McpTools<'a> for McpBackend {
                 .iter
                 .clone()
                 .filter(move |item| {
-                    properties.iter().all(|(key, value)| {
-                        item.check_property(key.as_str())
-                            .is_ok_and(|v| *v == *value)
+                    properties.iter().all(|filter| {
+                        item.check_property(&filter.key)
+                            .is_ok_and(|v| *v == filter.value)
                     })
                 })
                 .collect::<Vec<_>>(),

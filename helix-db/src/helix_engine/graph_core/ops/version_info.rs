@@ -35,14 +35,14 @@ impl VersionInfo {
     }
 }
 
-type NodeProps = HashMap<String, Value>;
+type Props = HashMap<String, Value>;
 
 pub struct ItemInfo {
     /// The latest version of this item
     /// All writes should be done with this version
     latest: u8,
     /// Stores transition from version x and index x-1
-    transition_fns: Vec<fn(NodeProps) -> NodeProps>,
+    transition_fns: Vec<fn(Props) -> Props>,
 }
 
 impl ItemInfo {
@@ -62,13 +62,13 @@ impl ItemInfo {
 
     fn upgrade_edge_to_latest(&self, mut edge: Edge) -> Edge {
         if edge.version < self.latest
-            && let Some(mut props) = edge.properties.take()
+            && let Some(mut edge_props) = edge.properties.take()
         {
             for trans_fn in self.transition_fns.iter().skip(edge.version as usize - 1) {
-                props = trans_fn(props);
+                edge_props = trans_fn(edge_props);
             }
 
-            edge.properties = Some(props);
+            edge.properties = Some(edge_props);
         }
 
         edge
