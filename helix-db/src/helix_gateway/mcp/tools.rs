@@ -71,6 +71,23 @@ pub enum ToolArgs {
 pub struct FilterProperties {
     pub key: String,
     pub value: Value,
+    pub operator: Option<Operator>,
+}
+
+#[derive(Debug, Deserialize)]
+pub enum Operator {
+    #[serde(rename = "==")]
+    Eq,
+    #[serde(rename = "!=")]
+    Neq,
+    #[serde(rename = ">")]
+    Gt,
+    #[serde(rename = "<")]
+    Lt,
+    #[serde(rename = ">=")]
+    Gte,
+    #[serde(rename = "<=")]
+    Lte,
 }
 
 #[derive(Debug, Deserialize)]
@@ -409,7 +426,7 @@ pub(super) fn _filter_items(
     let db = Arc::clone(&db);
 
     debug_println!("properties: {:?}", filter);
-    debug_println!("filter_traversals: {:?}", filter.filter_traversals);;
+    debug_println!("filter_traversals: {:?}", filter.filter_traversals);
 
     let initial_filtered_iter = match &filter.properties {
         Some(properties) => iter
@@ -419,7 +436,15 @@ pub(super) fn _filter_items(
                     match item.check_property(&filter.key) {
                         Ok(v) => {
                             debug_println!("item value for key: {:?} is {:?}", filter.key, v);
-                            *v == filter.value
+                            match filter.operator {
+                                Some(Operator::Eq) => *v == filter.value,
+                                Some(Operator::Neq) => *v != filter.value,
+                                Some(Operator::Gt) => *v > filter.value,
+                                Some(Operator::Lt) => *v < filter.value,
+                                Some(Operator::Gte) => *v >= filter.value,
+                                Some(Operator::Lte) => *v <= filter.value,
+                                None => *v == filter.value,
+                            }
                         }
                         Err(_) => false,
                     }
