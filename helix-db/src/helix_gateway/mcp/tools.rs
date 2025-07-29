@@ -24,7 +24,7 @@ use crate::{
         embedding_providers::embedding_providers::{EmbeddingModel, get_embedding_model},
         mcp::mcp::{MCPConnection, MCPHandler, MCPHandlerSubmission, MCPToolInput, McpBackend},
     },
-    protocol::{response::Response, return_values::ReturnValue},
+    protocol::{response::Response, return_values::ReturnValue, value::Value},
     utils::label_hash::hash_label,
 };
 use heed3::RoTxn;
@@ -39,16 +39,20 @@ pub enum ToolArgs {
     OutStep {
         edge_label: String,
         edge_type: EdgeType,
+        filter: Option<FilterTraversal>,
     },
     OutEStep {
         edge_label: String,
+        filter: Option<FilterTraversal>,
     },
     InStep {
         edge_label: String,
         edge_type: EdgeType,
+        filter: Option<FilterTraversal>,
     },
     InEStep {
         edge_label: String,
+        filter: Option<FilterTraversal>,
     },
     NFromType {
         node_type: String,
@@ -66,9 +70,15 @@ pub enum ToolArgs {
 #[serde(rename_all = "snake_case")]
 pub struct FilterProperties {
     pub key: String,
-    pub value: String,
+    pub value: Value,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct FilterTraversal {
+    pub properties: Option<Vec<FilterProperties>>,
+    pub filter_traversals: Option<Vec<ToolArgs>>,
+}
 
 #[tool_calls]
 trait McpTools<'a> {
@@ -122,8 +132,7 @@ trait McpTools<'a> {
         &'a self,
         txn: &'a RoTxn,
         connection: &'a MCPConnection,
-        properties: Option<Vec<FilterProperties>>,
-        filter_traversals: Option<Vec<ToolArgs>>,
+        filter: FilterTraversal,
     ) -> Result<Vec<TraversalVal>, GraphError>;
 
     /// BM25
@@ -343,70 +352,9 @@ impl<'a> McpTools<'a> for McpBackend {
         &'a self,
         txn: &'a RoTxn,
         connection: &'a MCPConnection,
-        properties: Option<Vec<FilterProperties>>,
-        filter_traversals: Option<Vec<ToolArgs>>,
+        filter: FilterTraversal,
     ) -> Result<Vec<TraversalVal>, GraphError> {
-        let db = Arc::clone(&self.db);
-
-        debug_println!("properties: {:?}", properties);
-        debug_println!("filter_traversals: {:?}", filter_traversals);
-        debug_println!("connection: {:?}", connection.iter);
-
-        let iter = match properties {
-            Some(properties) => connection
-                .iter
-                .clone()
-                .filter(move |item| {
-                    properties.iter().all(|filter| {
-                        debug_println!("filter: {:?}", filter);
-                        match item.check_property(&filter.key) {
-                            Ok(v) => {
-                                debug_println!("item value for key: {:?} is {:?}", filter.key, v);
-                                *v == filter.value
-                            }
-                            Err(_) => false,
-                        }
-                    })
-                })
-                .collect::<Vec<_>>(),
-            None => connection.iter.clone().collect::<Vec<_>>(),
-        };
-
-        debug_println!("iter: {:?}", iter);
-
-        let result = iter
-            .clone()
-            .into_iter()
-            .map(move |item| match &filter_traversals {
-                Some(filter_traversals) => {
-                    filter_traversals.iter().all(|filter| {
-                        let result = G::new_from(Arc::clone(&db), txn, vec![item.clone()]);
-                        match filter {
-                            ToolArgs::OutStep {
-                                edge_label,
-                                edge_type,
-                            } => result.out(edge_label, edge_type).next().is_some(),
-                            ToolArgs::OutEStep { edge_label } => {
-                                result.out_e(edge_label).next().is_some()
-                            }
-                            ToolArgs::InStep {
-                                edge_label,
-                                edge_type,
-                            } => result.in_(edge_label, edge_type).next().is_some(),
-                            ToolArgs::InEStep { edge_label } => {
-                                result.in_e(edge_label).next().is_some()
-                            }
-                            _ => false,
-                        }
-                    });
-
-                    item
-                }
-                None => item,
-            })
-            .collect::<Vec<_>>();
-
-        debug_println!("result: {:?}", result);
+        let result = _filter_items(Arc::clone(&self.db), txn, connection.iter.clone(), &filter);
 
         Ok(result)
     }
@@ -446,4 +394,121 @@ impl<'a> McpTools<'a> for McpBackend {
         println!("result: {res:?}");
         Ok(res)
     }
+}
+
+pub trait FilterValues {
+    fn is_match(&self, value: &Value) -> bool;
+}
+
+pub(super) fn _filter_items(
+    db: Arc<HelixGraphStorage>,
+    txn: &RoTxn,
+    iter: impl Iterator<Item = TraversalVal>,
+    filter: &FilterTraversal,
+) -> Vec<TraversalVal> {
+    let db = Arc::clone(&db);
+
+    debug_println!("properties: {:?}", properties);
+    debug_println!("filter_traversals: {:?}", filter_traversals);
+    debug_println!("connection: {:?}", iter);
+
+    let initial_filtered_iter = match &filter.properties {
+        Some(properties) => iter
+            .filter(move |item| {
+                properties.iter().all(|filter| {
+                    debug_println!("filter: {:?}", filter);
+                    match item.check_property(&filter.key) {
+                        Ok(v) => {
+                            debug_println!("item value for key: {:?} is {:?}", filter.key, v);
+                            *v == filter.value
+                        }
+                        Err(_) => false,
+                    }
+                })
+            })
+            .collect::<Vec<_>>(),
+        None => iter.collect::<Vec<_>>(),
+    };
+
+    debug_println!("iter: {:?}", iter);
+
+    let result = initial_filtered_iter
+        .into_iter()
+        .map(move |item| match &filter.filter_traversals {
+            Some(filter_traversals) => {
+                filter_traversals.iter().all(|filter| {
+                    let result = G::new_from(Arc::clone(&db), txn, vec![item.clone()]);
+                    match filter {
+                        ToolArgs::OutStep {
+                            edge_label,
+                            edge_type,
+                            filter: filter_traversal_filter,
+                        } => match filter_traversal_filter {
+                            Some(filter_traversal_filter) => !_filter_items(
+                                Arc::clone(&db),
+                                txn,
+                                result
+                                    .out(edge_label, edge_type)
+                                    .collect_to::<Vec<_>>()
+                                    .into_iter(),
+                                filter_traversal_filter,
+                            )
+                            .is_empty(),
+                            None => result.out(edge_label, edge_type).next().is_some(),
+                        },
+                        ToolArgs::OutEStep {
+                            edge_label,
+                            filter: filter_traversal_filter,
+                        } => match filter_traversal_filter {
+                            Some(filter_traversal_filter) => !_filter_items(
+                                Arc::clone(&db),
+                                txn,
+                                result.out_e(edge_label).collect_to::<Vec<_>>().into_iter(),
+                                filter_traversal_filter,
+                            )
+                            .is_empty(),
+                            None => result.out_e(edge_label).next().is_some(),
+                        },
+                        ToolArgs::InStep {
+                            edge_label,
+                            edge_type,
+                            filter: filter_traversal_filter,
+                        } => match filter_traversal_filter {
+                            Some(filter_traversal_filter) => !_filter_items(
+                                Arc::clone(&db),
+                                txn,
+                                result
+                                    .in_(edge_label, edge_type)
+                                    .collect_to::<Vec<_>>()
+                                    .into_iter(),
+                                filter_traversal_filter,
+                            )
+                            .is_empty(),
+                            None => result.in_(edge_label, edge_type).next().is_some(),
+                        },
+                        ToolArgs::InEStep {
+                            edge_label,
+                            filter: filter_traversal_filter,
+                        } => match filter_traversal_filter {
+                            Some(filter_traversal_filter) => !_filter_items(
+                                Arc::clone(&db),
+                                txn,
+                                result.in_e(edge_label).collect_to::<Vec<_>>().into_iter(),
+                                filter_traversal_filter,
+                            )
+                            .is_empty(),
+                            None => result.in_e(edge_label).next().is_some(),
+                        },
+                        _ => false,
+                    }
+                });
+
+                item
+            }
+            None => item,
+        })
+        .collect::<Vec<_>>();
+
+    debug_println!("result: {:?}", result);
+    result
 }
