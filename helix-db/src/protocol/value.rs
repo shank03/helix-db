@@ -945,15 +945,15 @@ impl From<ID> for Value {
     }
 }
 
-// impl<'a, K> From<&'a K> for Value
-// where
-//     K: Into<Value> + Serialize + Clone,
-// {
-//     #[inline]
-//     fn from(k: &'a K) -> Self {
-//         k.clone().into()
-//     }
-// }
+impl<'a, K> From<&'a K> for Value
+where
+    K: Into<Value> + Serialize + Clone,
+{
+    #[inline]
+    fn from(k: &'a K) -> Self {
+        k.clone().into()
+    }
+}
 
 impl From<chrono::DateTime<Utc>> for Value {
     #[inline]
