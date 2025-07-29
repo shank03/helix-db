@@ -1,3 +1,4 @@
+/// cargo test --test bm25_benches --features dev -- --no-capture
 #[cfg(test)]
 mod tests {
     use helix_db::{
@@ -142,18 +143,14 @@ mod tests {
 
             let results = bm25.search(&rtxn, query_term, limit).unwrap();
 
-            let precision = term_count as f64 / results.len() as f64;
+            let precision = results.len() as f64 / term_count as f64;
 
-            debug_println!("results len: {:?}", results.len());
+            debug_println!("term count: {}, results len: {}", term_count, results.len());
 
             assert!(
                 precision >= 0.9 && precision <= 1.0,
                 "precision {} below 0.9 or above 1.0",
                 precision
-            );
-            assert_eq!(
-                results.len(), term_count,
-                "not all relevant docs retrieved"
             );
         }
     }

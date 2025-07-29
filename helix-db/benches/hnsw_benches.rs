@@ -1,27 +1,28 @@
+/// cargo test --test hnsw_benches --features dev -- --no-capture
 #[cfg(test)]
 mod tests {
-    use helix_db::helix_engine::vector_core::{
-        hnsw::HNSW,
-        vector::HVector,
-        vector_core::{HNSWConfig, VectorCore},
+    use heed3::{Env, EnvOpenOptions, RoTxn};
+    use helix_db::{
+        helix_engine::vector_core::{
+            hnsw::HNSW,
+            vector::HVector,
+            vector_core::{HNSWConfig, VectorCore},
+        },
+        utils::tqdm::tqdm,
     };
-    use heed3::{Env, EnvOpenOptions};
     use polars::prelude::*;
     use rand::prelude::SliceRandom;
     use std::{
         collections::HashSet,
-        env,
         fs::{self, File},
-        io::{BufReader, Error as IoError, Read},
+        sync::{Arc, Mutex},
+        thread,
         time::Instant,
     };
 
     fn setup_temp_env() -> Env {
         let temp_dir = tempfile::tempdir().unwrap();
         let path = temp_dir.path().to_str().unwrap();
-
-        // let home_dir = dirs::home_dir().unwrap();
-        // let path = format!("{}/dev/helix-db/helixdb_test", home_dir.to_str().unwrap());
 
         unsafe {
             EnvOpenOptions::new()
@@ -32,94 +33,134 @@ mod tests {
         }
     }
 
-    /*
-    fn get_vector_data() -> Result<(), Vec<Vec<f64>>> {
+    fn fetch_parquet_vectors() -> Result<(), Box<dyn std::error::Error>> {
+        let urls = [
+            "https://huggingface.co/datasets/KShivendu/dbpedia-entities-openai-1M/resolve/main/data/train-00002-of-00026-b05ce48965853dad.parquet",
+            "https://huggingface.co/datasets/KShivendu/dbpedia-entities-openai-1M/resolve/main/data/train-00000-of-00026-3c7b99d1c7eda36e.parquet",
+            "https://huggingface.co/datasets/KShivendu/dbpedia-entities-openai-1M/resolve/main/data/train-00003-of-00026-d116c3c239aa7895.parquet",
+        ];
+
+        for url in tqdm::new(urls.iter(), urls.len(), None, Some("fetching vectors")) {
+            let res = reqwest::blocking::get(*url).unwrap();
+            //let mut file = File::create("output_file")?;
+            let content = res.bytes()?;
+            println!("content: {:?}", content);
+            //file.write_all(&content)?;
+        }
+
+        Ok(())
     }
-    */
 
-    // fn calc_ground_truths(
-    //     vectors: Vec<HVector>,
-    //     query_vectors: Vec<(String, Vec<f64>)>,
-    //     k: usize,
-    // ) -> Vec<Vec<String>> {
-    //     query_vectors
-    //         .par_iter()
-    //         .map(|(_, query)| {
-    //             let hquery = HVector::from_slice(0, 0, query.clone());
+    fn calc_ground_truths(
+        vectors: Vec<HVector>,
+        query_vectors: Vec<(String, Vec<f64>)>,
+        k: usize,
+    ) -> Vec<Vec<String>> {
+        let vectors = Arc::new(vectors);
+        let result = Arc::new(Mutex::new(Vec::new()));
+        let chunk_size = (query_vectors.len() + num_cpus::get() - 1) / num_cpus::get();
 
-    //             let mut distances: Vec<(String, f64)> = vectors
-    //                 .iter()
-    //                 .map(|hvector| (hvector.get_id().to_string(), hvector.distance_to(&hquery)))
-    //                 .collect();
+        let handles: Vec<_> = query_vectors
+            .into_iter()
+            .collect::<Vec<_>>()
+            .chunks(chunk_size)
+            .map(|chunk| {
+                let vectors = Arc::clone(&vectors);
+                let result = Arc::clone(&result);
+                let chunk = chunk.to_vec();
 
-    //             distances.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+                thread::spawn(move || {
+                    let mut local_results: Vec<Vec<String>> = chunk
+                        .into_iter()
+                        .map(|(_, query)| {
+                            let hquery = HVector::from_slice(0, query);
+                            let mut distances: Vec<(String, f64)> = vectors
+                                .iter()
+                                .filter_map(|hvector| {
+                                    hvector
+                                        .distance_to(&hquery)
+                                        .map(|dist| (hvector.get_id().to_string(), dist))
+                                        .ok()
+                                })
+                                .collect();
 
-    //             distances.iter().take(k).map(|(id, _)| id.clone()).collect()
-    //         })
-    //         .collect()
-    // }
+                            distances.sort_by(|a, b| {
+                                a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
+                            });
+                            distances.into_iter().take(k).map(|(id, _)| id).collect()
+                        })
+                        .collect();
 
-    // fn load_dbpedia_vectors(limit: usize) -> Result<Vec<(String, Vec<f64>)>, PolarsError> {
-    //     // https://huggingface.co/datasets/KShivendu/dbpedia-entities-openai-1M
-    //     if limit > 1_000_000 {
-    //         return Err(PolarsError::OutOfBounds(
-    //             "can't load more than 1,000,000 vecs from this dataset".into(),
-    //         ));
-    //     }
+                    result.lock().unwrap().append(&mut local_results);
+                })
+            })
+            .collect();
 
-    //     let data_dir = "../data/dbpedia-openai-1m/";
-    //     let mut all_vectors = Vec::new();
-    //     let mut total_loaded = 0;
+        for handle in handles {
+            handle.join().unwrap();
+        }
 
-    //     for entry in fs::read_dir(data_dir)? {
-    //         let entry = entry?;
-    //         let path = entry.path();
+        Arc::try_unwrap(result).unwrap().into_inner().unwrap()
+    }
 
-    //         if path.is_file() && path.extension().map_or(false, |ext| ext == "parquet") {
-    //             let df = ParquetReader::new(File::open(&path)?)
-    //                 .finish()?
-    //                 .lazy()
-    //                 .limit((limit - total_loaded) as u32)
-    //                 .collect()?;
+    fn load_dbpedia_vectors(limit: usize) -> Result<Vec<(String, Vec<f64>)>, PolarsError> {
+        // https://huggingface.co/datasets/KShivendu/dbpedia-entities-openai-1M
+        if limit > 1_000_000 {
+            return Err(PolarsError::OutOfBounds(
+                "can't load more than 1,000,000 vecs from this dataset".into(),
+            ));
+        }
 
-    //             let ids = df.column("_id")?.str()?;
-    //             let embeddings = df.column("openai")?.list()?;
+        let data_dir = "../data/dbpedia-openai-1m/";
+        let mut all_vectors = Vec::new();
+        let mut total_loaded = 0;
 
-    //             for (_id, embedding) in ids.into_iter().zip(embeddings.into_iter()) {
-    //                 if total_loaded >= limit {
-    //                     break;
-    //                 }
+        for entry in fs::read_dir(data_dir)? {
+            let entry = entry?;
+            let path = entry.path();
 
-    //                 let embedding = embedding.unwrap();
-    //                 let f64_series = embedding.cast(&DataType::Float64).unwrap();
-    //                 let chunked = f64_series.f64().unwrap();
-    //                 let vector: Vec<f64> = chunked.into_no_null_iter().collect();
+            if path.is_file() && path.extension().map_or(false, |ext| ext == "parquet") {
+                let df = ParquetReader::new(File::open(&path)?)
+                    .finish()?
+                    .lazy()
+                    .limit((limit - total_loaded) as u32)
+                    .collect()?;
 
-    //                 all_vectors.push((_id.unwrap().to_string(), vector));
+                let ids = df.column("_id")?.str()?;
+                let embeddings = df.column("openai")?.list()?;
 
-    //                 total_loaded += 1;
-    //             }
+                for (_id, embedding) in ids.into_iter().zip(embeddings.into_iter()) {
+                    if total_loaded >= limit {
+                        break;
+                    }
 
-    //             if total_loaded >= limit {
-    //                 break;
-    //             }
-    //         }
-    //     }
-    //     Ok(all_vectors)
-    // }
+                    let embedding = embedding.unwrap();
+                    let f64_series = embedding.cast(&DataType::Float64).unwrap();
+                    let chunked = f64_series.f64().unwrap();
+                    let vector: Vec<f64> = chunked.into_no_null_iter().collect();
+
+                    all_vectors.push((_id.unwrap().to_string(), vector));
+
+                    total_loaded += 1;
+                }
+
+                if total_loaded >= limit {
+                    break;
+                }
+            }
+        }
+        Ok(all_vectors)
+    }
 
     /// Test the precision of the HNSW search algorithm
-    /// cargo test --release bench_hnsw_search -- --nocapture
     #[test]
-    fn bench_hnsw_search() {
-        type Filter = fn(&HVector) -> bool;
-        let n_base = 50_000;
-        //let dims = 1536;
+    fn bench_hnsw_search_long() {
+        type Filter = fn(&HVector, &RoTxn) -> bool;
+        //fetch_parquet_vectors().unwrap();
+        let n_base = 70_000;
         let vectors = load_dbpedia_vectors(n_base).unwrap();
-        // let vectors = load_ann_gist1m_vectors(n_base).unwrap();
-        println!("loaded {} vectors", vectors.len());
 
-        let n_query = 5_000; // 10-20%
+        let n_query = 8_000; // 10-20%
         let mut rng = rand::rng();
         let mut shuffled_vectors = vectors.clone();
         shuffled_vectors.shuffle(&mut rng);
@@ -138,25 +179,20 @@ mod tests {
         let index = VectorCore::new(&env, &mut txn, HNSWConfig::new(None, None, None)).unwrap();
 
         let mut all_vectors: Vec<HVector> = Vec::new();
-
         let over_all_time = Instant::now();
-        for (i, (id, data)) in vectors.iter().enumerate() {
+        for (i, (_, data)) in vectors.iter().enumerate() {
             let start_time = Instant::now();
-            let vec = index.insert::<Filter>(&mut txn, data, Some(id.parse::<u128>().unwrap())).unwrap();
-            all_vectors.push(vec);
+            let vec = index.insert::<Filter>(&mut txn, data, None).unwrap();
             let time = start_time.elapsed();
-            if i % 1000 == 0 {
-                println!(
-                    "{} => inserting in {} ms, vector: {}",
-                    i,
-                    time.as_millis(),
-                    id
-                );
+            all_vectors.push(vec);
+            //if i % 0 == 0 {
+                println!("{} => inserting in {} ms", i, time.as_millis());
                 println!("time taken so far: {:?}", over_all_time.elapsed());
-            }
+            //}
             total_insertion_time += time;
         }
         txn.commit().unwrap();
+
         let txn = env.read_txn().unwrap();
         println!("{:?}", index.config);
 
@@ -218,4 +254,3 @@ mod tests {
         assert!(total_recall >= 0.8, "recall not high enough!");
     }
 }
-

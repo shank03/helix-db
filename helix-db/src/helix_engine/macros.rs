@@ -265,5 +265,29 @@ pub mod macros {
             }
         };
     }
+
+    #[macro_export]
+    macro_rules! time_block {
+        ($($block:tt)*) => {{
+            use std::time::Instant;
+            let start_time = Instant::now();
+            $($block)*
+                let time = start_time.elapsed();
+            println!("\t=> time elapsed: {:?}", time);
+            time
+        }};
+    }
+
+    #[macro_export]
+    macro_rules! time_block_result {
+        ($($block:tt)*) => {{
+            use std::time::Instant;
+            let start_time = Instant::now();
+            let result = { $($block)* };
+            let time = start_time.elapsed();
+            println!("\t=> time elapsed: {:?}", time);
+            result
+        }};
+    }
 }
 

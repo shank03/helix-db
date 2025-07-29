@@ -1,12 +1,13 @@
-use crate::helix_engine::{
-    types::VectorError,
-    vector_core::{
-        hnsw::HNSW,
-        utils::{Candidate, HeapOps},
-        vector::HVector,
-    },
+use crate::{
+    helix_engine::{
+        types::VectorError,
+        vector_core::{
+            hnsw::HNSW,
+            utils::{Candidate, HeapOps},
+            vector::HVector,
+        },
+    }, protocol::value::Value, time_block, time_block_result
 };
-use crate::protocol::value::Value;
 use heed3::{
     Database, Env, RoTxn, RwTxn,
     types::{Bytes, Unit},
@@ -247,15 +248,18 @@ impl VectorCore {
         if should_extend {
             let mut result = BinaryHeap::with_capacity(m * cands.len());
             for candidate in cands.iter() {
-                for mut neighbor in self.get_neighbors(txn, candidate.get_id(), level, filter)? {
-                    if visited.insert(neighbor.get_id().to_string()) {
-                        // TODO: NOT TO_STRING()
-                        neighbor.set_distance(neighbor.distance_to(query)?);
-                        if filter.is_none() || filter.unwrap().iter().all(|f| f(&neighbor, txn)) {
-                            result.push(neighbor);
+                time_block! {
+                    println!("2");
+                    for mut neighbor in self.get_neighbors(txn, candidate.get_id(), level, filter)? {
+                        if visited.insert(neighbor.get_id().to_string()) {
+                            // TODO: NOT TO_STRING()
+                            neighbor.set_distance(neighbor.distance_to(query)?);
+                            if filter.is_none() || filter.unwrap().iter().all(|f| f(&neighbor, txn)) {
+                                result.push(neighbor);
+                            }
                         }
                     }
-                }
+                };
             }
             result.extend_inord(cands);
             Ok(result.take_inord(m))
@@ -464,12 +468,12 @@ impl HNSW for VectorCore {
 
         for level in (0..=l.min(new_level)).rev() {
             let nearest = self.search_level::<F>(
-                txn,
-                &query,
-                &mut curr_ep,
-                self.config.ef_construct,
-                level,
-                None,
+                    txn,
+                    &query,
+                    &mut curr_ep,
+                    self.config.ef_construct,
+                    level,
+                    None,
             )?;
 
             curr_ep = nearest.peek().unwrap().clone();
@@ -481,12 +485,14 @@ impl HNSW for VectorCore {
             for e in neighbors {
                 let id = e.get_id();
                 let e_conns = self.get_neighbors::<F>(txn, id, level, None)?;
-                {
-                    let e_conns = BinaryHeap::from(e_conns);
-                    let e_new_conn =
-                        self.select_neighbors::<F>(txn, &query, e_conns, level, true, None)?;
+
+                let e_conns = BinaryHeap::from(e_conns);
+                let e_new_conn =
+                    time_block_result! {
+                        println!("1"); // ----------
+                        self.select_neighbors::<F>(txn, &query, e_conns, level, true, None)?
+                    };
                     self.set_neighbours(txn, id, &e_new_conn, level)?;
-                }
             }
         }
 
