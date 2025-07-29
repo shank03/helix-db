@@ -466,7 +466,7 @@ pub(super) fn _filter_items(
                             //         None => v.compare(&filter.value, None),
                             //     },
                             // }
-                            v.compare(&filter.value, filter.operator)
+                            v.compare(&filter.value, filter.operator.clone())
                         }
                         Err(_) => false,
                     }
