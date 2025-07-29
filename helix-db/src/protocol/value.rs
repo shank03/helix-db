@@ -986,6 +986,7 @@ impl From<Value> for GenRef<String> {
 }
 
 impl FilterValues for Value {
+    #[inline]
     fn compare(&self, value: &Value, operator: Option<Operator>) -> bool {
         debug_println!("comparing value1: {:?}, value2: {:?}", self, value);
         let comparison = match (self, value) {
