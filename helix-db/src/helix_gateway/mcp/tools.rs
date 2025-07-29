@@ -450,22 +450,6 @@ pub(super) fn _filter_items(
                     match item.check_property(&filter.key) {
                         Ok(v) => {
                             debug_println!("item value for key: {:?} is {:?}", filter.key, v);
-                            // match &filter.value {
-                            //     // Value::Array(array) => {
-                            //     //     debug_println!("array: {:?}", array);
-                            //     //     array.iter().any(|value| {
-                            //     //         debug_println!("value in array: {:?}", value);
-                            //     //         match &filter.operator {
-                            //     //             Some(op) => op.execute(&v, value),
-                            //     //             None => v.compare(value, None),
-                            //     //         }
-                            //     //     })
-                            //     // }
-                            //     _ => match &filter.operator {
-                            //         Some(op) => op.execute(&v, &filter.value),
-                            //         None => v.compare(&filter.value, None),
-                            //     },
-                            // }
                             v.compare(&filter.value, filter.operator.clone())
                         }
                         Err(_) => false,
