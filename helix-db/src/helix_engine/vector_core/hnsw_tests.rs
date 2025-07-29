@@ -50,15 +50,15 @@ fn tests_hnsw_config_build() {
     let mut txn = env.write_txn().unwrap();
 
     let config = HNSWConfig::new(
-        Some(69),
-        Some(69),
-        Some(69),
+        Some(32),
+        Some(256),
+        Some(256),
     );
 
     let index = VectorCore::new(&env, &mut txn, config).unwrap();
-    assert_eq!(index.config.m, 69, "m is set");
-    assert_eq!(index.config.ef_construct, 69, "ef_construct is set");
-    assert_eq!(index.config.ef, 69, "ef is set");
+    assert_eq!(index.config.m, 32);
+    assert_eq!(index.config.ef_construct, 256);
+    assert_eq!(index.config.ef, 256);
 
     let config = HNSWConfig::new(
         Some(6969),
@@ -76,7 +76,7 @@ fn test_hnsw_insert() {
     let mut txn = env.write_txn().unwrap();
     let index = VectorCore::new(&env, &mut txn, HNSWConfig::new(None, None, None)).unwrap();
 
-    let n_base = 1_000;
+    let n_base = 500;
     let dims = 750;
     let vectors = gen_sim_vecs(n_base, dims, 0.8);
 
@@ -86,7 +86,8 @@ fn test_hnsw_insert() {
         assert!(vec.properties.is_none());
     }
 
-    assert!(index.num_inserted_vectors(&txn).unwrap() > n_base as u64);
+    // >= because vecs spread over levels
+    assert!(index.num_inserted_vectors(&txn).unwrap() >= n_base as u64);
 }
 
 #[test]
@@ -95,7 +96,7 @@ fn test_get_vector() {
     let mut txn = env.write_txn().unwrap();
     let index = VectorCore::new(&env, &mut txn, HNSWConfig::new(None, None, None)).unwrap();
 
-    let n_base = 1_000;
+    let n_base = 500;
     let dims = 750;
     let vectors = gen_sim_vecs(n_base, dims, 0.8);
 

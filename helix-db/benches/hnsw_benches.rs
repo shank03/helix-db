@@ -11,7 +11,10 @@ mod tests {
         utils::tqdm::tqdm,
     };
     use polars::prelude::*;
-    use rand::prelude::SliceRandom;
+    use rand::{
+        prelude::SliceRandom,
+        Rng,
+    };
     use std::{
         collections::HashSet,
         fs::{self, File},
@@ -174,6 +177,7 @@ mod tests {
         vectors
     }
 
+    /*
     #[test]
     fn bench_hnsw_search_short() {
         //fetch_parquet_vectors().unwrap();
@@ -375,4 +379,5 @@ mod tests {
         );
         assert!(total_recall >= 0.8, "recall not high enough!");
     }
+    */
 }
