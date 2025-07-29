@@ -1,3 +1,4 @@
+use crate::debug_println;
 use crate::helix_gateway::mcp::tools::{FilterValues, Operator};
 use crate::protocol::date::Date;
 use crate::utils::id::ID;
@@ -986,6 +987,7 @@ impl From<Value> for GenRef<String> {
 
 impl FilterValues for Value {
     fn compare(&self, value: &Value, operator: Option<Operator>) -> bool {
+        debug_println!("comparing value1: {:?}, value2: {:?}", self, value);
         match (self, value) {
             (Value::Array(a1), Value::Array(a2)) => a1.iter().any(|a1_item| {
                 a2.iter()
@@ -998,7 +1000,6 @@ impl FilterValues for Value {
                 Some(op) => op.execute(value1, value2),
                 None => value1 == value2,
             },
-            _ => false,
         }
     }
 }

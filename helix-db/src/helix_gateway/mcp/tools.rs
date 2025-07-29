@@ -92,6 +92,7 @@ pub enum Operator {
 
 impl Operator {
     pub fn execute(&self, value1: &Value, value2: &Value) -> bool {
+        debug_println!("operating on value1: {:?}, value2: {:?}", value1, value2);
         match self {
             Operator::Eq => *value1 == *value2,
             Operator::Neq => *value1 != *value2,
@@ -451,17 +452,19 @@ pub(super) fn _filter_items(
                             debug_println!("item value for key: {:?} is {:?}", filter.key, v);
                             match &filter.value {
                                 Value::Array(array) => {
-                                    array.iter().any(|value| match filter.operator {
-                                        Some(Operator::Eq) => *v == *value,
-                                        Some(Operator::Neq) => *v != *value,
-                                        Some(Operator::Gt) => *v > *value,
-                                        Some(Operator::Lt) => *v < *value,
-                                        Some(Operator::Gte) => *v >= *value,
-                                        Some(Operator::Lte) => *v <= *value,
-                                        None => *v == *value,
+                                    debug_println!("array: {:?}", array);
+                                    array.iter().any(|value| {
+                                        debug_println!("value in array: {:?}", value);
+                                        match &filter.operator {
+                                            Some(op) => op.execute(&v, value),
+                                            None => v.compare(value, None),
+                                        }
                                     })
                                 }
-                                _ => *v == filter.value,
+                                _ => match &filter.operator {
+                                    Some(op) => op.execute(&v, &filter.value),
+                                    None => v.compare(&filter.value, None),
+                                },
                             }
                         }
                         Err(_) => false,
