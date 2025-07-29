@@ -412,6 +412,8 @@ impl<'a> McpTools<'a> for McpBackend {
             .search_bm25("mcp search", &query, limit)?
             .collect_to::<Vec<_>>();
 
+        debug_println!("result: {res:?}");
+
         Ok(results)
     }
 
@@ -431,7 +433,8 @@ impl<'a> McpTools<'a> for McpBackend {
             .search_v::<fn(&HVector, &RoTxn) -> bool, _>(&embedding, 5, None)
             .collect_to::<Vec<_>>();
 
-        println!("result: {res:?}");
+        debug_println!("result: {res:?}");
         Ok(res)
     }
 }
+

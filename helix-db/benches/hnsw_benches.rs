@@ -1,4 +1,4 @@
-/// cargo test --test hnsw_benches --features dev -- --no-capture
+/// cargo test --test hnsw_benches --release -- --no-capture
 #[cfg(test)]
 mod tests {
     use heed3::{Env, EnvOpenOptions, RoTxn};
@@ -283,7 +283,6 @@ mod tests {
     /// Test the precision of the HNSW search algorithm
     #[test]
     fn bench_hnsw_search_long() {
-        //fetch_parquet_vectors().unwrap();
         let n_base = 70_000;
         let vectors = load_dbpedia_vectors(n_base).unwrap();
 
@@ -309,7 +308,7 @@ mod tests {
         let over_all_time = Instant::now();
         for (i, (_, data)) in vectors.iter().enumerate() {
             let start_time = Instant::now();
-            let vec = index.insert::<Filter>(&mut txn, data, None).unwrap();
+            let vec = index.insert::<Filter>(&mut txn, &data, None).unwrap();
             let time = start_time.elapsed();
             all_vectors.push(vec);
             //if i % 1000 == 0 {

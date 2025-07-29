@@ -60,7 +60,7 @@ impl HNSWConfig {
 pub struct VectorCore {
     pub vectors_db: Database<Bytes, Bytes>,
     pub vector_data_db: Database<Bytes, Bytes>,
-    pub out_edges_db: Database<Bytes, Unit>,
+    pub edges_db: Database<Bytes, Unit>,
     pub config: HNSWConfig,
 }
 
@@ -68,12 +68,12 @@ impl VectorCore {
     pub fn new(env: &Env, txn: &mut RwTxn, config: HNSWConfig) -> Result<Self, VectorError> {
         let vectors_db = env.create_database(txn, Some(DB_VECTORS))?;
         let vector_data_db = env.create_database(txn, Some(DB_VECTOR_DATA))?;
-        let out_edges_db = env.create_database(txn, Some(DB_HNSW_OUT_EDGES))?;
+        let edges_db = env.create_database(txn, Some(DB_HNSW_OUT_EDGES))?;
 
         Ok(Self {
             vectors_db,
             vector_data_db,
-            out_edges_db,
+            edges_db,
             config,
         })
     }
@@ -166,7 +166,7 @@ impl VectorCore {
         let mut neighbors = Vec::with_capacity(self.config.m_max_0.min(512)); // TODO: why 512?
 
         let iter = self
-            .out_edges_db
+            .edges_db
             .lazily_decode_data()
             .prefix_iter(txn, &out_key)?;
 
@@ -205,7 +205,7 @@ impl VectorCore {
         let prefix = Self::out_edges_key(id, level, None);
 
         let mut keys_to_delete: HashSet<Vec<u8>> = self
-            .out_edges_db
+            .edges_db
             .prefix_iter(txn, prefix.as_ref())?
             .filter_map(|result| result.ok().map(|(key, _)| key.to_vec()))
             .collect();
@@ -219,17 +219,17 @@ impl VectorCore {
                 }
                 let out_key = Self::out_edges_key(id, level, Some(neighbor_id));
                 keys_to_delete.remove(&out_key);
-                self.out_edges_db.put(txn, &out_key, &())?;
+                self.edges_db.put(txn, &out_key, &())?;
 
                 let in_key = Self::out_edges_key(neighbor_id, level, Some(id));
                 keys_to_delete.remove(&in_key);
-                self.out_edges_db.put(txn, &in_key, &())?;
+                self.edges_db.put(txn, &in_key, &())?;
 
                 Ok(())
             })?;
 
         for key in keys_to_delete {
-            self.out_edges_db.delete(txn, &key)?;
+            self.edges_db.delete(txn, &key)?;
         }
 
         Ok(())
@@ -257,9 +257,9 @@ impl VectorCore {
             return Ok(cands.take_inord(m));
         }
 
-        let estimated_unique_neighbors = (cands.len() * self.config.m).min(m * 3);
-        // TODO: TEST THIS BEFORE PUSHING (PRECISION)
-        let mut visited: HashSet<u128> = HashSet::with_capacity(estimated_unique_neighbors);
+        //let est_unique_neighbors = (cands.len() * self.config.m).min(m * 3);
+        //let mut visited: HashSet<u128> = HashSet::with_capacity(estimated_unique_neighbors);
+        let mut visited: HashSet<u128> = HashSet::new();
         let mut result = BinaryHeap::with_capacity(m * cands.len());
         for candidate in cands.iter() {
             for mut neighbor in self.get_neighbors(txn, candidate.get_id(), level, filter)? {
@@ -483,11 +483,9 @@ impl HNSW for VectorCore {
                 level,
                 None,
             )?;
-
             curr_ep = nearest.peek().unwrap().clone();
 
             let neighbors = self.select_neighbors::<F>(txn, &query, nearest, level, true, None)?;
-
             self.set_neighbours(txn, query.get_id(), &neighbors, level)?;
 
             for e in neighbors {
@@ -500,15 +498,13 @@ impl HNSW for VectorCore {
                         self.config.m
                     }
                 {
-                    let e_new_conn = time_block_result! {
-                        let ordered_conns = BinaryHeap::from(e_conns);
-                        println!("select_neighbors");
-                        self.select_neighbors::<F>(txn, &query, ordered_conns, level, true, None)?
-                    };
-                    time_block! {
-                        println!("set_neighbors");
-                        self.set_neighbours(txn, id, &e_new_conn, level)?;
-                    };
+                    let e_conns = BinaryHeap::from(e_conns);
+                    let e_new_conn =
+                        time_block_result! {
+                            println!("select_neighbors");
+                            self.select_neighbors::<F>(txn, &query, e_conns, level, true, None)?
+                        };
+                    self.set_neighbours(txn, id, &e_new_conn, level)?;
                 }
             }
         }
