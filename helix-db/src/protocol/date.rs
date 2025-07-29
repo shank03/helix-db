@@ -8,12 +8,12 @@ use core::fmt;
 use std::ops::Deref;
 
 use chrono::{DateTime, NaiveDate, Utc};
-use serde::{de::Visitor, Deserializer};
+use serde::{de::Visitor, Deserializer, Serialize};
 use sonic_rs::Deserialize;
 
 use super::value::Value;
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize)]
 #[repr(transparent)]
 pub struct Date(DateTime<Utc>);
 impl Date {
