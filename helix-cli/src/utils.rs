@@ -7,7 +7,7 @@ use helix_db::{
     helix_engine::graph_core::config::Config,
     helixc::{
         analyzer::analyzer::analyze,
-        generator::{generator_types::Source as GeneratedSource, tsdisplay::ToTypeScript},
+        generator::{Source as GeneratedSource, tsdisplay::ToTypeScript},
         parser::helix_parser::{Content, HelixParser, HxFile, Source},
     },
     utils::styled_string::StyledString,

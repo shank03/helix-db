@@ -3,7 +3,6 @@ schema::1 {
         name: String,
         age: I32,
         bio: String,
-        other_bio: String,
     }
 
     E::Knows {
