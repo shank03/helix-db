@@ -358,8 +358,14 @@ impl<'a> McpTools<'a> for McpBackend {
                 .clone()
                 .filter(move |item| {
                     properties.iter().all(|filter| {
-                        item.check_property(&filter.key)
-                            .is_ok_and(|v| *v == filter.value)
+                        debug_println!("filter: {:?}", filter);
+                        match item.check_property(&filter.key) {
+                            Ok(v) => {
+                                debug_println!("item value for key: {:?} is {:?}", filter.key, v);
+                                *v == filter.value
+                            }
+                            Err(_) => false,
+                        }
                     })
                 })
                 .collect::<Vec<_>>(),
@@ -373,7 +379,7 @@ impl<'a> McpTools<'a> for McpBackend {
             .into_iter()
             .map(move |item| match &filter_traversals {
                 Some(filter_traversals) => {
-                    filter_traversals.iter().any(|filter| {
+                    filter_traversals.iter().all(|filter| {
                         let result = G::new_from(Arc::clone(&db), txn, vec![item.clone()]);
                         match filter {
                             ToolArgs::OutStep {
