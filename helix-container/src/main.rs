@@ -19,7 +19,7 @@ fn main() {
 
     match env_res {
         Ok(_) => info!("Loaded .env file"),
-        Err(e) => info!(?e, "Didn't load .enf file"),
+        Err(e) => info!(?e, "Didn't load .env file"),
     }
 
     let config = queries::config().unwrap_or_default();
