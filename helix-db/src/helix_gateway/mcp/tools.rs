@@ -107,7 +107,7 @@ impl Operator {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct FilterTraversal {
-    pub properties: Option<Vec<FilterProperties>>,
+    pub properties: Option<Vec<Vec<FilterProperties>>>,
     pub filter_traversals: Option<Vec<ToolArgs>>,
 }
 
@@ -484,15 +484,17 @@ pub(super) fn _filter_items(
     let initial_filtered_iter = match &filter.properties {
         Some(properties) => iter
             .filter(move |item| {
-                properties.iter().all(|filter| {
-                    debug_println!("filter: {:?}", filter);
-                    match item.check_property(&filter.key) {
-                        Ok(v) => {
-                            debug_println!("item value for key: {:?} is {:?}", filter.key, v);
-                            v.compare(&filter.value, filter.operator.clone())
+                properties.iter().any( |filters| {
+                    filters.iter().all(|filter| {
+                        debug_println!("filter: {:?}", filter);
+                        match item.check_property(&filter.key) {
+                            Ok(v) => {
+                                debug_println!("item value for key: {:?} is {:?}", filter.key, v);
+                                v.compare(&filter.value, filter.operator.clone())
+                            }
+                            Err(_) => false,
                         }
-                        Err(_) => false,
-                    }
+                    })
                 })
             })
             .collect::<Vec<_>>(),
