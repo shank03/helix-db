@@ -1,28 +1,24 @@
-use crate::{
-    helix_engine::{
-        types::VectorError,
-        vector_core::{
-            hnsw::HNSW,
-            utils::{Candidate, HeapOps},
-            vector::HVector,
-        },
+use crate::helix_engine::{
+    types::VectorError,
+    vector_core::{
+        hnsw::HNSW, vector::HVector,
+        utils::{Candidate, HeapOps}
     },
-    protocol::value::Value,
-    time_block, time_block_result,
 };
+use crate::protocol::value::Value;
 use heed3::{
-    Database, Env, RoTxn, RwTxn,
     types::{Bytes, Unit},
+    Database, Env, RoTxn, RwTxn,
 };
 use itertools::Itertools;
 use rand::prelude::Rng;
 use serde::{Deserialize, Serialize};
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::{BinaryHeap, HashSet, HashMap};
 
 const DB_VECTORS: &str = "vectors"; // for vector data (v:)
 const DB_VECTOR_DATA: &str = "vector_data"; // for vector data (v:)
 
-const DB_HNSW_OUT_EDGES: &str = "hnsw_out_nodes"; // for hnsw out node data
+const DB_HNSW_EDGES: &str = "hnsw_out_nodes"; // for hnsw out node data
 const VECTOR_PREFIX: &[u8] = b"v:";
 const ENTRY_POINT_KEY: &str = "entry_point";
 
@@ -68,7 +64,7 @@ impl VectorCore {
     pub fn new(env: &Env, txn: &mut RwTxn, config: HNSWConfig) -> Result<Self, VectorError> {
         let vectors_db = env.create_database(txn, Some(DB_VECTORS))?;
         let vector_data_db = env.create_database(txn, Some(DB_VECTOR_DATA))?;
-        let edges_db = env.create_database(txn, Some(DB_HNSW_OUT_EDGES))?;
+        let edges_db = env.create_database(txn, Some(DB_HNSW_EDGES))?;
 
         Ok(Self {
             vectors_db,
@@ -108,7 +104,6 @@ impl VectorCore {
         // Should instead using an atomic mutable seed and the XOR shift algorithm
         let mut rng = rand::rng();
         let r: f64 = rng.random::<f64>();
-
         (-r.ln() * self.config.m_l).floor() as usize
     }
 
@@ -121,7 +116,7 @@ impl VectorCore {
             arr[..len].copy_from_slice(&ep_id[..len]);
 
             let ep = self
-                .get_vector(txn, u128::from_be_bytes(arr), 0, false)
+                .get_vector(txn, u128::from_be_bytes(arr), 0, true)
                 .map_err(|_| VectorError::EntryPointNotFound)?;
             Ok(ep)
         } else {
@@ -172,19 +167,20 @@ impl VectorCore {
 
         let prefix_len = out_key.len();
 
-        for result in iter.flatten() {
-            let (key, _) = result;
-            // TODO: fix here because not working at all
-            let mut arr = [0u8; 16];
-            let len = std::cmp::min(key.len(), 16);
-            arr[..len].copy_from_slice(&key[prefix_len..(prefix_len + len)]);
-            let neighbor_id = u128::from_be_bytes(arr);
+        for result in iter {
+            if let Ok((key, _)) = result {
+                // TODO: fix here because not working at all
+                let mut arr = [0u8; 16];
+                let len = std::cmp::min(key.len(), 16);
+                arr[..len].copy_from_slice(&key[prefix_len..(prefix_len + len)]);
+                let neighbor_id = u128::from_be_bytes(arr);
 
-            if neighbor_id != id {
-                if let Ok(vector) = self.get_vector(txn, neighbor_id, level, false) {
-                    // TODO: look at implementing a macro that actually just runs each function rather than iterating through
-                    if filter.is_none() || filter.unwrap().iter().all(|f| f(&vector, txn)) {
-                        neighbors.push(vector);
+                if neighbor_id != id {
+                    if let Ok(vector) = self.get_vector(txn, neighbor_id, level, true) {
+                        // TODO: look at implementing a macro that actually just runs each function rather than iterating through
+                        if filter.is_none() || filter.unwrap().iter().all(|f| f(&vector, txn)) {
+                            neighbors.push(vector);
+                        }
                     }
                 }
             }
@@ -248,33 +244,30 @@ impl VectorCore {
         F: Fn(&HVector, &RoTxn) -> bool,
     {
         let m: usize = if level == 0 {
-            self.config.m_max_0
-        } else {
             self.config.m
+        } else {
+            self.config.m_max_0
         };
 
-        if !should_extend {
-            return Ok(cands.take_inord(m));
-        }
-
-        //let est_unique_neighbors = (cands.len() * self.config.m).min(m * 3);
-        //let mut visited: HashSet<u128> = HashSet::with_capacity(estimated_unique_neighbors);
-        let mut visited: HashSet<u128> = HashSet::new();
-        let mut result = BinaryHeap::with_capacity(m * cands.len());
-        for candidate in cands.iter() {
-            for mut neighbor in self.get_neighbors(txn, candidate.get_id(), level, filter)? {
-                if !visited.insert(neighbor.get_id()) {
-                    continue;
-                }
-
-                neighbor.set_distance(neighbor.distance_to(query)?);
-                if filter.is_none() || filter.unwrap().iter().all(|f| f(&neighbor, txn)) {
-                    result.push(neighbor);
+        let mut visited: HashSet<String> = HashSet::new();
+        if should_extend {
+            let mut result = BinaryHeap::with_capacity(m * cands.len());
+            for candidate in cands.iter() {
+                for mut neighbor in self.get_neighbors(txn, candidate.get_id(), level, filter)? {
+                    if visited.insert(neighbor.get_id().to_string()) {
+                        // TODO: NOT TO_STRING()
+                        neighbor.set_distance(neighbor.distance_to(query)?);
+                        if filter.is_none() || filter.unwrap().iter().all(|f| f(&neighbor, txn)) {
+                            result.push(neighbor);
+                        }
+                    }
                 }
             }
+            result.extend_inord(cands);
+            Ok(result.take_inord(m))
+        } else {
+            Ok(cands.take_inord(m))
         }
-        result.extend_inord(cands);
-        Ok(result.take_inord(m))
     }
 
     fn search_level<'a, F>(
@@ -305,7 +298,7 @@ impl VectorCore {
             if results.len() >= ef
                 && results
                     .get_max()
-                    .is_some_and(|f| curr_cand.distance > f.get_distance())
+                    .map_or(false, |f| curr_cand.distance > f.get_distance())
             {
                 break;
             }
@@ -321,7 +314,7 @@ impl VectorCore {
                 .filter(|neighbor| visited.insert(neighbor.get_id()))
                 .filter_map(|mut neighbor| {
                     let distance = neighbor.distance_to(query).ok()?;
-                    if max_distance.is_none_or(|max| distance < max) {
+                    if max_distance.map_or(true, |max| distance < max) {
                         neighbor.set_distance(distance);
                         Some((neighbor, distance))
                     } else {
@@ -359,15 +352,11 @@ impl HNSW for VectorCore {
         let key = Self::vector_key(id, level);
         let vector = match self.vectors_db.get(txn, key.as_ref())? {
             Some(bytes) => {
-                let mut vector = HVector::from_bytes(id, level, bytes)?;
-                if with_data {
-                    vector.properties = match self.vector_data_db.get(txn, &id.to_be_bytes())? {
-                        Some(bytes) => {
-                            Some(bincode::deserialize(bytes).map_err(VectorError::from)?)
-                        }
-                        None => None,
-                    };
-                }
+                let vector = if with_data {
+                    HVector::from_bytes(id, level, &bytes)
+                } else {
+                    Ok(HVector::from_slice(level, vec![]))
+                }?;
                 Ok(vector)
             }
             None if level > 0 => self.get_vector(txn, id, 0, with_data),
@@ -431,7 +420,7 @@ impl HNSW for VectorCore {
                 .vector_data_db
                 .get(txn, &result.get_id().to_be_bytes())?
             {
-                Some(bytes) => Some(bincode::deserialize(bytes).map_err(VectorError::from)?),
+                Some(bytes) => Some(bincode::deserialize(&bytes).map_err(VectorError::from)?),
                 None => None, // Maybe should be an error?
             };
         }
@@ -463,7 +452,8 @@ impl HNSW for VectorCore {
             Err(_) => {
                 self.set_entry_point(txn, &query)?;
                 query.set_distance(0.0);
-                query.clone()
+                //query.clone()
+                return Ok(query);
             }
         };
 
@@ -491,19 +481,10 @@ impl HNSW for VectorCore {
             for e in neighbors {
                 let id = e.get_id();
                 let e_conns = self.get_neighbors::<F>(txn, id, level, None)?;
-                if e_conns.len()
-                    > if level == 0 {
-                        self.config.m_max_0
-                    } else {
-                        self.config.m
-                    }
                 {
                     let e_conns = BinaryHeap::from(e_conns);
                     let e_new_conn =
-                        time_block_result! {
-                            println!("select_neighbors");
-                            self.select_neighbors::<F>(txn, &query, e_conns, level, true, None)?
-                        };
+                        self.select_neighbors::<F>(txn, &query, e_conns, level, true, None)?;
                     self.set_neighbours(txn, id, &e_new_conn, level)?;
                 }
             }
@@ -541,7 +522,7 @@ impl HNSW for VectorCore {
             println!("properties: {properties:?}");
             self.vector_data_db
                 .put(txn, &id.to_be_bytes(), &bincode::serialize(&properties)?)?;
-        }
+            }
         Ok(())
     }
 
@@ -555,9 +536,10 @@ impl HNSW for VectorCore {
             .map(|result| {
                 result
                     .map_err(VectorError::from)
-                    .and_then(|(_, value)| bincode::deserialize(value).map_err(VectorError::from))
+                    .and_then(|(_, value)| bincode::deserialize(&value).map_err(VectorError::from))
             })
-            .filter_ok(|vector: &HVector| level.is_none_or(|l| vector.level == l))
+            .filter_ok(|vector: &HVector| level.map_or(true, |l| vector.level == l))
             .collect()
     }
 }
+

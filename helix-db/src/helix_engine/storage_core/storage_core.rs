@@ -11,9 +11,7 @@ use crate::{
             vector_core::{HNSWConfig, VectorCore},
         },
     },
-    protocol::value::Value,
     utils::{
-        filterable::Filterable,
         items::{Edge, Node},
         label_hash::hash_label,
     },

@@ -16,7 +16,7 @@ mod tests {
         Rng,
     };
     use std::{
-        collections::HashSet,
+        collections::{HashSet, HashMap},
         fs::{self, File},
         sync::{Arc, Mutex},
         thread,
@@ -56,59 +56,66 @@ mod tests {
         Ok(())
     }
 
+    /// Returns query ids and their associated closest k vectors (by vec id)
     fn calc_ground_truths(
-        vectors: Vec<HVector>,
-        query_vectors: Vec<(String, Vec<f64>)>,
+        base_vectors: Vec<HVector>,
+        query_vectors: &Vec<(usize, Vec<f64>)>,
         k: usize,
-    ) -> Vec<Vec<String>> {
-        let vectors = Arc::new(vectors);
-        let result = Arc::new(Mutex::new(Vec::new()));
+    ) -> HashMap<usize, Vec<u128>> {
+        let base_vectors = Arc::new(base_vectors);
+        let results = Arc::new(Mutex::new(HashMap::new()));
         let chunk_size = (query_vectors.len() + num_cpus::get() - 1) / num_cpus::get();
 
         let handles: Vec<_> = query_vectors
-            .into_iter()
-            .collect::<Vec<_>>()
             .chunks(chunk_size)
             .map(|chunk| {
-                let vectors = Arc::clone(&vectors);
-                let result = Arc::clone(&result);
+                let base_vectors = Arc::clone(&base_vectors);
+                let results = Arc::clone(&results);
                 let chunk = chunk.to_vec();
 
                 thread::spawn(move || {
-                    let mut local_results: Vec<Vec<String>> = chunk
+                    let local_results: HashMap<usize, Vec<u128>> = chunk
                         .into_iter()
-                        .map(|(_, query)| {
-                            let hquery = HVector::from_slice(0, query);
-                            let mut distances: Vec<(String, f64)> = vectors
+                        .map(|(query_id, query_vec)| {
+                            let query_hvector = HVector::from_slice(0, query_vec);
+
+                            let mut distances: Vec<(u128, f64)> = base_vectors
                                 .iter()
-                                .filter_map(|hvector| {
-                                    hvector
-                                        .distance_to(&hquery)
-                                        .map(|dist| (hvector.get_id().to_string(), dist))
+                                .filter_map(|base_vec| {
+                                    query_hvector
+                                        .distance_to(base_vec)
+                                        .map(|dist| (base_vec.id.clone(), dist))
                                         .ok()
                                 })
-                                .collect();
+                            .collect();
 
                             distances.sort_by(|a, b| {
                                 a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
                             });
-                            distances.into_iter().take(k).map(|(id, _)| id).collect()
-                        })
-                        .collect();
 
-                    result.lock().unwrap().append(&mut local_results);
+                            let top_k_ids: Vec<u128> = distances
+                                .into_iter()
+                                .take(k)
+                                .map(|(id, _)| id)
+                                .collect();
+
+                            (query_id, top_k_ids)
+                        })
+                    .collect();
+
+                    results.lock().unwrap().extend(local_results);
                 })
             })
-            .collect();
+        .collect();
 
         for handle in handles {
             handle.join().unwrap();
         }
 
-        Arc::try_unwrap(result).unwrap().into_inner().unwrap()
+        Arc::try_unwrap(results).unwrap().into_inner().unwrap()
     }
 
-    fn load_dbpedia_vectors(limit: usize) -> Result<Vec<(String, Vec<f64>)>, PolarsError> {
+    fn load_dbpedia_vectors(limit: usize) -> Result<Vec<Vec<f64>>, PolarsError> {
         // https://huggingface.co/datasets/KShivendu/dbpedia-entities-openai-1M
         if limit > 1_000_000 {
             return Err(PolarsError::OutOfBounds(
@@ -131,10 +138,9 @@ mod tests {
                     .limit((limit - total_loaded) as u32)
                     .collect()?;
 
-                let ids = df.column("_id")?.str()?;
                 let embeddings = df.column("openai")?.list()?;
 
-                for (_id, embedding) in ids.into_iter().zip(embeddings.into_iter()) {
+                for embedding in embeddings.into_iter() {
                     if total_loaded >= limit {
                         break;
                     }
@@ -144,7 +150,7 @@ mod tests {
                     let chunked = f64_series.f64().unwrap();
                     let vector: Vec<f64> = chunked.into_no_null_iter().collect();
 
-                    all_vectors.push((_id.unwrap().to_string(), vector));
+                    all_vectors.push(vector);
 
                     total_loaded += 1;
                 }
@@ -283,38 +289,42 @@ mod tests {
     /// Test the precision of the HNSW search algorithm
     #[test]
     fn bench_hnsw_search_long() {
-        let n_base = 70_000;
-        let vectors = load_dbpedia_vectors(n_base).unwrap();
-
+        let n_base = 50_000;
         let n_query = 8_000; // 10-20%
+        let k = 10;
+        let mut vectors = load_dbpedia_vectors(n_base).unwrap();
+
         let mut rng = rand::rng();
-        let mut shuffled_vectors = vectors.clone();
-        shuffled_vectors.shuffle(&mut rng);
-        let base_vectors = &shuffled_vectors[..n_base - n_query];
-        let query_vectors = &shuffled_vectors[n_base - n_query..];
+        vectors.shuffle(&mut rng);
+
+        let base_vectors = &vectors[..n_base - n_query];
+        let query_vectors = vectors[n_base - n_query..]
+            .to_vec()
+            .iter()
+            .enumerate()
+            .map(|(i, x)| (i + 1, x.clone()))
+            .collect::<Vec<(usize, Vec<f64>)>>();
 
         println!("num of base vecs: {}", base_vectors.len());
         println!("num of query vecs: {}", query_vectors.len());
 
-        let k = 10;
-
         let env = setup_temp_env();
         let mut txn = env.write_txn().unwrap();
-
-        let mut total_insertion_time = std::time::Duration::from_secs(0);
         let index = VectorCore::new(&env, &mut txn, HNSWConfig::new(None, None, None)).unwrap();
+        let mut total_insertion_time = std::time::Duration::from_secs(0);
 
-        let mut all_vectors: Vec<HVector> = Vec::new();
+        let mut base_all_vectors: Vec<HVector> = Vec::new();
         let over_all_time = Instant::now();
-        for (i, (_, data)) in vectors.iter().enumerate() {
+        for (i, data) in base_vectors.iter().enumerate() {
             let start_time = Instant::now();
             let vec = index.insert::<Filter>(&mut txn, &data, None).unwrap();
             let time = start_time.elapsed();
-            all_vectors.push(vec);
-            //if i % 1000 == 0 {
+            base_all_vectors.push(vec);
+            //println!("{} => inserting in {} ms", i, time.as_millis());
+            if i % 500 == 0 {
                 println!("{} => inserting in {} ms", i, time.as_millis());
                 println!("time taken so far: {:?}", over_all_time.elapsed());
-            //}
+            }
             total_insertion_time += time;
         }
         txn.commit().unwrap();
@@ -331,8 +341,8 @@ mod tests {
             total_insertion_time.as_millis() as f64 / n_base as f64
         );
 
+        let ground_truths = calc_ground_truths(base_all_vectors, &query_vectors, k);
         println!("calculating ground truths");
-        let ground_truths = calc_ground_truths(all_vectors, query_vectors.to_vec(), k);
 
         println!("searching and comparing...");
         let test_id = format!("k = {} with {} queries", k, n_query);
@@ -340,19 +350,25 @@ mod tests {
         let mut total_recall = 0.0;
         let mut total_precision = 0.0;
         let mut total_search_time = std::time::Duration::from_secs(0);
-        for ((_, query), gt) in query_vectors.iter().zip(ground_truths.iter()) {
+        for (qid, query) in query_vectors.iter() {
             let start_time = Instant::now();
             let results = index.search::<Filter>(&txn, query, k, None, false).unwrap();
             let search_duration = start_time.elapsed();
             total_search_time += search_duration;
 
-            let result_indices: HashSet<String> = results
+            let result_indices = results
                 .into_iter()
-                .map(|hvector| hvector.get_id().to_string())
-                .collect();
+                .map(|hvec| hvec.get_id())
+                .collect::<HashSet<u128>>();
 
-            let gt_indices: HashSet<String> = gt.iter().cloned().collect();
-            //println!("gt: {:?}\nresults: {:?}\n", gt_indices, result_indices);
+            let gt_indices = ground_truths
+                .get(&qid)
+                .unwrap()
+                .clone()
+                .into_iter()
+                .collect::<HashSet<u128>>();
+
+            println!("gt: {:?}\nresults: {:?}\n", gt_indices, result_indices);
             let true_positives = result_indices.intersection(&gt_indices).count();
 
             let recall: f64 = true_positives as f64 / gt_indices.len() as f64;
@@ -375,7 +391,7 @@ mod tests {
         total_precision = total_precision / n_query as f64;
         println!(
             "{}: avg. recall: {:.4?}, avg. precision: {:.4?}",
-            test_id, total_recall, total_precision
+            test_id, total_recall, total_precision,
         );
         assert!(total_recall >= 0.8, "recall not high enough!");
     }

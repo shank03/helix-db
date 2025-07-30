@@ -266,26 +266,37 @@ pub mod macros {
         };
     }
 
+    /// Time a block of code
+    /// time_block!("my label" {
+    ///     let x = 1 + 2;
+    /// });
     #[macro_export]
     macro_rules! time_block {
-        ($($block:tt)*) => {{
+        // params: label, code block
+        ($label:expr, $($block:tt)*) => {{
             use std::time::Instant;
             let start_time = Instant::now();
             $($block)*
                 let time = start_time.elapsed();
-            println!("\t=> time elapsed: {:?}", time);
+            println!("{}: time elapsed: {:?}", $label, time);
             time
         }};
     }
 
+    /// Time a block of code and be able to return something out of the block
+    /// time_block_result!("my label" {
+    ///     let x = 1 + 2;
+    ///     x
+    /// });
     #[macro_export]
     macro_rules! time_block_result {
-        ($($block:tt)*) => {{
+        // params: label, code block
+        ($label:expr, $($block:tt)*) => {{
             use std::time::Instant;
             let start_time = Instant::now();
             let result = { $($block)* };
             let time = start_time.elapsed();
-            println!("\t=> time elapsed: {:?}", time);
+            println!("{}: time elapsed: {:?}", $label, time);
             result
         }};
     }

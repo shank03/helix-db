@@ -3,7 +3,6 @@ use crate::helix_engine::{
     graph_core::ops::tr_val::TraversalVal,
     storage_core::{storage_core::HelixGraphStorage, storage_methods::StorageMethods},
     types::GraphError,
-    vector_core::hnsw::HNSW,
 };
 use heed3::RwTxn;
 use std::{fmt::Debug, sync::Arc};
