@@ -1867,7 +1867,7 @@ fn test_order_by_desc() {
     let traversal = G::new(Arc::clone(&storage), &txn)
         .n_from_type("person")
         .order_by_desc("age")
-        .unwrap();
+        .collect_to::<Vec<_>>();
 
     assert_eq!(traversal.len(), 3);
     assert_eq!(traversal[0].id(), node3.id());
@@ -1898,7 +1898,7 @@ fn test_order_by_asc() {
     let traversal = G::new(Arc::clone(&storage), &txn)
         .n_from_type("person")
         .order_by_asc("age")
-        .unwrap();
+        .collect_to::<Vec<_>>();
 
     assert_eq!(traversal.len(), 3);
     assert_eq!(traversal[0].id(), node3.id());
