@@ -41,6 +41,7 @@ pub(crate) struct Ctx<'a> {
 }
 
 pub static INTROSPECTION_DATA: OnceLock<IntrospectionData> = OnceLock::new();
+pub static SECONDARY_INDICES: OnceLock<Vec<String>> = OnceLock::new();
 
 impl<'a> Ctx<'a> {
     pub(super) fn new(src: &'a Source) -> Self {
@@ -72,6 +73,20 @@ impl<'a> Ctx<'a> {
             .set(IntrospectionData::from_schema(&out))
             .ok();
 
+        SECONDARY_INDICES
+            .set(
+                src.node_schemas
+                    .iter()
+                    .flat_map(|schema| {
+                        schema
+                            .fields
+                            .iter()
+                            .filter(|f| f.is_indexed())
+                            .map(|f| f.name.clone())
+                    })
+                    .collect(),
+            )
+            .ok();
         out
     }
 
