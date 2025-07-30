@@ -1,6 +1,7 @@
 use crate::{helix_engine::types::GraphError, helixc::analyzer::analyzer::INTROSPECTION_DATA};
 use serde::{Deserialize, Serialize};
 use std::{fmt, path::PathBuf};
+use tracing::error;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct VectorConfig {
@@ -68,7 +69,7 @@ impl Config {
 
     pub fn from_files(config_path: PathBuf, schema_path: PathBuf) -> Result<Self, GraphError> {
         if !config_path.exists() {
-            println!("no config path!");
+            error!("no config path!");
             return Err(GraphError::ConfigFileNotFound);
         }
 

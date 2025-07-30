@@ -15,6 +15,7 @@ use crate::{
 use heed3::{RoTxn, types::Bytes};
 use helix_macros::debug_trace;
 use std::sync::Arc;
+use tracing::error;
 
 pub struct InNodesIterator<'a, T> {
     pub iter: heed3::RoIter<
@@ -39,7 +40,7 @@ impl<'a> Iterator for InNodesIterator<'a, RoTxn<'a>> {
                     let (_, node_id) = match HelixGraphStorage::unpack_adj_edge_data(data) {
                         Ok(data) => data,
                         Err(e) => {
-                            println!("Error unpacking edge data: {e:?}");
+                            error!("Error unpacking edge data: {e:?}");
                             return Some(Err(e));
                         }
                     };

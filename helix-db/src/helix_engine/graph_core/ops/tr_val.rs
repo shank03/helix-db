@@ -1,3 +1,5 @@
+use tracing::error;
+
 use crate::{
     helix_engine::{types::GraphError, vector_core::vector::HVector},
     protocol::value::Value,
@@ -68,7 +70,7 @@ impl IntoIterator for TraversalVal {
 pub trait Traversable {
     fn id(&self) -> u128;
     fn label(&self) -> String;
-    fn check_property(&self, prop: &str) -> Result<Cow<'_,Value>, GraphError>;
+    fn check_property(&self, prop: &str) -> Result<Cow<'_, Value>, GraphError>;
     fn uuid(&self) -> String;
 }
 
@@ -82,7 +84,7 @@ impl Traversable for TraversalVal {
             TraversalVal::Value(_) => unreachable!(),
             TraversalVal::Empty => 0,
             t => {
-                println!("invalid traversal value {t:?}");
+                error!("invalid traversal value {t:?}");
                 panic!("Invalid traversal value")
             }
         }
@@ -105,12 +107,14 @@ impl Traversable for TraversalVal {
         }
     }
 
-    fn check_property(&self, prop: &str) -> Result<Cow<'_,Value>, GraphError> {
+    fn check_property(&self, prop: &str) -> Result<Cow<'_, Value>, GraphError> {
         match self {
             TraversalVal::Node(node) => node.check_property(prop),
             TraversalVal::Edge(edge) => edge.check_property(prop),
             TraversalVal::Vector(vector) => vector.check_property(prop),
-            _ => Err(GraphError::ConversionError("Invalid traversal value".to_string())),
+            _ => Err(GraphError::ConversionError(
+                "Invalid traversal value".to_string(),
+            )),
         }
     }
 }
@@ -130,9 +134,11 @@ impl Traversable for Vec<TraversalVal> {
         self[0].label()
     }
 
-    fn check_property(&self, prop: &str) -> Result<Cow<'_,Value>, GraphError> {
+    fn check_property(&self, prop: &str) -> Result<Cow<'_, Value>, GraphError> {
         if self.is_empty() {
-            return Err(GraphError::ConversionError("Invalid traversal value".to_string()));
+            return Err(GraphError::ConversionError(
+                "Invalid traversal value".to_string(),
+            ));
         }
         self[0].check_property(prop)
     }

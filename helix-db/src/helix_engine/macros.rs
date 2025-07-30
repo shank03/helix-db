@@ -138,7 +138,7 @@ pub mod macros {
                     return Err(GraphError::ConversionError(format!(
                         "Error Decoding: {:?}",
                         "Invalid node".to_string()
-                    )))
+                    )));
                 }
             };
             let old_value_remapping =
@@ -206,15 +206,15 @@ pub mod macros {
                     return Err(GraphError::ConversionError(format!(
                         "Error Decoding: {:?}",
                         "Invalid node".to_string()
-                    )))
+                    )));
                 }
             };
             let value_remapping = Remapping::new(
                 false,
                 Some($identifier_value.to_string()),
                 Some(ReturnValue::from(value)),
-            );-
-            $remapping_vals.insert(
+            );
+            -$remapping_vals.insert(
                 $var_name.id(),
                 ResponseRemapping::new(
                     HashMap::from([($field_name.to_string(), value_remapping)]),
@@ -234,7 +234,7 @@ pub mod macros {
                     return Err(GraphError::ConversionError(format!(
                         "Error Decoding: {:?}",
                         "Invalid node".to_string()
-                    )))
+                    )));
                 }
             };
             let old_value_remapping = Remapping::new(
@@ -265,5 +265,16 @@ pub mod macros {
             }
         };
     }
-}
 
+    #[macro_export]
+    macro_rules! get_caller_and_location {
+        () => {
+            {
+                let caller = std::any::type_name_of_val(&|| {});
+                let caller = caller.strip_suffix("::{{closure}}").unwrap_or(caller);
+                format!("{}:{}", caller, line!(), format_args!($($arg)*));
+            }
+
+        };
+    }
+}

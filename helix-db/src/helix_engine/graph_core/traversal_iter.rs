@@ -1,6 +1,7 @@
 use std::{cmp::Ordering, sync::Arc};
 
 use heed3::{RoTxn, RwTxn};
+use tracing::trace;
 
 use super::ops::tr_val::TraversalVal;
 use crate::{
@@ -37,9 +38,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> RoTraversalIterat
     }
 
     pub fn collect_to<B: FromIterator<TraversalVal>>(self) -> B {
-        self.inner.filter_map(|item| {
-            item.ok()
-        }).collect::<B>()
+        self.inner.filter_map(|item| item.ok()).collect::<B>()
     }
 
     pub fn collect_dedup<B: FromIterator<TraversalVal>>(self) -> B {
@@ -143,7 +142,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> RoTraversalIterat
     ) -> Result<bool, GraphError> {
         let val = match &self.inner.next() {
             Some(Ok(TraversalVal::Value(val))) => {
-                println!("value : {val:?}");
+                trace!("value : {val:?}");
                 Ok(f(val))
             }
             Some(Ok(_)) => Err(GraphError::ConversionError(
@@ -152,7 +151,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> RoTraversalIterat
             Some(Err(err)) => Err(GraphError::from(err.to_string())),
             None => Ok(default),
         };
-        println!("result: {val:?}");
+        trace!("result: {val:?}");
         val
     }
 }

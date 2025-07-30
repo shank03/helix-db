@@ -5,7 +5,7 @@ use helix_db::helix_gateway::{
     router::router::{HandlerFn, HandlerSubmission},
 };
 use std::{collections::HashMap, sync::Arc};
-use tracing::Level;
+use tracing::{Level, info, trace, warn};
 use tracing_subscriber::util::SubscriberInitExt;
 
 mod queries;
@@ -20,7 +20,7 @@ fn main() {
     let path = match std::env::var("HELIX_DATA_DIR") {
         Ok(val) => std::path::PathBuf::from(val).join("user"),
         Err(_) => {
-            println!("HELIX_DATA_DIR not set, using default");
+            warn!("HELIX_DATA_DIR not set, using default");
             let home = dirs::home_dir().expect("Could not retrieve home directory");
             home.join(".helix/user")
         }
@@ -31,10 +31,10 @@ fn main() {
         Err(_) => 6969,
     };
 
-    println!("Running with the following setup:");
-    println!("\tconfig: {config:?}");
-    println!("\tpath: {}", path.display());
-    println!("\tport: {port}");
+    info!("Running with the following setup:");
+    info!("\tconfig: {config:?}");
+    info!("\tpath: {}", path.display());
+    info!("\tport: {port}");
 
     let path_str = path.to_str().expect("Could not convert path to string");
     let opts = HelixGraphEngineOpts {
@@ -46,12 +46,12 @@ fn main() {
 
     // generates routes from handler proc macro
     let submissions: Vec<_> = inventory::iter::<HandlerSubmission>.into_iter().collect();
-    println!("Found {} route submissions", submissions.len());
+    info!("Found {} route submissions", submissions.len());
 
     let query_routes: HashMap<String, HandlerFn> = inventory::iter::<HandlerSubmission>
         .into_iter()
         .map(|submission| {
-            println!(
+            trace!(
                 "Processing POST submission for handler: {}",
                 submission.0.name
             );
@@ -61,34 +61,17 @@ fn main() {
         })
         .collect();
 
-    // collect GET routes
-    // let get_routes: HashMap<(String, String), HandlerFn> = inventory::iter::<HandlerSubmission>
-    //     .into_iter()
-    //     .map(|submission| {
-    //         println!("Processing GET submission for handler: {}", submission.0.name);
-    //         let handler = &submission.0;
-    //         let func: HandlerFn = Arc::new(move |input, response| (handler.func)(input, response));
-    //         (
-    //             (
-    //                 "GET".to_string(),
-    //                 format!("/get/{}", handler.name.to_string()),
-    //             ),
-    //             func,
-    //         )
-    //     })
-    // .collect();
-
     let mcp_routes = inventory::iter::<MCPHandlerSubmission>
         .into_iter()
         .map(|submission| {
-            println!("Processing submission for handler: {}", submission.0.name);
+            trace!("Processing submission for handler: {}", submission.0.name);
             let handler = &submission.0;
             let func: MCPHandlerFn = Arc::new(handler.func);
             (handler.name.to_string(), func)
         })
         .collect::<HashMap<String, MCPHandlerFn>>();
 
-    println!("Routes: {:?}", query_routes.keys());
+    info!("Routes: {:?}", query_routes.keys());
     let gateway = HelixGateway::new(
         &format!("0.0.0.0:{port}"),
         graph,
