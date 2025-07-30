@@ -181,6 +181,7 @@ pub struct Range {
 pub struct CollectRequest {
     pub connection_id: String,
     pub range: Option<Range>,
+    pub drop: Option<bool>,
 }
 
 #[mcp_handler]
@@ -209,14 +210,53 @@ pub fn collect(input: &mut MCPToolInput) -> Result<Response, GraphError> {
         .collect::<Vec<TraversalVal>>();
 
     let mut connections = input.mcp_connections.lock().unwrap();
+    let mut new_iter = values.clone().into_iter();
+    if data.drop.unwrap_or(true) {
+        println!("Dropping connection");
+        new_iter = vec![].into_iter();
+    }
+    else {
+        println!("Not dropping connection");
+    }
+
     connections.add_connection(MCPConnection::new(
         connection.connection_id.clone(),
-        vec![].into_iter(),
+        new_iter,
     ));
     drop(connections);
 
     Ok(Format::Json.create_response(&ReturnValue::from(values)))
 }
+
+#[derive(Deserialize)]
+pub struct ResetRequest {
+    pub connection_id: String,
+}
+
+#[mcp_handler]
+pub fn reset(input: &mut MCPToolInput) -> Result<Response, GraphError> {
+    let data: ResetRequest = match sonic_rs::from_slice(&input.request.body) {
+        Ok(data) => data,
+        Err(e) => return Err(GraphError::from(e)),
+    };
+
+    let mut connections = input.mcp_connections.lock().unwrap();
+    let connection = match connections.get_connection_owned(&data.connection_id) {
+        Some(conn) => conn,
+        None => return Err(GraphError::StorageError("Connection not found".to_string())),
+    };
+    let connection_id = connection.connection_id.to_string();
+
+    connections.add_connection(MCPConnection::new(
+        connection.connection_id.clone(),
+        vec![].into_iter(),
+    ));
+
+    drop(connections);
+
+    Ok(Format::Json.create_response(&ReturnValue::from(connection_id)))
+}
+
 
 #[mcp_handler]
 pub fn schema_resource(input: &mut MCPToolInput) -> Result<Response, GraphError> {
