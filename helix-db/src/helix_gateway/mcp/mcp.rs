@@ -212,11 +212,7 @@ pub fn collect(input: &mut MCPToolInput) -> Result<Response, GraphError> {
     let mut connections = input.mcp_connections.lock().unwrap();
     let mut new_iter = values.clone().into_iter();
     if data.drop.unwrap_or(true) {
-        println!("Dropping connection");
         new_iter = vec![].into_iter();
-    }
-    else {
-        println!("Not dropping connection");
     }
 
     connections.add_connection(MCPConnection::new(
