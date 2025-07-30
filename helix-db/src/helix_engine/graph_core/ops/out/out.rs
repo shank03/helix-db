@@ -13,8 +13,8 @@ use crate::{
     utils::label_hash::hash_label,
 };
 use heed3::{RoTxn, types::Bytes};
-use helix_macros::debug_trace;
 use std::sync::Arc;
+use tracing::instrument;
 
 pub struct OutNodesIterator<'a, T> {
     pub iter: heed3::RoIter<
@@ -31,7 +31,7 @@ pub struct OutNodesIterator<'a, T> {
 impl<'a> Iterator for OutNodesIterator<'a, RoTxn<'a>> {
     type Item = Result<TraversalVal, GraphError>;
 
-    #[debug_trace("OUT")]
+    #[instrument(skip(self), fields(result), name = "OUT")]
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(Ok((_, data))) = self.iter.next() {
             match data.decode() {

@@ -13,9 +13,8 @@ use crate::{
     utils::label_hash::hash_label,
 };
 use heed3::{RoTxn, types::Bytes};
-use helix_macros::debug_trace;
 use std::sync::Arc;
-use tracing::error;
+use tracing::{error, instrument};
 
 pub struct InNodesIterator<'a, T> {
     pub iter: heed3::RoIter<
@@ -32,7 +31,7 @@ pub struct InNodesIterator<'a, T> {
 impl<'a> Iterator for InNodesIterator<'a, RoTxn<'a>> {
     type Item = Result<TraversalVal, GraphError>;
 
-    #[debug_trace("IN_NODES")]
+    #[instrument(skip(self), fields(result), name = "IN_NODES")]
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(Ok((_, data))) = self.iter.next() {
             match data.decode() {
@@ -58,7 +57,7 @@ impl<'a> Iterator for InNodesIterator<'a, RoTxn<'a>> {
                     }
                 }
                 Err(e) => {
-                    println!("Error decoding edge data: {e:?}");
+                    error!("Error decoding edge data: {e:?}");
                     return Some(Err(GraphError::DecodeError(e.to_string())));
                 }
             }

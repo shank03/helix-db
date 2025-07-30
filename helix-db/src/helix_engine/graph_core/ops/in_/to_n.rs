@@ -3,9 +3,9 @@ use crate::helix_engine::{
     storage_core::{storage_core::HelixGraphStorage, storage_methods::StorageMethods},
     types::GraphError,
 };
-use helix_macros::debug_trace;
 use heed3::RoTxn;
 use std::sync::Arc;
+use tracing::instrument;
 
 pub struct ToNIterator<'a, I, T> {
     iter: I,
@@ -20,7 +20,7 @@ where
 {
     type Item = Result<TraversalVal, GraphError>;
 
-    #[debug_trace("TO_N")]
+    #[instrument(skip(self), fields(result), name = "TO_N")]
     fn next(&mut self) -> Option<Self::Item> {
         match self.iter.next() {
             Some(item) => match item {

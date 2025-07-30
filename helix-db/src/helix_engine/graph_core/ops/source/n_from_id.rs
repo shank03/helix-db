@@ -6,9 +6,9 @@ use crate::{
     },
     utils::items::Node,
 };
-use helix_macros::debug_trace;
 use heed3::RoTxn;
 use std::{iter::Once, sync::Arc};
+use tracing::instrument;
 
 pub struct NFromId<'a, T> {
     iter: Once<Result<TraversalVal, GraphError>>,
@@ -20,7 +20,7 @@ pub struct NFromId<'a, T> {
 impl<'a> Iterator for NFromId<'a, RoTxn<'a>> {
     type Item = Result<TraversalVal, GraphError>;
 
-    #[debug_trace("N_FROM_ID")]
+    #[instrument(skip(self), fields(result), name = "N_FROM_ID")]
     fn next(&mut self) -> Option<Self::Item> {
         self.iter.next().map(|_| {
             let node: Node = match self.storage.get_node(self.txn, &self.id) {

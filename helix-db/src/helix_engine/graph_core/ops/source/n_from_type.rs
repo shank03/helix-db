@@ -5,11 +5,11 @@ use crate::{
     },
     utils::items::Node,
 };
-use helix_macros::debug_trace;
 use heed3::{
     byteorder::BE,
     types::{Bytes, U128},
 };
+use tracing::instrument;
 
 pub struct NFromType<'a> {
     pub iter: heed3::RoIter<'a, U128<BE>, heed3::types::LazyDecode<Bytes>>,
@@ -19,7 +19,7 @@ pub struct NFromType<'a> {
 impl<'a> Iterator for NFromType<'a> {
     type Item = Result<TraversalVal, GraphError>;
 
-    #[debug_trace("N_FROM_TYPE")]
+    #[instrument(skip(self), fields(result), name = "N_FROM_TYPE")]
     fn next(&mut self) -> Option<Self::Item> {
         for value in self.iter.by_ref() {
             let (key_, value) = value.unwrap();

@@ -6,10 +6,10 @@ use crate::{
     },
     protocol::value::Value,
 };
-use helix_macros::debug_trace;
-use heed3::{byteorder::BE, RoTxn};
+use heed3::{RoTxn, byteorder::BE};
 use serde::Serialize;
 use std::sync::Arc;
+use tracing::instrument;
 
 pub struct NFromIndex<'a> {
     iter:
@@ -21,7 +21,7 @@ pub struct NFromIndex<'a> {
 impl<'a> Iterator for NFromIndex<'a> {
     type Item = Result<TraversalVal, GraphError>;
 
-    #[debug_trace("N_FROM_INDEX")]
+    #[instrument(skip(self), fields(result), name = "N_FROM_INDEX")]
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(value) = self.iter.by_ref().next() {
             let (_, value) = value.unwrap();

@@ -9,9 +9,9 @@ use crate::{
     },
     utils::label_hash::hash_label,
 };
-use helix_macros::debug_trace;
-use heed3::{types::Bytes, RoTxn};
+use heed3::{RoTxn, types::Bytes};
 use std::sync::Arc;
+use tracing::instrument;
 
 pub struct OutEdgesIterator<'a, T> {
     pub iter: heed3::RoIter<
@@ -27,7 +27,7 @@ pub struct OutEdgesIterator<'a, T> {
 impl<'a> Iterator for OutEdgesIterator<'a, RoTxn<'a>> {
     type Item = Result<TraversalVal, GraphError>;
 
-    #[debug_trace("OUT_E")]
+    #[instrument(skip(self), fields(result), name = "OUT_E")]
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(Ok((_, data))) = self.iter.next() {
             match data.decode() {

@@ -6,8 +6,8 @@ use crate::helix_engine::{
     types::{GraphError, VectorError},
     vector_core::{hnsw::HNSW, vector::HVector},
 };
-use helix_macros::debug_trace;
 use std::iter::once;
+use tracing::instrument;
 
 pub struct SearchV<I: Iterator<Item = Result<TraversalVal, GraphError>>> {
     iter: I,
@@ -17,7 +17,7 @@ pub struct SearchV<I: Iterator<Item = Result<TraversalVal, GraphError>>> {
 impl<I: Iterator<Item = Result<TraversalVal, GraphError>>> Iterator for SearchV<I> {
     type Item = Result<TraversalVal, GraphError>;
 
-    #[debug_trace("SEARCH_V")]
+    #[instrument(skip(self), fields(result), name = "SEARCH_V")]
     fn next(&mut self) -> Option<Self::Item> {
         self.iter.next()
     }
@@ -50,10 +50,10 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> SearchVAdapt
         K: TryInto<usize>,
         K::Error: std::fmt::Debug,
     {
-        let vectors = self
-            .storage
-            .vectors
-            .search(self.txn, query, k.try_into().unwrap(), filter, false);
+        let vectors =
+            self.storage
+                .vectors
+                .search(self.txn, query, k.try_into().unwrap(), filter, false);
 
         let iter = match vectors {
             Ok(vectors) => vectors

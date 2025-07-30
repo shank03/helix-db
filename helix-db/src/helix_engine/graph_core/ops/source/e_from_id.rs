@@ -6,9 +6,9 @@ use crate::{
     },
     utils::items::Edge,
 };
-use helix_macros::debug_trace;
 use heed3::RoTxn;
 use std::{iter::Once, sync::Arc};
+use tracing::instrument;
 
 pub struct EFromId<'a, T> {
     iter: Once<Result<TraversalVal, GraphError>>,
@@ -18,10 +18,9 @@ pub struct EFromId<'a, T> {
 }
 
 impl<'a> Iterator for EFromId<'a, RoTxn<'a>> {
-
     type Item = Result<TraversalVal, GraphError>;
 
-    #[debug_trace("E_FROM_ID")]
+    #[instrument(skip(self), fields(result), name = "E_FROM_ID")]
     fn next(&mut self) -> Option<Self::Item> {
         self.iter.next().map(|_| {
             let edge: Edge = match self.storage.get_edge(self.txn, self.id) {

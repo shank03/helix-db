@@ -3,7 +3,7 @@ use crate::helix_engine::{
     graph_core::traversal_iter::RoTraversalIterator, types::GraphError,
     vector_core::vector_distance::cosine_similarity,
 };
-use helix_macros::debug_trace;
+use tracing::instrument;
 
 pub struct BruteForceSearchV<I: Iterator<Item = Result<TraversalVal, GraphError>>> {
     iter: I,
@@ -13,7 +13,7 @@ pub struct BruteForceSearchV<I: Iterator<Item = Result<TraversalVal, GraphError>
 impl<I: Iterator<Item = Result<TraversalVal, GraphError>>> Iterator for BruteForceSearchV<I> {
     type Item = Result<TraversalVal, GraphError>;
 
-    #[debug_trace("BRUTE_FORCE_SEARCH_V")]
+    #[instrument(skip(self), fields(result), name = "BRUTE_FORCE_SEARCH_V")]
     fn next(&mut self) -> Option<Self::Item> {
         self.iter.next()
     }
