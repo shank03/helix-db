@@ -13,7 +13,7 @@ use sonic_rs::Deserialize;
 
 use super::value::Value;
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(transparent)]
 pub struct Date(DateTime<Utc>);
 impl Date {
@@ -137,6 +137,15 @@ impl<'de> Deserialize<'de> for Date {
         D: Deserializer<'de>,
     {
         deserializer.deserialize_any(DateVisitor)
+    }
+}
+
+impl Serialize for Date {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.to_rfc3339())
     }
 }
 
