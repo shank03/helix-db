@@ -5,7 +5,9 @@ use helix_db::helix_gateway::{
     router::router::{HandlerFn, HandlerSubmission},
 };
 use std::{collections::HashMap, sync::Arc};
-use tracing::{Level, info, trace, warn};
+use tracing::level_filters::LevelFilter;
+use tracing::{info, trace, warn};
+use tracing_subscriber::EnvFilter;
 use tracing_subscriber::util::SubscriberInitExt;
 
 mod queries;
@@ -13,7 +15,11 @@ mod queries;
 fn main() {
     let env_res = dotenvy::dotenv();
     tracing_subscriber::fmt()
-        .with_max_level(Level::TRACE)
+        .with_env_filter(
+            EnvFilter::builder()
+                .with_default_directive(LevelFilter::INFO.into())
+                .from_env_lossy(),
+        )
         .finish()
         .init();
 
