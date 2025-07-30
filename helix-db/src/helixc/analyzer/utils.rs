@@ -83,49 +83,18 @@ pub(super) fn field_exists_on_item_type(
     item_type: Type,
     fields: Vec<(&str, &Loc)>,
 ) {
-    match item_type {
-        Type::Node(Some(node_type)) => {
-            for (key, loc) in fields {
-                if !ctx
-                    .node_fields
-                    .get(node_type.as_str())
-                    .map(|fields| fields.contains_key(key))
-                    .unwrap_or(true)
-                {
-                    generate_error!(
-                        ctx,
-                        original_query,
-                        loc.clone(),
-                        E202,
-                        key,
-                        "node",
-                        &node_type
-                    );
-                }
-            }
+    for (key, loc) in fields {
+        if !item_type.item_fields_contains_key(ctx, key) {
+            generate_error!(
+                ctx,
+                original_query,
+                loc.clone(),
+                E202,
+                key,
+                item_type.kind_str(),
+                &item_type.get_type_name()
+            );
         }
-        Type::Edge(Some(edge_type)) => {
-            for (key, loc) in fields {
-                if !ctx
-                    .edge_fields
-                    .get(edge_type.as_str())
-                    .map(|fields| fields.contains_key(key))
-                    .unwrap_or(true)
-                {
-                    generate_error!(
-                        ctx,
-                        original_query,
-                        loc.clone(),
-                        E202,
-                        key,
-                        "edge",
-                        &edge_type
-                    );
-                }
-            }
-        }
-        Type::Vector(_) => unreachable!("Updating vectors is not supported yet"),
-        _ => unreachable!("shouldve been caught eariler"),
     }
 }
 

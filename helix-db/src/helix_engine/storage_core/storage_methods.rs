@@ -36,6 +36,7 @@ pub trait StorageMethods {
 
     fn drop_node(&self, txn: &mut RwTxn, id: &u128) -> Result<(), GraphError>;
     fn drop_edge(&self, txn: &mut RwTxn, id: &u128) -> Result<(), GraphError>;
+    fn drop_vector(&self, txn: &mut RwTxn, id: &u128) -> Result<(), GraphError>;
 }
 
 pub trait SearchMethods {
@@ -56,4 +57,3 @@ pub trait SearchMethods {
         to_id: &u128,
     ) -> Result<(Vec<Node>, Vec<Edge>), GraphError>;
 }
-

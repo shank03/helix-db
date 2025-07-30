@@ -22,6 +22,7 @@ where
 
     #[debug_trace("FROM_V")]
     fn next(&mut self) -> Option<Self::Item> {
+
         match self.iter.next() {
             Some(item) => match item {
                 Ok(TraversalVal::Edge(item)) => Some(Ok(TraversalVal::Vector(

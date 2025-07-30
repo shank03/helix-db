@@ -1,3 +1,6 @@
+use crate::debug_println;
+use crate::helix_gateway::mcp::tools::{FilterValues, Operator};
+use crate::protocol::date::Date;
 use crate::utils::id::ID;
 use crate::{helix_engine::types::GraphError, helixc::generator::utils::GenRef};
 use chrono::Utc;
@@ -28,6 +31,7 @@ pub enum Value {
     U32(u32),
     U64(u64),
     U128(u128),
+    Date(Date),
     Boolean(bool),
     Array(Vec<Value>),
     Object(HashMap<String, Value>),
@@ -49,6 +53,7 @@ impl Value {
             Value::U32(u) => u.to_string(),
             Value::U64(u) => u.to_string(),
             Value::U128(u) => u.to_string(),
+            Value::Date(d) => d.to_string(),
             Value::Boolean(b) => b.to_string(),
             Value::Array(arr) => arr
                 .iter()
@@ -96,6 +101,7 @@ impl Display for Value {
             Value::U32(_) => write!(f, "U32"),
             Value::U64(_) => write!(f, "U64"),
             Value::U128(_) => write!(f, "U128"),
+            Value::Date(_) => write!(f, "Date"),
             Value::Boolean(_) => write!(f, "Boolean"),
             Value::Array(_) => write!(f, "Array"),
             Value::Object(_) => write!(f, "Object"),
@@ -124,6 +130,7 @@ impl Ord for Value {
             (Value::U32(s), Value::U32(o)) => s.cmp(o),
             (Value::U64(s), Value::U64(o)) => s.cmp(o),
             (Value::U128(s), Value::U128(o)) => s.cmp(o),
+            (Value::Date(s), Value::Date(o)) => s.cmp(o),
             (Value::Boolean(s), Value::Boolean(o)) => s.cmp(o),
             (Value::Array(s), Value::Array(o)) => s.cmp(o),
             (Value::Empty, Value::Empty) => Ordering::Equal,
@@ -369,6 +376,7 @@ impl Serialize for Value {
                 Value::U64(i) => i.serialize(serializer),
                 Value::U128(i) => i.serialize(serializer),
                 Value::Boolean(b) => b.serialize(serializer),
+                Value::Date(d) => d.serialize(serializer),
                 Value::Array(arr) => {
                     use serde::ser::SerializeSeq;
                     let mut seq = serializer.serialize_seq(Some(arr.len()))?;
@@ -401,6 +409,7 @@ impl Serialize for Value {
                 Value::U32(i) => serializer.serialize_newtype_variant("Value", 9, "U32", i),
                 Value::U64(i) => serializer.serialize_newtype_variant("Value", 10, "U64", i),
                 Value::U128(i) => serializer.serialize_newtype_variant("Value", 11, "U128", i),
+                Value::Date(d) => serializer.serialize_newtype_variant("Value", 12, "Date", d),
                 Value::Boolean(b) => {
                     serializer.serialize_newtype_variant("Value", 12, "Boolean", b)
                 }
@@ -968,9 +977,31 @@ impl From<Value> for GenRef<String> {
             Value::U32(u) => GenRef::Std(format!("{u}")),
             Value::U64(u) => GenRef::Std(format!("{u}")),
             Value::U128(u) => GenRef::Std(format!("{u}")),
+            Value::Date(d) => GenRef::Std(format!("{d:?}")),
             Value::Array(_a) => unimplemented!(),
             Value::Object(_o) => unimplemented!(),
             Value::Empty => GenRef::Literal("".to_string()),
         }
+    }
+}
+
+impl FilterValues for Value {
+    fn compare(&self, value: &Value, operator: Option<Operator>) -> bool {
+        debug_println!("comparing value1: {:?}, value2: {:?}", self, value);
+        let comparison = match (self, value) {
+            (Value::Array(a1), Value::Array(a2)) => a1.iter().any(|a1_item| {
+                a2.iter()
+                    .any(|a2_item| a1_item.compare(a2_item, operator.clone()))
+            }),
+            (value, Value::Array(a)) => a
+                .iter()
+                .any(|a_item| value.compare(a_item, operator.clone())),
+            (value1, value2) => match operator {
+                Some(op) => op.execute(value1, value2),
+                None => value1 == value2,
+            },
+        };
+        debug_println!("comparison: {:?}", comparison);
+        comparison
     }
 }

@@ -441,6 +441,19 @@ pub struct Step {
 }
 
 #[derive(Debug, Clone)]
+pub enum OrderByType {
+    Asc,
+    Desc,
+}
+
+#[derive(Debug, Clone)]
+pub struct OrderBy {
+    pub loc: Loc,
+    pub order_by_type: OrderByType,
+    pub expression: Box<Expression>,
+}
+
+#[derive(Debug, Clone)]
 pub enum StepType {
     Node(GraphStep),
     Edge(GraphStep),
@@ -452,8 +465,7 @@ pub enum StepType {
     Exclude(Exclude),
     Closure(Closure),
     Range((Expression, Expression)),
-    OrderByAsc(Box<Expression>),
-    OrderByDesc(Box<Expression>),
+    OrderBy(OrderBy),
     AddEdge(AddEdge),
 }
 impl PartialEq<StepType> for StepType {
@@ -473,8 +485,7 @@ impl PartialEq<StepType> for StepType {
                 | (&StepType::Exclude(_), &StepType::Exclude(_))
                 | (&StepType::Closure(_), &StepType::Closure(_))
                 | (&StepType::Range(_), &StepType::Range(_))
-                | (&StepType::OrderByAsc(_), &StepType::OrderByAsc(_))
-                | (&StepType::OrderByDesc(_), &StepType::OrderByDesc(_))
+                | (&StepType::OrderBy(_), &StepType::OrderBy(_))
                 | (&StepType::AddEdge(_), &StepType::AddEdge(_))
         )
     }
@@ -2145,19 +2156,32 @@ impl HelixParser {
                 loc: inner.loc(),
                 step: StepType::AddEdge(self.parse_add_edge(inner, true)?),
             }),
-            Rule::order_by_asc => Ok(Step {
+            Rule::order_by => Ok(Step {
                 loc: inner.loc(),
-                step: StepType::OrderByAsc(Box::new(self.parse_expression(inner)?)),
-            }),
-            Rule::order_by_desc => Ok(Step {
-                loc: inner.loc(),
-                step: StepType::OrderByDesc(Box::new(self.parse_expression(inner)?)),
+                step: StepType::OrderBy(self.parse_order_by(inner)?),
             }),
             _ => Err(ParserError::from(format!(
                 "Unexpected step type: {:?}",
                 inner.as_rule()
             ))),
         }
+    }
+
+    fn parse_order_by(&self, pair: Pair<Rule>) -> Result<OrderBy, ParserError> {
+        let mut inner = pair.clone().into_inner();
+        println!("inner: {:?}", inner.clone().next().unwrap().into_inner().next().unwrap());
+        let order_by_type = match inner.next().unwrap().into_inner().next().unwrap().as_rule() {
+            Rule::asc => OrderByType::Asc,
+            Rule::desc => OrderByType::Desc,
+            _ => unreachable!(),
+        };
+        println!("inner: {:?}", inner.clone().next().unwrap());
+        let expression = self.parse_expression(inner.next().unwrap())?;
+        Ok(OrderBy {
+            loc: pair.loc(),
+            order_by_type,
+            expression: Box::new(expression),
+        })
     }
 
     fn parse_range(&self, pair: Pair<Rule>) -> Result<(Expression, Expression), ParserError> {

@@ -8,7 +8,7 @@ use core::fmt;
 use std::ops::Deref;
 
 use chrono::{DateTime, NaiveDate, Utc};
-use serde::{de::Visitor, Deserializer};
+use serde::{de::Visitor, Deserializer, Serialize};
 use sonic_rs::Deserialize;
 
 use super::value::Value;
@@ -137,6 +137,15 @@ impl<'de> Deserialize<'de> for Date {
         D: Deserializer<'de>,
     {
         deserializer.deserialize_any(DateVisitor)
+    }
+}
+
+impl Serialize for Date {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.to_rfc3339())
     }
 }
 

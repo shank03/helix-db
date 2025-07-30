@@ -947,6 +947,7 @@ pub(crate) fn infer_expr_type<'a>(
             assert!(matches!(stmt, Some(GeneratedStatement::Traversal(_))));
             let expr = match stmt.unwrap() {
                 GeneratedStatement::Traversal(mut tr) => {
+                    // TODO: FIX VALUE HERE
                     tr.traversal_type = TraversalType::NestedFrom(GenRef::Std("val".to_string()));
                     tr
                 }

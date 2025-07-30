@@ -278,6 +278,7 @@ pub(crate) fn parse_object_remapping<'a>(
                     let expr = match stmt.unwrap() {
                         Statement::Traversal(mut tr) => {
                             tr.traversal_type =
+                                // TODO: FIX VALUE HERE
                                 TraversalType::NestedFrom(GenRef::Std("val".to_string()));
                             tr
                         }

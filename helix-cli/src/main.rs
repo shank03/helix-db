@@ -538,13 +538,14 @@ async fn main() -> ExitCode {
             fs::create_dir_all(&path).unwrap();
 
             let schema_path = path.join("schema.hx");
-            fs::write(&schema_path, DEFAULT_SCHEMA).unwrap();
+            fs::write(&schema_path, DEFAULT_SCHEMA).expect("could not write schema");
 
             let main_path = path.join("queries.hx");
-            fs::write(main_path, DEFAULT_QUERIES).unwrap();
+            fs::write(main_path, DEFAULT_QUERIES).expect("could not write queries");
 
             let config_path = path.join("config.hx.json");
-            fs::write(config_path, Config::init_config()).unwrap();
+            fs::write(config_path, Config::init_config())
+                .expect("could not write config");
 
             println!(
                 "{} {}",

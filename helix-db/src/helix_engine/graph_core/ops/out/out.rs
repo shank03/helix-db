@@ -12,8 +12,8 @@ use crate::{
     },
     utils::label_hash::hash_label,
 };
+use heed3::{RoTxn, types::Bytes};
 use helix_macros::debug_trace;
-use heed3::{types::Bytes, RoTxn};
 use std::sync::Arc;
 
 pub struct OutNodesIterator<'a, T> {
