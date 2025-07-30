@@ -77,14 +77,13 @@ impl<'a> Ctx<'a> {
             .set(
                 src.node_schemas
                     .iter()
-                    .map(|schema| {
+                    .flat_map(|schema| {
                         schema
                             .fields
                             .iter()
                             .filter(|f| f.is_indexed())
                             .map(|f| f.name.clone())
                     })
-                    .flatten()
                     .collect(),
             )
             .ok();
