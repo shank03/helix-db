@@ -2169,13 +2169,11 @@ impl HelixParser {
 
     fn parse_order_by(&self, pair: Pair<Rule>) -> Result<OrderBy, ParserError> {
         let mut inner = pair.clone().into_inner();
-        println!("inner: {:?}", inner.clone().next().unwrap().into_inner().next().unwrap());
         let order_by_type = match inner.next().unwrap().into_inner().next().unwrap().as_rule() {
             Rule::asc => OrderByType::Asc,
             Rule::desc => OrderByType::Desc,
             _ => unreachable!(),
         };
-        println!("inner: {:?}", inner.clone().next().unwrap());
         let expression = self.parse_expression(inner.next().unwrap())?;
         Ok(OrderBy {
             loc: pair.loc(),

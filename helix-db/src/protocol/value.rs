@@ -33,6 +33,7 @@ pub enum Value {
     U128(u128),
     Date(Date),
     Boolean(bool),
+    Id(ID),
     Array(Vec<Value>),
     Object(HashMap<String, Value>),
     Empty,
@@ -55,6 +56,7 @@ impl Value {
             Value::U128(u) => u.to_string(),
             Value::Date(d) => d.to_string(),
             Value::Boolean(b) => b.to_string(),
+            Value::Id(id) => id.stringify(),
             Value::Array(arr) => arr
                 .iter()
                 .map(|v| v.to_string())
@@ -103,6 +105,7 @@ impl Display for Value {
             Value::U128(_) => write!(f, "U128"),
             Value::Date(_) => write!(f, "Date"),
             Value::Boolean(_) => write!(f, "Boolean"),
+            Value::Id(_) => write!(f, "Id"),
             Value::Array(_) => write!(f, "Array"),
             Value::Object(_) => write!(f, "Object"),
             Value::Empty => write!(f, "Empty"),
@@ -149,6 +152,14 @@ impl PartialOrd for Value {
 
 impl Eq for Value {}
 
+impl PartialEq<ID> for Value {
+    fn eq(&self, other: &ID) -> bool {
+        match self {
+            Value::Id(id) => id == other,
+            _ => false,
+        }
+    }
+}
 impl PartialEq<u8> for Value {
     fn eq(&self, other: &u8) -> bool {
         match self {
@@ -354,6 +365,15 @@ impl PartialOrd<u128> for Value {
         }
     }
 }
+
+impl PartialOrd<ID> for Value {
+    fn partial_cmp(&self, other: &ID) -> Option<Ordering> {
+        match self {
+            Value::Id(id) => id.partial_cmp(other),
+            _ => None,
+        }
+    }
+}
 /// Custom serialisation implementation for Value that removes enum variant names in JSON
 /// whilst preserving them for binary formats like bincode.
 impl Serialize for Value {
@@ -377,6 +397,7 @@ impl Serialize for Value {
                 Value::U128(i) => i.serialize(serializer),
                 Value::Boolean(b) => b.serialize(serializer),
                 Value::Date(d) => d.serialize(serializer),
+                Value::Id(id) => id.serialize(serializer),
                 Value::Array(arr) => {
                     use serde::ser::SerializeSeq;
                     let mut seq = serializer.serialize_seq(Some(arr.len()))?;
@@ -410,6 +431,7 @@ impl Serialize for Value {
                 Value::U64(i) => serializer.serialize_newtype_variant("Value", 10, "U64", i),
                 Value::U128(i) => serializer.serialize_newtype_variant("Value", 11, "U128", i),
                 Value::Date(d) => serializer.serialize_newtype_variant("Value", 12, "Date", d),
+                Value::Id(id) => serializer.serialize_newtype_variant("Value", 13, "Id", id),
                 Value::Boolean(b) => {
                     serializer.serialize_newtype_variant("Value", 12, "Boolean", b)
                 }
@@ -978,6 +1000,7 @@ impl From<Value> for GenRef<String> {
             Value::U64(u) => GenRef::Std(format!("{u}")),
             Value::U128(u) => GenRef::Std(format!("{u}")),
             Value::Date(d) => GenRef::Std(format!("{d:?}")),
+            Value::Id(id) => GenRef::Literal(id.stringify()),
             Value::Array(_a) => unimplemented!(),
             Value::Object(_o) => unimplemented!(),
             Value::Empty => GenRef::Literal("".to_string()),

@@ -1052,7 +1052,7 @@ pub(crate) fn validate_traversal<'a>(
                                     OrderByType::Desc => Order::Desc,
                                 },
                             })));
-                        gen_traversal.should_collect = ShouldCollect::Try;
+                        gen_traversal.should_collect = ShouldCollect::ToVec;
                     }
                     _ => unreachable!("Cannot reach here"),
                 }
