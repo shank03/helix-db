@@ -1022,11 +1022,11 @@ pub(crate) fn validate_traversal<'a>(
                         end,
                     })));
             }
-            StepType::OrderByAsc(expr) => {
+            StepType::OrderBy(order_by) => {
                 // verify property access
                 let (_, stmt) = infer_expr_type(
                     ctx,
-                    expr,
+                    &order_by.expression,
                     scope,
                     original_query,
                     Some(cur_ty.clone()),
@@ -1047,39 +1047,10 @@ pub(crate) fn validate_traversal<'a>(
                             .steps
                             .push(Separator::Period(GeneratedStep::OrderBy(OrderBy {
                                 property,
-                                order: Order::Asc,
-                            })));
-                        gen_traversal.should_collect = ShouldCollect::Try;
-                    }
-                    _ => unreachable!("Cannot reach here"),
-                }
-            }
-            StepType::OrderByDesc(expr) => {
-                // verify property access
-                let (_, stmt) = infer_expr_type(
-                    ctx,
-                    expr,
-                    scope,
-                    original_query,
-                    Some(cur_ty.clone()),
-                    gen_query,
-                );
-
-                assert!(stmt.is_some());
-                match stmt.unwrap() {
-                    GeneratedStatement::Traversal(traversal) => {
-                        let property = match &traversal.steps.last() {
-                            Some(step) => match &step.inner() {
-                                GeneratedStep::PropertyFetch(property) => property.clone(),
-                                _ => unreachable!("Cannot reach here"),
-                            },
-                            None => unreachable!("Cannot reach here"),
-                        };
-                        gen_traversal
-                            .steps
-                            .push(Separator::Period(GeneratedStep::OrderBy(OrderBy {
-                                property,
-                                order: Order::Desc,
+                                order: match order_by.order_by_type {
+                                    OrderByType::Asc => Order::Asc,
+                                    OrderByType::Desc => Order::Desc,
+                                },
                             })));
                         gen_traversal.should_collect = ShouldCollect::Try;
                     }

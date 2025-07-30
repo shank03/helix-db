@@ -5,6 +5,6 @@ N::User {
 
 
 QUERY GetOrder() =>
-    userByAge <- N<User>::OrderByDesc(_::{age})
-    userByName <- N<User>::OrderByAsc(_::{name})
+    userByAge <- N<User>::ORDER<Desc>(_::{age})
+    userByName <- N<User>::ORDER<Asc>(_::{name})
     RETURN userByAge, userByName
