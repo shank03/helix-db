@@ -14,7 +14,7 @@ use crate::{
             },
             source::{add_e::EdgeType, e_from_type::EFromType, n_from_type::NFromType},
             tr_val::{Traversable, TraversalVal},
-            vectors::search::SearchVAdapter,
+            vectors::{brute_force_search::BruteForceSearchVAdapter, search::SearchVAdapter},
         },
         storage_core::storage_core::HelixGraphStorage,
         types::GraphError,
@@ -181,6 +181,15 @@ trait McpTools<'a> {
         txn: &'a RoTxn,
         connection: &'a MCPConnection,
         query: String,
+    ) -> Result<Vec<TraversalVal>, GraphError>;
+
+    fn search_vector(
+        &'a self,
+        txn: &'a RoTxn,
+        connection: &'a MCPConnection,
+        vector: Vec<f64>,
+        k: usize,
+        min_score: Option<f64>,
     ) -> Result<Vec<TraversalVal>, GraphError>;
 }
 
@@ -421,6 +430,36 @@ impl<'a> McpTools<'a> for McpBackend {
         let res = G::new(db, txn)
             .search_v::<fn(&HVector, &RoTxn) -> bool, _>(&embedding, 5, None)
             .collect_to::<Vec<_>>();
+
+        println!("result: {res:?}");
+        Ok(res)
+    }
+
+    fn search_vector(
+        &'a self,
+        txn: &'a RoTxn,
+        connection: &'a MCPConnection,
+        vector: Vec<f64>,
+        k: usize,
+        min_score: Option<f64>,
+    ) -> Result<Vec<TraversalVal>, GraphError> {
+        let db = Arc::clone(&self.db);
+
+        let items = connection.iter.clone().collect::<Vec<_>>();
+
+        let mut res = G::new_from(db, txn, items)
+            .brute_force_search_v(&vector, k)
+            .collect_to::<Vec<_>>();
+
+        if let Some(min_score) = min_score {
+            res.retain(|item| {
+                if let TraversalVal::Vector(vector) = item {
+                    vector.get_distance() > min_score
+                } else {
+                    false
+                }
+            });
+        }
 
         println!("result: {res:?}");
         Ok(res)
