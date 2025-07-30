@@ -11,10 +11,17 @@ use tracing_subscriber::util::SubscriberInitExt;
 mod queries;
 
 fn main() {
+    let env_res = dotenvy::dotenv();
     tracing_subscriber::fmt()
         .with_max_level(Level::TRACE)
         .finish()
         .init();
+
+    match env_res {
+        Ok(_) => info!("Loaded .env file"),
+        Err(e) => info!(?e, "Didn't load .env file"),
+    }
+
     let config = queries::config().unwrap_or_default();
 
     let path = match std::env::var("HELIX_DATA_DIR") {

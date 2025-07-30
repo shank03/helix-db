@@ -86,7 +86,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> SearchVAdapt
                 let error = GraphError::VectorError("invalid vector dimensions!".to_string());
                 once(Err(error)).collect::<Vec<_>>().into_iter()
             }
-            Err((id)) => {
+            Err(id) => {
                 let error = GraphError::VectorError(format!("vector already deleted for id {id}"));
                 once(Err(error)).collect::<Vec<_>>().into_iter()
             }
