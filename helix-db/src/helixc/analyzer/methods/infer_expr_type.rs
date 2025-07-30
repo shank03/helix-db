@@ -948,7 +948,12 @@ pub(crate) fn infer_expr_type<'a>(
             let expr = match stmt.unwrap() {
                 GeneratedStatement::Traversal(mut tr) => {
                     // TODO: FIX VALUE HERE
-                    tr.traversal_type = TraversalType::NestedFrom(GenRef::Std("val".to_string()));
+                    let source_variable = match tr.source_step.inner() {
+                        SourceStep::Identifier(id) => id.inner().clone(),
+                        _ => "val".to_string(),
+                    };
+                    tr.traversal_type = TraversalType::NestedFrom(GenRef::Std(source_variable));
+                    tr.should_collect = ShouldCollect::No;
                     tr
                 }
                 _ => unreachable!(),

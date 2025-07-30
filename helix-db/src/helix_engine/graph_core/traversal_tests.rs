@@ -10,7 +10,7 @@ use crate::{
             source::{add_n::AddNAdapter, e_from_id::EFromIdAdapter, n_from_id::NFromIdAdapter},
             tr_val::{Traversable, TraversalVal},
             util::{
-                dedup::DedupAdapter, map::MapAdapter, props::PropsAdapter, range::RangeAdapter,
+                dedup::DedupAdapter, map::MapAdapter, order::OrderByAdapter, props::PropsAdapter, range::RangeAdapter
             },
             vectors::brute_force_search::BruteForceSearchVAdapter,
         },
