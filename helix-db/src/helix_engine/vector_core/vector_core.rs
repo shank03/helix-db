@@ -1,9 +1,6 @@
 use crate::helix_engine::{
     types::VectorError,
-    vector_core::{
-        hnsw::HNSW, vector::HVector,
-        utils::{Candidate, HeapOps}
-    },
+    vector_core::{hnsw::HNSW, vector::HVector},
 };
 use crate::protocol::value::Value;
 use heed3::{
@@ -13,12 +10,15 @@ use heed3::{
 use itertools::Itertools;
 use rand::prelude::Rng;
 use serde::{Deserialize, Serialize};
-use std::collections::{BinaryHeap, HashSet, HashMap};
+use std::{
+    cmp::Ordering,
+    collections::{BinaryHeap, HashSet, HashMap},
+};
 
 const DB_VECTORS: &str = "vectors"; // for vector data (v:)
 const DB_VECTOR_DATA: &str = "vector_data"; // for vector data (v:)
 
-const DB_HNSW_EDGES: &str = "hnsw_out_nodes"; // for hnsw out node data
+const DB_HNSW_OUT_EDGES: &str = "hnsw_out_nodes"; // for hnsw out node data
 const VECTOR_PREFIX: &[u8] = b"v:";
 const ENTRY_POINT_KEY: &str = "entry_point";
 
@@ -32,31 +32,143 @@ pub struct HNSWConfig {
 }
 
 impl HNSWConfig {
-    /// Constructor for the configs of the HNSW vector similarity search algorithm
-    /// - m (5 <= m <= 48): max num of bi-directional links per element
-    /// - m_max_0 (2 * m): max num of links for level 0 (level that stores all vecs)
-    /// - ef_construct (40 <= ef_construct <= 512): size of the dynamic candidate list
-    ///     for construction
-    /// - m_l (ln(1/m)): level generation factor (multiplied by a random number)
-    /// - ef (10 <= ef <= 512): num of candidates to search
     pub fn new(m: Option<usize>, ef_construct: Option<usize>, ef: Option<usize>) -> Self {
-        let m = m.unwrap_or(16).clamp(5, 48);
-        let ef_construct = ef_construct.unwrap_or(128).clamp(40, 512);
-        let ef = ef.unwrap_or(768).clamp(10, 512);
+        let m = m.unwrap_or(16);
         Self {
             m,
             m_max_0: 2 * m,
-            ef_construct,
+            ef_construct: ef_construct.unwrap_or(128),
             m_l: 1.0 / (m as f64).ln(),
-            ef,
+            ef: ef.unwrap_or(768),
         }
+    }
+}
+
+#[derive(PartialEq)]
+struct Candidate {
+    id: u128,
+    distance: f64,
+}
+
+impl Eq for Candidate {}
+
+impl PartialOrd for Candidate {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        other.distance.partial_cmp(&self.distance)
+    }
+}
+
+impl Ord for Candidate {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap_or(Ordering::Equal)
+    }
+}
+
+pub trait HeapOps<T> {
+    /// Extend the heap with another heap
+    /// Used because using `.extend()` does not keep the order
+    fn extend_inord(&mut self, other: BinaryHeap<T>)
+    where
+        T: Ord;
+
+    /// Take the top k elements from the heap
+    /// Used because using `.iter()` does not keep the order
+    fn take_inord(&mut self, k: usize) -> BinaryHeap<T>
+    where
+        T: Ord;
+
+    /// Take the top k elements from the heap and return a vector
+    fn to_vec(&mut self, k: usize) -> Vec<T>
+    where
+        T: Ord;
+
+    /// Get the maximum element from the heap
+    fn get_max(&self) -> Option<&T>
+    where
+        T: Ord;
+
+    fn to_vec_with_filter<F>(&mut self, k: usize, filter: Option<&[F]>, txn: &RoTxn) -> Vec<T>
+    where
+        T: Ord,
+        F: Fn(&T, &RoTxn) -> bool;
+}
+
+impl<T> HeapOps<T> for BinaryHeap<T> {
+    #[inline(always)]
+    fn extend_inord(&mut self, mut other: BinaryHeap<T>)
+    where
+        T: Ord,
+    {
+        self.reserve(other.len());
+        for item in other.drain() {
+            self.push(item);
+        }
+    }
+
+    #[inline(always)]
+    fn take_inord(&mut self, k: usize) -> BinaryHeap<T>
+    where
+        T: Ord,
+    {
+        let mut result = BinaryHeap::with_capacity(k);
+        for _ in 0..k {
+            if let Some(item) = self.pop() {
+                result.push(item);
+            } else {
+                break;
+            }
+        }
+        result
+    }
+
+    #[inline(always)]
+    fn to_vec(&mut self, k: usize) -> Vec<T>
+    where
+        T: Ord,
+    {
+        let mut result = Vec::with_capacity(k);
+        for _ in 0..k {
+            if let Some(item) = self.pop() {
+                result.push(item);
+            } else {
+                break;
+            }
+        }
+        result
+    }
+
+    #[inline(always)]
+    fn get_max(&self) -> Option<&T>
+    where
+        T: Ord,
+    {
+        self.iter().max()
+    }
+
+    #[inline(always)]
+    fn to_vec_with_filter<F>(&mut self, k: usize, filter: Option<&[F]>, txn: &RoTxn) -> Vec<T>
+    where
+        T: Ord,
+        F: Fn(&T, &RoTxn) -> bool,
+    {
+        let mut result = Vec::with_capacity(k);
+        for _ in 0..k {
+            // while pop check filters and pop until one passes
+            while let Some(item) = self.pop() {
+                if filter.is_none() || filter.unwrap().iter().all(|f| f(&item, txn)) {
+                    result.push(item);
+                    break;
+                }
+            }
+        }
+        result
     }
 }
 
 pub struct VectorCore {
     pub vectors_db: Database<Bytes, Bytes>,
     pub vector_data_db: Database<Bytes, Bytes>,
-    pub edges_db: Database<Bytes, Unit>,
+    pub out_edges_db: Database<Bytes, Unit>,
     pub config: HNSWConfig,
 }
 
@@ -64,12 +176,12 @@ impl VectorCore {
     pub fn new(env: &Env, txn: &mut RwTxn, config: HNSWConfig) -> Result<Self, VectorError> {
         let vectors_db = env.create_database(txn, Some(DB_VECTORS))?;
         let vector_data_db = env.create_database(txn, Some(DB_VECTOR_DATA))?;
-        let edges_db = env.create_database(txn, Some(DB_HNSW_EDGES))?;
+        let out_edges_db = env.create_database(txn, Some(DB_HNSW_OUT_EDGES))?;
 
         Ok(Self {
             vectors_db,
             vector_data_db,
-            edges_db,
+            out_edges_db,
             config,
         })
     }
@@ -101,10 +213,12 @@ impl VectorCore {
     #[inline]
     fn get_new_level(&self) -> usize {
         // TODO: look at using the XOR shift algorithm for random number generation
+        // Storing global rng will not be threadsafe or possible as thread rng needs to be mutable
         // Should instead using an atomic mutable seed and the XOR shift algorithm
         let mut rng = rand::rng();
         let r: f64 = rng.random::<f64>();
-        (-r.ln() * self.config.m_l).floor() as usize
+        let level = (-r.ln() * self.config.m_l).floor() as usize;
+        level
     }
 
     #[inline]
@@ -161,7 +275,7 @@ impl VectorCore {
         let mut neighbors = Vec::with_capacity(self.config.m_max_0.min(512)); // TODO: why 512?
 
         let iter = self
-            .edges_db
+            .out_edges_db
             .lazily_decode_data()
             .prefix_iter(txn, &out_key)?;
 
@@ -191,17 +305,17 @@ impl VectorCore {
     }
 
     #[inline(always)]
-    fn set_neighbours(
+    fn set_neighbours<'a>(
         &self,
         txn: &mut RwTxn,
         id: u128,
-        neighbors: &BinaryHeap<HVector>,
+        neighbors: &'a BinaryHeap<HVector>,
         level: usize,
     ) -> Result<(), VectorError> {
         let prefix = Self::out_edges_key(id, level, None);
 
         let mut keys_to_delete: HashSet<Vec<u8>> = self
-            .edges_db
+            .out_edges_db
             .prefix_iter(txn, prefix.as_ref())?
             .filter_map(|result| result.ok().map(|(key, _)| key.to_vec()))
             .collect();
@@ -215,17 +329,17 @@ impl VectorCore {
                 }
                 let out_key = Self::out_edges_key(id, level, Some(neighbor_id));
                 keys_to_delete.remove(&out_key);
-                self.edges_db.put(txn, &out_key, &())?;
+                self.out_edges_db.put(txn, &out_key, &())?;
 
                 let in_key = Self::out_edges_key(neighbor_id, level, Some(id));
                 keys_to_delete.remove(&in_key);
-                self.edges_db.put(txn, &in_key, &())?;
+                self.out_edges_db.put(txn, &in_key, &())?;
 
                 Ok(())
             })?;
 
         for key in keys_to_delete {
-            self.edges_db.delete(txn, &key)?;
+            self.out_edges_db.delete(txn, &key)?;
         }
 
         Ok(())
@@ -248,7 +362,6 @@ impl VectorCore {
         } else {
             self.config.m_max_0
         };
-
         let mut visited: HashSet<String> = HashSet::new();
         if should_extend {
             let mut result = BinaryHeap::with_capacity(m * cands.len());
@@ -352,10 +465,9 @@ impl HNSW for VectorCore {
         let key = Self::vector_key(id, level);
         let vector = match self.vectors_db.get(txn, key.as_ref())? {
             Some(bytes) => {
-                let vector = if with_data {
-                    HVector::from_bytes(id, level, &bytes)
-                } else {
-                    Ok(HVector::from_slice(level, vec![]))
+                let vector = match with_data {
+                    true => HVector::from_bytes(id, level, &bytes),
+                    false => Ok(HVector::from_slice(level, vec![])),
                 }?;
                 Ok(vector)
             }
@@ -413,7 +525,7 @@ impl HNSW for VectorCore {
             },
         )?;
 
-        let mut results = candidates.to_vec_with_filter::<F, true>(k, filter, txn);
+        let mut results = candidates.to_vec_with_filter(k, filter, txn);
 
         for result in results.iter_mut() {
             result.properties = match self
@@ -452,8 +564,7 @@ impl HNSW for VectorCore {
             Err(_) => {
                 self.set_entry_point(txn, &query)?;
                 query.set_distance(0.0);
-                //query.clone()
-                return Ok(query);
+                query.clone()
             }
         };
 
@@ -473,9 +584,11 @@ impl HNSW for VectorCore {
                 level,
                 None,
             )?;
+
             curr_ep = nearest.peek().unwrap().clone();
 
             let neighbors = self.select_neighbors::<F>(txn, &query, nearest, level, true, None)?;
+
             self.set_neighbours(txn, query.get_id(), &neighbors, level)?;
 
             for e in neighbors {
