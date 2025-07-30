@@ -198,7 +198,7 @@ impl fmt::Display for Config {
             "secondary_indices: {},",
             match SECONDARY_INDICES.get() {
                 Some(indices) => {
-                    format!("Some(vec![{}]", indices.join(".to_string(),"))
+                    format!("Some(vec![{}])", indices.join(".to_string(),"))
                 }
                 None => "None".to_string(),
             }
