@@ -2551,7 +2551,7 @@ fn test_edge_deletion_in_existing_graph() {
 
     txn.commit().unwrap();
 
-    let mut txn = storage.graph_env.read_txn().unwrap();
+    let txn = storage.graph_env.read_txn().unwrap();
     let edges = G::new(Arc::clone(&storage), &txn)
         .e_from_type("knows")
         .collect_to::<Vec<_>>();

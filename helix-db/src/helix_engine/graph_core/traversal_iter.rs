@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, sync::Arc};
+use std::sync::Arc;
 
 use heed3::{RoTxn, RwTxn};
 
@@ -6,7 +6,6 @@ use super::ops::tr_val::TraversalVal;
 use crate::{
     helix_engine::{storage_core::storage_core::HelixGraphStorage, types::GraphError},
     protocol::value::Value,
-    utils::filterable::Filterable,
 };
 use itertools::Itertools;
 
@@ -37,9 +36,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> RoTraversalIterat
     }
 
     pub fn collect_to<B: FromIterator<TraversalVal>>(self) -> B {
-        self.inner.filter_map(|item| {
-            item.ok()
-        }).collect::<B>()
+        self.inner.filter_map(|item| item.ok()).collect::<B>()
     }
 
     pub fn collect_dedup<B: FromIterator<TraversalVal>>(self) -> B {
@@ -60,7 +57,6 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> RoTraversalIterat
         Value::from(self.inner.count())
     }
 
-  
     pub fn map_value_or(
         mut self,
         default: bool,
