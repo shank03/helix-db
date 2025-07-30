@@ -12,7 +12,6 @@ use crate::{
 
 pub struct OrderByAsc<I> {
     iter: I,
-    property: String,
 }
 
 impl<I> Iterator for OrderByAsc<I>
@@ -28,7 +27,6 @@ where
 
 pub struct OrderByDesc<I> {
     iter: I,
-    property: String,
 }
 
 impl<I> Iterator for OrderByDesc<I>
@@ -100,7 +98,6 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> OrderByAdapter<'a
                     (Err(_), _) => Ordering::Equal,
                     (_, Err(_)) => Ordering::Equal,
                 }),
-                property: property.to_string(),
             },
             storage: self.storage,
             txn: self.txn,
@@ -150,7 +147,6 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> OrderByAdapter<'a
                     (Err(_), _) => Ordering::Equal,
                     (_, Err(_)) => Ordering::Equal,
                 }),
-                property: property.to_string(),
             },
             storage: self.storage,
             txn: self.txn,
