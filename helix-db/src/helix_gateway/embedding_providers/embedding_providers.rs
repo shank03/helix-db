@@ -52,8 +52,11 @@ impl EmbeddingModel for EmbeddingModelImpl {
                 "model": &self.model,
             }))
             .send()
-            .map_err(|e| GraphError::from(format!("Failed to send request: {e}")))?
-            .json::<sonic_rs::Value>()
+            .map_err(|e| GraphError::from(format!("Failed to send request: {e}")))?;
+        let text = response
+            .text()
+            .map_err(|e| GraphError::from(format!("Failed to parse response: {e}")))?;
+        let response = sonic_rs::from_str::<sonic_rs::Value>(&text)
             .map_err(|e| GraphError::from(format!("Failed to parse response: {e}")))?;
 
         let embedding = response["data"][0]["embedding"]
@@ -103,9 +106,11 @@ impl EmbeddingModel for EmbeddingModelImpl {
                 "chunk_size": 100
             }))
             .send()
-            .map_err(|e| GraphError::from(format!("Request failed: {}", e)))?
-            .json::<sonic_rs::Value>()
+            .map_err(|e| GraphError::from(format!("Request failed: {}", e)))?;
+        let text = response
+            .text()
             .map_err(|e| GraphError::from(format!("Failed to parse response: {}", e)))?;
+        let response = sonic_rs::from_str::<sonic_rs::Value>(&text).unwrap();
 
         let embedding = response["embedding"]
             .as_array()
