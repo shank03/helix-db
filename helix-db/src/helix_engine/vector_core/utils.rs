@@ -1,8 +1,6 @@
-use std::{cmp::Ordering, collections::BinaryHeap};
-
-use heed3::RoTxn;
-
 use crate::{protocol::value::Value, utils::filterable::Filterable};
+use std::{cmp::Ordering, collections::BinaryHeap};
+use heed3::RoTxn;
 
 #[derive(PartialEq)]
 pub(super) struct Candidate {
@@ -116,12 +114,14 @@ impl<T> HeapOps<T> for BinaryHeap<T> {
                         }
                     }
                 }
+
                 if filter.is_none() || filter.unwrap().iter().all(|f| f(&item, txn)) {
                     result.push(item);
                     break;
                 }
             }
         }
+
         result
     }
 }

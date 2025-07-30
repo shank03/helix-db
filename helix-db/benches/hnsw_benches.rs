@@ -397,3 +397,5 @@ mod tests {
     }
 }
 
+// TODO: memory benchmark (only the hnsw index ofc)
+
