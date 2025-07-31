@@ -173,6 +173,7 @@ trait McpTools<'a> {
         connection: &'a MCPConnection,
         query: String,
         limit: usize,
+        label: String,
     ) -> Result<Vec<TraversalVal>, GraphError>;
 
     /// HNSW Search with built int embedding model
@@ -402,15 +403,20 @@ impl<'a> McpTools<'a> for McpBackend {
     fn search_keyword(
         &'a self,
         txn: &'a RoTxn,
-        _connection: &'a MCPConnection,
+        connection: &'a MCPConnection,
         query: String,
         limit: usize,
+        label: String,
     ) -> Result<Vec<TraversalVal>, GraphError> {
         let db = Arc::clone(&self.db);
 
-        let results = G::new(db, txn)
-            .search_bm25("mcp search", &query, limit)?
+        let items = connection.iter.clone().collect::<Vec<_>>();
+
+        let results = G::new_from(db, txn, items)
+            .search_bm25(&label, &query, limit)?
             .collect_to::<Vec<_>>();
+
+        println!("results: {results:?}");
 
         Ok(results)
     }
