@@ -560,9 +560,8 @@ impl HNSW for VectorCore {
         }
 
         let vec = self.vector_data_db.get(txn, &id.to_be_bytes());
-        println!("{:?}", vec);
 
-        println!("vector deleted with id {}", &id);
+        debug_println!("vector deleted with id {}", &id);
         Ok(())
     }
 
