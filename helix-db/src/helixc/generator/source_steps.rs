@@ -172,9 +172,9 @@ impl Display for SearchVector {
             Some(pre_filter) => write!(
                 f,
                 "search_v::<fn(&HVector, &RoTxn) -> bool, _>({}, {}, {}, Some(&[{}]))",
-                self.label,
                 self.vec,
                 self.k,
+                self.label,
                 pre_filter
                     .iter()
                     .map(|f| format!("|v: &HVector, txn: &RoTxn| {f}"))
@@ -184,9 +184,9 @@ impl Display for SearchVector {
             None => write!(
                 f,
                 "search_v::<fn(&HVector, &RoTxn) -> bool, _>({}, {}, {}, None)",
-                self.label,
                 self.vec,
-                self.k
+                self.k,
+                self.label,
             ),
         }
     }
