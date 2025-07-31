@@ -226,7 +226,7 @@ fn test_hnsw_search() {
     let mut total_recall = 0.0;
     let mut total_precision = 0.0;
     for (qid, query) in query_vectors {
-        let results = index.search::<Filter>(&txn, &query, k, None, false).unwrap();
+        let results = index.search::<Filter>(&txn, &query, "label", k, None, false).unwrap();
 
         let result_indices = results
             .into_iter()
@@ -258,6 +258,14 @@ fn test_hnsw_search() {
     );
     assert!(total_recall >= 0.8, "recall not high enough!");
     assert!(total_precision>= 0.8, "precision not high enough!");
+}
+
+#[test]
+fn test_hnsw_search_property_ordering() {
+}
+
+#[test]
+fn test_hnsw_search_filter_ordering() {
 }
 
 #[test]

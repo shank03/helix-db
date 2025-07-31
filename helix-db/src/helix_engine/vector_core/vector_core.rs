@@ -173,24 +173,35 @@ impl VectorCore {
         let prefix_len = out_key.len();
 
         for result in iter {
-            if let Ok((key, _)) = result {
-                // TODO: fix here because not working at all
-                let mut arr = [0u8; 16];
-                let len = std::cmp::min(key.len(), 16);
-                arr[..len].copy_from_slice(&key[prefix_len..(prefix_len + len)]);
-                let neighbor_id = u128::from_be_bytes(arr);
+            let (key, _) = result?;
 
-                if neighbor_id == id {
-                    continue;
-                }
+            // TODO: fix here because not working at all
+            let mut arr = [0u8; 16];
+            let len = std::cmp::min(key.len(), 16);
+            arr[..len].copy_from_slice(&key[prefix_len..(prefix_len + len)]);
+            let neighbor_id = u128::from_be_bytes(arr);
 
-                if let Ok(vector) = self.get_vector(txn, neighbor_id, level, true) {
-                    // TODO: look at implementing a macro that actually just runs each function rather than iterating through
-                    if filter.is_none() || filter.unwrap().iter().all(|f| f(&vector, txn)) {
-                        neighbors.push(vector);
-                    }
-                }
+            if neighbor_id == id {
+                continue;
             }
+
+            let vector = self.get_vector(txn, neighbor_id, level, true)?;
+
+            let passes_filters = match filter {
+                Some(filter_slice) => filter_slice.iter().all(|f| f(&vector, txn)),
+                None => true,
+            };
+
+            if passes_filters {
+                neighbors.push(vector);
+            }
+
+            //if let Ok(vector) = self.get_vector(txn, neighbor_id, level, true) {
+            //    // TODO: look at implementing a macro that actually just runs each function rather than iterating through
+            //    if filter.is_none() || filter.unwrap().iter().all(|f| f(&vector, txn)) {
+            //        neighbors.push(vector);
+            //    }
+            //}
         }
         neighbors.shrink_to_fit();
 
@@ -382,6 +393,7 @@ impl HNSW for VectorCore {
         &self,
         txn: &RoTxn,
         query: &[f64],
+        label: &str,
         k: usize,
         filter: Option<&[F]>,
         should_trickle: bool,
@@ -426,7 +438,7 @@ impl HNSW for VectorCore {
             },
         )?;
 
-        let mut results = candidates.to_vec_with_filter::<F, true>(k, filter, txn);
+        let mut results = candidates.to_vec_with_filter::<F, true>(k, filter, label, txn);
 
         for result in results.iter_mut() {
             result.properties = match self
@@ -552,3 +564,4 @@ impl HNSW for VectorCore {
             .collect()
     }
 }
+

@@ -1,6 +1,6 @@
 use crate::{protocol::value::Value, utils::filterable::Filterable};
-use std::{cmp::Ordering, collections::BinaryHeap};
 use heed3::RoTxn;
+use std::{cmp::Ordering, collections::BinaryHeap};
 
 #[derive(PartialEq)]
 pub(super) struct Candidate {
@@ -47,6 +47,7 @@ pub(super) trait HeapOps<T> {
         &mut self,
         k: usize,
         filter: Option<&[F]>,
+        label: &str,
         txn: &RoTxn,
     ) -> Vec<T>
     where
@@ -95,6 +96,7 @@ impl<T> HeapOps<T> for BinaryHeap<T> {
         &mut self,
         k: usize,
         filter: Option<&[F]>,
+        label: &str,
         txn: &RoTxn,
     ) -> Vec<T>
     where
@@ -115,7 +117,9 @@ impl<T> HeapOps<T> for BinaryHeap<T> {
                     }
                 }
 
-                if filter.is_none() || filter.unwrap().iter().all(|f| f(&item, txn)) {
+                if item.label() == label
+                    && (filter.is_none() || filter.unwrap().iter().all(|f| f(&item, txn)))
+                {
                     result.push(item);
                     break;
                 }
@@ -125,4 +129,3 @@ impl<T> HeapOps<T> for BinaryHeap<T> {
         result
     }
 }
-
