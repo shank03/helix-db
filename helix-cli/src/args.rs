@@ -64,6 +64,10 @@ pub enum CommandType {
 #[derive(Debug, Args)]
 #[clap(name = "deploy", about = "Deploy a Helix project")]
 pub struct DeployCommand {
+
+    #[clap(long, help = "Build in release mode (default is dev)")]
+    pub release: bool,
+
     #[clap(short, long, help = "Redeploy a remote instance of HelixDB")]
     pub remote: bool,
 
