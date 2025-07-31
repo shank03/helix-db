@@ -369,12 +369,18 @@ impl StorageMethods for HelixGraphStorage {
         }
 
         for (other_node_id, label_bytes, edge_id) in other_out_edges.iter() {
-            self.out_edges_db
-                .delete_one_duplicate(txn, &Self::out_edge_key(other_node_id, label_bytes), &Self::pack_edge_data(edge_id, id))?;
+            self.out_edges_db.delete_one_duplicate(
+                txn,
+                &Self::out_edge_key(other_node_id, label_bytes),
+                &Self::pack_edge_data(edge_id, id),
+            )?;
         }
         for (other_node_id, label_bytes, edge_id) in other_in_edges.iter() {
-            self.in_edges_db
-                .delete_one_duplicate(txn, &Self::in_edge_key(other_node_id, label_bytes), &Self::pack_edge_data(edge_id, id))?;
+            self.in_edges_db.delete_one_duplicate(
+                txn,
+                &Self::in_edge_key(other_node_id, label_bytes),
+                &Self::pack_edge_data(edge_id, id),
+            )?;
         }
         // Delete node data and label
         self.nodes_db.delete(txn, Self::node_key(id))?;
@@ -462,12 +468,18 @@ impl StorageMethods for HelixGraphStorage {
         }
 
         for (other_node_id, label_bytes, edge_id) in other_out_edges.iter() {
-            self.out_edges_db
-                .delete_one_duplicate(txn, &Self::out_edge_key(other_node_id, label_bytes), &Self::pack_edge_data(edge_id, id))?;
+            self.out_edges_db.delete_one_duplicate(
+                txn,
+                &Self::out_edge_key(other_node_id, label_bytes),
+                &Self::pack_edge_data(edge_id, id),
+            )?;
         }
         for (other_node_id, label_bytes, edge_id) in other_in_edges.iter() {
-            self.in_edges_db
-                .delete_one_duplicate(txn, &Self::in_edge_key(other_node_id, label_bytes), &Self::pack_edge_data(edge_id, id))?;
+            self.in_edges_db.delete_one_duplicate(
+                txn,
+                &Self::in_edge_key(other_node_id, label_bytes),
+                &Self::pack_edge_data(edge_id, id),
+            )?;
         }
 
         // Delete vector data

@@ -50,10 +50,10 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> SearchVAdapt
         K: TryInto<usize>,
         K::Error: std::fmt::Debug,
     {
-        let vectors = self
-            .storage
-            .vectors
-            .search(self.txn, query, k.try_into().unwrap(), filter, false);
+        let vectors =
+            self.storage
+                .vectors
+                .search(self.txn, query, k.try_into().unwrap(), filter, false);
 
         let iter = match vectors {
             Ok(vectors) => vectors

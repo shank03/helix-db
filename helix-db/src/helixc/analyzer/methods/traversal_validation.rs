@@ -1,4 +1,6 @@
 use crate::helixc::analyzer::error_codes::*;
+use crate::helixc::generator::source_steps::SearchVector;
+use crate::helixc::generator::utils::VecData;
 use crate::{
     generate_error,
     helixc::{
@@ -285,6 +287,167 @@ pub(crate) fn validate_traversal<'a>(
             gen_traversal.traversal_type = TraversalType::FromVar(GenRef::Std("val".to_string())); // TODO: ensure this default is stable
             gen_traversal.source_step = Separator::Empty(SourceStep::Anonymous);
             parent
+        }
+        StartNode::SearchVector(sv) => {
+            if let Some(ref ty) = sv.vector_type {
+                if !ctx.vector_set.contains(ty.as_str()) {
+                    generate_error!(ctx, original_query, sv.loc.clone(), E103, ty.as_str());
+                }
+            }
+            let vec: VecData = match &sv.data {
+                Some(VectorData::Vector(v)) => {
+                    VecData::Standard(GeneratedValue::Literal(GenRef::Ref(format!(
+                        "[{}]",
+                        v.iter()
+                            .map(|f| f.to_string())
+                            .collect::<Vec<String>>()
+                            .join(",")
+                    ))))
+                }
+                Some(VectorData::Identifier(i)) => {
+                    is_valid_identifier(ctx, original_query, sv.loc.clone(), i.as_str());
+                    // if is in params then use data.
+                    let _ = type_in_scope(ctx, original_query, sv.loc.clone(), scope, i.as_str());
+                    VecData::Standard(gen_identifier_or_param(
+                        original_query,
+                        i.as_str(),
+                        true,
+                        false,
+                    ))
+                }
+                Some(VectorData::Embed(e)) => {
+                    match &e.value {
+                        EvaluatesToString::Identifier(i) => VecData::Embed(
+                            gen_identifier_or_param(original_query, i.as_str(), true, false),
+                        ),
+                        EvaluatesToString::StringLiteral(s) => {
+                            VecData::Embed(GeneratedValue::Literal(GenRef::Ref(s.clone())))
+                        }
+                    }
+                }
+                _ => {
+                    generate_error!(
+                        ctx,
+                        original_query,
+                        sv.loc.clone(),
+                        E305,
+                        ["vector_data", "SearchV"],
+                        ["vector_data"]
+                    );
+                    VecData::Unknown
+                }
+            };
+            let k = match &sv.k {
+                Some(k) => match &k.value {
+                    EvaluatesToNumberType::I8(i) => {
+                        GeneratedValue::Primitive(GenRef::Std(i.to_string()))
+                    }
+                    EvaluatesToNumberType::I16(i) => {
+                        GeneratedValue::Primitive(GenRef::Std(i.to_string()))
+                    }
+                    EvaluatesToNumberType::I32(i) => {
+                        GeneratedValue::Primitive(GenRef::Std(i.to_string()))
+                    }
+                    EvaluatesToNumberType::I64(i) => {
+                        GeneratedValue::Primitive(GenRef::Std(i.to_string()))
+                    }
+
+                    EvaluatesToNumberType::U8(i) => {
+                        GeneratedValue::Primitive(GenRef::Std(i.to_string()))
+                    }
+                    EvaluatesToNumberType::U16(i) => {
+                        GeneratedValue::Primitive(GenRef::Std(i.to_string()))
+                    }
+                    EvaluatesToNumberType::U32(i) => {
+                        GeneratedValue::Primitive(GenRef::Std(i.to_string()))
+                    }
+                    EvaluatesToNumberType::U64(i) => {
+                        GeneratedValue::Primitive(GenRef::Std(i.to_string()))
+                    }
+                    EvaluatesToNumberType::U128(i) => {
+                        GeneratedValue::Primitive(GenRef::Std(i.to_string()))
+                    }
+                    EvaluatesToNumberType::Identifier(i) => {
+                        is_valid_identifier(ctx, original_query, sv.loc.clone(), i.as_str());
+                        gen_identifier_or_param(original_query, i, false, true)
+                    }
+                    _ => {
+                        generate_error!(
+                            ctx,
+                            original_query,
+                            sv.loc.clone(),
+                            E305,
+                            ["k", "SearchV"],
+                            ["k"]
+                        );
+                        GeneratedValue::Unknown
+                    }
+                },
+                None => {
+                    generate_error!(ctx, original_query, sv.loc.clone(), E601, &sv.loc.span);
+                    GeneratedValue::Unknown
+                }
+            };
+
+            let pre_filter: Option<Vec<BoExp>> = match &sv.pre_filter {
+                Some(expr) => {
+                    let (_, stmt) = infer_expr_type(
+                        ctx,
+                        expr,
+                        scope,
+                        original_query,
+                        Some(Type::Vector(sv.vector_type.clone())),
+                        gen_query,
+                    );
+                    // Where/boolean ops don't change the element type,
+                    // so `cur_ty` stays the same.
+                    assert!(stmt.is_some());
+                    let stmt = stmt.unwrap();
+                    let mut gen_traversal = GeneratedTraversal {
+                        traversal_type: TraversalType::NestedFrom(GenRef::Std("v".to_string())),
+                        steps: vec![],
+                        should_collect: ShouldCollect::ToVec,
+                        source_step: Separator::Empty(SourceStep::Anonymous),
+                    };
+                    match stmt {
+                        GeneratedStatement::Traversal(tr) => {
+                            gen_traversal
+                                .steps
+                                .push(Separator::Period(GeneratedStep::Where(Where::Ref(
+                                    WhereRef {
+                                        expr: BoExp::Expr(tr),
+                                    },
+                                ))));
+                        }
+                        GeneratedStatement::BoExp(expr) => {
+                            gen_traversal
+                                .steps
+                                .push(Separator::Period(GeneratedStep::Where(match expr {
+                                    BoExp::Exists(mut tr) => {
+                                        tr.should_collect = ShouldCollect::No;
+                                        Where::Ref(WhereRef {
+                                            expr: BoExp::Exists(tr),
+                                        })
+                                    }
+                                    _ => Where::Ref(WhereRef { expr }),
+                                })));
+                        }
+                        _ => unreachable!(),
+                    }
+                    Some(vec![BoExp::Expr(gen_traversal)])
+                }
+                None => None,
+            };
+
+            gen_traversal.traversal_type = TraversalType::Ref;
+            gen_traversal.should_collect = ShouldCollect::ToVec;
+            gen_traversal.source_step = Separator::Period(SourceStep::SearchVector(SearchVector {
+                vec,
+                k,
+                pre_filter,
+            }));
+            // Search returns nodes that contain the vectors
+            Type::Vectors(sv.vector_type.clone())
         }
     };
 
@@ -1022,11 +1185,11 @@ pub(crate) fn validate_traversal<'a>(
                         end,
                     })));
             }
-            StepType::OrderByAsc(expr) => {
+            StepType::OrderBy(order_by) => {
                 // verify property access
                 let (_, stmt) = infer_expr_type(
                     ctx,
-                    expr,
+                    &order_by.expression,
                     scope,
                     original_query,
                     Some(cur_ty.clone()),
@@ -1047,41 +1210,12 @@ pub(crate) fn validate_traversal<'a>(
                             .steps
                             .push(Separator::Period(GeneratedStep::OrderBy(OrderBy {
                                 property,
-                                order: Order::Asc,
+                                order: match order_by.order_by_type {
+                                    OrderByType::Asc => Order::Asc,
+                                    OrderByType::Desc => Order::Desc,
+                                },
                             })));
-                        gen_traversal.should_collect = ShouldCollect::Try;
-                    }
-                    _ => unreachable!("Cannot reach here"),
-                }
-            }
-            StepType::OrderByDesc(expr) => {
-                // verify property access
-                let (_, stmt) = infer_expr_type(
-                    ctx,
-                    expr,
-                    scope,
-                    original_query,
-                    Some(cur_ty.clone()),
-                    gen_query,
-                );
-
-                assert!(stmt.is_some());
-                match stmt.unwrap() {
-                    GeneratedStatement::Traversal(traversal) => {
-                        let property = match &traversal.steps.last() {
-                            Some(step) => match &step.inner() {
-                                GeneratedStep::PropertyFetch(property) => property.clone(),
-                                _ => unreachable!("Cannot reach here"),
-                            },
-                            None => unreachable!("Cannot reach here"),
-                        };
-                        gen_traversal
-                            .steps
-                            .push(Separator::Period(GeneratedStep::OrderBy(OrderBy {
-                                property,
-                                order: Order::Desc,
-                            })));
-                        gen_traversal.should_collect = ShouldCollect::Try;
+                        gen_traversal.should_collect = ShouldCollect::ToVec;
                     }
                     _ => unreachable!("Cannot reach here"),
                 }

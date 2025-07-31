@@ -43,6 +43,9 @@ impl EmbeddingModelImpl {
 #[cfg(feature = "embed_openai")]
 impl EmbeddingModel for EmbeddingModelImpl {
     fn fetch_embedding(&self, text: &str) -> Result<Vec<f64>, GraphError> {
+        if self.api_key.is_empty() {
+            return Err(GraphError::from("OPENAI_API_KEY not set"));
+        }
         let response = self
             .client
             .post("https://api.openai.com/v1/embeddings")
@@ -52,10 +55,12 @@ impl EmbeddingModel for EmbeddingModelImpl {
                 "model": &self.model,
             }))
             .send()
-            .map_err(|e| GraphError::from(format!("Failed to send request: {e}")))?
-            .json::<sonic_rs::Value>()
+            .map_err(|e| GraphError::from(format!("Failed to send request: {e}")))?;
+        let text = response
+            .text()
             .map_err(|e| GraphError::from(format!("Failed to parse response: {e}")))?;
-
+        let response = sonic_rs::from_str::<sonic_rs::Value>(&text)
+            .map_err(|e| GraphError::from(format!("Failed to parse response: {e}")))?;
         let embedding = response["data"][0]["embedding"]
             .as_array()
             .ok_or_else(|| GraphError::from("Invalid embedding format"))?
@@ -103,9 +108,11 @@ impl EmbeddingModel for EmbeddingModelImpl {
                 "chunk_size": 100
             }))
             .send()
-            .map_err(|e| GraphError::from(format!("Request failed: {}", e)))?
-            .json::<sonic_rs::Value>()
+            .map_err(|e| GraphError::from(format!("Request failed: {}", e)))?;
+        let text = response
+            .text()
             .map_err(|e| GraphError::from(format!("Failed to parse response: {}", e)))?;
+        let response = sonic_rs::from_str::<sonic_rs::Value>(&text).unwrap();
 
         let embedding = response["embedding"]
             .as_array()

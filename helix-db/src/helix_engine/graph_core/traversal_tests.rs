@@ -10,7 +10,7 @@ use crate::{
             source::{add_n::AddNAdapter, e_from_id::EFromIdAdapter, n_from_id::NFromIdAdapter},
             tr_val::{Traversable, TraversalVal},
             util::{
-                dedup::DedupAdapter, map::MapAdapter, props::PropsAdapter, range::RangeAdapter,
+                dedup::DedupAdapter, map::MapAdapter, order::OrderByAdapter, props::PropsAdapter, range::RangeAdapter
             },
             vectors::brute_force_search::BruteForceSearchVAdapter,
         },
@@ -1867,7 +1867,7 @@ fn test_order_by_desc() {
     let traversal = G::new(Arc::clone(&storage), &txn)
         .n_from_type("person")
         .order_by_desc("age")
-        .unwrap();
+        .collect_to::<Vec<_>>();
 
     assert_eq!(traversal.len(), 3);
     assert_eq!(traversal[0].id(), node3.id());
@@ -1898,7 +1898,7 @@ fn test_order_by_asc() {
     let traversal = G::new(Arc::clone(&storage), &txn)
         .n_from_type("person")
         .order_by_asc("age")
-        .unwrap();
+        .collect_to::<Vec<_>>();
 
     assert_eq!(traversal.len(), 3);
     assert_eq!(traversal[0].id(), node3.id());

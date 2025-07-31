@@ -63,8 +63,8 @@ async fn main() -> ExitCode {
             {
                 let instance_manager = InstanceManager::new().unwrap();
                 let mut sp = Spinner::new(Spinners::Dots9, "Starting Helix instance".into());
-
-                match instance_manager.start_instance(&command.cluster.unwrap(), None) {
+                let openai_key = get_openai_key();  
+                match instance_manager.start_instance(&command.cluster.unwrap(), None, openai_key) {
                     Ok(instance) => {
                         sp.stop_with_message(
                             "Successfully started Helix instance"
@@ -102,7 +102,7 @@ async fn main() -> ExitCode {
             };
 
             if !command.remote {
-                let code = match compile_and_build_helix(path, &output, files) {
+                let code = match compile_and_build_helix(path, &output, files, command.release) {
                     Ok(code) => code,
                     Err(_) => return ExitCode::FAILURE,
                 };
@@ -538,13 +538,14 @@ async fn main() -> ExitCode {
             fs::create_dir_all(&path).unwrap();
 
             let schema_path = path.join("schema.hx");
-            fs::write(&schema_path, DEFAULT_SCHEMA).unwrap();
+            fs::write(&schema_path, DEFAULT_SCHEMA).expect("could not write schema");
 
             let main_path = path.join("queries.hx");
-            fs::write(main_path, DEFAULT_QUERIES).unwrap();
+            fs::write(main_path, DEFAULT_QUERIES).expect("could not write queries");
 
             let config_path = path.join("config.hx.json");
-            fs::write(config_path, Config::init_config()).unwrap();
+            fs::write(config_path, Config::init_config())
+                .expect("could not write config");
 
             println!(
                 "{} {}",
