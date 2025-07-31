@@ -188,6 +188,7 @@ impl VectorCore {
             let vector = self.get_vector(txn, neighbor_id, level, true)?;
 
             let passes_filters = match filter {
+                // TODO: look at implementing a macro that actually just runs each function rather than iterating through
                 Some(filter_slice) => filter_slice.iter().all(|f| f(&vector, txn)),
                 None => true,
             };
@@ -197,7 +198,6 @@ impl VectorCore {
             }
 
             //if let Ok(vector) = self.get_vector(txn, neighbor_id, level, true) {
-            //    // TODO: look at implementing a macro that actually just runs each function rather than iterating through
             //    if filter.is_none() || filter.unwrap().iter().all(|f| f(&vector, txn)) {
             //        neighbors.push(vector);
             //    }
@@ -281,9 +281,19 @@ impl VectorCore {
                 }
 
                 neighbor.set_distance(neighbor.distance_to(query)?);
-                if filter.is_none() || filter.unwrap().iter().all(|f| f(&neighbor, txn)) {
+
+                let passes_filters = match filter {
+                    Some(filter_slice) => filter_slice.iter().all(|f| f(&neighbor, txn)),
+                    None => true,
+                };
+
+                if passes_filters {
                     result.push(neighbor);
                 }
+
+                //if filter.is_none() || filter.unwrap().iter().all(|f| f(&neighbor, txn)) {
+                //    result.push(neighbor);
+                //}
             }
         }
 
@@ -446,10 +456,11 @@ impl HNSW for VectorCore {
                 .get(txn, &result.get_id().to_be_bytes())?
             {
                 Some(bytes) => Some(bincode::deserialize(&bytes).map_err(VectorError::from)?),
-                None => None, // Maybe should be an error?
+                None => None, // TODO: maybe should be an error?
             };
         }
 
+        debug_println!("vector search found {} results", results.len());
         Ok(results)
     }
 
@@ -484,7 +495,10 @@ impl HNSW for VectorCore {
         let mut curr_ep = entry_point;
         for level in (new_level + 1..=l).rev() {
             let nearest = self.search_level::<F>(txn, &query, &mut curr_ep, 1, level, None)?;
-            curr_ep = nearest.peek().unwrap().clone();
+            curr_ep = nearest
+                .peek()
+                .ok_or(VectorError::VectorCoreError("emtpy search result".to_string()))?
+                .clone();
         }
 
         for level in (0..=l.min(new_level)).rev() {
@@ -521,6 +535,8 @@ impl HNSW for VectorCore {
                 &bincode::serialize(&fields)?,
             )?;
         }
+
+        debug_println!("vector inserted with id {}", query.get_id());
         Ok(query)
     }
 
@@ -545,6 +561,8 @@ impl HNSW for VectorCore {
             self.vector_data_db
                 .put(txn, &id.to_be_bytes(), &bincode::serialize(&properties)?)?;
         }
+
+        debug_println!("vector deleted with id {}", &id);
         Ok(())
     }
 
