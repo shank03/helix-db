@@ -40,7 +40,7 @@ impl HNSWConfig {
     /// - m (5 <= m <= 48): max num of bi-directional links per element
     /// - m_max_0 (2 * m): max num of links for level 0 (level that stores all vecs)
     /// - ef_construct (40 <= ef_construct <= 512): size of the dynamic candidate list
-    ///     for construction
+    ///   for construction
     /// - m_l (ln(1/m)): level generation factor (multiplied by a random number)
     /// - ef (10 <= ef <= 512): num of candidates to search
     pub fn new(m: Option<usize>, ef_construct: Option<usize>, ef: Option<usize>) -> Self {
@@ -209,11 +209,11 @@ impl VectorCore {
     }
 
     #[inline(always)]
-    fn set_neighbours<'a>(
+    fn set_neighbours(
         &self,
         txn: &mut RwTxn,
         id: u128,
-        neighbors: &'a BinaryHeap<HVector>,
+        neighbors: &BinaryHeap<HVector>,
         level: usize,
     ) -> Result<(), VectorError> {
         let prefix = Self::out_edges_key(id, level, None);
@@ -262,11 +262,7 @@ impl VectorCore {
     where
         F: Fn(&HVector, &RoTxn) -> bool,
     {
-        let m: usize = if level == 0 {
-            self.config.m
-        } else {
-            self.config.m
-        };
+        let m = self.config.m;
 
         if !should_extend {
             return Ok(cands.take_inord(m));
@@ -387,7 +383,7 @@ impl HNSW for VectorCore {
         let vector = match self.vectors_db.get(txn, key.as_ref())? {
             Some(bytes) => {
                 let vector = match with_data {
-                    true => HVector::from_bytes(id, level, &bytes),
+                    true => HVector::from_bytes(id, level, bytes),
                     false => Ok(HVector::from_slice(level, vec![])),
                 }?;
                 Ok(vector)
@@ -455,7 +451,7 @@ impl HNSW for VectorCore {
                 .vector_data_db
                 .get(txn, &result.get_id().to_be_bytes())?
             {
-                Some(bytes) => Some(bincode::deserialize(&bytes).map_err(VectorError::from)?),
+                Some(bytes) => Some(bincode::deserialize(bytes).map_err(VectorError::from)?),
                 None => None, // TODO: maybe should be an error?
             };
         }
@@ -576,7 +572,7 @@ impl HNSW for VectorCore {
             .map(|result| {
                 result
                     .map_err(VectorError::from)
-                    .and_then(|(_, value)| bincode::deserialize(&value).map_err(VectorError::from))
+                    .and_then(|(_, value)| bincode::deserialize(value).map_err(VectorError::from))
             })
             .filter_ok(|vector: &HVector| level.is_none_or(|l| vector.level == l))
             .collect()
