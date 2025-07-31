@@ -1,5 +1,5 @@
 N::File1 {
-    name: String,
+    INDEX name: String,
     age: I32,
 }
 

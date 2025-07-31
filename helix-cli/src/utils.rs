@@ -17,6 +17,7 @@ use serde::Deserialize;
 use serde_json::{Value as JsonValue, json};
 use spinners::{Spinner, Spinners};
 use std::{
+    env,
     error::Error,
     fmt::Write,
     fs::{self, DirEntry, File},
@@ -548,6 +549,7 @@ pub fn compile_and_build_helix(
     path: String,
     output: &PathBuf,
     files: Vec<DirEntry>,
+    release_mode: bool,
 ) -> Result<Content, String> {
     let mut sp = Spinner::new(Spinners::Dots9, "Compiling Helix queries".into());
 
@@ -623,7 +625,11 @@ pub fn compile_and_build_helix(
     let mut runner = Command::new("cargo");
     runner
         .arg("build")
-        .arg("--release")
+        .args(if release_mode {
+            vec!["--release"]
+        } else {
+            vec!["--profile", "dev"]
+        })
         .current_dir(PathBuf::from(&output))
         .env("RUSTFLAGS", "-Awarnings");
 
@@ -669,8 +675,8 @@ pub fn deploy_helix(port: u16, code: Content, instance_id: Option<String>) -> Re
                 return Err("".to_string());
             }
         }
-
-        match instance_manager.start_instance(&iid, Some(endpoints)) {
+        let openai_key = get_openai_key();
+        match instance_manager.start_instance(&iid, Some(endpoints), openai_key) {
             Ok(instance) => {
                 sp.stop_with_message(
                     "Successfully started Helix instance"
@@ -688,7 +694,8 @@ pub fn deploy_helix(port: u16, code: Content, instance_id: Option<String>) -> Re
             }
         }
     } else {
-        match instance_manager.init_start_instance(&binary_path, port, endpoints) {
+        let openai_key = get_openai_key();
+        match instance_manager.init_start_instance(&binary_path, port, endpoints, openai_key) {
             Ok(instance) => {
                 sp.stop_with_message(
                     "Successfully started Helix instance"
@@ -854,4 +861,10 @@ pub async fn redeploy_helix_remote(
         }
     };
     Ok(())
+}
+
+pub fn get_openai_key() -> Option<String> {
+    use dotenvy::dotenv;
+    dotenv().ok();
+    env::var("OPENAI_API_KEY").ok()
 }
