@@ -559,8 +559,6 @@ impl HNSW for VectorCore {
                 .put(txn, &id.to_be_bytes(), &bincode::serialize(&n_properties)?)?;
         }
 
-        let vec = self.vector_data_db.get(txn, &id.to_be_bytes());
-
         debug_println!("vector deleted with id {}", &id);
         Ok(())
     }
