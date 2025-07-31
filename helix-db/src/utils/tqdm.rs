@@ -12,8 +12,7 @@ impl fmt::Display for ProgChar {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let c = match self {
             ProgChar::Block => '█',
-            ProgChar::Hash => '#',
-        };
+            ProgChar::Hash => '#', };
         write!(f, "{c}")
     }
 }
@@ -51,7 +50,7 @@ impl<T: Iterator> tqdm<T> {
 
         print!("\r[");
         for _ in 0..filled {
-            print!("{self.prog_char}");
+            print!("{0}", self.prog_char);
         }
         for _ in 0..empty {
             print!("-");
