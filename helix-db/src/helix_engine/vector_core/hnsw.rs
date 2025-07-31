@@ -20,6 +20,7 @@ pub trait HNSW
         txn: &RoTxn,
         query: &[f64],
         k: usize,
+        label: &str,
         filter: Option<&[F]>,
         should_trickle: bool,
     ) -> Result<Vec<HVector>, VectorError>

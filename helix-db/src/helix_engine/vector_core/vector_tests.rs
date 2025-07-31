@@ -98,3 +98,4 @@ fn test_hvector_cosine_similarity() {
     let similarity = v1.distance_to(&v2).unwrap();
     assert!(similarity == 1.0 - 0.9746318461970762);
 }
+

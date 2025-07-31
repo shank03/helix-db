@@ -1,7 +1,7 @@
 N::User {
     name: String,
     age: I32,
-    created_at: Date,
+    created_at: Date DEFAULT NOW,
 }
 
 E::Knows {
@@ -12,9 +12,10 @@ E::Knows {
     }
 }
 
+QUERY AddUser() =>
+    user <- AddN<User>({name: "john", age: 20})
+    RETURN user
 
 QUERY GetOrder() =>
-    userByAge <- N<User>::ORDER<Desc>(_::{age})
-    userByName <- N<User>::ORDER<Asc>(_::{name})
-    userByCreatedAt <- N<User>::ORDER<Desc>(_::{created_at})::OutE<Knows>
-    RETURN userByAge, userByName
+    userByAge <- N<User>::ORDER<Desc>(_::{created_at})
+    RETURN userByAge

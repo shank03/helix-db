@@ -430,6 +430,7 @@ pub enum StartNode {
         edge_type: String,
         ids: Option<Vec<IdType>>,
     },
+    SearchVector(SearchVector),
     Identifier(String),
     Anonymous,
 }
@@ -2093,6 +2094,7 @@ impl HelixParser {
                 Ok(StartNode::Edge { edge_type, ids })
             }
             Rule::identifier => Ok(StartNode::Identifier(pair.as_str().to_string())),
+            Rule::search_vector => Ok(StartNode::SearchVector(self.parse_search_vector(pair)?)),
             _ => Ok(StartNode::Anonymous),
         }
     }
