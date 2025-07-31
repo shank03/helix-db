@@ -378,6 +378,7 @@ impl HybridSearch for HelixGraphStorage {
                 &txn,
                 &query_vector_owned,
                 limit * 2,
+                "vector",
                 None,
                 false,
             )?;
