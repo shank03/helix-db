@@ -6,3 +6,6 @@ pub mod vector_distance;
 
 #[cfg(test)]
 mod vector_tests;
+#[cfg(test)]
+mod hnsw_tests;
+

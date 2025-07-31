@@ -279,8 +279,6 @@ impl BM25 for HBM25Config {
         let tf_component = (tf * (self.k1 + 1.0))
             / (tf + self.k1 * (1.0 - self.b + self.b * (doc_len.abs() / avgdl)));
 
-        
-
         (idf * tf_component) as f32
     }
 
@@ -291,6 +289,7 @@ impl BM25 for HBM25Config {
         limit: usize,
     ) -> Result<Vec<(u128, f32)>, GraphError> {
         let query_terms = self.tokenize::<true>(query);
+        // (node uuid, score)
         let mut doc_scores: HashMap<u128, f32> = HashMap::with_capacity(limit);
 
         let metadata = self
@@ -299,15 +298,14 @@ impl BM25 for HBM25Config {
             .ok_or(GraphError::New("BM25 metadata not found".to_string()))?;
         let metadata: BM25Metadata = bincode::deserialize(metadata)?;
 
-        // For each query term, calculate scores
+        // for each query term, calculate scores
         for term in query_terms {
             let term_bytes = term.as_bytes();
 
-            // Get document frequency for this term
-            let df = self.term_frequencies_db.get(txn, term_bytes)?.unwrap_or(0);
-            // if df == 0 {
-            //     continue; // Term not in index
-            // }
+            let doc_frequency = self.term_frequencies_db.get(txn, term_bytes)?.unwrap_or(0);
+            if doc_frequency == 0 {
+                continue;
+            }
 
             // Get all documents containing this term
             if let Some(duplicates) = self.inverted_index_db.get_duplicates(txn, term_bytes)? {
@@ -322,12 +320,11 @@ impl BM25 for HBM25Config {
                     let score = self.calculate_bm25_score(
                         posting.term_frequency,
                         doc_length,
-                        df,
+                        doc_frequency,
                         metadata.total_docs,
                         metadata.avgdl,
                     );
 
-                    // Add to document's total score
                     *doc_scores.entry(posting.doc_id).or_insert(0.0) += score;
                 }
             }

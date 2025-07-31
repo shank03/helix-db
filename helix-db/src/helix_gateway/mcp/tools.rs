@@ -376,7 +376,9 @@ impl<'a> McpTools<'a> for McpBackend {
             label: &edge_type,
         };
 
-        iter.take(100).collect::<Result<Vec<_>, _>>()
+        let result = iter.take(100).collect::<Result<Vec<_>, _>>();
+        debug_println!("result: {:?}", result);
+        result
     }
 
     fn filter_items(
@@ -403,6 +405,8 @@ impl<'a> McpTools<'a> for McpBackend {
             .search_bm25("mcp search", &query, limit)?
             .collect_to::<Vec<_>>();
 
+        debug_println!("result: {results:?}");
+
         Ok(results)
     }
 
@@ -422,7 +426,7 @@ impl<'a> McpTools<'a> for McpBackend {
             .search_v::<fn(&HVector, &RoTxn) -> bool, _>(&embedding, 5, None)
             .collect_to::<Vec<_>>();
 
-        println!("result: {res:?}");
+        debug_println!("result: {res:?}");
         Ok(res)
     }
 }
@@ -557,3 +561,4 @@ pub(super) fn _filter_items(
     debug_println!("result: {:?}", result);
     result
 }
+
