@@ -4,7 +4,7 @@ use crate::{
         types::VectorError,
         vector_core::{
             hnsw::HNSW,
-            utils::{Candidate, HeapOps},
+            utils::{Candidate, HeapOps, VectorFilter},
             vector::HVector,
         },
     },
@@ -278,6 +278,7 @@ impl VectorCore {
 
                 neighbor.set_distance(neighbor.distance_to(query)?);
 
+                /*
                 let passes_filters = match filter {
                     Some(filter_slice) => filter_slice.iter().all(|f| f(&neighbor, txn)),
                     None => true,
@@ -286,10 +287,11 @@ impl VectorCore {
                 if passes_filters {
                     result.push(neighbor);
                 }
+                */
 
-                //if filter.is_none() || filter.unwrap().iter().all(|f| f(&neighbor, txn)) {
-                //    result.push(neighbor);
-                //}
+                if filter.is_none() || filter.unwrap().iter().all(|f| f(&neighbor, txn)) {
+                    result.push(neighbor);
+                }
             }
         }
 
@@ -444,17 +446,8 @@ impl HNSW for VectorCore {
             },
         )?;
 
-        let mut results = candidates.to_vec_with_filter::<F, true>(k, filter, label, txn);
-
-        for result in results.iter_mut() {
-            result.properties = match self
-                .vector_data_db
-                .get(txn, &result.get_id().to_be_bytes())?
-            {
-                Some(bytes) => Some(bincode::deserialize(bytes).map_err(VectorError::from)?),
-                None => None, // TODO: maybe should be an error?
-            };
-        }
+        let results =
+            candidates.to_vec_with_filter::<F, true>(k, filter, label, txn, self.vector_data_db)?;
 
         debug_println!("vector search found {} results", results.len());
         Ok(results)
@@ -483,7 +476,8 @@ impl HNSW for VectorCore {
             Err(_) => {
                 self.set_entry_point(txn, &query)?;
                 query.set_distance(0.0);
-                query.clone()
+                //query.clone()
+                return Ok(query);
             }
         };
 
@@ -556,9 +550,19 @@ impl HNSW for VectorCore {
 
             self.vector_data_db
                 .put(txn, &id.to_be_bytes(), &bincode::serialize(&properties)?)?;
+        } else {
+            let mut n_properties: HashMap<String, Value> = HashMap::new();
+            n_properties.insert("is_deleted".to_string(), Value::Boolean(true));
+            debug_println!("properties: {n_properties:?}");
+
+            self.vector_data_db
+                .put(txn, &id.to_be_bytes(), &bincode::serialize(&n_properties)?)?;
         }
 
-        debug_println!("vector deleted with id {}", &id);
+        let vec = self.vector_data_db.get(txn, &id.to_be_bytes());
+        println!("{:?}", vec);
+
+        println!("vector deleted with id {}", &id);
         Ok(())
     }
 
