@@ -412,13 +412,33 @@ impl<'a> McpTools<'a> for McpBackend {
 
         let items = connection.iter.clone().collect::<Vec<_>>();
 
-        let results = G::new_from(db, txn, items)
-            .search_bm25(&label, &query, limit)?
-            .collect_to::<Vec<_>>();
+        // Check if BM25 is enabled and has metadata
+        if let Some(bm25) = &db.bm25 {
+            match bm25.metadata_db.get(txn, crate::helix_engine::bm25::bm25::METADATA_KEY) {
+                Ok(Some(_)) => {
+                    let results = G::new_from(db, txn, items)
+                        .search_bm25(&label, &query, limit)?
+                        .collect_to::<Vec<_>>();
 
-        println!("results: {results:?}");
-
-        Ok(results)
+                    println!("BM25 search results: {results:?}");
+                    Ok(results)
+                },
+                Ok(None) => {
+                    // BM25 metadata not found - index not initialized yet
+                    debug_println!("BM25 index not initialized yet - returning empty results");
+                    Ok(vec![])
+                },
+                Err(e) => {
+                    // Error accessing metadata database
+                    debug_println!("Error checking BM25 metadata: {:?} - returning empty results", e);
+                    Ok(vec![])
+                }
+            }
+        } else {
+            // BM25 is not enabled
+            debug_println!("BM25 is not enabled - returning empty results");
+            Ok(vec![])
+        }
     }
 
     fn search_vector_text(
