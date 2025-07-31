@@ -1,8 +1,12 @@
+use crate::{
+    helix_engine::{
+        types::VectorError,
+        vector_core::vector::HVector,
+    },
+    protocol::value::Value, utils::filterable::Filterable
+};
+use heed3::{Database, types::Bytes, RoTxn};
 use std::{cmp::Ordering, collections::BinaryHeap};
-
-use heed3::RoTxn;
-
-use crate::{protocol::value::Value, utils::filterable::Filterable};
 
 #[derive(PartialEq)]
 pub(super) struct Candidate {
@@ -44,16 +48,6 @@ pub(super) trait HeapOps<T> {
     fn get_max(&self) -> Option<&T>
     where
         T: Ord;
-
-    fn to_vec_with_filter<F, const SHOULD_CHECK_DELETED: bool>(
-        &mut self,
-        k: usize,
-        filter: Option<&[F]>,
-        txn: &RoTxn,
-    ) -> Vec<T>
-    where
-        T: Ord + Filterable,
-        F: Fn(&T, &RoTxn) -> bool;
 }
 
 impl<T> HeapOps<T> for BinaryHeap<T> {
@@ -91,22 +85,45 @@ impl<T> HeapOps<T> for BinaryHeap<T> {
     {
         self.iter().max()
     }
+}
 
+pub trait VectorFilter {
+    fn to_vec_with_filter<F, const SHOULD_CHECK_DELETED: bool>(
+        &mut self,
+        k: usize,
+        filter: Option<&[F]>,
+        label: &str,
+        txn: &RoTxn,
+        db: Database<Bytes, Bytes>,
+    ) -> Result<Vec<HVector>, VectorError>
+    where
+        F: Fn(&HVector, &RoTxn) -> bool;
+}
+
+impl VectorFilter for BinaryHeap<HVector> {
     #[inline(always)]
     fn to_vec_with_filter<F, const SHOULD_CHECK_DELETED: bool>(
         &mut self,
         k: usize,
         filter: Option<&[F]>,
+        label: &str,
         txn: &RoTxn,
-    ) -> Vec<T>
+        db: Database<Bytes, Bytes>,
+    ) -> Result<Vec<HVector>, VectorError>
     where
-        T: Ord + Filterable,
-        F: Fn(&T, &RoTxn) -> bool,
+        F: Fn(&HVector, &RoTxn) -> bool,
     {
         let mut result = Vec::with_capacity(k);
         for _ in 0..k {
             // while pop check filters and pop until one passes
-            while let Some(item) = self.pop() {
+            while let Some(mut item) = self.pop() {
+                item.properties = match db
+                    .get(txn, &item.get_id().to_be_bytes())?
+                    {
+                        Some(bytes) => Some(bincode::deserialize(bytes).map_err(VectorError::from)?),
+                        None => None, // TODO: maybe should be an error?
+                    };
+
                 if SHOULD_CHECK_DELETED {
                     if let Ok(is_deleted) = item.check_property("is_deleted") {
                         if let Value::Boolean(is_deleted) = is_deleted.as_ref() {
@@ -116,12 +133,17 @@ impl<T> HeapOps<T> for BinaryHeap<T> {
                         }
                     }
                 }
-                if filter.is_none() || filter.unwrap().iter().all(|f| f(&item, txn)) {
+
+                if item.label() == label
+                    && (filter.is_none() || filter.unwrap().iter().all(|f| f(&item, txn)))
+                {
                     result.push(item);
                     break;
                 }
             }
         }
-        result
+
+        Ok(result)
     }
 }
+

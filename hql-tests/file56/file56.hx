@@ -15,5 +15,6 @@ V::UserEmbedding {
     userId: String,
     dataType: String,
     metadata: String DEFAULT "{}",
-    lastUpdated: String
+    lastUpdated: String,
+    createdAt: Date DEFAULT NOW
 }
