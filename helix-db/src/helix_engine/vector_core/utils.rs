@@ -125,7 +125,6 @@ impl VectorFilter for BinaryHeap<HVector> {
                     };
 
                 if SHOULD_CHECK_DELETED {
-                    println!("---- item: {:?}", item.check_property("is_deleted"));
                     if let Ok(is_deleted) = item.check_property("is_deleted") {
                         if let Value::Boolean(is_deleted) = is_deleted.as_ref() {
                             if *is_deleted {
