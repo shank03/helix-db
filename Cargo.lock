@@ -1180,12 +1180,13 @@ dependencies = [
 
 [[package]]
 name = "helix-cli"
-version = "1.0.123"
+version = "1.0.124"
 dependencies = [
  "anyhow",
  "chrono",
  "clap",
  "dirs 6.0.0",
+ "dotenvy",
  "futures-util",
  "helix-db",
  "indicatif",
@@ -1229,7 +1230,7 @@ dependencies = [
 
 [[package]]
 name = "helix-db"
-version = "1.0.123"
+version = "1.0.124"
 dependencies = [
  "async-trait",
  "axum",

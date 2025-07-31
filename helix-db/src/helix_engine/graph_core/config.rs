@@ -1,4 +1,7 @@
-use crate::{helix_engine::types::GraphError, helixc::analyzer::analyzer::INTROSPECTION_DATA};
+use crate::{
+    helix_engine::types::GraphError,
+    helixc::analyzer::analyzer::{INTROSPECTION_DATA, SECONDARY_INDICES},
+};
 use serde::{Deserialize, Serialize};
 use std::{fmt, path::PathBuf};
 
@@ -193,20 +196,10 @@ impl fmt::Display for Config {
         writeln!(
             f,
             "secondary_indices: {},",
-            match &self
-                .graph_config
-                .as_ref()
-                .unwrap_or(&GraphConfig::default())
-                .secondary_indices
-            {
-                Some(indices) => format!(
-                    "Some(vec![{}])",
-                    indices
-                        .iter()
-                        .map(|s| format!("\"{s}\".to_string()"))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                ),
+            match SECONDARY_INDICES.get() {
+                Some(indices) => {
+                    format!("Some(vec![{}])", indices.iter().map(|i| format!("\"{i}\".to_string()")).collect::<Vec<_>>().join(", "))
+                }
                 None => "None".to_string(),
             }
         )?;
