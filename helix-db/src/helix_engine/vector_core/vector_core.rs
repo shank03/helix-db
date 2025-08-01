@@ -476,7 +476,14 @@ impl HNSW for VectorCore {
             Err(_) => {
                 self.set_entry_point(txn, &query)?;
                 query.set_distance(0.0);
-                //query.clone()
+
+                if let Some(fields) = fields {
+                    self.vector_data_db.put(
+                        txn,
+                        &query.get_id().to_be_bytes(),
+                        &bincode::serialize(&fields)?,
+                    )?;
+                }
                 return Ok(query);
             }
         };
