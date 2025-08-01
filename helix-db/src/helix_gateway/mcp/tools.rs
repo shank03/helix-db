@@ -431,7 +431,7 @@ impl<'a> McpTools<'a> for McpBackend {
                     debug_println!("BM25 index not initialized yet - returning empty results");
                     Ok(vec![])
                 },
-                Err(e) => {
+                Err(_e) => {
                     // Error accessing metadata database
                     debug_println!("Error checking BM25 metadata: {:?} - returning empty results", e);
                     Ok(vec![])
