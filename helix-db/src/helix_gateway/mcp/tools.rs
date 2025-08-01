@@ -182,6 +182,7 @@ trait McpTools<'a> {
         txn: &'a RoTxn,
         connection: &'a MCPConnection,
         query: String,
+        label: String,
     ) -> Result<Vec<TraversalVal>, GraphError>;
 
     fn search_vector(
@@ -448,6 +449,7 @@ impl<'a> McpTools<'a> for McpBackend {
         txn: &'a RoTxn,
         _connection: &'a MCPConnection,
         query: String,
+        label: String,
     ) -> Result<Vec<TraversalVal>, GraphError> {
         let db = Arc::clone(&self.db);
 
@@ -456,7 +458,7 @@ impl<'a> McpTools<'a> for McpBackend {
         let embedding = result?;
 
         let res = G::new(db, txn)
-            .search_v::<fn(&HVector, &RoTxn) -> bool, _>(&embedding, 5, "UserEmbedding", None)
+            .search_v::<fn(&HVector, &RoTxn) -> bool, _>(&embedding, 5, &label, None)
             .collect_to::<Vec<_>>();
 
         debug_println!("result: {res:?}");
