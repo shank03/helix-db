@@ -49,7 +49,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> BruteForceSe
         K: TryInto<usize>,
         K::Error: std::fmt::Debug,
     {
-        let iter = self.inner.into_iter().map(|v| match v {
+        let iter = self.inner.map(|v| match v {
             Ok(TraversalVal::Vector(mut v)) => {
                 let d = cosine_similarity(v.get_data(), query).unwrap();
                 v.set_distance(d);
@@ -90,15 +90,15 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> BruteForceSe
                     println!("is_deleted: {is_deleted:?}");
                     if let Value::Boolean(is_deleted) = is_deleted.as_ref() {
                         if *is_deleted {
-                            return None;
+                            None
                         } else {
-                            return Some(item);
+                            Some(item)
                         }
                     } else {
-                        return None;
+                        None
                     }
                 } else {
-                    return None;
+                    None
                 }
 
                 // get properties
