@@ -26,7 +26,7 @@ properties = { "Properties" ~ ":" ~ "{" ~ field_defs? ~ "}" }
 // ---------------------------------------------------------------------
 // Query definitions
 // ---------------------------------------------------------------------
-query_def    = { mcp_macro? ~ "QUERY" ~ identifier ~ query_params ~ "=>" ~ query_body ~ return_stmt } // TODO: possible optional return stmt
+query_def    = { built_in_macro? ~ "QUERY" ~ identifier ~ query_params ~ "=>" ~ query_body ~ return_stmt } // TODO: possible optional return stmt
 query_params = { "(" ~ (param_def ~ ("," ~ param_def)*)? ~ ")" }
 param_def    = { identifier ~ ":" ~ param_type }
 query_body   = { (get_stmt | drop | for_loop | creation_stmt)* }
