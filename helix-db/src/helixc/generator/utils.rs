@@ -360,7 +360,7 @@ use helix_db::{
                 util::{
                     dedup::DedupAdapter, drop::Drop, exist::Exist, filter_mut::FilterMut,
                     filter_ref::FilterRefAdapter, map::MapAdapter, paths::ShortestPathAdapter,
-                    props::PropsAdapter, range::RangeAdapter, update::UpdateAdapter,
+                    props::PropsAdapter, range::RangeAdapter, update::UpdateAdapter, order::OrderByAdapter,
                 },
                 vectors::{
                     brute_force_search::BruteForceSearchVAdapter, insert::InsertVAdapter,

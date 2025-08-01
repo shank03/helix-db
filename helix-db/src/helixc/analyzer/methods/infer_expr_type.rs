@@ -864,7 +864,12 @@ pub(crate) fn infer_expr_type<'a>(
                     steps: vec![],
                     should_collect: ShouldCollect::ToVec,
                     source_step: Separator::Period(SourceStep::SearchVector(
-                        GeneratedSearchVector { vec, k, pre_filter },
+                        GeneratedSearchVector {
+                            label: GenRef::Literal(sv.vector_type.clone().unwrap()),
+                            vec,
+                            k,
+                            pre_filter,
+                        },
                     )),
                 })),
             )
@@ -947,7 +952,13 @@ pub(crate) fn infer_expr_type<'a>(
             assert!(matches!(stmt, Some(GeneratedStatement::Traversal(_))));
             let expr = match stmt.unwrap() {
                 GeneratedStatement::Traversal(mut tr) => {
-                    tr.traversal_type = TraversalType::NestedFrom(GenRef::Std("val".to_string()));
+                    // TODO: FIX VALUE HERE
+                    let source_variable = match tr.source_step.inner() {
+                        SourceStep::Identifier(id) => id.inner().clone(),
+                        _ => "val".to_string(),
+                    };
+                    tr.traversal_type = TraversalType::NestedFrom(GenRef::Std(source_variable));
+                    tr.should_collect = ShouldCollect::No;
                     tr
                 }
                 _ => unreachable!(),

@@ -3,7 +3,6 @@ use crate::helix_engine::{
     graph_core::ops::tr_val::TraversalVal,
     storage_core::{storage_core::HelixGraphStorage, storage_methods::StorageMethods},
     types::GraphError,
-    vector_core::hnsw::HNSW,
 };
 use heed3::RwTxn;
 use std::{fmt::Debug, sync::Arc};
@@ -42,7 +41,7 @@ where
                     },
                     TraversalVal::Vector(vector) => match storage.drop_vector(txn, &vector.id) {
                         Ok(_) => Ok(()),
-                        Err(e) => Err(e.into()),
+                        Err(e) => Err(e),
                     },
                     _ => Err(GraphError::ConversionError(format!(
                         "Incorrect Type: {item:?}"

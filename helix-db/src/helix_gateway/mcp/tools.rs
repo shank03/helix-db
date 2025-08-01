@@ -386,7 +386,9 @@ impl<'a> McpTools<'a> for McpBackend {
             label: &edge_type,
         };
 
-        iter.take(100).collect::<Result<Vec<_>, _>>()
+        let result = iter.take(100).collect::<Result<Vec<_>, _>>();
+        debug_println!("result: {:?}", result);
+        result
     }
 
     fn filter_items(
@@ -403,20 +405,20 @@ impl<'a> McpTools<'a> for McpBackend {
     fn search_keyword(
         &'a self,
         txn: &'a RoTxn,
-        connection: &'a MCPConnection,
+        _connection: &'a MCPConnection,
         query: String,
         limit: usize,
         label: String,
     ) -> Result<Vec<TraversalVal>, GraphError> {
         let db = Arc::clone(&self.db);
 
-        let items = connection.iter.clone().collect::<Vec<_>>();
+//         let items = connection.iter.clone().collect::<Vec<_>>();
 
         // Check if BM25 is enabled and has metadata
         if let Some(bm25) = &db.bm25 {
             match bm25.metadata_db.get(txn, crate::helix_engine::bm25::bm25::METADATA_KEY) {
                 Ok(Some(_)) => {
-                    let results = G::new_from(db, txn, items)
+                    let results = G::new(db, txn)
                         .search_bm25(&label, &query, limit)?
                         .collect_to::<Vec<_>>();
 
@@ -454,10 +456,10 @@ impl<'a> McpTools<'a> for McpBackend {
         let embedding = result?;
 
         let res = G::new(db, txn)
-            .search_v::<fn(&HVector, &RoTxn) -> bool, _>(&embedding, 5, None)
+            .search_v::<fn(&HVector, &RoTxn) -> bool, _>(&embedding, 5, "UserEmbedding", None)
             .collect_to::<Vec<_>>();
 
-        println!("result: {res:?}");
+        debug_println!("result: {res:?}");
         Ok(res)
     }
 
@@ -610,3 +612,4 @@ pub(super) fn _filter_items(
     debug_println!("result: {:?}", result);
     result
 }
+

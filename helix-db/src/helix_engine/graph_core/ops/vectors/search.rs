@@ -28,6 +28,7 @@ pub trait SearchVAdapter<'a>: Iterator<Item = Result<TraversalVal, GraphError>> 
         self,
         query: &[f64],
         k: K,
+        label: &str,
         filter: Option<&[F]>,
     ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>
     where
@@ -43,6 +44,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> SearchVAdapt
         self,
         query: &[f64],
         k: K,
+        label: &str,
         filter: Option<&[F]>,
     ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>
     where
@@ -50,10 +52,10 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> SearchVAdapt
         K: TryInto<usize>,
         K::Error: std::fmt::Debug,
     {
-        let vectors = self
-            .storage
-            .vectors
-            .search(self.txn, query, k.try_into().unwrap(), filter, false);
+        let vectors =
+            self.storage
+                .vectors
+                .search(self.txn, query, k.try_into().unwrap(), label, filter, false);
 
         let iter = match vectors {
             Ok(vectors) => vectors
@@ -86,7 +88,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> SearchVAdapt
                 let error = GraphError::VectorError("invalid vector dimensions!".to_string());
                 once(Err(error)).collect::<Vec<_>>().into_iter()
             }
-            Err((id)) => {
+            Err(id) => {
                 let error = GraphError::VectorError(format!("vector already deleted for id {id}"));
                 once(Err(error)).collect::<Vec<_>>().into_iter()
             }
@@ -103,3 +105,4 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> SearchVAdapt
         }
     }
 }
+

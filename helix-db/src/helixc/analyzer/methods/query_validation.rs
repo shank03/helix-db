@@ -156,8 +156,9 @@ pub(crate) fn validate_query<'a>(ctx: &mut Ctx<'a>, original_query: &'a Query) {
                 };
                 let value =
                     gen_identifier_or_param(original_query, id.inner().as_str(), false, true);
+
                 match identifier_end_type {
-                    Type::Scalar(_) => {
+                    Type::Scalar(_) | Type::Boolean => {
                         query.return_values.push(ReturnValue::new_named_literal(
                             GeneratedValue::Literal(GenRef::Literal(id.inner().clone())),
                             value,

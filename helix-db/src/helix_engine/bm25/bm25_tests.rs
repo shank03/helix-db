@@ -11,10 +11,11 @@ mod tests {
         },
         protocol::value::Value,
     };
+
     use heed3::{Env, EnvOpenOptions, RoTxn};
+    use rand::Rng;
     use std::collections::HashMap;
     use tempfile::tempdir;
-    use rand::Rng;
 
     fn setup_test_env() -> (Env, tempfile::TempDir) {
         let temp_dir = tempdir().unwrap();
@@ -69,8 +70,10 @@ mod tests {
         let text = "The quick brown fox jumps over the lazy dog! It was amazing.";
         let tokens = bm25.tokenize::<true>(text);
 
-        // Should filter out words with length <= 2 and normalize to lowercase
-        let expected = ["the", "quick", "brown", "fox", "jumps", "over", "the", "lazy", "dog", "was", "amazing"];
+        // should filter out words with length <= 2 and normalize to lowercase
+        let expected = [
+            "the", "quick", "brown", "fox", "jumps", "over", "the", "lazy", "dog", "was", "amazing",
+        ];
         assert_eq!(tokens.len(), expected.len());
 
         for (i, token) in tokens.iter().enumerate() {
@@ -160,18 +163,36 @@ mod tests {
 
         // model properties list stored in nodes
         let props1: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("Swift shadow leaps".to_string())),
-            ("label2".to_string(), Value::String("Idle fox wolf rests".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("Swift shadow leaps".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("Idle fox wolf rests".to_string()),
+            ),
         ]);
 
         let props2: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("Rapid hare bounds".to_string())),
-            ("label2".to_string(), Value::String("Quiet bear naps".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("Rapid hare bounds".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("Quiet bear naps".to_string()),
+            ),
         ]);
 
         let props3: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("Fleet deer fox sprints".to_string())),
-            ("label2".to_string(), Value::String("Calm owl dozes".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("Fleet deer fox sprints".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("Calm owl dozes".to_string()),
+            ),
         ]);
 
         let nodes = [props1, props2, props3];
@@ -207,18 +228,33 @@ mod tests {
         let mut wtxn = bm25.graph_env.write_txn().unwrap();
 
         let props1: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("machine learning algorithms for data science".to_string())),
-            ("label2".to_string(), Value::String("deep learning".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("machine learning algorithms for data science".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("deep learning".to_string()),
+            ),
         ]);
 
         let props2: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("deep learning neural networks".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("deep learning neural networks".to_string()),
+            ),
             ("label2".to_string(), Value::I64(6969)),
         ]);
 
         let props3: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("data analysis and machine learning".to_string())),
-            ("label2".to_string(), Value::String("natural language processing".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("data analysis and machine learning".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("natural language processing".to_string()),
+            ),
         ]);
 
         let nodes = [props1, props2, props3];
@@ -249,361 +285,959 @@ mod tests {
         let mut wtxn = bm25.graph_env.write_txn().unwrap();
 
         let props1: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("machine learning algorithms for data science".to_string())),
-            ("label2".to_string(), Value::String("deep learning".to_string())),
-            ("label3".to_string(), Value::String("neural networks optimization".to_string())),
-            ("label4".to_string(), Value::String("data analysis techniques".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("machine learning algorithms for data science".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("deep learning".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("neural networks optimization".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("data analysis techniques".to_string()),
+            ),
         ]);
 
         let props2: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("deep learning neural networks".to_string())),
-            ("label2".to_string(), Value::String("machine learning".to_string())),
-            ("label3".to_string(), Value::String("computer vision models".to_string())),
-            ("label4".to_string(), Value::String("reinforcement learning".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("deep learning neural networks".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("machine learning".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("computer vision models".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("reinforcement learning".to_string()),
+            ),
         ]);
 
         let props3: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("data analysis and machine learning".to_string())),
-            ("label2".to_string(), Value::String("natural language processing".to_string())),
-            ("label3".to_string(), Value::String("sentiment analysis".to_string())),
-            ("label4".to_string(), Value::String("text mining".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("data analysis and machine learning".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("natural language processing".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("sentiment analysis".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("text mining".to_string()),
+            ),
         ]);
 
         let props4: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("machine learning for predictive analytics".to_string())),
-            ("label2".to_string(), Value::String("deep learning frameworks".to_string())),
-            ("label3".to_string(), Value::String("image recognition".to_string())),
-            ("label4".to_string(), Value::String("data preprocessing".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("machine learning for predictive analytics".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("deep learning frameworks".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("image recognition".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("data preprocessing".to_string()),
+            ),
         ]);
 
         let props5: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("neural networks for data science".to_string())),
-            ("label2".to_string(), Value::String("machine learning pipelines".to_string())),
-            ("label3".to_string(), Value::String("feature engineering".to_string())),
-            ("label4".to_string(), Value::String("model evaluation".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("neural networks for data science".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("machine learning pipelines".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("feature engineering".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("model evaluation".to_string()),
+            ),
         ]);
 
         let props6: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("deep learning for image processing".to_string())),
-            ("label2".to_string(), Value::String("machine learning models".to_string())),
-            ("label3".to_string(), Value::String("clustering algorithms".to_string())),
-            ("label4".to_string(), Value::String("dimensionality reduction".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("deep learning for image processing".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("machine learning models".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("clustering algorithms".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("dimensionality reduction".to_string()),
+            ),
         ]);
 
         let props7: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("natural language processing techniques".to_string())),
-            ("label2".to_string(), Value::String("machine learning applications".to_string())),
-            ("label3".to_string(), Value::String("text classification".to_string())),
-            ("label4".to_string(), Value::String("data visualization".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("natural language processing techniques".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("machine learning applications".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("text classification".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("data visualization".to_string()),
+            ),
         ]);
 
         let props8: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("machine learning for time series".to_string())),
-            ("label2".to_string(), Value::String("deep learning architectures".to_string())),
-            ("label3".to_string(), Value::String("anomaly detection".to_string())),
-            ("label4".to_string(), Value::String("predictive modeling".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("machine learning for time series".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("deep learning architectures".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("anomaly detection".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("predictive modeling".to_string()),
+            ),
         ]);
 
         let props9: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("data science with machine learning".to_string())),
-            ("label2".to_string(), Value::String("neural networks training".to_string())),
-            ("label3".to_string(), Value::String("regression analysis".to_string())),
-            ("label4".to_string(), Value::String("model optimization".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("data science with machine learning".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("neural networks training".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("regression analysis".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("model optimization".to_string()),
+            ),
         ]);
 
         let props10: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("deep learning for speech recognition".to_string())),
-            ("label2".to_string(), Value::String("machine learning workflows".to_string())),
-            ("label3".to_string(), Value::String("audio processing".to_string())),
-            ("label4".to_string(), Value::String("data augmentation".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("deep learning for speech recognition".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("machine learning workflows".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("audio processing".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("data augmentation".to_string()),
+            ),
         ]);
 
         let props11: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("machine learning for fraud detection".to_string())),
-            ("label2".to_string(), Value::String("deep learning systems".to_string())),
-            ("label3".to_string(), Value::String("pattern recognition".to_string())),
-            ("label4".to_string(), Value::String("data cleaning".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("machine learning for fraud detection".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("deep learning systems".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("pattern recognition".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("data cleaning".to_string()),
+            ),
         ]);
 
         let props12: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("natural language processing models".to_string())),
-            ("label2".to_string(), Value::String("machine learning algorithms".to_string())),
-            ("label3".to_string(), Value::String("topic modeling".to_string())),
-            ("label4".to_string(), Value::String("text analytics".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("natural language processing models".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("machine learning algorithms".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("topic modeling".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("text analytics".to_string()),
+            ),
         ]);
 
         let props13: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("machine learning for recommendation systems".to_string())),
-            ("label2".to_string(), Value::String("deep learning techniques".to_string())),
-            ("label3".to_string(), Value::String("collaborative filtering".to_string())),
-            ("label4".to_string(), Value::String("user profiling".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("machine learning for recommendation systems".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("deep learning techniques".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("collaborative filtering".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("user profiling".to_string()),
+            ),
         ]);
 
         let props14: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("data science and neural networks".to_string())),
-            ("label2".to_string(), Value::String("machine learning strategies".to_string())),
-            ("label3".to_string(), Value::String("classification models".to_string())),
-            ("label4".to_string(), Value::String("data exploration".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("data science and neural networks".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("machine learning strategies".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("classification models".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("data exploration".to_string()),
+            ),
         ]);
 
         let props15: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("deep learning for object detection".to_string())),
-            ("label2".to_string(), Value::String("machine learning tools".to_string())),
-            ("label3".to_string(), Value::String("image segmentation".to_string())),
-            ("label4".to_string(), Value::String("feature extraction".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("deep learning for object detection".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("machine learning tools".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("image segmentation".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("feature extraction".to_string()),
+            ),
         ]);
 
         let props16: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("machine learning for customer segmentation".to_string())),
-            ("label2".to_string(), Value::String("deep learning applications".to_string())),
-            ("label3".to_string(), Value::String("market analysis".to_string())),
-            ("label4".to_string(), Value::String("data clustering".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("machine learning for customer segmentation".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("deep learning applications".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("market analysis".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("data clustering".to_string()),
+            ),
         ]);
 
         let props17: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("natural language processing for chatbots".to_string())),
-            ("label2".to_string(), Value::String("machine learning frameworks".to_string())),
-            ("label3".to_string(), Value::String("dialogue systems".to_string())),
-            ("label4".to_string(), Value::String("text generation".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("natural language processing for chatbots".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("machine learning frameworks".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("dialogue systems".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("text generation".to_string()),
+            ),
         ]);
 
         let props18: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("machine learning for predictive maintenance".to_string())),
-            ("label2".to_string(), Value::String("deep learning models".to_string())),
-            ("label3".to_string(), Value::String("equipment monitoring".to_string())),
-            ("label4".to_string(), Value::String("failure prediction".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("machine learning for predictive maintenance".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("deep learning models".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("equipment monitoring".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("failure prediction".to_string()),
+            ),
         ]);
 
         let props19: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("data science with deep learning".to_string())),
-            ("label2".to_string(), Value::String("machine learning techniques".to_string())),
-            ("label3".to_string(), Value::String("statistical modeling".to_string())),
-            ("label4".to_string(), Value::String("data interpretation".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("data science with deep learning".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("machine learning techniques".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("statistical modeling".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("data interpretation".to_string()),
+            ),
         ]);
 
         let props20: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("deep learning for facial recognition".to_string())),
-            ("label2".to_string(), Value::String("machine learning processes".to_string())),
-            ("label3".to_string(), Value::String("biometric analysis".to_string())),
-            ("label4".to_string(), Value::String("identity verification".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("deep learning for facial recognition".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("machine learning processes".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("biometric analysis".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("identity verification".to_string()),
+            ),
         ]);
 
         let props21: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("machine learning for supply chain".to_string())),
-            ("label2".to_string(), Value::String("deep learning optimization".to_string())),
-            ("label3".to_string(), Value::String("inventory management".to_string())),
-            ("label4".to_string(), Value::String("demand forecasting".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("machine learning for supply chain".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("deep learning optimization".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("inventory management".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("demand forecasting".to_string()),
+            ),
         ]);
 
         let props22: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("natural language processing for sentiment".to_string())),
-            ("label2".to_string(), Value::String("machine learning solutions".to_string())),
-            ("label3".to_string(), Value::String("opinion mining".to_string())),
-            ("label4".to_string(), Value::String("text processing".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("natural language processing for sentiment".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("machine learning solutions".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("opinion mining".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("text processing".to_string()),
+            ),
         ]);
 
         let props23: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("machine learning for risk assessment".to_string())),
-            ("label2".to_string(), Value::String("deep learning algorithms".to_string())),
-            ("label3".to_string(), Value::String("probability analysis".to_string())),
-            ("label4".to_string(), Value::String("data modeling".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("machine learning for risk assessment".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("deep learning algorithms".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("probability analysis".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("data modeling".to_string()),
+            ),
         ]);
 
         let props24: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("data science for business intelligence".to_string())),
-            ("label2".to_string(), Value::String("machine learning insights".to_string())),
-            ("label3".to_string(), Value::String("decision support".to_string())),
-            ("label4".to_string(), Value::String("data reporting".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("data science for business intelligence".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("machine learning insights".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("decision support".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("data reporting".to_string()),
+            ),
         ]);
 
         let props25: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("deep learning for autonomous vehicles".to_string())),
-            ("label2".to_string(), Value::String("machine learning systems".to_string())),
-            ("label3".to_string(), Value::String("path planning".to_string())),
-            ("label4".to_string(), Value::String("sensor fusion".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("deep learning for autonomous vehicles".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("machine learning systems".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("path planning".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("sensor fusion".to_string()),
+            ),
         ]);
 
         let props26: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("machine learning for healthcare".to_string())),
-            ("label2".to_string(), Value::String("deep learning diagnostics".to_string())),
-            ("label3".to_string(), Value::String("medical imaging".to_string())),
-            ("label4".to_string(), Value::String("patient data analysis".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("machine learning for healthcare".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("deep learning diagnostics".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("medical imaging".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("patient data analysis".to_string()),
+            ),
         ]);
 
         let props27: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("natural language processing for translation".to_string())),
-            ("label2".to_string(), Value::String("machine learning models".to_string())),
-            ("label3".to_string(), Value::String("language models".to_string())),
-            ("label4".to_string(), Value::String("text translation".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("natural language processing for translation".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("machine learning models".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("language models".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("text translation".to_string()),
+            ),
         ]);
 
         let props28: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("machine learning for energy optimization".to_string())),
-            ("label2".to_string(), Value::String("deep learning strategies".to_string())),
-            ("label3".to_string(), Value::String("energy forecasting".to_string())),
-            ("label4".to_string(), Value::String("resource allocation".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("machine learning for energy optimization".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("deep learning strategies".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("energy forecasting".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("resource allocation".to_string()),
+            ),
         ]);
 
         let props29: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("data science for marketing".to_string())),
-            ("label2".to_string(), Value::String("machine learning analytics".to_string())),
-            ("label3".to_string(), Value::String("customer insights".to_string())),
-            ("label4".to_string(), Value::String("campaign analysis".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("data science for marketing".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("machine learning analytics".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("customer insights".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("campaign analysis".to_string()),
+            ),
         ]);
 
         let props30: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("deep learning for video analysis".to_string())),
-            ("label2".to_string(), Value::String("machine learning pipelines".to_string())),
-            ("label3".to_string(), Value::String("motion detection".to_string())),
-            ("label4".to_string(), Value::String("frame analysis".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("deep learning for video analysis".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("machine learning pipelines".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("motion detection".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("frame analysis".to_string()),
+            ),
         ]);
 
         let props31: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("machine learning for cybersecurity".to_string())),
-            ("label2".to_string(), Value::String("deep learning detection".to_string())),
-            ("label3".to_string(), Value::String("threat analysis".to_string())),
-            ("label4".to_string(), Value::String("network security".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("machine learning for cybersecurity".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("deep learning detection".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("threat analysis".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("network security".to_string()),
+            ),
         ]);
 
         let props32: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("natural language processing for summarization".to_string())),
-            ("label2".to_string(), Value::String("machine learning techniques".to_string())),
-            ("label3".to_string(), Value::String("text summarization".to_string())),
-            ("label4".to_string(), Value::String("content analysis".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("natural language processing for summarization".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("machine learning techniques".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("text summarization".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("content analysis".to_string()),
+            ),
         ]);
 
         let props33: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("machine learning for logistics".to_string())),
-            ("label2".to_string(), Value::String("deep learning optimization".to_string())),
-            ("label3".to_string(), Value::String("route planning".to_string())),
-            ("label4".to_string(), Value::String("supply chain analytics".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("machine learning for logistics".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("deep learning optimization".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("route planning".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("supply chain analytics".to_string()),
+            ),
         ]);
 
         let props34: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("data science for finance".to_string())),
-            ("label2".to_string(), Value::String("machine learning predictions".to_string())),
-            ("label3".to_string(), Value::String("market forecasting".to_string())),
-            ("label4".to_string(), Value::String("risk modeling".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("data science for finance".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("machine learning predictions".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("market forecasting".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("risk modeling".to_string()),
+            ),
         ]);
 
         let props35: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("deep learning for robotics".to_string())),
-            ("label2".to_string(), Value::String("machine learning algorithms".to_string())),
-            ("label3".to_string(), Value::String("motion planning".to_string())),
-            ("label4".to_string(), Value::String("sensor processing".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("deep learning for robotics".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("machine learning algorithms".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("motion planning".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("sensor processing".to_string()),
+            ),
         ]);
 
         let props36: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("machine learning for agriculture".to_string())),
-            ("label2".to_string(), Value::String("deep learning applications".to_string())),
-            ("label3".to_string(), Value::String("crop monitoring".to_string())),
-            ("label4".to_string(), Value::String("yield prediction".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("machine learning for agriculture".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("deep learning applications".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("crop monitoring".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("yield prediction".to_string()),
+            ),
         ]);
 
         let props37: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("natural language processing for search".to_string())),
-            ("label2".to_string(), Value::String("machine learning systems".to_string())),
-            ("label3".to_string(), Value::String("query processing".to_string())),
-            ("label4".to_string(), Value::String("search optimization".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("natural language processing for search".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("machine learning systems".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("query processing".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("search optimization".to_string()),
+            ),
         ]);
 
         let props38: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("machine learning for retail".to_string())),
-            ("label2".to_string(), Value::String("deep learning models".to_string())),
-            ("label3".to_string(), Value::String("sales forecasting".to_string())),
-            ("label4".to_string(), Value::String("inventory optimization".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("machine learning for retail".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("deep learning models".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("sales forecasting".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("inventory optimization".to_string()),
+            ),
         ]);
 
         let props39: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("data science for education".to_string())),
-            ("label2".to_string(), Value::String("machine learning tools".to_string())),
-            ("label3".to_string(), Value::String("student performance".to_string())),
-            ("label4".to_string(), Value::String("learning analytics".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("data science for education".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("machine learning tools".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("student performance".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("learning analytics".to_string()),
+            ),
         ]);
 
         let props40: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("deep learning for gaming".to_string())),
-            ("label2".to_string(), Value::String("machine learning strategies".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("deep learning for gaming".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("machine learning strategies".to_string()),
+            ),
             ("label3".to_string(), Value::String("game AI".to_string())),
-            ("label4".to_string(), Value::String("player behavior".to_string())),
+            (
+                "label4".to_string(),
+                Value::String("player behavior".to_string()),
+            ),
         ]);
 
         let props41: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("machine learning for transportation".to_string())),
-            ("label2".to_string(), Value::String("deep learning frameworks".to_string())),
-            ("label3".to_string(), Value::String("traffic prediction".to_string())),
-            ("label4".to_string(), Value::String("route optimization".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("machine learning for transportation".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("deep learning frameworks".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("traffic prediction".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("route optimization".to_string()),
+            ),
         ]);
 
         let props42: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("natural language processing for legal".to_string())),
-            ("label2".to_string(), Value::String("machine learning applications".to_string())),
-            ("label3".to_string(), Value::String("document analysis".to_string())),
-            ("label4".to_string(), Value::String("contract review".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("natural language processing for legal".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("machine learning applications".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("document analysis".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("contract review".to_string()),
+            ),
         ]);
 
         let props43: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("machine learning for manufacturing".to_string())),
-            ("label2".to_string(), Value::String("deep learning systems".to_string())),
-            ("label3".to_string(), Value::String("quality control".to_string())),
-            ("label4".to_string(), Value::String("process optimization".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("machine learning for manufacturing".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("deep learning systems".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("quality control".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("process optimization".to_string()),
+            ),
         ]);
 
         let props44: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("data science for e-commerce".to_string())),
-            ("label2".to_string(), Value::String("machine learning insights".to_string())),
-            ("label3".to_string(), Value::String("product recommendation".to_string())),
-            ("label4".to_string(), Value::String("customer segmentation".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("data science for e-commerce".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("machine learning insights".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("product recommendation".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("customer segmentation".to_string()),
+            ),
         ]);
 
         let props45: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("deep learning for environmental monitoring".to_string())),
-            ("label2".to_string(), Value::String("machine learning models".to_string())),
-            ("label3".to_string(), Value::String("climate analysis".to_string())),
-            ("label4".to_string(), Value::String("sensor data".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("deep learning for environmental monitoring".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("machine learning models".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("climate analysis".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("sensor data".to_string()),
+            ),
         ]);
 
         let props46: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("machine learning for sports analytics".to_string())),
-            ("label2".to_string(), Value::String("deep learning techniques".to_string())),
-            ("label3".to_string(), Value::String("player performance".to_string())),
-            ("label4".to_string(), Value::String("game strategy".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("machine learning for sports analytics".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("deep learning techniques".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("player performance".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("game strategy".to_string()),
+            ),
         ]);
 
         let props47: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("natural language processing for news".to_string())),
-            ("label2".to_string(), Value::String("machine learning algorithms".to_string())),
-            ("label3".to_string(), Value::String("article classification".to_string())),
-            ("label4".to_string(), Value::String("content summarization".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("natural language processing for news".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("machine learning algorithms".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("article classification".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("content summarization".to_string()),
+            ),
         ]);
 
         let props48: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("machine learning for urban planning".to_string())),
-            ("label2".to_string(), Value::String("deep learning applications".to_string())),
-            ("label3".to_string(), Value::String("traffic modeling".to_string())),
-            ("label4".to_string(), Value::String("resource planning".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("machine learning for urban planning".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("deep learning applications".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("traffic modeling".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("resource planning".to_string()),
+            ),
         ]);
 
         let props49: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("data science for telecommunications".to_string())),
-            ("label2".to_string(), Value::String("machine learning systems".to_string())),
-            ("label3".to_string(), Value::String("network optimization".to_string())),
-            ("label4".to_string(), Value::String("customer analytics".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("data science for telecommunications".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("machine learning systems".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("network optimization".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("customer analytics".to_string()),
+            ),
         ]);
 
         let props50: HashMap<String, Value> = HashMap::from([
-            ("label1".to_string(), Value::String("deep learning for astronomy".to_string())),
-            ("label2".to_string(), Value::String("machine learning frameworks".to_string())),
-            ("label3".to_string(), Value::String("star classification".to_string())),
-            ("label4".to_string(), Value::String("cosmic data analysis".to_string())),
+            (
+                "label1".to_string(),
+                Value::String("deep learning for astronomy".to_string()),
+            ),
+            (
+                "label2".to_string(),
+                Value::String("machine learning frameworks".to_string()),
+            ),
+            (
+                "label3".to_string(),
+                Value::String("star classification".to_string()),
+            ),
+            (
+                "label4".to_string(),
+                Value::String("cosmic data analysis".to_string()),
+            ),
         ]);
 
         let nodes = [
             props1, props2, props3, props4, props5, props6, props7, props8, props9, props10,
-            props11, props12, props13, props14, props15, props16, props17, props18, props19, props20,
-            props21, props22, props23, props24, props25, props26, props27, props28, props29, props30,
-            props31, props32, props33, props34, props35, props36, props37, props38, props39, props40,
-            props41, props42, props43, props44, props45, props46, props47, props48, props49, props50
+            props11, props12, props13, props14, props15, props16, props17, props18, props19,
+            props20, props21, props22, props23, props24, props25, props26, props27, props28,
+            props29, props30, props31, props32, props33, props34, props35, props36, props37,
+            props38, props39, props40, props41, props42, props43, props44, props45, props46,
+            props47, props48, props49, props50,
         ];
 
         for (i, props) in nodes.iter().enumerate() {
@@ -790,7 +1424,9 @@ mod tests {
         let mut wtxn = storage.graph_env.write_txn().unwrap();
         let vectors = generate_random_vectors(800, 650);
         for vec in vectors {
-            let _ = storage.vectors.insert::<fn(&HVector, &RoTxn) -> bool>(&mut wtxn, &vec, None);
+            let _ = storage
+                .vectors
+                .insert::<fn(&HVector, &RoTxn) -> bool>(&mut wtxn, &vec, None);
         }
         wtxn.commit().unwrap();
 
@@ -799,12 +1435,9 @@ mod tests {
         let alpha = 0.5; // equal weight between BM25 and vector
         let limit = 10;
 
-        let result = storage.hybrid_search(
-            query,
-            &query_vector[0],
-            alpha,
-            limit,
-        ).await;
+        let result = storage
+            .hybrid_search(query, &query_vector[0], alpha, limit)
+            .await;
 
         match result {
             Ok(results) => assert!(results.len() <= limit),
@@ -833,7 +1466,9 @@ mod tests {
         let mut wtxn = storage.graph_env.write_txn().unwrap();
         let vectors = generate_random_vectors(800, 650);
         for vec in vectors {
-            let _ = storage.vectors.insert::<fn(&HVector, &RoTxn) -> bool>(&mut wtxn, &vec, None);
+            let _ = storage
+                .vectors
+                .insert::<fn(&HVector, &RoTxn) -> bool>(&mut wtxn, &vec, None);
         }
         wtxn.commit().unwrap();
 
@@ -841,12 +1476,9 @@ mod tests {
         let query_vector = generate_random_vectors(1, 650);
 
         // alpha = 0.0 (Vector only)
-        let results_vector_only = storage.hybrid_search(
-            query,
-            &query_vector[0],
-            0.0,
-            10,
-        ).await;
+        let results_vector_only = storage
+            .hybrid_search(query, &query_vector[0], 0.0, 10)
+            .await;
 
         match results_vector_only {
             Ok(results) => assert!(results.len() <= 10),
@@ -877,7 +1509,9 @@ mod tests {
         let mut wtxn = storage.graph_env.write_txn().unwrap();
         let vectors = generate_random_vectors(800, 650);
         for vec in vectors {
-            let _ = storage.vectors.insert::<fn(&HVector, &RoTxn) -> bool>(&mut wtxn, &vec, None);
+            let _ = storage
+                .vectors
+                .insert::<fn(&HVector, &RoTxn) -> bool>(&mut wtxn, &vec, None);
         }
         wtxn.commit().unwrap();
 
@@ -885,12 +1519,9 @@ mod tests {
         let query_vector = generate_random_vectors(1, 650);
 
         // alpha = 1.0 (BM25 only)
-        let results_bm25_only = storage.hybrid_search(
-            query,
-            &query_vector[0],
-            1.0,
-            10,
-        ).await;
+        let results_bm25_only = storage
+            .hybrid_search(query, &query_vector[0], 1.0, 10)
+            .await;
 
         // all should be valid results or acceptable errors
         match results_bm25_only {
@@ -949,7 +1580,5 @@ mod tests {
 
         wtxn.commit().unwrap();
     }
-
-    // TODO: hybrid search proper accuracy test as well
 }
 

@@ -1,3 +1,5 @@
+use crate::types::BuildMode;
+
 use super::utils::find_available_port;
 use helix_db::utils::styled_string::StyledString;
 use std::{
@@ -58,6 +60,7 @@ impl InstanceManager {
         source_binary: &Path,
         port: u16,
         endpoints: Vec<String>,
+        openai_key: Option<String>,
     ) -> io::Result<InstanceInfo> {
         let instance_id = Uuid::new_v4().to_string();
         let cached_binary = self.cache_dir.join(&instance_id);
@@ -71,7 +74,7 @@ impl InstanceManager {
         let log_file = self.logs_dir.join(format!("instance_{instance_id}.log"));
         let log_file = OpenOptions::new()
             .create(true)
-            
+
             .append(true)
             .open(log_file)?;
         let error_log_file = self
@@ -79,7 +82,7 @@ impl InstanceManager {
             .join(format!("instance_{instance_id}_error.log"));
         let error_log_file = OpenOptions::new()
             .create(true)
-            
+
             .append(true)
             .open(error_log_file)?;
 
@@ -89,6 +92,7 @@ impl InstanceManager {
             .env("HELIX_DAEMON", "1")
             .env("HELIX_DATA_DIR", data_dir.to_str().unwrap())
             .env("HELIX_PORT", port.to_string())
+            .env("OPENAI_API_KEY", openai_key.unwrap_or_default())
             .stdout(Stdio::from(log_file))
             .stderr(Stdio::from(error_log_file));
 
@@ -113,7 +117,7 @@ impl InstanceManager {
     }
 
     /// instance_id can either be u16 or uuid here (same for the others)
-    pub fn start_instance(&self, instance_id: &str, endpoints: Option<Vec<String>>) -> Result<InstanceInfo, String> {
+    pub fn start_instance(&self, instance_id: &str, endpoints: Option<Vec<String>>, openai_key: Option<String>, _release_mode: BuildMode) -> Result<InstanceInfo, String> {
         let instance_id = match instance_id.parse() {
             Ok(n) => match self.id_from_short_id(n) {
                 Ok(n) => n.id,
@@ -146,7 +150,7 @@ impl InstanceManager {
 
         let log_file = self.logs_dir.join(format!("instance_{instance_id}.log"));
         let log_file = OpenOptions::new()
-            
+
             .append(true)
             .create(true)
             .open(log_file)
@@ -166,6 +170,7 @@ impl InstanceManager {
             .env("HELIX_DAEMON", "1")
             .env("HELIX_DATA_DIR", data_dir.to_str().unwrap())
             .env("HELIX_PORT", instance.port.to_string())
+            .env("OPENAI_API_KEY", openai_key.unwrap_or_default())
             .stdout(Stdio::from(log_file.try_clone().map_err(|e| {
                 format!("Failed to clone log file: {e}")
             })?))

@@ -2,15 +2,15 @@
 //!
 //! This is a wrapper around a 128-bit UUID.
 //!
-//! It is used to deserialize a string UUID into a 128-bit integer so that 
-//! it can be serialized properly for use with LMDB. 
-//! 
+//! It is used to deserialize a string UUID into a 128-bit integer so that
+//! it can be serialized properly for use with LMDB.
+//!
 //! The ID type can be dereferenced to a 128-bit integer for use with other functions that expect a 128-bit integer.
 
 use core::fmt;
 use std::ops::Deref;
 
-use serde::{de::Visitor, Deserializer, Serializer};
+use serde::{Deserializer, Serializer, de::Visitor};
 use sonic_rs::{Deserialize, Serialize};
 
 /// A wrapper around a 128-bit UUID.
@@ -23,6 +23,10 @@ pub struct ID(u128);
 impl ID {
     pub fn inner(&self) -> u128 {
         self.0
+    }
+
+    pub fn stringify(&self) -> String {
+        uuid::Uuid::from_u128(self.0).to_string()
     }
 }
 
@@ -88,7 +92,7 @@ impl From<ID> for u128 {
 }
 
 /// Generates a new v6 UUID.
-/// 
+///
 /// This is used to generate a new UUID for a node or edge.
 /// The UUID is generated using the current time and a random number.
 #[inline(always)]

@@ -10,7 +10,7 @@ use crate::{
             source::{add_n::AddNAdapter, e_from_id::EFromIdAdapter, n_from_id::NFromIdAdapter},
             tr_val::{Traversable, TraversalVal},
             util::{
-                dedup::DedupAdapter, map::MapAdapter, props::PropsAdapter, range::RangeAdapter,
+                dedup::DedupAdapter, map::MapAdapter, order::OrderByAdapter, props::PropsAdapter, range::RangeAdapter
             },
             vectors::brute_force_search::BruteForceSearchVAdapter,
         },
@@ -1719,7 +1719,7 @@ fn test_add_e_between_node_and_vector() {
     println!(
         "vectors: {:?}",
         G::new(Arc::clone(&storage), &txn)
-            .search_v::<fn(&HVector, &RoTxn) -> bool, _>(&[1.0, 2.0, 3.0], 10, None)
+            .search_v::<fn(&HVector, &RoTxn) -> bool, _>(&[1.0, 2.0, 3.0], 10, "vector", None)
             .collect_to::<Vec<_>>()
     );
 
@@ -1867,7 +1867,7 @@ fn test_order_by_desc() {
     let traversal = G::new(Arc::clone(&storage), &txn)
         .n_from_type("person")
         .order_by_desc("age")
-        .unwrap();
+        .collect_to::<Vec<_>>();
 
     assert_eq!(traversal.len(), 3);
     assert_eq!(traversal[0].id(), node3.id());
@@ -1898,7 +1898,7 @@ fn test_order_by_asc() {
     let traversal = G::new(Arc::clone(&storage), &txn)
         .n_from_type("person")
         .order_by_asc("age")
-        .unwrap();
+        .collect_to::<Vec<_>>();
 
     assert_eq!(traversal.len(), 3);
     assert_eq!(traversal[0].id(), node3.id());
@@ -1958,7 +1958,7 @@ fn test_vector_search() {
 
     let txn = storage.graph_env.read_txn().unwrap();
     let traversal = G::new(Arc::clone(&storage), &txn)
-        .search_v::<fn(&HVector, &RoTxn) -> bool, _>(&[1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 2000, None)
+        .search_v::<fn(&HVector, &RoTxn) -> bool, _>(&[1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 2000, "vector", None)
         .collect_to::<Vec<_>>();
     // traversal.reverse();
 
@@ -2187,6 +2187,7 @@ fn test_delete_vector() {
         .search_v::<fn(&HVector, &RoTxn) -> bool, usize>(
             &[1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
             2000,
+            "vector",
             None,
         )
         .collect_to::<Vec<_>>();
@@ -2202,6 +2203,7 @@ fn test_delete_vector() {
             .search_v::<fn(&HVector, &RoTxn) -> bool, _>(
                 &[1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
                 2000,
+                "vector",
                 None,
             )
             .collect_to::<Vec<_>>(),
@@ -2217,9 +2219,14 @@ fn test_delete_vector() {
         .search_v::<fn(&HVector, &RoTxn) -> bool, usize>(
             &[1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
             2000,
+            "vector",
             None,
         )
         .collect_to::<Vec<_>>();
+
+    println!();
+    println!("traversal: {:?}", traversal);
+    println!();
 
     assert_eq!(traversal.len(), 0);
 
@@ -2328,6 +2335,7 @@ fn test_drop_vectors_then_add_them_back() {
         .search_v::<fn(&HVector, &RoTxn) -> bool, usize>(
             &[1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
             2000,
+            "Entity_Embedding",
             None,
         )
         .collect_to::<Vec<_>>();
@@ -2405,6 +2413,7 @@ fn test_drop_vectors_then_add_them_back() {
         .search_v::<fn(&HVector, &RoTxn) -> bool, usize>(
             &[1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
             2000,
+            "Entity_Embedding",
             None,
         )
         .collect_to::<Vec<_>>();
@@ -2551,7 +2560,7 @@ fn test_edge_deletion_in_existing_graph() {
 
     txn.commit().unwrap();
 
-    let mut txn = storage.graph_env.read_txn().unwrap();
+    let txn = storage.graph_env.read_txn().unwrap();
     let edges = G::new(Arc::clone(&storage), &txn)
         .e_from_type("knows")
         .collect_to::<Vec<_>>();
