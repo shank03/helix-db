@@ -198,16 +198,14 @@ pub fn collect(input: &mut MCPToolInput) -> Result<Response, GraphError> {
     };
     drop(connections);
 
-    let (start, end) = match data.range {
-        Some(range) => (range.start, range.end),
-        None => (0, 10),
+    let values = match data.range {
+        Some(range) => connection
+            .iter
+            .skip(range.start)
+            .take(range.end - range.start)
+            .collect::<Vec<TraversalVal>>(),
+        None => connection.iter.collect::<Vec<TraversalVal>>(),
     };
-
-    let values = connection
-        .iter
-        .skip(start)
-        .take(end - start)
-        .collect::<Vec<TraversalVal>>();
 
     let mut connections = input.mcp_connections.lock().unwrap();
     let mut new_iter = values.clone().into_iter();
@@ -252,7 +250,6 @@ pub fn reset(input: &mut MCPToolInput) -> Result<Response, GraphError> {
 
     Ok(Format::Json.create_response(&ReturnValue::from(connection_id)))
 }
-
 
 #[mcp_handler]
 pub fn schema_resource(input: &mut MCPToolInput) -> Result<Response, GraphError> {
