@@ -986,9 +986,9 @@ async fn main() -> ExitCode {
                             cluster.bold()
                         );
                         println!(
-                            "Key has id: {}, please store it carefully\n{}",
-                            key_info.key_id.bold(),
-                            key_info.key.bold()
+                            "Your api key is: {}, please store it carefully (id:{})",
+                            key_info.key.bold(),
+                            key_info.key_id
                         )
                     }
                     Err(e) => {
