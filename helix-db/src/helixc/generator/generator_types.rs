@@ -262,6 +262,14 @@ impl Display for Query {
         )?;
         writeln!(f, "{{")?;
 
+        if let Some(model) = &self.embedding_model_to_use {
+            writeln!(
+                f,
+                "   let model = get_embedding_model(None, Some(\"{}\"), None).unwrap();",
+                model
+            )?;
+        }
+
         // prints each statement
         for statement in &self.statements {
             writeln!(f, "    {statement};")?;
@@ -440,7 +448,6 @@ impl Display for Drop {
         )
     }
 }
-
 
 /// Boolean expression is used for a traversal or set of traversals wrapped in AND/OR
 /// that resolve to a boolean value

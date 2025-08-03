@@ -111,7 +111,10 @@ impl From<IdType> for GenRef<String> {
 #[derive(Clone)]
 pub enum VecData {
     Standard(GeneratedValue),
-    Embed(GeneratedValue),
+    Embed {
+        data: GeneratedValue,
+        model_name: Option<String>,
+    },
     Unknown,
 }
 
@@ -119,7 +122,10 @@ impl Display for VecData {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             VecData::Standard(v) => write!(f, "{v}"),
-            VecData::Embed(v) => write!(f, "&embed!(db, {v})"),
+            VecData::Embed { data, model_name } => match model_name {
+                Some(model) => write!(f, "&embed!(db, {data}, \"{model}\")"),
+                None => write!(f, "&embed!(db, {data})"),
+            },
             VecData::Unknown => panic!("Cannot convert to string, VecData is unknown"),
         }
     }
