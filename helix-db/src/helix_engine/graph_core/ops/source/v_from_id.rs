@@ -35,9 +35,9 @@ impl<'a> Iterator for VFromId<'a, RoTxn<'a>> {
 pub trait VFromIdAdapter<'a>: Iterator<Item = Result<TraversalVal, GraphError>> {
     type OutputIter: Iterator<Item = Result<TraversalVal, GraphError>>;
 
-    /// Returns an iterator containing the node with the given id.
+    /// Returns an iterator containing the vector with the given id.
     ///
-    /// Note that the `id` cannot be empty and must be a valid, existing node id.
+    /// Note that the `id` cannot be empty and must be a valid, existing vector id.
     fn v_from_id(self, id: &u128) -> Self::OutputIter;
 }
 
