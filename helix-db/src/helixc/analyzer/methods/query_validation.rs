@@ -191,22 +191,29 @@ pub(crate) fn validate_query<'a>(ctx: &mut Ctx<'a>, original_query: &'a Query) {
             _ => unreachable!(),
         }
     }
-    if original_query.is_mcp {
-        if query.return_values.len() != 1 {
-            generate_error!(
-                ctx,
-                original_query,
-                original_query.loc.clone(),
-                E401,
-                &query.return_values.len().to_string()
-            );
-        } else {
-            // match query.return_values.first().unwrap().return_type {
+    match &original_query.built_in_macro {
+        Some(BuiltInMacro::MCP) => {
+            if query.return_values.len() != 1 {
+                generate_error!(
+                    ctx,
+                    original_query,
+                    original_query.loc.clone(),
+                    E401,
+                    &query.return_values.len().to_string()
+                );
+            } else {
+                // match query.return_values.first().unwrap().return_type {
 
-            // }
+                // }
+            }
+            let return_name = query.return_values.first().unwrap().get_name();
+            query.mcp_handler = Some(return_name);
         }
-        let return_name = query.return_values.first().unwrap().get_name();
-        query.mcp_handler = Some(return_name);
+        Some(BuiltInMacro::Model(model_name)) => {
+            // handle model macro
+            query.embedding_model_to_use = Some(model_name.clone());
+        }
+        None => {}
     }
     ctx.output.queries.push(query);
 }

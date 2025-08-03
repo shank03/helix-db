@@ -274,7 +274,7 @@ impl PartialEq<Value> for FieldType {
 #[derive(Debug, Clone)]
 pub struct Query {
     pub original_query: String,
-    pub is_mcp: bool,
+    pub built_in_macro: Option<BuiltInMacro>,
     pub name: String,
     pub parameters: Vec<Parameter>,
     pub statements: Vec<Statement>,
@@ -810,6 +810,12 @@ pub struct Closure {
     pub loc: Loc,
 }
 
+#[derive(Debug, Clone)]
+pub enum BuiltInMacro {
+    MCP,
+    Model(String),
+}
+
 impl HelixParser {
     pub fn parse_source(input: &Content) -> Result<Source, ParserError> {
         let mut source = Source {
@@ -1127,12 +1133,22 @@ impl HelixParser {
     fn parse_query_def(&self, pair: Pair<Rule>, filepath: String) -> Result<Query, ParserError> {
         let original_query = pair.clone().as_str().to_string();
         let mut pairs = pair.clone().into_inner();
-        let is_mcp = match pairs.peek() {
-            Some(pair) if pair.as_rule() == Rule::mcp_macro => {
+        let built_in_macro = match pairs.peek() {
+            Some(pair) if pair.as_rule() == Rule::built_in_macro => {
+                let built_in_macro = match pair.into_inner().next() {
+                    Some(pair) => match pair.as_rule() {
+                        Rule::mcp_macro => Some(BuiltInMacro::MCP),
+                        Rule::model_macro => Some(BuiltInMacro::Model(
+                            pair.into_inner().next().unwrap().as_str().to_string(),
+                        )),
+                        _ => None,
+                    },
+                    _ => None,
+                };
                 pairs.next();
-                true
+                built_in_macro
             }
-            _ => false,
+            _ => None,
         };
         let name = pairs.next().unwrap().as_str().to_string();
         let parameters = self.parse_parameters(pairs.next().unwrap())?;
@@ -1141,7 +1157,7 @@ impl HelixParser {
         let return_values = self.parse_return_statement(pairs.next().unwrap())?;
 
         Ok(Query {
-            is_mcp,
+            built_in_macro,
             name,
             parameters,
             statements,

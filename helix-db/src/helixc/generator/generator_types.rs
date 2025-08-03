@@ -198,6 +198,7 @@ pub struct SchemaProperty {
 }
 
 pub struct Query {
+    pub embedding_model_to_use: Option<String>,
     pub mcp_handler: Option<String>,
     pub name: String,
     pub statements: Vec<Statement>,
@@ -287,6 +288,7 @@ impl Display for Query {
 impl Default for Query {
     fn default() -> Self {
         Self {
+            embedding_model_to_use: None,
             mcp_handler: None,
             name: "".to_string(),
             statements: vec![],
