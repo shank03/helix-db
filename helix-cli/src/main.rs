@@ -945,7 +945,7 @@ async fn main() -> ExitCode {
             let contents = match read_to_string(&cred_path) {
                 Ok(c) => c,
                 Err(e) => {
-                    println!("Error: Can't read credentials, try helix login: \n{:?}", e);
+                    println!("Error: Can't read credentials, try helix login: \n{e:?}");
                     return ExitCode::FAILURE;
                 }
             };
