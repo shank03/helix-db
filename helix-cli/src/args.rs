@@ -59,12 +59,15 @@ pub enum CommandType {
 
     /// Remove login credentials
     Logout,
+
+    /// Create a new key for a clowd cluster
+    #[command(name = "create-key")]
+    CreateKey { cluster: String },
 }
 
 #[derive(Debug, Args)]
 #[clap(name = "deploy", about = "Deploy a Helix project")]
 pub struct DeployCommand {
-
     #[clap(long, help = "Build in release mode (default is dev)")]
     pub release: bool,
 
@@ -104,7 +107,11 @@ pub struct CheckCommand {
 #[derive(Debug, Args)]
 #[clap(name = "install", about = "Install the Helix repo")]
 pub struct InstallCommand {
-    #[clap(short, long, help = "Install HelixDB from the development branch (considered unstable)")]
+    #[clap(
+        short,
+        long,
+        help = "Install HelixDB from the development branch (considered unstable)"
+    )]
     pub dev: bool,
 }
 
@@ -151,4 +158,3 @@ pub struct VisualizeCommand {
     #[clap(help = "Cluster ID to visualize")]
     pub cluster: String,
 }
-

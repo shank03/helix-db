@@ -6,6 +6,8 @@ use crate::{
 };
 use clap::Parser;
 use helix_db::{helix_engine::graph_core::config::Config, utils::styled_string::StyledString};
+use serde::Deserialize;
+use serde_json::json;
 use spinners::{Spinner, Spinners};
 use std::{
     fmt::Write,
@@ -928,7 +930,86 @@ async fn main() -> ExitCode {
                 fs::remove_file(cred_path).unwrap()
             }
         }
+
+        CommandType::CreateKey { cluster } => {
+            let home_dir = std::env::var("HOME").unwrap_or("~/".to_string());
+            let config_path = &format!("{home_dir}/.helix");
+            let config_path = Path::new(config_path);
+            if !config_path.exists() {
+                println!("Error: Can't find credentials, try helix login");
+                return ExitCode::FAILURE;
+            }
+
+            let cred_path = config_path.join("credentials");
+
+            let contents = match read_to_string(&cred_path) {
+                Ok(c) => c,
+                Err(e) => {
+                    println!("Error: Can't read credentials, try helix login: \n{:?}", e);
+                    return ExitCode::FAILURE;
+                }
+            };
+
+            let key = match parse_credentials(&contents) {
+                Some(k) => k,
+                None => {
+                    println!("Error: Can't parse credentials, try helix login");
+                    return ExitCode::FAILURE;
+                }
+            };
+
+            let client = reqwest::Client::new();
+
+            let res = client
+                .post("http://ec2-184-72-27-116.us-west-1.compute.amazonaws.com:3000/clusters/create_api_key")
+                .bearer_auth(key)
+                .header("x-cluster-id", &cluster)
+                .json(&json!({
+                    "name": "N/A",
+                }))
+                .send()
+                .await;
+
+            let res = match res {
+                Ok(r) => r,
+                Err(e) => {
+                    println!("Error sending request: {e:?}");
+                    return ExitCode::FAILURE;
+                }
+            };
+
+            match res.error_for_status() {
+                Ok(r) => match r.json::<CreateKeyResponse>().await {
+                    Ok(key_info) => {
+                        println!(
+                            "Successfully created new key for cluster: {}",
+                            cluster.bold()
+                        );
+                        println!(
+                            "Key has id: {}, please store it carefully\n{}",
+                            key_info.key_id.bold(),
+                            key_info.key.bold()
+                        )
+                    }
+                    Err(e) => {
+                        println!("Couldn't decode response: {e:?}");
+                        return ExitCode::FAILURE;
+                    }
+                },
+                Err(e) => {
+                    println!("Error creating key: {e:?}");
+                    return ExitCode::FAILURE;
+                }
+            }
+        }
     }
 
     ExitCode::SUCCESS
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CreateKeyResponse {
+    key: String,
+    key_id: String,
 }
