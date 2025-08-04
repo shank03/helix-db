@@ -2,9 +2,10 @@ use std::collections::HashMap;
 
 use crate::helixc::{
     generator::{
-        generator_types::{
-            EdgeSchema as GeneratedEdgeSchema, NodeSchema as GeneratedNodeSchema,
-            Parameter as GeneratedParameter, SchemaProperty, VectorSchema as GeneratedVectorSchema,
+        queries::Parameter as GeneratedParameter,
+        schemas::{
+            EdgeSchema as GeneratedEdgeSchema, NodeSchema as GeneratedNodeSchema, SchemaProperty,
+            VectorSchema as GeneratedVectorSchema,
         },
         utils::{GenRef, GeneratedType, GeneratedValue, RustType as GeneratedRustType},
     },

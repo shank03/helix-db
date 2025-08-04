@@ -1,4 +1,6 @@
-V::ClinicalNote {
-    vector: [F64],
-    text: String,
+schema::1 {
+    V::ClinicalNote {
+        vector: [F64],
+        text: String,
+    }
 }

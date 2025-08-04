@@ -1,4 +1,5 @@
 use helix_db::helix_engine::graph_core::graph_core::{HelixGraphEngine, HelixGraphEngineOpts};
+use helix_db::helix_engine::graph_core::ops::version_info::VersionInfo;
 use helix_db::helix_gateway::mcp::mcp::{MCPHandlerFn, MCPHandlerSubmission};
 use helix_db::helix_gateway::{
     gateway::{GatewayOpts, HelixGateway},
@@ -47,6 +48,7 @@ fn main() {
     let opts = HelixGraphEngineOpts {
         path: path_str.to_string(),
         config,
+        version_info: VersionInfo::default(),
     };
 
     let graph = Arc::new(HelixGraphEngine::new(opts.clone()).unwrap());
