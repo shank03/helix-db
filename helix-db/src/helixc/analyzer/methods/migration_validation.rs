@@ -14,6 +14,7 @@ use crate::{
             MigrationPropertyMapping,
         },
     },
+    protocol::value::Value,
 };
 
 use paste::paste;
@@ -51,6 +52,7 @@ pub(crate) fn validate_migration(ctx: &mut Ctx, migration: &Migration) {
     let mut item_mappings = Vec::new();
     for item in &migration.body {
         // // get from fields and to fields and check they exist in respective versions
+        // println!("item: {:?}", item);
 
         let from_fields = match match &item.from_item {
             (_, MigrationItem::Node(node)) => from_node_fields.get(node.as_str()),
@@ -102,6 +104,11 @@ pub(crate) fn validate_migration(ctx: &mut Ctx, migration: &Migration) {
             loc: _,
         } in &item.remappings
         {
+            println!("property_name: {:?}", property_name);
+            println!("property_value: {:?}", property_value);
+            println!("default: {:?}", default);
+            println!("cast: {:?}", cast);
+
             // check the new property exists in to version schema
             let to_property_field = match to_fields.get(property_name.1.as_str()) {
                 Some(field) => field,
@@ -151,22 +158,80 @@ pub(crate) fn validate_migration(ctx: &mut Ctx, migration: &Migration) {
             // // warnings if numeric type cast is smaller than existing type
 
             // generate migration
-            generated_migration_item_mapping
-                .remappings
-                .push(Separator::Semicolon(
-                    GeneratedMigrationPropertyMapping::FieldAdditionFromOldField {
-                        old_field: GeneratedValue::Literal(GenRef::Literal(
-                            property_name.1.to_string(),
-                        )),
-                        new_field: GeneratedValue::Literal(GenRef::Literal(
-                            property_name.1.to_string(),
-                        )),
-                    },
-                ));
+
+            match &cast {
+                Some(cast) => {
+                    generated_migration_item_mapping
+                        .remappings
+                        .push(Separator::Semicolon(
+                            GeneratedMigrationPropertyMapping::FieldTypeCast {
+                                field: GeneratedValue::Literal(GenRef::Literal(
+                                    property_name.1.to_string(),
+                                )),
+                                cast: cast.cast_to.clone().into(),
+                            },
+                        ))
+                }
+
+                None => {
+                    match &property_value.value {
+                        FieldValueType::Literal(literal) => {
+                            if to_property_field.field_type != *literal {
+                                // schema error - property value is not valid for the new field type
+                                panic!("property value is not valid for the new field type");
+                            }
+                            generated_migration_item_mapping
+                                .remappings
+                                .push(Separator::Semicolon(
+                                    GeneratedMigrationPropertyMapping::FieldAdditionFromValue {
+                                        new_field: GeneratedValue::Literal(GenRef::Literal(
+                                            property_name.1.to_string(),
+                                        )),
+                                        value: GeneratedValue::Literal(match literal {
+                                            Value::String(s) => GenRef::Literal(s.to_string()),
+                                            other => GenRef::Std(other.to_string()),
+                                        }),
+                                    },
+                                ));
+                        }
+                        FieldValueType::Identifier(identifier) => {
+                            if from_fields.get(identifier.as_str()).is_none() {
+                                // schema error - identifier does not exist in from version
+                                panic!("identifier does not exist in from version");
+                            }
+                            generated_migration_item_mapping
+                                .remappings
+                                .push(Separator::Semicolon(
+                                    GeneratedMigrationPropertyMapping::FieldAdditionFromOldField {
+                                        old_field: match &property_value.value {
+                                            FieldValueType::Literal(literal) => {
+                                                GeneratedValue::Literal(GenRef::Literal(
+                                                    literal.to_string(),
+                                                ))
+                                            }
+                                            FieldValueType::Identifier(identifier) => {
+                                                GeneratedValue::Identifier(GenRef::Literal(
+                                                    identifier.to_string(),
+                                                ))
+                                            }
+                                            _ => todo!(),
+                                        },
+                                        new_field: GeneratedValue::Literal(GenRef::Literal(
+                                            property_name.1.to_string(),
+                                        )),
+                                    },
+                                ));
+                        }
+                        _ => todo!(),
+                    }
+                }
+            };
         }
 
         item_mappings.push(generated_migration_item_mapping);
     }
+
+    println!("{:?}", item_mappings);
 
     ctx.output.migrations.push(GeneratedMigration {
         from_version: migration.from_version.1.to_string(),

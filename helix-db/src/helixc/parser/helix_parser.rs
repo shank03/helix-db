@@ -2,7 +2,7 @@ use super::{
     location::{HasLoc, Loc},
     parser_methods::ParserError,
 };
-use crate::protocol::value::Value;
+use crate::protocol::{remapping, value::Value};
 use chrono::{DateTime, NaiveDate, Utc};
 use itertools::Itertools;
 use pest::{
@@ -1268,11 +1268,17 @@ impl HelixParser {
             Some(p) => match p.as_rule() {
                 Rule::node_migration => p
                     .into_inner()
-                    .map(|p| self.parse_field_migration(p.into_inner().next().unwrap()))
+                    .next()
+                    .unwrap()
+                    .into_inner()
+                    .map(|p| self.parse_field_migration(p))
                     .collect::<Result<Vec<_>, _>>()?,
                 Rule::edge_migration => p
                     .into_inner()
-                    .map(|p| self.parse_field_migration(p.into_inner().next().unwrap()))
+                    .next()
+                    .unwrap()
+                    .into_inner()
+                    .map(|p| self.parse_field_migration(p))
                     .collect::<Result<Vec<_>, _>>()?,
                 _ => {
                     return Err(ParserError::from(
@@ -1286,6 +1292,17 @@ impl HelixParser {
                 ));
             }
         };
+        // let remappings = Vec::new();
+        // for pair in pairs {
+        //     match pair.as_rule() {
+        //         Rule::node_migration => {
+        //             remappings.push(self.parse_field_migration(pair.into_inner().next().unwrap())?);
+        //         }
+        //         Rule::edge_migration => {
+        //             remappings.push(self.parse_field_migration(pair.into_inner().next().unwrap())?);
+        //         }
+        //     }
+        // }
 
         Ok(MigrationItemMapping {
             from_item: from_item_type,

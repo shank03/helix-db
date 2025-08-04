@@ -57,7 +57,10 @@ use helix_db::{
         remapping::{Remapping, RemappingMap, ResponseRemapping},
         response::Response,
         return_values::ReturnValue,
-        value::Value,
+        value::{
+            Value,
+            casting::{CastType, cast},
+        },
     },
     traversal_remapping,
     utils::{
@@ -94,8 +97,8 @@ pub fn config() -> Option<Config> {
       {
         "name": "User",
         "properties": {
-          "age": "U32",
           "username": "String",
+          "age": "U32",
           "post_count": "U32"
         }
       }
@@ -121,7 +124,11 @@ pub struct User {
 #[migration(User, 1 -> 2)]
 pub fn migration_user_1_2(mut props: HashMap<String, Value>) -> HashMap<String, Value> {
     let mut new_props = HashMap::new();
-    field_addition_from_old_field!(&mut props, &mut new_props, "username", "username");
+    field_addition_from_old_field!(&mut props, &mut new_props, "username", "name");
+
+    field_type_cast!(&mut props, &mut new_props, "age", U32);
+
+    field_addition_from_value!(&mut new_props, "post_count", 0);
 
     new_props
 }

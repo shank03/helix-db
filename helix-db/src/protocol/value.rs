@@ -1073,6 +1073,8 @@ pub trait CastValue {
     fn into_id(self) -> ID;
     fn into_array(self) -> Vec<Value>;
     fn into_object(self) -> HashMap<String, Value>;
+    fn into_f32(self) -> f32;
+    fn into_f64(self) -> f64;
 }
 
 impl CastValue for Value {
@@ -1281,11 +1283,50 @@ impl CastValue for Value {
             _ => panic!("Value cannot be cast to object"),
         }
     }
+
+    fn into_f32(self) -> f32 {
+        match self {
+            Value::F32(f) => f,
+            Value::F64(f) => f as f32,
+            Value::I8(i) => i as f32,
+            Value::I16(i) => i as f32,
+            Value::I32(i) => i as f32,
+            Value::I64(i) => i as f32,
+            Value::U8(i) => i as f32,
+            Value::U16(i) => i as f32,
+            Value::U32(i) => i as f32,
+            Value::U64(i) => i as f32,
+            Value::U128(i) => i as f32,
+            Value::String(s) => s.parse::<f32>().unwrap(),
+            _ => panic!("Value cannot be cast to f32"),
+        }
+    }
+
+    fn into_f64(self) -> f64 {
+        match self {
+            Value::F64(f) => f,
+            Value::F32(f) => f as f64,
+            Value::I8(i) => i as f64,
+            Value::I16(i) => i as f64,
+            Value::I32(i) => i as f64,
+            Value::I64(i) => i as f64,
+            Value::U8(i) => i as f64,
+            Value::U16(i) => i as f64,
+            Value::U32(i) => i as f64,
+            Value::U64(i) => i as f64,
+            Value::U128(i) => i as f64,
+            Value::String(s) => s.parse::<f64>().unwrap(),
+            _ => panic!("Value cannot be cast to f64"),
+        }
+    }
 }
 
 pub mod casting {
+    use crate::helixc::parser::helix_parser::{FieldType, FieldValueType};
+
     use super::*;
 
+    #[derive(Debug)]
     pub enum CastType {
         String,
         I8,
@@ -1297,6 +1338,8 @@ pub mod casting {
         U32,
         U64,
         U128,
+        F32,
+        F64,
         Date,
         Boolean,
         Id,
@@ -1317,6 +1360,8 @@ pub mod casting {
             CastType::U32 => Value::U32(value.into_u32()),
             CastType::U64 => Value::U64(value.into_u64()),
             CastType::U128 => Value::U128(value.into_u128()),
+            CastType::F32 => Value::F32(value.into_f32()),
+            CastType::F64 => Value::F64(value.into_f64()),
             CastType::Date => Value::Date(value.into_date().unwrap()),
             CastType::Boolean => Value::Boolean(value.into_boolean()),
             CastType::Id => Value::Id(value.into_id()),
@@ -1339,12 +1384,39 @@ pub mod casting {
                 CastType::U32 => write!(f, "U32"),
                 CastType::U64 => write!(f, "U64"),
                 CastType::U128 => write!(f, "U128"),
+                CastType::F32 => write!(f, "F32"),
+                CastType::F64 => write!(f, "F64"),
                 CastType::Date => write!(f, "Date"),
                 CastType::Boolean => write!(f, "Boolean"),
                 CastType::Id => write!(f, "Id"),
                 CastType::Array => write!(f, "Array"),
                 CastType::Object => write!(f, "Object"),
                 CastType::Empty => write!(f, "Empty"),
+            }
+        }
+    }
+
+    impl From<FieldType> for CastType {
+        fn from(value: FieldType) -> Self {
+            match value {
+                FieldType::String => CastType::String,
+                FieldType::I8 => CastType::I8,
+                FieldType::I16 => CastType::I16,
+                FieldType::I32 => CastType::I32,
+                FieldType::I64 => CastType::I64,
+                FieldType::U8 => CastType::U8,
+                FieldType::U16 => CastType::U16,
+                FieldType::U32 => CastType::U32,
+                FieldType::U64 => CastType::U64,
+                FieldType::U128 => CastType::U128,
+                FieldType::F32 => CastType::F32,
+                FieldType::F64 => CastType::F64,
+                FieldType::Date => CastType::Date,
+                FieldType::Boolean => CastType::Boolean,
+                FieldType::Uuid => CastType::Id,
+                FieldType::Array(_) => CastType::Array,
+                FieldType::Object(_) => CastType::Object,
+                _ => CastType::Empty,
             }
         }
     }

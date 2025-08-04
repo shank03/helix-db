@@ -109,7 +109,7 @@ inventory::collect!(TransitionSubmission);
 
 #[macro_export]
 macro_rules! field_addition_from_old_field {
-    ($old_props:expr, $new_props:expr, $old_name:expr, $new_name:expr) => {{
+    ($old_props:expr, $new_props:expr, $new_name:expr, $old_name:expr) => {{
         let value = $old_props.remove($old_name).unwrap();
         $new_props.insert($new_name.to_string(), value);
     }};
@@ -118,7 +118,6 @@ macro_rules! field_addition_from_old_field {
 #[macro_export]
 macro_rules! field_type_cast {
     ($old_props:expr, $new_props:expr, $field_to_cast:expr, $new_field_type:ident) => {{
-        use crate::protocol::value::casting::{CastType, cast};
         let value = cast(
             $old_props.remove($field_to_cast).unwrap(),
             CastType::$new_field_type,
@@ -159,6 +158,8 @@ mod tests {
 
     #[test]
     fn test_field_type_cast() {
+        use crate::protocol::value::casting::{CastType, cast};
+
         let mut props =
             HashMap::from([("some_name".to_string(), Value::String("123".to_string()))]);
         let mut new_props = HashMap::new();

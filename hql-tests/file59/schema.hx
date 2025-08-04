@@ -18,6 +18,6 @@ MIGRATION schema::1 => schema::2 {
     N::User => _::{
         username: name,
         age: age AS U32,
-        post_count: DEFAULT 0
+        post_count: 0
     }
 }

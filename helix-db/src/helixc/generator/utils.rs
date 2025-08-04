@@ -122,12 +122,10 @@ impl Display for VecData {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             VecData::Standard(v) => write!(f, "{v}"),
-            VecData::Embed { data, model_name } => {
-                match model_name {
-                    Some(model) => write!(f, "&embed!(db, {data}, {model})"),
-                    None => write!(f, "&embed!(db, {data})"),
-                }
-            }
+            VecData::Embed { data, model_name } => match model_name {
+                Some(model) => write!(f, "&embed!(db, {data}, {model})"),
+                None => write!(f, "&embed!(db, {data})"),
+            },
             VecData::Unknown => panic!("Cannot convert to string, VecData is unknown"),
         }
     }
@@ -301,7 +299,7 @@ impl RustType {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Separator<T> {
     Comma(T),
     Semicolon(T),
@@ -392,7 +390,7 @@ use helix_db::{
         remapping::{Remapping, RemappingMap, ResponseRemapping},
         response::Response,
         return_values::ReturnValue,
-        value::Value,
+        value::{Value, casting::{CastType, cast}},
         format::Format,
     },
     utils::{
