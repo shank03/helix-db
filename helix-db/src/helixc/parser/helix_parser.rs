@@ -991,7 +991,7 @@ impl HelixParser {
                                         .parse::<usize>()
                                         .unwrap()
                                 } else {
-                                    return Err(ParserError::from("Expected schema version"));
+                                    1
                                 }
                             }
                             None => 1,

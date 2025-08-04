@@ -93,20 +93,46 @@ pub fn config() -> Option<Config> {
         schema: Some(
             r#"{
   "schema": {
-    "nodes": [
+    "nodes": [],
+    "vectors": [
       {
-        "name": "User",
+        "name": "UserEmbedding",
         "properties": {
-          "username": "String",
-          "age": "U32",
-          "post_count": "U32"
+          "createdAt": "Date",
+          "userId": "String",
+          "lastUpdated": "String",
+          "metadata": "String",
+          "dataType": "String",
+          "id": "ID"
         }
       }
     ],
-    "vectors": [],
     "edges": []
   },
-  "queries": []
+  "queries": [
+    {
+      "name": "CreateUserBioEmbedding",
+      "parameters": {
+        "userId": "String",
+        "bioText": "String",
+        "lastUpdated": "String"
+      },
+      "returns": [
+        "embedding"
+      ]
+    },
+    {
+      "name": "SearchSimilarUsers",
+      "parameters": {
+        "k": "I64",
+        "dataType": "String",
+        "queryText": "String"
+      },
+      "returns": [
+        "search_results"
+      ]
+    }
+  ]
 }"#
             .to_string(),
         ),
@@ -115,20 +141,60 @@ pub fn config() -> Option<Config> {
     });
 }
 
-pub struct User {
-    pub username: String,
-    pub age: u32,
-    pub post_count: u32,
+pub struct UserEmbedding {
+    pub userId: String,
+    pub dataType: String,
+    pub metadata: String,
+    pub lastUpdated: String,
+    pub createdAt: DateTime<Utc>,
 }
 
-#[migration(User, 1 -> 2)]
-pub fn migration_user_1_2(mut props: HashMap<String, Value>) -> HashMap<String, Value> {
-    let mut new_props = HashMap::new();
-    field_addition_from_old_field!(&mut props, &mut new_props, "username", "name");
+#[derive(Serialize, Deserialize)]
+pub struct CreateUserBioEmbeddingInput {
+    pub userId: String,
+    pub bioText: String,
+    pub lastUpdated: String,
+}
+#[handler(with_write)]
+pub fn CreateUserBioEmbedding(input: &HandlerInput) -> Result<Response, GraphError> {
+    {
+        let embedding = G::new_mut(Arc::clone(&db), &mut txn)
+.insert_v::<fn(&HVector, &RoTxn) -> bool>(&embed!(db, &data.bioText), "UserEmbedding", Some(props! { "lastUpdated" => data.lastUpdated.clone(), "userId" => data.userId.clone(), "dataType" => "bio", "metadata" => "{}" })).collect_to_obj();
+        let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
+        return_vals.insert(
+            "embedding".to_string(),
+            ReturnValue::from_traversal_value_with_mixin(
+                embedding.clone().clone(),
+                remapping_vals.borrow_mut(),
+            ),
+        );
+    }
+}
 
-    field_type_cast!(&mut props, &mut new_props, "age", U32);
-
-    field_addition_from_value!(&mut new_props, "post_count", 0);
-
-    new_props
+#[derive(Serialize, Deserialize)]
+pub struct SearchSimilarUsersInput {
+    pub queryText: String,
+    pub k: i64,
+    pub dataType: String,
+}
+#[handler(with_read)]
+pub fn SearchSimilarUsers(input: &HandlerInput) -> Result<Response, GraphError> {
+    {
+        let search_results = G::new(Arc::clone(&db), &txn)
+            .search_v::<fn(&HVector, &RoTxn) -> bool, _>(
+                &embed!(db, &data.queryText),
+                data.k.clone(),
+                "UserEmbedding",
+                None,
+            )
+            .collect_to::<Vec<_>>();
+        let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
+        return_vals.insert(
+            "search_results".to_string(),
+            ReturnValue::from_traversal_value_array_with_mixin(
+                search_results.clone().clone(),
+                remapping_vals.borrow_mut(),
+            ),
+        );
+    }
 }
