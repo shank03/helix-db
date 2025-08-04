@@ -4,6 +4,7 @@ use std::fmt::Display;
 use crate::{
     helix_engine::graph_core::config::Config,
     helixc::generator::{
+        migrations::GeneratedMigration,
         queries::Query,
         schemas::{EdgeSchema, NodeSchema, VectorSchema},
         utils::write_headers,
@@ -32,6 +33,7 @@ pub struct Source {
     pub queries: Vec<Query>,
     pub config: Config,
     pub src: String,
+    pub migrations: Vec<GeneratedMigration>,
 }
 impl Default for Source {
     fn default() -> Self {
@@ -42,6 +44,7 @@ impl Default for Source {
             queries: vec![],
             config: Config::default(),
             src: "".to_string(),
+            migrations: vec![],
         }
     }
 }
@@ -87,6 +90,17 @@ impl Display for Source {
                 .map(|q| format!("{q}"))
                 .collect::<Vec<_>>()
                 .join("\n")
-        )
+        )?;
+        writeln!(f)?;
+        writeln!(
+            f,
+            "{}",
+            self.migrations
+                .iter()
+                .map(|m| format!("{m}"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        )?;
+        Ok(())
     }
 }

@@ -2,6 +2,13 @@ use crate::{
     generate_error,
     helixc::{
         analyzer::analyzer::Ctx,
+        generator::{
+            migrations::{
+                GeneratedMigration, GeneratedMigrationItemMapping,
+                GeneratedMigrationPropertyMapping,
+            },
+            utils::{GenRef, GeneratedValue, Separator},
+        },
         parser::helix_parser::{
             FieldValue, FieldValueType, Migration, MigrationItem, MigrationItemMapping,
             MigrationPropertyMapping,
@@ -41,6 +48,7 @@ pub(crate) fn validate_migration(ctx: &mut Ctx, migration: &Migration) {
         .unwrap();
 
     // for each migration item mapping
+    let mut item_mappings = Vec::new();
     for item in &migration.body {
         // // get from fields and to fields and check they exist in respective versions
 
@@ -52,7 +60,11 @@ pub(crate) fn validate_migration(ctx: &mut Ctx, migration: &Migration) {
             Some(fields) => fields,
             None => {
                 // schema error - item does not exist
-                continue;
+                println!(
+                    "item does not exist: {:?}, {:?}",
+                    item.from_item, from_node_fields
+                );
+                panic!("item does not exist");
             }
         };
 
@@ -64,7 +76,7 @@ pub(crate) fn validate_migration(ctx: &mut Ctx, migration: &Migration) {
             Some(fields) => fields,
             None => {
                 // schema error - item does not exist
-                continue;
+                panic!("item does not exist");
             }
         };
 
@@ -72,14 +84,22 @@ pub(crate) fn validate_migration(ctx: &mut Ctx, migration: &Migration) {
         // TODO: add support for migrating actual item types
         if item.from_item.1 != item.to_item.1 {
             // schema error - item types do not match
+            panic!("item types do not match");
         }
+
+        let mut generated_migration_item_mapping = GeneratedMigrationItemMapping {
+            from_item: item.from_item.1.inner().to_string(),
+            to_item: item.to_item.1.inner().to_string(),
+            remappings: Vec::new(),
+            should_spread: true,
+        };
 
         for MigrationPropertyMapping {
             property_name,
             property_value,
             default,
             cast,
-            loc,
+            loc: _,
         } in &item.remappings
         {
             // check the new property exists in to version schema
@@ -87,7 +107,7 @@ pub(crate) fn validate_migration(ctx: &mut Ctx, migration: &Migration) {
                 Some(field) => field,
                 None => {
                     // schema error - property does not exist in to version
-                    continue;
+                    panic!("property does not exist in to version");
                 }
             };
 
@@ -98,14 +118,14 @@ pub(crate) fn validate_migration(ctx: &mut Ctx, migration: &Migration) {
                 FieldValueType::Literal(literal) => {
                     if to_property_field.field_type != *literal {
                         // schema error - property value is not valid for the new field type
-                        continue;
+                        panic!("property value is not valid for the new field type");
                     }
                 }
                 FieldValueType::Identifier(identifier) => {
                     // check the identifier is valid for the new field type
                     if from_fields.get(identifier.as_str()).is_none() {
                         // schema error - identifier does not exist in from version
-                        continue;
+                        panic!("identifier does not exist in from version");
                     }
                 }
                 _ => todo!(),
@@ -115,7 +135,7 @@ pub(crate) fn validate_migration(ctx: &mut Ctx, migration: &Migration) {
             if let Some(default) = &default {
                 if to_property_field.field_type != *default {
                     // schema error - default value is not valid for the new field type
-                    continue;
+                    panic!("default value is not valid for the new field type");
                 }
             }
 
@@ -123,14 +143,34 @@ pub(crate) fn validate_migration(ctx: &mut Ctx, migration: &Migration) {
             if let Some(cast) = &cast {
                 if to_property_field.field_type != cast.cast_to {
                     // schema error - cast is not valid for the new field type
-                    continue;
+                    panic!("cast is not valid for the new field type");
                 }
             }
 
-          
-          
             // // warnings if name is same
             // // warnings if numeric type cast is smaller than existing type
+
+            // generate migration
+            generated_migration_item_mapping
+                .remappings
+                .push(Separator::Semicolon(
+                    GeneratedMigrationPropertyMapping::FieldAdditionFromOldField {
+                        old_field: GeneratedValue::Literal(GenRef::Literal(
+                            property_name.1.to_string(),
+                        )),
+                        new_field: GeneratedValue::Literal(GenRef::Literal(
+                            property_name.1.to_string(),
+                        )),
+                    },
+                ));
         }
+
+        item_mappings.push(generated_migration_item_mapping);
     }
+
+    ctx.output.migrations.push(GeneratedMigration {
+        from_version: migration.from_version.1.to_string(),
+        to_version: migration.to_version.1.to_string(),
+        body: item_mappings,
+    });
 }

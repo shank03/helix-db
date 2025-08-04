@@ -313,7 +313,7 @@ impl<T: Display> Display for Separator<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Separator::Comma(t) => write!(f, ",\n{t}"),
-            Separator::Semicolon(t) => write!(f, ";\n{t}"),
+            Separator::Semicolon(t) => write!(f, "{t};\n"),
             Separator::Period(t) => write!(f, "\n.{t}"),
             Separator::Newline(t) => write!(f, "\n{t}"),
             Separator::Empty(t) => write!(f, "{t}"),
@@ -343,7 +343,7 @@ pub fn write_headers() -> String {
 
 
 use heed3::RoTxn;
-use helix_macros::{handler, tool_call, mcp_handler};
+use helix_macros::{handler, tool_call, mcp_handler, migration};
 use helix_db::{
     helix_engine::{
         graph_core::{
@@ -387,6 +387,7 @@ use helix_db::{
     node_matches, props, embed,
     field_remapping, identifier_remapping, 
     traversal_remapping, exclude_field, value_remapping, 
+    field_addition_from_old_field, field_type_cast, field_addition_from_value,
     protocol::{
         remapping::{Remapping, RemappingMap, ResponseRemapping},
         response::Response,

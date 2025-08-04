@@ -1,8 +1,8 @@
 use super::super::tr_val::TraversalVal;
 use crate::{
     helix_engine::{
-        bm25::bm25::{BM25, BM25Flatten},
-        graph_core::traversal_iter::RwTraversalIterator,
+        bm25::bm25::{BM25Flatten, BM25},
+        graph_core::{ops::version_info::VersionInfo, traversal_iter::RwTraversalIterator},
         types::GraphError,
     },
     protocol::value::Value,
@@ -43,7 +43,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddNAdapter<'
         let node = Node {
             id: v6_uuid(),
             label: label.to_string(), // TODO: just &str or Cow<'a, str>
-            version: todo!("TODO: need to have node schema data accessible"),
+            version: 1,
             properties: properties.map(|props| props.into_iter().collect()),
         };
         let secondary_indices = secondary_indices.unwrap_or(&[]).to_vec();

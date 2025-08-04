@@ -8,7 +8,8 @@
 use chrono::{DateTime, Utc};
 use heed3::RoTxn;
 use helix_db::{
-    embed, exclude_field, field_remapping,
+    embed, exclude_field, field_addition_from_old_field, field_addition_from_value,
+    field_remapping, field_type_cast,
     helix_engine::{
         graph_core::{
             config::{Config, GraphConfig, VectorConfig},
@@ -67,7 +68,7 @@ use helix_db::{
     },
     value_remapping,
 };
-use helix_macros::{handler, mcp_handler, tool_call};
+use helix_macros::{handler, mcp_handler, migration, tool_call};
 use sonic_rs::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -89,40 +90,20 @@ pub fn config() -> Option<Config> {
         schema: Some(
             r#"{
   "schema": {
-    "nodes": [],
-    "vectors": [
+    "nodes": [
       {
-        "name": "ClinicalNote",
+        "name": "User",
         "properties": {
-          "id": "ID",
-          "text": "String",
-          "vector": "Array(F64)"
+          "age": "U32",
+          "username": "String",
+          "post_count": "U32"
         }
       }
     ],
+    "vectors": [],
     "edges": []
   },
-  "queries": [
-    {
-      "name": "addClinicalNote",
-      "parameters": {
-        "text": "String"
-      },
-      "returns": [
-        "note"
-      ]
-    },
-    {
-      "name": "searchClinicalNotes",
-      "parameters": {
-        "query": "String",
-        "k": "I64"
-      },
-      "returns": [
-        "notes"
-      ]
-    }
-  ]
+  "queries": []
 }"#
             .to_string(),
         ),
@@ -131,67 +112,16 @@ pub fn config() -> Option<Config> {
     });
 }
 
-pub struct ClinicalNote {
-    pub vector: Vec<f64>,
-    pub text: String,
+pub struct User {
+    pub username: String,
+    pub age: u32,
+    pub post_count: u32,
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct addClinicalNoteInput {
-    pub text: String,
-}
-#[handler(with_write)]
-pub fn addClinicalNote(input: &HandlerInput) -> Result<Response, GraphError> {
-    {
-        let note = G::new_mut(Arc::clone(&db), &mut txn)
-            .insert_v::<fn(&HVector, &RoTxn) -> bool>(
-                &embed!(
-                    db,
-                    &data.text,
-                    "gemini:gemini-embedding-001:RETRIEVAL_DOCUMENT"
-                ),
-                "ClinicalNote",
-                Some(props! { "text" => data.text.clone() }),
-            )
-            .collect_to_obj();
-        let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
-        return_vals.insert(
-            "note".to_string(),
-            ReturnValue::from_traversal_value_with_mixin(
-                note.clone().clone(),
-                remapping_vals.borrow_mut(),
-            ),
-        );
-    }
-}
+#[migration(User, 1 -> 2)]
+pub fn migration_user_1_2(mut props: HashMap<String, Value>) -> HashMap<String, Value> {
+    let mut new_props = HashMap::new();
+    field_addition_from_old_field!(&mut props, &mut new_props, "username", "username");
 
-#[derive(Serialize, Deserialize)]
-pub struct searchClinicalNotesInput {
-    pub query: String,
-    pub k: i64,
-}
-#[handler(with_read)]
-pub fn searchClinicalNotes(input: &HandlerInput) -> Result<Response, GraphError> {
-    {
-        let notes = G::new(Arc::clone(&db), &txn)
-            .search_v::<fn(&HVector, &RoTxn) -> bool, _>(
-                &embed!(
-                    db,
-                    &data.query,
-                    "gemini:gemini-embedding-001:RETRIEVAL_QUERY"
-                ),
-                data.k.clone(),
-                "ClinicalNote",
-                None,
-            )
-            .collect_to::<Vec<_>>();
-        let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
-        return_vals.insert(
-            "notes".to_string(),
-            ReturnValue::from_traversal_value_array_with_mixin(
-                notes.clone().clone(),
-                remapping_vals.borrow_mut(),
-            ),
-        );
-    }
+    new_props
 }

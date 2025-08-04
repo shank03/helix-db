@@ -125,6 +125,16 @@ pub enum MigrationItem {
     Vector(String),
 }
 
+impl MigrationItem {
+    pub fn inner(&self) -> &str {
+        match self {
+            MigrationItem::Node(s) => s,
+            MigrationItem::Edge(s) => s,
+            MigrationItem::Vector(s) => s,
+        }
+    }
+}
+
 impl PartialEq<MigrationItem> for MigrationItem {
     fn eq(&self, other: &MigrationItem) -> bool {
         match (self, other) {
@@ -984,7 +994,7 @@ impl HelixParser {
                                     return Err(ParserError::from("Expected schema version"));
                                 }
                             }
-                            None => return Err(ParserError::from("Expected schema version")),
+                            None => 1,
                         };
 
                         for pair in schema_pairs {
@@ -1070,7 +1080,6 @@ impl HelixParser {
                     .queries
                     .push(parser.parse_query_def(pair, file.name.clone())?);
             }
-
 
             // parse all schemas first then parse queries using self
             source.schema.extend(parser.source.schema);
@@ -1162,36 +1171,98 @@ impl HelixParser {
     ) -> Result<MigrationItemMapping, ParserError> {
         let mut pairs = pair.clone().into_inner();
         let from_item_type = match pairs.next() {
-            Some(pair) => match pair.as_rule() {
-                Rule::node_decl => (pair.loc(), MigrationItem::Node(pair.as_str().to_string())),
-                Rule::edge_decl => (pair.loc(), MigrationItem::Edge(pair.as_str().to_string())),
-                Rule::vec_decl => (pair.loc(), MigrationItem::Vector(pair.as_str().to_string())),
-                _ => return Err(ParserError::from("Expected item_def")),
+            Some(item_def) => match item_def.into_inner().next() {
+                Some(item_decl) => match item_decl.as_rule() {
+                    Rule::node_decl => (
+                        item_decl.loc(),
+                        MigrationItem::Node(
+                            item_decl.into_inner().next().unwrap().as_str().to_string(),
+                        ),
+                    ),
+                    Rule::edge_decl => (
+                        item_decl.loc(),
+                        MigrationItem::Edge(
+                            item_decl.into_inner().next().unwrap().as_str().to_string(),
+                        ),
+                    ),
+                    Rule::vec_decl => (
+                        item_decl.loc(),
+                        MigrationItem::Vector(
+                            item_decl.into_inner().next().unwrap().as_str().to_string(),
+                        ),
+                    ),
+                    _ => {
+                        return Err(ParserError::from(format!(
+                            "Expected item declaration, got {:?}",
+                            item_decl.as_rule()
+                        )));
+                    }
+                },
+                None => {
+                    return Err(ParserError::from(format!(
+                        "Expected item declaration, got {:?}",
+                        pair.as_rule()
+                    )));
+                }
             },
-            None => return Err(ParserError::from("Expected item_def")),
+            _ => {
+                return Err(ParserError::from(format!(
+                    "Expected item declaration, got {:?}",
+                    pair.as_rule()
+                )));
+            }
         };
 
         let to_item_type = match pairs.next() {
             Some(pair) => match pair.as_rule() {
-                Rule::item_def => match &pair.into_inner().next() {
-                    Some(pair) => match pair.as_rule() {
-                        Rule::node_decl => {
-                            (pair.loc(), MigrationItem::Node(pair.as_str().to_string()))
+                Rule::item_def => match pair.into_inner().next() {
+                    Some(item_decl) => match item_decl.as_rule() {
+                        Rule::node_decl => (
+                            item_decl.loc(),
+                            MigrationItem::Node(
+                                item_decl.into_inner().next().unwrap().as_str().to_string(),
+                            ),
+                        ),
+                        Rule::edge_decl => (
+                            item_decl.loc(),
+                            MigrationItem::Edge(
+                                item_decl.into_inner().next().unwrap().as_str().to_string(),
+                            ),
+                        ),
+                        Rule::vec_decl => (
+                            item_decl.loc(),
+                            MigrationItem::Vector(
+                                item_decl.into_inner().next().unwrap().as_str().to_string(),
+                            ),
+                        ),
+                        _ => {
+                            return Err(ParserError::from(format!(
+                                "Expected item declaration, got {:?}",
+                                item_decl.as_rule()
+                            )));
                         }
-                        Rule::edge_decl => {
-                            (pair.loc(), MigrationItem::Edge(pair.as_str().to_string()))
-                        }
-                        Rule::vec_decl => {
-                            (pair.loc(), MigrationItem::Vector(pair.as_str().to_string()))
-                        }
-                        _ => return Err(ParserError::from("Expected item_def")),
                     },
-                    None => return Err(ParserError::from("Expected item_def")),
+                    None => {
+                        return Err(ParserError::from(format!(
+                            "Expected item, got {:?}",
+                            pairs.peek()
+                        )));
+                    }
                 },
                 Rule::anon_decl => from_item_type.clone(),
-                _ => return Err(ParserError::from("Expected item_def")),
+                _ => {
+                    return Err(ParserError::from(format!(
+                        "Invalid item declaration, got {:?}",
+                        pair.as_rule()
+                    )));
+                }
             },
-            None => return Err(ParserError::from("Expected item_def")),
+            None => {
+                return Err(ParserError::from(format!(
+                    "Expected item_def, got {:?}",
+                    pairs.peek()
+                )));
+            }
         };
         let remappings = match pairs.next() {
             Some(p) => match p.as_rule() {

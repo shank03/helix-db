@@ -5,11 +5,11 @@ use crate::helixc::{
         methods::{
             migration_validation::validate_migration,
             query_validation::validate_query,
-            schema_methods::{SchemaVersionMap, build_field_lookups, check_schema},
+            schema_methods::{build_field_lookups, check_schema, SchemaVersionMap},
         },
         types::Type,
     },
-    generator::Source as GeneratedSource,
+    generator::{migrations::GeneratedMigration, Source as GeneratedSource},
     parser::helix_parser::{EdgeSchema, ExpressionType, Field, Query, Source},
 };
 use serde::Serialize;
@@ -30,7 +30,6 @@ pub fn analyze(src: &Source) -> (Vec<Diagnostic>, GeneratedSource) {
 /// Internal working context shared by all passes.
 pub(crate) struct Ctx<'a> {
     pub(super) src: &'a Source,
-
     /// Quick look‑ups
     pub(super) node_set: HashSet<&'a str>,
     pub(super) vector_set: HashSet<&'a str>,
