@@ -10,7 +10,9 @@ use crate::helixc::{
 
 type FieldLookup<'a> = HashMap<&'a str, HashMap<&'a str, Cow<'a, Field>>>;
 
-pub(crate) struct SchemaVersionMap<'a>(HashMap<usize, (FieldLookup<'a>, FieldLookup<'a>, FieldLookup<'a>)>);
+pub(crate) struct SchemaVersionMap<'a>(
+    HashMap<usize, (FieldLookup<'a>, FieldLookup<'a>, FieldLookup<'a>)>,
+);
 
 impl<'a> SchemaVersionMap<'a> {
     pub fn get_latest(&self) -> (FieldLookup<'a>, FieldLookup<'a>, FieldLookup<'a>) {
@@ -22,80 +24,88 @@ impl<'a> SchemaVersionMap<'a> {
     }
 }
 
-
-pub(crate) fn build_field_lookups<'a>(
-    src: &'a Source,
-) -> SchemaVersionMap<'a> {
-    SchemaVersionMap(src.get_schemas_in_order()
-        .iter()
-        .map(|schema| {
-            let node_fields = schema
-                .node_schemas
-                .iter()
-                .map(|n| {
-                    (
-                        n.name.1.as_str(),
-                        n.fields
+pub(crate) fn build_field_lookups<'a>(src: &'a Source) -> SchemaVersionMap<'a> {
+    SchemaVersionMap(
+        src.get_schemas_in_order()
+            .iter()
+            .map(|schema| {
+                let node_fields = schema
+                    .node_schemas
+                    .iter()
+                    .map(|n| {
+                        let mut props = n
+                            .fields
                             .iter()
                             .map(|f| (f.name.as_str(), Cow::Borrowed(f)))
-                            .collect::<HashMap<&str, Cow<'a, Field>>>(),
-                    )
-                })
-                .collect();
+                            .collect::<HashMap<&str, Cow<'a, Field>>>();
+                        props.insert(
+                            "id",
+                            Cow::Owned(Field {
+                                prefix: FieldPrefix::Empty,
+                                defaults: None,
+                                name: "id".to_string(),
+                                field_type: FieldType::Uuid,
+                                loc: Loc::empty(),
+                            }),
+                        );
+                        (n.name.1.as_str(), props)
+                    })
+                    .collect();
 
-            let edge_fields = schema
-                .edge_schemas
-                .iter()
-                .map(|e| {
-                    let mut props: HashMap<_, _> = e
-                        .properties
-                        .as_ref()
-                        .map(|v| {
-                            v.iter()
-                                .map(|f| (f.name.as_str(), Cow::Borrowed(f)))
-                                .collect()
-                        })
-                        .unwrap_or_default();
-                    props.insert(
-                        "id",
-                        Cow::Owned(Field {
-                            prefix: FieldPrefix::Empty,
-                            defaults: None,
-                            name: "id".to_string(),
-                            field_type: FieldType::Uuid,
-                            loc: Loc::empty(),
-                        }),
-                    );
-                    (e.name.1.as_str(), props)
-                })
-                .collect();
+                let edge_fields = schema
+                    .edge_schemas
+                    .iter()
+                    .map(|e| {
+                        let mut props: HashMap<_, _> = e
+                            .properties
+                            .as_ref()
+                            .map(|v| {
+                                v.iter()
+                                    .map(|f| (f.name.as_str(), Cow::Borrowed(f)))
+                                    .collect()
+                            })
+                            .unwrap_or_default();
+                        props.insert(
+                            "id",
+                            Cow::Owned(Field {
+                                prefix: FieldPrefix::Empty,
+                                defaults: None,
+                                name: "id".to_string(),
+                                field_type: FieldType::Uuid,
+                                loc: Loc::empty(),
+                            }),
+                        );
+                        (e.name.1.as_str(), props)
+                    })
+                    .collect();
 
-            let vector_fields = schema
-                .vector_schemas
-                .iter()
-                .map(|v| {
-                    let mut props = v
-                        .fields
-                        .iter()
-                        .map(|f| (f.name.as_str(), Cow::Borrowed(f)))
-                        .collect::<HashMap<&str, Cow<'a, Field>>>();
-                    props.insert(
-                        "id",
-                        Cow::Owned(Field {
-                            prefix: FieldPrefix::Empty,
-                            defaults: None,
-                            name: "id".to_string(),
-                            field_type: FieldType::Uuid,
-                            loc: Loc::empty(),
-                        }),
-                    );
-                    (v.name.as_str(), props)
-                })
-                .collect();
+                let vector_fields = schema
+                    .vector_schemas
+                    .iter()
+                    .map(|v| {
+                        let mut props = v
+                            .fields
+                            .iter()
+                            .map(|f| (f.name.as_str(), Cow::Borrowed(f)))
+                            .collect::<HashMap<&str, Cow<'a, Field>>>();
+                        props.insert(
+                            "id",
+                            Cow::Owned(Field {
+                                prefix: FieldPrefix::Empty,
+                                defaults: None,
+                                name: "id".to_string(),
+                                field_type: FieldType::Uuid,
+                                loc: Loc::empty(),
+                            }),
+                        );
+                        (v.name.as_str(), props)
+                    })
+                    .collect();
 
-            (schema.version.1, (node_fields, edge_fields, vector_fields))
-        })
-        .collect())
+                (schema.version.1, (node_fields, edge_fields, vector_fields))
+            })
+            .collect(),
+    )
 }
 
 pub(crate) fn check_schema(ctx: &mut Ctx) {
