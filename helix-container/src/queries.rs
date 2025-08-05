@@ -98,12 +98,12 @@ pub fn config() -> Option<Config> {
       {
         "name": "UserEmbedding",
         "properties": {
-          "createdAt": "Date",
+          "id": "ID",
           "userId": "String",
-          "lastUpdated": "String",
-          "metadata": "String",
           "dataType": "String",
-          "id": "ID"
+          "createdAt": "Date",
+          "metadata": "String",
+          "lastUpdated": "String"
         }
       }
     ],
@@ -125,8 +125,8 @@ pub fn config() -> Option<Config> {
       "name": "SearchSimilarUsers",
       "parameters": {
         "k": "I64",
-        "dataType": "String",
-        "queryText": "String"
+        "queryText": "String",
+        "dataType": "String"
       },
       "returns": [
         "search_results"
@@ -159,7 +159,7 @@ pub struct CreateUserBioEmbeddingInput {
 pub fn CreateUserBioEmbedding(input: &HandlerInput) -> Result<Response, GraphError> {
     {
         let embedding = G::new_mut(Arc::clone(&db), &mut txn)
-.insert_v::<fn(&HVector, &RoTxn) -> bool>(&embed!(db, &data.bioText), "UserEmbedding", Some(props! { "lastUpdated" => data.lastUpdated.clone(), "userId" => data.userId.clone(), "dataType" => "bio", "metadata" => "{}" })).collect_to_obj();
+.insert_v::<fn(&HVector, &RoTxn) -> bool>(&embed!(db, &data.bioText), "UserEmbedding", Some(props! { "metadata" => "{}", "userId" => data.userId.clone(), "dataType" => "bio", "lastUpdated" => data.lastUpdated.clone() })).collect_to_obj();
         let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
         return_vals.insert(
             "embedding".to_string(),
@@ -173,7 +173,7 @@ pub fn CreateUserBioEmbedding(input: &HandlerInput) -> Result<Response, GraphErr
 
 #[derive(Serialize, Deserialize)]
 pub struct SearchSimilarUsersInput {
-    pub queryText: String,
+    pub queryText: Option<String>,
     pub k: i64,
     pub dataType: String,
 }
@@ -182,7 +182,12 @@ pub fn SearchSimilarUsers(input: &HandlerInput) -> Result<Response, GraphError> 
     {
         let search_results = G::new(Arc::clone(&db), &txn)
             .search_v::<fn(&HVector, &RoTxn) -> bool, _>(
-                &embed!(db, &data.queryText),
+                &embed!(
+                    db,
+                    data.queryText
+                        .as_ref()
+                        .ok_or_else(|| GraphError::ParamNotFound("queryText"))?
+                ),
                 data.k.clone(),
                 "UserEmbedding",
                 None,

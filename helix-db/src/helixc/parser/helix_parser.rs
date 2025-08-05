@@ -416,6 +416,7 @@ pub struct Query {
 pub struct Parameter {
     pub name: (Loc, String),
     pub param_type: (Loc, FieldType),
+    pub is_optional: bool,
     pub loc: Loc,
 }
 
@@ -1605,8 +1606,14 @@ impl HelixParser {
                     (pair.loc(), pair.as_str().to_string())
                 };
 
+                // gets optional param
+                let is_optional = inner.peek().map_or(false, |p| p.as_rule() == Rule::optional_param);
+                if is_optional {
+                    inner.next();
+                }
+
                 // gets param type
-                let param_pair = inner
+                let param_type_pair = inner
                     .clone()
                     .next()
                     .unwrap()
@@ -1614,10 +1621,10 @@ impl HelixParser {
                     .into_inner()
                     .next()
                     .unwrap();
-                let param_type_location = param_pair.loc();
+                let param_type_location = param_type_pair.loc();
                 let param_type = self.parse_field_type(
                     // unwraps the param type to get the rule (array, object, named_type, etc)
-                    param_pair,
+                    param_type_pair,
                     Some(&self.source),
                 )?;
 
@@ -1625,6 +1632,7 @@ impl HelixParser {
                     Ok(Parameter {
                         name,
                         param_type: (param_type_location, param_type),
+                        is_optional,
                         loc: pair.loc(),
                     })
                 } else {
