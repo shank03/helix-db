@@ -392,6 +392,24 @@ impl StorageMethods for HelixGraphStorage {
                 &Self::pack_edge_data(edge_id, id),
             )?;
         }
+
+        // delete secondary indices
+        let node = self.get_node(txn, id)?;
+        if let Some(properties) = node.properties {
+            for (key, v) in properties.iter() {
+                if let Some(db) = self.secondary_indices.get(key) {
+                    match bincode::serialize(v) {
+                        Ok(serialized) => {
+                            if let Err(e) = db.delete_one_duplicate(txn, &serialized, &node.id) {
+                                return Err(GraphError::from(e));
+                            }
+                        }
+                        Err(e) => return Err(GraphError::from(e)),
+                    }
+                }
+            }
+        }
+
         // Delete node data and label
         self.nodes_db.delete(txn, Self::node_key(id))?;
 
