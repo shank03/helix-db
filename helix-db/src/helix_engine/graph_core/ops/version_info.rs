@@ -10,40 +10,42 @@ pub struct VersionInfo(pub HashMap<String, ItemInfo>);
 
 impl VersionInfo {
     pub fn upgrade_to_node_latest(&self, node: Node) -> Node {
-        let item_info = self
-            .0
-            .get(&node.label)
-            .expect("All nodes should have version info");
-
-        item_info.upgrade_node_to_latest(node)
+        match self.0.get(&node.label) {
+            Some(item_info) => item_info.upgrade_node_to_latest(node),
+            None => node,
+        }
     }
 
     pub fn upgrade_to_edge_latest(&self, node: Edge) -> Edge {
-        let item_info = self
-            .0
-            .get(&node.label)
-            .expect("All edges should have version info");
-
-        item_info.upgrade_edge_to_latest(node)
+        match self.0.get(&node.label) {
+            Some(item_info) => item_info.upgrade_edge_to_latest(node),
+            None => node,
+        }
     }
 
     pub fn get_latest(&self, label: &str) -> u8 {
         self.0
             .get(label)
-            .expect("All labels should have version info")
-            .latest
+            .map(|item_info| item_info.latest)
+            .unwrap_or(1)
     }
 }
 
 type Props = HashMap<String, Value>;
+#[derive(Clone, Debug)]
+pub struct TransitionFn {
+    pub from_version: u8,
+    pub to_version: u8,
+    pub func: fn(Props) -> Props,
+}
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ItemInfo {
     /// The latest version of this item
     /// All writes should be done with this version
-    latest: u8,
+    pub latest: u8,
     /// Stores transition from version x and index x-1
-    transition_fns: Vec<fn(Props) -> Props>,
+    pub transition_fns: Vec<TransitionFn>,
 }
 
 impl ItemInfo {
@@ -51,8 +53,10 @@ impl ItemInfo {
         if node.version < self.latest
             && let Some(mut node_props) = node.properties.take()
         {
-            for trans_fn in self.transition_fns.iter().skip(node.version as usize - 1) {
-                node_props = trans_fn(node_props);
+            for TransitionFn { func, .. } in
+                self.transition_fns.iter().skip(node.version as usize - 1)
+            {
+                node_props = func(node_props);
             }
 
             node.properties = Some(node_props);
@@ -65,8 +69,10 @@ impl ItemInfo {
         if edge.version < self.latest
             && let Some(mut edge_props) = edge.properties.take()
         {
-            for trans_fn in self.transition_fns.iter().skip(edge.version as usize - 1) {
-                edge_props = trans_fn(edge_props);
+            for TransitionFn { func, .. } in
+                self.transition_fns.iter().skip(edge.version as usize - 1)
+            {
+                edge_props = func(edge_props);
             }
 
             edge.properties = Some(edge_props);
@@ -76,14 +82,21 @@ impl ItemInfo {
     }
 }
 
-pub type TransitionFn = fn(Props) -> Props;
+impl Default for ItemInfo {
+    fn default() -> Self {
+        Self {
+            latest: 1,
+            transition_fns: vec![],
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct Transition {
     pub item_label: &'static str,
     pub from_version: u8,
     pub to_version: u8,
-    pub func: TransitionFn,
+    pub func: fn(Props) -> Props,
 }
 
 impl Transition {
@@ -91,7 +104,7 @@ impl Transition {
         item_label: &'static str,
         from_version: u8,
         to_version: u8,
-        func: TransitionFn,
+        func: fn(Props) -> Props,
     ) -> Self {
         Self {
             item_label,
