@@ -141,8 +141,8 @@ macro_rules! field_type_cast {
 
 #[macro_export]
 macro_rules! field_addition_from_value {
-    ($new_props:expr, $new_field_name:expr, $value:expr) => {{
-        $new_props.insert($new_field_name.to_string(), Value::from($value));
+    ($new_props:expr, $new_field_name:expr, $new_field_type:ident, $value:expr) => {{
+        $new_props.insert($new_field_name.to_string(), Value::$new_field_type($value));
     }};
 }
 
@@ -158,7 +158,7 @@ mod tests {
         )]);
 
         let mut new_props = HashMap::new();
-        field_addition_from_old_field!(&mut props, &mut new_props, "some_name", "new_name");
+        field_addition_from_old_field!(&mut props, &mut new_props, "new_name", "some_name");
 
         assert_eq!(
             new_props,
@@ -179,7 +179,7 @@ mod tests {
         field_type_cast!(&mut props, &mut new_props, "some_name", U32);
 
         assert_eq!(
-            props,
+            new_props,
             HashMap::from([("some_name".to_string(), Value::U32(123))])
         );
     }
@@ -188,7 +188,7 @@ mod tests {
     fn test_field_addition_from_value() {
         let mut new_props = HashMap::new();
 
-        field_addition_from_value!(&mut new_props, "new_name", 123);
+        field_addition_from_value!(&mut new_props, "new_name", U32, 123);
 
         assert_eq!(
             new_props,

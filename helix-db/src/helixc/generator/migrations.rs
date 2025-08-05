@@ -1,5 +1,8 @@
 use crate::{
-    helixc::generator::utils::{GeneratedValue, Separator},
+    helixc::{
+        generator::utils::{GeneratedValue, Separator},
+        parser::helix_parser::FieldType,
+    },
     protocol::value::casting::CastType,
 };
 
@@ -24,7 +27,8 @@ pub enum GeneratedMigrationPropertyMapping {
         new_field: GeneratedValue,
     },
     FieldAdditionFromValue {
-        new_field: GeneratedValue,
+        new_field_name: GeneratedValue,
+        new_field_type: FieldType,
         value: GeneratedValue,
     },
     FieldTypeCast {
@@ -69,10 +73,14 @@ impl std::fmt::Display for GeneratedMigrationPropertyMapping {
                 f,
                 "field_addition_from_old_field!(&mut props, &mut new_props, {new_field}, {old_field})"
             ),
-            GeneratedMigrationPropertyMapping::FieldAdditionFromValue { new_field, value } => {
+            GeneratedMigrationPropertyMapping::FieldAdditionFromValue {
+                new_field_name,
+                new_field_type,
+                value,
+            } => {
                 write!(
                     f,
-                    "field_addition_from_value!(&mut new_props, {new_field}, {value})"
+                    "field_addition_from_value!(&mut new_props, {new_field_name}, {new_field_type}, {value})"
                 )
             }
             GeneratedMigrationPropertyMapping::FieldTypeCast { field, cast } => {
