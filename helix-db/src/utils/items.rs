@@ -20,7 +20,7 @@ pub struct Node {
     pub id: u128,
     /// The label of the node.
     pub label: String,
-    ///
+    /// The version of the node.
     pub version: u8,
     /// The properties of the node.
     ///

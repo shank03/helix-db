@@ -1,14 +1,11 @@
-use std::collections::HashMap;
-
 use heed3::PutFlags;
-
 use crate::{
     helix_engine::{
         graph_core::traversal_iter::RwTraversalIterator,
         storage_core::{storage_core::HelixGraphStorage, storage_methods::StorageMethods},
         types::GraphError,
     },
-    protocol::value::{Value, properties_format},
+    protocol::value::{Value},
 };
 
 use super::super::tr_val::TraversalVal;
@@ -56,10 +53,7 @@ impl<'scope, 'env, I: Iterator<Item = Result<TraversalVal, GraphError>>> UpdateA
             match item {
                 Ok(TraversalVal::Node(node)) => match storage.get_node(self.txn, &node.id) {
                     Ok(mut old_node) => {
-                        let mut properties = match old_node.properties {
-                            Some(properties) => properties,
-                            None => HashMap::new(),
-                        };
+                        let mut properties = old_node.properties.unwrap_or_default();
 
                         if let Some(ref props) = props {
                             for (key, _new_value) in props.iter() {

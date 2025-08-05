@@ -1,5 +1,4 @@
 use crate::{
-    generate_error,
     helixc::{
         analyzer::analyzer::Ctx,
         generator::{
@@ -10,14 +9,11 @@ use crate::{
             utils::{GenRef, GeneratedValue, Separator},
         },
         parser::helix_parser::{
-            FieldValue, FieldValueType, Migration, MigrationItem, MigrationItemMapping,
-            MigrationPropertyMapping,
+            FieldValueType, Migration, MigrationItem, MigrationPropertyMapping,
         },
     },
     protocol::value::Value,
 };
-
-use paste::paste;
 
 pub(crate) fn validate_migration(ctx: &mut Ctx, migration: &Migration) {
     // check from version exists
@@ -104,10 +100,6 @@ pub(crate) fn validate_migration(ctx: &mut Ctx, migration: &Migration) {
             loc: _,
         } in &item.remappings
         {
-            println!("property_name: {:?}", property_name);
-            println!("property_value: {:?}", property_value);
-            println!("default: {:?}", default);
-            println!("cast: {:?}", cast);
 
             // check the new property exists in to version schema
             let to_property_field = match to_fields.get(property_name.1.as_str()) {
@@ -230,8 +222,6 @@ pub(crate) fn validate_migration(ctx: &mut Ctx, migration: &Migration) {
 
         item_mappings.push(generated_migration_item_mapping);
     }
-
-    println!("{:?}", item_mappings);
 
     ctx.output.migrations.push(GeneratedMigration {
         from_version: migration.from_version.1.to_string(),

@@ -311,7 +311,7 @@ impl<T: Display> Display for Separator<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Separator::Comma(t) => write!(f, ",\n{t}"),
-            Separator::Semicolon(t) => write!(f, "{t};\n"),
+            Separator::Semicolon(t) => writeln!(f, "{t};"),
             Separator::Period(t) => write!(f, "\n.{t}"),
             Separator::Newline(t) => write!(f, "\n{t}"),
             Separator::Empty(t) => write!(f, "{t}"),

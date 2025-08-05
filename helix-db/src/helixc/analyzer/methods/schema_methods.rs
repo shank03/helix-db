@@ -14,7 +14,7 @@ pub(crate) struct SchemaVersionMap<'a>(HashMap<usize, (FieldLookup<'a>, FieldLoo
 
 impl<'a> SchemaVersionMap<'a> {
     pub fn get_latest(&self) -> (FieldLookup<'a>, FieldLookup<'a>, FieldLookup<'a>) {
-        self.0.get(&self.0.keys().max().unwrap()).unwrap().clone()
+        self.0.get(self.0.keys().max().unwrap()).unwrap().clone()
     }
 
     pub fn inner(&self) -> &HashMap<usize, (FieldLookup<'a>, FieldLookup<'a>, FieldLookup<'a>)> {

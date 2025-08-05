@@ -115,10 +115,8 @@ pub fn nodes_edges_inner(input: &HandlerInput) -> Result<protocol::Response, Gra
         })
         .unwrap_or_else(|_| "[]".to_string());
 
-    let combined = format!(
-        r#"{{"data": {}, "vectors": {}, "stats": {}}}"#,
-        json_result, vectors_result, db_stats
-    );
+    let combined =
+        format!(r#"{{"data": {json_result}, "vectors": {vectors_result}, "stats": {db_stats }}}"#);
 
     Ok(protocol::Response {
         body: combined.into_bytes(),
@@ -146,7 +144,7 @@ fn get_all_nodes_edges_json(
         });
 
         if let Some(prop) = &node_label {
-            let node = Node::decode_node(&value, id)?;
+            let node = Node::decode_node(value, id)?;
             if let Some(props) = node.properties {
                 if let Some(prop_value) = props.get(prop) {
                     json_node["label"] = sonic_rs::to_value(&prop_value.to_string())
@@ -162,7 +160,7 @@ fn get_all_nodes_edges_json(
     let edge_iter = db.edges_db.iter(txn)?;
     for result in edge_iter {
         let (id, value) = result?;
-        let edge = Edge::decode_edge(&value, id)?;
+        let edge = Edge::decode_edge(value, id)?;
 
         edges.push(json!({
             "from": edge.from_node.to_string(),

@@ -56,7 +56,7 @@ impl EmbeddingModelImpl {
         let url = match &provider {
             EmbeddingProvider::Local => {
                 let url_str = _url.unwrap_or("http://localhost:8699/embed");
-                Url::parse(url_str).map_err(|e| GraphError::from(format!("Invalid URL: {}", e)))?;
+                Url::parse(url_str).map_err(|e| GraphError::from(format!("Invalid URL: {e}")))?;
                 Some(url_str.to_string())
             }
             _ => None,
@@ -99,11 +99,10 @@ impl EmbeddingModelImpl {
                     .unwrap_or("text-embedding-ada-002");
                 Ok((EmbeddingProvider::OpenAI, model_name.to_string()))
             }
-            Some(m) if m == "local" => Ok((EmbeddingProvider::Local, "local".to_string())),
+            Some("local") => Ok((EmbeddingProvider::Local, "local".to_string())),
 
             Some(m) => Err(GraphError::from(format!(
-                "Unknown embedding model '{}'. Please use 'openai:', 'gemini:', or 'local' prefix",
-                m
+                "Unknown embedding model '{m}'. Please use 'openai:', 'gemini:', or 'local' prefix"
             ))),
             None => Err(GraphError::from("No embedding provider available")),
         }
@@ -122,7 +121,7 @@ impl EmbeddingModel for EmbeddingModelImpl {
                 let response = self
                     .client
                     .post("https://api.openai.com/v1/embeddings")
-                    .header("Authorization", format!("Bearer {}", api_key))
+                    .header("Authorization", format!("Bearer {api_key}"))
                     .json(&json!({
                         "input": text,
                         "model": &self.model,
@@ -210,16 +209,14 @@ impl EmbeddingModel for EmbeddingModelImpl {
                         "chunk_size": 100
                     }))
                     .send()
-                    .map_err(|e| GraphError::from(format!("Request failed: {}", e)))?;
+                    .map_err(|e| GraphError::from(format!("Request failed: {e}")))?;
 
                 let text_response = response
                     .text()
-                    .map_err(|e| GraphError::from(format!("Failed to parse response: {}", e)))?;
+                    .map_err(|e| GraphError::from(format!("Failed to parse response: {e}")))?;
 
-                let response =
-                    sonic_rs::from_str::<sonic_rs::Value>(&text_response).map_err(|e| {
-                        GraphError::from(format!("Failed to parse JSON response: {}", e))
-                    })?;
+                let response = sonic_rs::from_str::<sonic_rs::Value>(&text_response)
+                    .map_err(|e| GraphError::from(format!("Failed to parse JSON response: {e}")))?;
 
                 let embedding = response["embedding"]
                     .as_array()

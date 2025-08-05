@@ -4,7 +4,7 @@ use crate::{
         bm25::bm25::HBM25Config,
         graph_core::{
             config::Config,
-            ops::version_info::{self, VersionInfo},
+            ops::version_info::VersionInfo,
         },
         storage_core::storage_methods::StorageMethods,
         types::GraphError,
