@@ -1,18 +1,21 @@
 use std::collections::HashMap;
 
-use crate::helixc::{
-    generator::{
+use crate::{generate_error, helixc::{
+    analyzer::analyzer::Ctx, generator::{
         queries::Parameter as GeneratedParameter,
         schemas::{
             EdgeSchema as GeneratedEdgeSchema, NodeSchema as GeneratedNodeSchema, SchemaProperty,
             VectorSchema as GeneratedVectorSchema,
         },
         utils::{GenRef, GeneratedType, GeneratedValue, RustType as GeneratedRustType},
-    },
-    parser::helix_parser::{
-        DefaultValue, EdgeSchema, FieldType, NodeSchema, Parameter, VectorSchema,
-    },
-};
+    }, parser::helix_parser::{
+        DefaultValue, EdgeSchema, FieldType, NodeSchema, Parameter, Query, VectorSchema
+    }
+}};
+use paste::paste;
+use crate::helixc::analyzer::error_codes::ErrorCode;
+use crate::helixc::analyzer::errors::push_query_err;
+
 
 impl From<NodeSchema> for GeneratedNodeSchema {
     fn from(generated: NodeSchema) -> Self {
@@ -26,6 +29,7 @@ impl From<NodeSchema> for GeneratedNodeSchema {
                     field_type: f.field_type.into(),
                     default_value: f.defaults.map(|d| d.into()),
                     is_index: f.prefix,
+                    is_optional: f.optional,
                 })
                 .collect(),
         }
@@ -46,6 +50,7 @@ impl From<EdgeSchema> for GeneratedEdgeSchema {
                         field_type: f.field_type.into(),
                         default_value: f.defaults.map(|d| d.into()),
                         is_index: f.prefix,
+                        is_optional: f.optional,
                     })
                     .collect()
             }),
@@ -65,6 +70,7 @@ impl From<VectorSchema> for GeneratedVectorSchema {
                     field_type: f.field_type.into(),
                     default_value: f.defaults.map(|d| d.into()),
                     is_index: f.prefix,
+                    is_optional: f.optional,
                 })
                 .collect(),
         }
@@ -72,13 +78,24 @@ impl From<VectorSchema> for GeneratedVectorSchema {
 }
 
 impl GeneratedParameter {
-    pub fn unwrap_param(
+    pub(crate) fn unwrap_param(
         param: Parameter,
+        original_query: &Query,
+        ctx: &mut Ctx,
         parameters: &mut Vec<GeneratedParameter>,
         sub_parameters: &mut Vec<(String, Vec<GeneratedParameter>)>,
     ) {
         match param.param_type.1 {
             FieldType::Identifier(ref id) => {
+                if !ctx.node_set.contains(id.as_str()) && !ctx.vector_set.contains(id.as_str()) && !ctx.edge_map.contains_key(id.as_str()) {
+                    generate_error!(
+                        ctx,
+                        original_query,
+                        param.param_type.0.clone(),
+                        E201,
+                        id.as_str()
+                    );
+                }
                 parameters.push(GeneratedParameter {
                     name: param.name.1,
                     field_type: GeneratedType::Variable(GenRef::Std(id.clone())),

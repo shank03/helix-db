@@ -10,9 +10,14 @@ pub struct NodeSchema {
 }
 impl Display for NodeSchema {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "#[derive(Debug, Clone, Deserialize, Serialize)]")?;
         writeln!(f, "pub struct {} {{", self.name)?;
         for property in &self.properties {
-            writeln!(f, "    pub {}: {},", property.name, property.field_type)?;
+            if property.is_optional {
+                writeln!(f, "    pub {}: Option<{}>,", property.name, property.field_type)?;
+            } else {
+                writeln!(f, "    pub {}: {},", property.name, property.field_type)?;
+            }
         }
         writeln!(f, "}}")
     }
@@ -47,11 +52,16 @@ pub struct EdgeSchema {
 }
 impl Display for EdgeSchema {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "#[derive(Debug, Clone, Deserialize, Serialize)]")?;
         writeln!(f, "pub struct {} {{", self.name)?;
         writeln!(f, "    pub from: {},", self.from)?;
         writeln!(f, "    pub to: {},", self.to)?;
         for property in &self.properties {
-            writeln!(f, "    pub {}: {},", property.name, property.field_type)?;
+            if property.is_optional {
+                writeln!(f, "    pub {}: Option<{}>,", property.name, property.field_type)?;
+            } else {
+                writeln!(f, "    pub {}: {},", property.name, property.field_type)?;
+            }
         }
         writeln!(f, "}}")
     }
@@ -84,9 +94,14 @@ pub struct VectorSchema {
 }
 impl Display for VectorSchema {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "#[derive(Debug, Clone, Deserialize, Serialize)]")?;
         writeln!(f, "pub struct {} {{", self.name)?;
         for property in &self.properties {
-            writeln!(f, "    pub {}: {},", property.name, property.field_type)?;
+            if property.is_optional {
+                writeln!(f, "    pub {}: Option<{}>,", property.name, property.field_type)?;
+            } else {
+                writeln!(f, "    pub {}: {},", property.name, property.field_type)?;
+            }
         }
         writeln!(f, "}}")
     }
@@ -121,6 +136,6 @@ pub struct SchemaProperty {
     pub name: String,
     pub field_type: GeneratedType,
     pub default_value: Option<GeneratedValue>,
-    // pub is_optional: bool,
+    pub is_optional: bool,
     pub is_index: FieldPrefix,
 }

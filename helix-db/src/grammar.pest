@@ -15,10 +15,10 @@ edge_def   = { "E::" ~ identifier_upper ~ edge_body }
 node_body  = { "{" ~ field_defs ~ "}" }
 edge_body  = { "{" ~ "From:" ~ identifier_upper ~ "," ~ ("To:" ~ identifier_upper ~ "," ~ properties ~ "}" | "To:" ~ identifier_upper ~ ","? ~ "}") }
 field_defs = { (field_def ~ ",")* ~ (field_def ~ ","?)? }
-field_def  = { index? ~ identifier ~ ":" ~ param_type ~ (default)? }
+field_def  = { index? ~ identifier ~ optional? ~ ":" ~ param_type ~ (default)? }
 index= { "INDEX" }
 default = { "DEFAULT" ~  (now | float | integer | boolean | string_literal | none) } 
-// optional = { "OPTIONAL" }
+optional = { "?" }
 properties = { "Properties" ~ ":" ~ "{" ~ field_defs? ~ "}" }
 schema_version = { "schema::" ~ integer }
 
@@ -191,7 +191,7 @@ count        = { "COUNT" }
 none         = { "NONE" }
 ID           = { "ID" }
 update_field = { identifier ~ ":" ~ (evaluates_to_anything | anonymous_traversal) }
-update       = { "UPDATE" ~ "(" ~ "{" ~ update_field ~ ("," ~ update_field)* ~ "}" ~ ")" }
+update       = { "UPDATE" ~ "(" ~ (("{" ~ update_field ~ ("," ~ update_field)* ~ "}") | identifier) ~ ")" }
 drop = { "DROP" ~ evaluates_to_anything }
 
 // ---------------------------------------------------------------------

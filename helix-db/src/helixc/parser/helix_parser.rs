@@ -173,6 +173,7 @@ pub struct ValueCast {
 pub struct Field {
     pub prefix: FieldPrefix,
     pub defaults: Option<DefaultValue>,
+    pub optional: bool,
     pub name: String,
     pub field_type: FieldType,
     pub loc: Loc,
@@ -1487,18 +1488,20 @@ impl HelixParser {
     fn parse_field_def(&self, pair: Pair<Rule>) -> Result<Field, ParserError> {
         let mut pairs = pair.clone().into_inner();
         // structure is index? ~ identifier ~ ":" ~ param_type
-        let prefix: FieldPrefix = match pairs.clone().next().unwrap().as_rule() {
-            Rule::index => {
+        let prefix: FieldPrefix = match pairs.peek() {
+            Some(pair) if pair.as_rule() == Rule::index => {
                 pairs.next().unwrap();
                 FieldPrefix::Index
             }
-            // Rule::optional => {
-            //     pairs.next().unwrap();
-            //     FieldPrefix::Optional
-            // }
             _ => FieldPrefix::Empty,
         };
+
         let name = pairs.next().unwrap().as_str().to_string();
+
+        let optional = pairs.peek().is_some_and(|p| p.as_rule() == Rule::optional);
+        if optional {
+            pairs.next().unwrap();
+        }
 
         let field_type = self.parse_field_type(
             pairs.next().unwrap().into_inner().next().unwrap(),
@@ -1510,6 +1513,7 @@ impl HelixParser {
         Ok(Field {
             prefix,
             defaults,
+            optional,
             name,
             field_type,
             loc: pair.loc(),
@@ -1607,7 +1611,9 @@ impl HelixParser {
                 };
 
                 // gets optional param
-                let is_optional = inner.peek().is_some_and(|p| p.as_rule() == Rule::optional_param);
+                let is_optional = inner
+                    .peek()
+                    .is_some_and(|p| p.as_rule() == Rule::optional_param);
                 if is_optional {
                     inner.next();
                 }

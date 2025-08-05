@@ -18,3 +18,20 @@ V::UserEmbedding {
     lastUpdated: String,
     createdAt: Date DEFAULT NOW
 }
+
+N::User {
+    name: String,
+}
+
+N::OtherUser {
+    name?: String,
+    age: I64,
+}
+
+QUERY UpdateUser(id: ID, user: OtherUser) =>
+    updated_user <- N<OtherUser>(id)::UPDATE(user)
+    RETURN updated_user
+
+QUERY GetUser(userId: String) =>
+    user <- N<User>(userId)::ID
+    RETURN user
