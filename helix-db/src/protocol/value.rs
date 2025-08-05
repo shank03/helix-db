@@ -1322,7 +1322,7 @@ impl CastValue for Value {
 }
 
 pub mod casting {
-    use crate::helixc::parser::helix_parser::{FieldType, FieldValueType};
+    use crate::helixc::parser::helix_parser::FieldType;
 
     use super::*;
 

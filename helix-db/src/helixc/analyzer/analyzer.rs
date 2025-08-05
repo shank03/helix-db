@@ -9,7 +9,7 @@ use crate::helixc::{
         },
         types::Type,
     },
-    generator::{migrations::GeneratedMigration, Source as GeneratedSource},
+    generator::{Source as GeneratedSource},
     parser::helix_parser::{EdgeSchema, ExpressionType, Field, Query, Source},
 };
 use serde::Serialize;

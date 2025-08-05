@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use heed3::PutFlags;
 
 use crate::{
@@ -8,7 +6,7 @@ use crate::{
         storage_core::{storage_core::HelixGraphStorage, storage_methods::StorageMethods},
         types::GraphError,
     },
-    protocol::value::{Value, properties_format},
+    protocol::value::Value,
 };
 
 use super::super::tr_val::TraversalVal;
@@ -56,10 +54,7 @@ impl<'scope, 'env, I: Iterator<Item = Result<TraversalVal, GraphError>>> UpdateA
             match item {
                 Ok(TraversalVal::Node(node)) => match storage.get_node(self.txn, &node.id) {
                     Ok(mut old_node) => {
-                        let mut properties = match old_node.properties {
-                            Some(properties) => properties,
-                            None => HashMap::new(),
-                        };
+                        let mut properties = old_node.properties.unwrap_or_default();
 
                         if let Some(ref props) = props {
                             for (key, _new_value) in props.iter() {
@@ -67,7 +62,11 @@ impl<'scope, 'env, I: Iterator<Item = Result<TraversalVal, GraphError>>> UpdateA
                                     if let Some(old_value) = properties.get(key) {
                                         match bincode::serialize(old_value) {
                                             Ok(old_serialized) => {
-                                                if let Err(e) = db.delete_one_duplicate(self.txn, &old_serialized, &node.id) {
+                                                if let Err(e) = db.delete_one_duplicate(
+                                                    self.txn,
+                                                    &old_serialized,
+                                                    &node.id,
+                                                ) {
                                                     vec.push(Err(GraphError::from(e)));
                                                 }
                                             }
@@ -83,7 +82,7 @@ impl<'scope, 'env, I: Iterator<Item = Result<TraversalVal, GraphError>>> UpdateA
                                 properties.insert(k.clone(), v.clone());
                             }
                         }
-                        
+
                         if let Some(ref props) = props {
                             for (key, new_value) in props.iter() {
                                 if let Some(db) = storage.secondary_indices.get(key) {
@@ -103,7 +102,7 @@ impl<'scope, 'env, I: Iterator<Item = Result<TraversalVal, GraphError>>> UpdateA
                                 }
                             }
                         }
-                        
+
                         if properties.is_empty() {
                             old_node.properties = None;
                         } else {

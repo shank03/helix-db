@@ -2,10 +2,7 @@ use super::storage_methods::DBMethods;
 use crate::{
     helix_engine::{
         bm25::bm25::HBM25Config,
-        graph_core::{
-            config::Config,
-            ops::version_info::{self, VersionInfo},
-        },
+        graph_core::{config::Config, ops::version_info::VersionInfo},
         storage_core::storage_methods::StorageMethods,
         types::GraphError,
         vector_core::{

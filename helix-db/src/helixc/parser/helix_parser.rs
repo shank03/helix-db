@@ -2,7 +2,7 @@ use super::{
     location::{HasLoc, Loc},
     parser_methods::ParserError,
 };
-use crate::protocol::{remapping, value::Value};
+use crate::protocol::value::Value;
 use chrono::{DateTime, NaiveDate, Utc};
 use itertools::Itertools;
 use pest::{
@@ -1607,7 +1607,7 @@ impl HelixParser {
                 };
 
                 // gets optional param
-                let is_optional = inner.peek().map_or(false, |p| p.as_rule() == Rule::optional_param);
+                let is_optional = inner.peek().is_some_and(|p| p.as_rule() == Rule::optional_param);
                 if is_optional {
                     inner.next();
                 }

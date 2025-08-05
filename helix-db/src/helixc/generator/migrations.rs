@@ -50,7 +50,7 @@ impl std::fmt::Display for GeneratedMigration {
             )?;
             writeln!(f, "let mut new_props = HashMap::new();")?;
             for remapping in item.remappings.iter() {
-                writeln!(f, "{}", remapping)?;
+                writeln!(f, "{remapping}")?;
             }
             writeln!(f, "new_props")?;
             writeln!(f, "}}")?;
@@ -67,21 +67,18 @@ impl std::fmt::Display for GeneratedMigrationPropertyMapping {
                 new_field,
             } => write!(
                 f,
-                "field_addition_from_old_field!(&mut props, &mut new_props, {}, {})",
-                new_field, old_field
+                "field_addition_from_old_field!(&mut props, &mut new_props, {new_field}, {old_field})"
             ),
             GeneratedMigrationPropertyMapping::FieldAdditionFromValue { new_field, value } => {
                 write!(
                     f,
-                    "field_addition_from_value!(&mut new_props, {}, {})",
-                    new_field, value
+                    "field_addition_from_value!(&mut new_props, {new_field}, {value})"
                 )
             }
             GeneratedMigrationPropertyMapping::FieldTypeCast { field, cast } => {
                 write!(
                     f,
-                    "field_type_cast!(&mut props, &mut new_props, {}, {})",
-                    field, cast
+                    "field_type_cast!(&mut props, &mut new_props, {field}, {cast})"
                 )
             }
         }
