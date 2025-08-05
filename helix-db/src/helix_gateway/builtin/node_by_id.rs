@@ -80,7 +80,14 @@ pub fn node_details_inner(input: &HandlerInput) -> Result<protocol::Response, Gr
 
     let node_id = match uuid::Uuid::parse_str(&node_id_str) {
         Ok(uuid) => uuid.as_u128(),
-        Err(_) => return Err(GraphError::New("invalid UUID format".to_string())),
+        Err(_) => {
+            match node_id_str.parse::<u128>() {
+                Ok(id) => id,
+                Err(_) => {
+                    return Err(GraphError::New("invalid ID format: must be UUID or u128".to_string()));
+                }
+            }
+        }
     };
 
     let remapping_vals = RemappingMap::new();
