@@ -459,15 +459,13 @@ impl Serialize for Value {
                 Value::U64(i) => serializer.serialize_newtype_variant("Value", 10, "U64", i),
                 Value::U128(i) => serializer.serialize_newtype_variant("Value", 11, "U128", i),
                 Value::Date(d) => serializer.serialize_newtype_variant("Value", 12, "Date", d),
-                Value::Id(id) => serializer.serialize_newtype_variant("Value", 13, "Id", id),
-                Value::Boolean(b) => {
-                    serializer.serialize_newtype_variant("Value", 12, "Boolean", b)
-                }
-                Value::Array(a) => serializer.serialize_newtype_variant("Value", 13, "Array", a),
+                Value::Boolean(b) => serializer.serialize_newtype_variant("Value", 13, "Boolean", b),
+                Value::Id(id) => serializer.serialize_newtype_variant("Value", 14, "Id", id),
+                Value::Array(a) => serializer.serialize_newtype_variant("Value", 15, "Array", a),
                 Value::Object(obj) => {
-                    serializer.serialize_newtype_variant("Value", 14, "Object", obj)
+                    serializer.serialize_newtype_variant("Value", 16, "Object", obj)
                 }
-                Value::Empty => serializer.serialize_unit_variant("Value", 15, "Empty"),
+                Value::Empty => serializer.serialize_unit_variant("Value", 17, "Empty"),
             }
         }
     }
@@ -645,17 +643,21 @@ impl<'de> Deserialize<'de> for Value {
                     9 => Ok(Value::U32(variant_data.newtype_variant()?)),
                     10 => Ok(Value::U64(variant_data.newtype_variant()?)),
                     11 => Ok(Value::U128(variant_data.newtype_variant()?)),
-                    12 => Ok(Value::Boolean(variant_data.newtype_variant()?)),
-                    13 => Ok(Value::Array(variant_data.newtype_variant()?)),
-                    14 => Ok(Value::Object(variant_data.newtype_variant()?)),
-                    15 => {
+                    12 => Ok(Value::Date(variant_data.newtype_variant()?)),
+                    13 => Ok(Value::Boolean(variant_data.newtype_variant()?)),
+                    14 => Ok(Value::Id(variant_data.newtype_variant()?)),
+                    15 => Ok(Value::Array(variant_data.newtype_variant()?)),
+                    16 => Ok(Value::Object(variant_data.newtype_variant()?)),
+                    17 => {
                         variant_data.unit_variant()?;
                         Ok(Value::Empty)
                     }
-                    _ => Err(serde::de::Error::invalid_value(
-                        serde::de::Unexpected::Unsigned(variant_idx as u64),
-                        &"variant index 0 through 5",
-                    )),
+                    _ => {
+                        Err(serde::de::Error::invalid_value(
+                            serde::de::Unexpected::Unsigned(variant_idx as u64),
+                            &"variant index 0 through 5",
+                        ))
+                    }
                 }
             }
         }
