@@ -12,6 +12,7 @@ use crate::{
         },
     },
     utils::{
+        filterable::Filterable,
         items::{Edge, Node},
         label_hash::hash_label,
     },
@@ -392,10 +393,11 @@ impl StorageMethods for HelixGraphStorage {
 
         // delete secondary indices
         let node = self.get_node(txn, id)?;
-        if let Some(properties) = node.properties {
-            for (key, v) in properties.iter() {
-                if let Some(db) = self.secondary_indices.get(key) {
-                    match bincode::serialize(v) {
+        for (index_name, db) in &self.secondary_indices {
+            // Use check_property like we do when adding, to handle id, label, and regular properties consistently
+            match node.check_property(index_name) {
+                Ok(value) => {
+                    match bincode::serialize(&*value) {
                         Ok(serialized) => {
                             if let Err(e) = db.delete_one_duplicate(txn, &serialized, &node.id) {
                                 return Err(GraphError::from(e));
@@ -403,6 +405,10 @@ impl StorageMethods for HelixGraphStorage {
                         }
                         Err(e) => return Err(GraphError::from(e)),
                     }
+                }
+                Err(_) => {
+                    // Property not found - this is expected for some indices
+                    // Continue to next index
                 }
             }
         }
