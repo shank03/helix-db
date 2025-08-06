@@ -11,11 +11,10 @@ use crate::helixc::{
         utils::{gen_identifier_or_param, is_valid_identifier},
     },
     generator::{
-        generator_types::{
-            Parameter as GeneratedParameter, Query as GeneratedQuery, ReturnValue, ReturnValueExpr,
-            Statement as GeneratedStatement,
-        },
+        queries::{Parameter as GeneratedParameter, Query as GeneratedQuery},
+        return_values::{ReturnValue, ReturnValueExpr},
         source_steps::SourceStep,
+        statements::Statement as GeneratedStatement,
         traversal_steps::ShouldCollect,
         utils::{GenRef, GeneratedValue},
     },
@@ -29,6 +28,11 @@ pub(crate) fn validate_query<'a>(ctx: &mut Ctx<'a>, original_query: &'a Query) {
         name: original_query.name.clone(),
         ..Default::default()
     };
+
+    if let Some(BuiltInMacro::Model(model_name)) = &original_query.built_in_macro {
+        // handle model macro
+        query.embedding_model_to_use = Some(model_name.clone());
+    }
 
     // -------------------------------------------------
     // Parameter validation
@@ -191,7 +195,8 @@ pub(crate) fn validate_query<'a>(ctx: &mut Ctx<'a>, original_query: &'a Query) {
             _ => unreachable!(),
         }
     }
-    if original_query.is_mcp {
+
+    if let Some(BuiltInMacro::MCP) = &original_query.built_in_macro {
         if query.return_values.len() != 1 {
             generate_error!(
                 ctx,
@@ -200,13 +205,10 @@ pub(crate) fn validate_query<'a>(ctx: &mut Ctx<'a>, original_query: &'a Query) {
                 E401,
                 &query.return_values.len().to_string()
             );
-        } else {
-            // match query.return_values.first().unwrap().return_type {
-
-            // }
         }
         let return_name = query.return_values.first().unwrap().get_name();
         query.mcp_handler = Some(return_name);
     }
+
     ctx.output.queries.push(query);
 }
