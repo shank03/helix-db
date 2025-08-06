@@ -1,4 +1,4 @@
-// MAKE SURE TO --release
+// NOTE: MAKE SURE TO --release
 use crate::{
     helix_engine::vector_core::{
         hnsw::HNSW,
@@ -7,10 +7,7 @@ use crate::{
     },
 };
 use heed3::{Env, EnvOpenOptions, RoTxn};
-use rand::{
-    seq::SliceRandom,
-    Rng,
-};
+use rand::{seq::SliceRandom, Rng};
 use std::{
     collections::{HashSet, HashMap},
     sync::{Arc, Mutex},
