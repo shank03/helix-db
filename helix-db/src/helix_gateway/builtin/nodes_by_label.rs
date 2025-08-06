@@ -19,11 +19,12 @@ use crate::utils::filterable::Filterable;
 use crate::utils::items::Node;
 
 // get all nodes with a specific label
-// curl "http://localhost:PORT/nodes-by-label?label=YOUR_LABEL"
+// curl "http://localhost:PORT/nodes-by-label?label=YOUR_LABEL&limit=100"
 
 #[derive(Deserialize)]
 pub struct NodesByLabelQuery {
     label: String,
+    limit: Option<usize>,
 }
 
 #[derive(Serialize)]
@@ -45,7 +46,8 @@ pub async fn nodes_by_label_handler(
     };
 
     if let Ok(params_json) = sonic_rs::to_vec(&json!({
-        "label": params.label
+        "label": params.label,
+        "limit": params.limit
     })) {
         req.body = axum::body::Bytes::from(params_json);
     }
@@ -65,23 +67,30 @@ pub fn nodes_by_label_inner(input: &HandlerInput) -> Result<protocol::Response, 
     let db = Arc::clone(&input.graph.storage);
     let txn = db.graph_env.read_txn().map_err(GraphError::from)?;
 
-    let label = if !input.request.body.is_empty() {
+    let (label, limit) = if !input.request.body.is_empty() {
         match sonic_rs::from_slice::<sonic_rs::Value>(&input.request.body) {
-            Ok(params) => params
-                .get("label")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
-            Err(_) => None,
+            Ok(params) => {
+                let label = params
+                    .get("label")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let limit = params
+                    .get("limit")
+                    .and_then(|v| v.as_u64())
+                    .map(|n| n as usize);
+                (label, limit)
+            }
+            Err(_) => (None, None),
         }
     } else {
-        None
+        (None, None)
     };
 
     let label = label.ok_or_else(|| GraphError::New("label is required".to_string()))?;
 
     let remapping_vals = RemappingMap::new();
 
-    let nodes: Vec<TraversalVal> = db
+    let mut nodes: Vec<TraversalVal> = db
         .nodes_db
         .iter(&txn)?
         .filter_map(|result| match result {
@@ -98,6 +107,10 @@ pub fn nodes_by_label_inner(input: &HandlerInput) -> Result<protocol::Response, 
             Err(e) => Some(Err(GraphError::from(e))),
         })
         .collect::<Result<Vec<_>, GraphError>>()?;
+
+    if let Some(limit_count) = limit {
+        nodes.truncate(limit_count);
+    }
 
     let count = nodes.len();
 
