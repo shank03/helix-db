@@ -163,12 +163,13 @@ fn get_all_nodes_edges_json(
     for result in edge_iter {
         let (id, value) = result?;
         let edge = Edge::decode_edge(&value, id)?;
+        let id_str = ID::from(id).stringify();
 
         edges.push(json!({
-            "from": edge.from_node.to_string(),
-            "to": edge.to_node.to_string(),
-            "title": id.to_string(),
-            "id": id.to_string()
+            "from": ID::from(edge.from_node).stringify(),
+            "to": ID::from(edge.to_node).stringify(),
+            "title": id_str.clone(),
+            "id": id_str
         }));
     }
 
