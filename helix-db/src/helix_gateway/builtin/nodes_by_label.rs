@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::body::Body;
@@ -8,14 +7,12 @@ use serde::{Deserialize, Serialize};
 use sonic_rs::{JsonValueTrait, json};
 use tracing::info;
 
-use crate::helix_engine::graph_core::ops::tr_val::TraversalVal;
 use crate::helix_engine::types::GraphError;
 use crate::helix_gateway::gateway::AppState;
 use crate::helix_gateway::router::router::{Handler, HandlerInput, HandlerSubmission};
-use crate::protocol::remapping::RemappingMap;
-use crate::protocol::return_values::ReturnValue;
 use crate::protocol::{self, request::RequestType};
 use crate::utils::filterable::Filterable;
+use crate::utils::id::ID;
 use crate::utils::items::Node;
 
 // get all nodes with a specific label
@@ -25,12 +22,6 @@ use crate::utils::items::Node;
 pub struct NodesByLabelQuery {
     label: String,
     limit: Option<usize>,
-}
-
-#[derive(Serialize)]
-pub struct NodesByLabelResponse {
-    pub nodes: Vec<ReturnValue>,
-    pub count: usize,
 }
 
 pub async fn nodes_by_label_handler(
@@ -88,43 +79,51 @@ pub fn nodes_by_label_inner(input: &HandlerInput) -> Result<protocol::Response, 
 
     let label = label.ok_or_else(|| GraphError::New("label is required".to_string()))?;
 
-    let remapping_vals = RemappingMap::new();
+    let mut nodes_json = Vec::new();
+    let mut count = 0;
 
-    let mut nodes: Vec<TraversalVal> = db
-        .nodes_db
-        .iter(&txn)?
-        .filter_map(|result| match result {
-            Ok((id, node_data)) => match Node::decode_node(node_data, id) {
-                Ok(node) => {
-                    if node.label() == label {
-                        Some(Ok(TraversalVal::Node(node)))
-                    } else {
-                        None
+    for result in db.nodes_db.iter(&txn)? {
+        let (id, node_data) = result?;
+        match Node::decode_node(node_data, id) {
+            Ok(node) => {
+                if node.label() == label {
+                    let id_str = ID::from(id).stringify();
+
+                    let mut node_json = json!({
+                        "id": id_str.clone(),
+                        "label": node.label(),
+                        "title": id_str
+                    });
+
+                    // Add node properties
+                    if let Some(properties) = &node.properties {
+                        for (key, value) in properties {
+                            node_json[key] = sonic_rs::to_value(&value.to_string())
+                                .unwrap_or_else(|_| sonic_rs::Value::from(""));
+                        }
+                    }
+
+                    nodes_json.push(node_json);
+                    count += 1;
+
+                    if let Some(limit_count) = limit {
+                        if count >= limit_count {
+                            break;
+                        }
                     }
                 }
-                Err(e) => Some(Err(e)),
-            },
-            Err(e) => Some(Err(GraphError::from(e))),
-        })
-        .collect::<Result<Vec<_>, GraphError>>()?;
-
-    if let Some(limit_count) = limit {
-        nodes.truncate(limit_count);
+            }
+            Err(_) => continue,
+        }
     }
 
-    let count = nodes.len();
-
-    let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
-
-    return_vals.insert(
-        "nodes".to_string(),
-        ReturnValue::from_traversal_value_array_with_mixin(nodes, remapping_vals.borrow_mut()),
-    );
-
-    return_vals.insert("count".to_string(), ReturnValue::from(count as i32));
+    let result = json!({
+        "nodes": nodes_json,
+        "count": count
+    });
 
     Ok(protocol::Response {
-        body: sonic_rs::to_vec(&return_vals).map_err(|e| GraphError::New(e.to_string()))?,
+        body: sonic_rs::to_vec(&result).map_err(|e| GraphError::New(e.to_string()))?,
         fmt: Default::default(),
     })
 }

@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use axum::body::Body;
@@ -14,9 +14,9 @@ use crate::helix_engine::storage_core::storage_methods::StorageMethods;
 use crate::helix_engine::types::GraphError;
 use crate::helix_gateway::gateway::AppState;
 use crate::helix_gateway::router::router::{Handler, HandlerInput, HandlerSubmission};
-use crate::protocol::remapping::RemappingMap;
-use crate::protocol::return_values::ReturnValue;
 use crate::protocol::{self, request::RequestType};
+use crate::utils::filterable::Filterable;
+use crate::utils::id::ID;
 
 // get all nodes connected to a specific node
 // curl "http://localhost:PORT/node-connections?node_id=YOUR_NODE_ID"
@@ -24,13 +24,6 @@ use crate::protocol::{self, request::RequestType};
 #[derive(Deserialize)]
 pub struct NodeConnectionsQuery {
     node_id: String,
-}
-
-#[derive(Serialize)]
-pub struct NodeConnectionsResponse {
-    pub connected_nodes: Vec<ReturnValue>,
-    pub incoming_edges: Vec<ReturnValue>,
-    pub outgoing_edges: Vec<ReturnValue>,
 }
 
 pub async fn node_connections_handler(
@@ -91,8 +84,6 @@ pub fn node_connections_inner(input: &HandlerInput) -> Result<protocol::Response
         ));
     };
 
-    let remapping_vals = RemappingMap::new();
-
     if db.get_node(&txn, &node_id).is_err() {
         return Err(GraphError::New("Node not found".to_string()));
     }
@@ -134,34 +125,69 @@ pub fn node_connections_inner(input: &HandlerInput) -> Result<protocol::Response
         })
         .collect::<Result<Vec<_>, GraphError>>()?;
 
-    let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
+    let connected_nodes_json: Vec<sonic_rs::Value> = connected_nodes
+        .into_iter()
+        .filter_map(|tv| {
+            if let TraversalVal::Node(node) = tv {
+                let id_str = ID::from(node.id).stringify();
+                let mut node_json = json!({
+                    "id": id_str.clone(),
+                    "label": node.label(),
+                    "title": id_str
+                });
+                if let Some(properties) = &node.properties {
+                    for (key, value) in properties {
+                        node_json[key] = sonic_rs::to_value(&value.to_string())
+                            .unwrap_or_else(|_| sonic_rs::Value::from(""));
+                    }
+                }
+                Some(node_json)
+            } else {
+                None
+            }
+        })
+        .collect();
 
-    return_vals.insert(
-        "connected_nodes".to_string(),
-        ReturnValue::from_traversal_value_array_with_mixin(
-            connected_nodes,
-            remapping_vals.borrow_mut(),
-        ),
-    );
+    let incoming_edges_json: Vec<sonic_rs::Value> = incoming_edges
+        .into_iter()
+        .filter_map(|tv| {
+            if let TraversalVal::Edge(edge) = tv {
+                Some(json!({
+                    "id": ID::from(edge.id).stringify(),
+                    "from_node": ID::from(edge.from_node).stringify(),
+                    "to_node": ID::from(edge.to_node).stringify(),
+                    "label": edge.label.as_str()
+                }))
+            } else {
+                None
+            }
+        })
+        .collect();
 
-    return_vals.insert(
-        "incoming_edges".to_string(),
-        ReturnValue::from_traversal_value_array_with_mixin(
-            incoming_edges,
-            remapping_vals.borrow_mut(),
-        ),
-    );
+    let outgoing_edges_json: Vec<sonic_rs::Value> = outgoing_edges
+        .into_iter()
+        .filter_map(|tv| {
+            if let TraversalVal::Edge(edge) = tv {
+                Some(json!({
+                    "id": ID::from(edge.id).stringify(),
+                    "from_node": ID::from(edge.from_node).stringify(),
+                    "to_node": ID::from(edge.to_node).stringify(),
+                    "label": edge.label.as_str()
+                }))
+            } else {
+                None
+            }
+        })
+        .collect();
 
-    return_vals.insert(
-        "outgoing_edges".to_string(),
-        ReturnValue::from_traversal_value_array_with_mixin(
-            outgoing_edges,
-            remapping_vals.borrow_mut(),
-        ),
-    );
+    let result = json!({
+        "connected_nodes": connected_nodes_json,
+        "incoming_edges": incoming_edges_json,
+        "outgoing_edges": outgoing_edges_json
+    });
 
     Ok(protocol::Response {
-        body: sonic_rs::to_vec(&return_vals).map_err(|e| GraphError::New(e.to_string()))?,
+        body: sonic_rs::to_vec(&result).map_err(|e| GraphError::New(e.to_string()))?,
         fmt: Default::default(),
     })
 }

@@ -132,6 +132,7 @@ fn get_all_nodes_edges_json(
     node_label: Option<String>,
 ) -> Result<String, GraphError> {
     use sonic_rs::json;
+    use crate::utils::filterable::Filterable;
 
     let nodes_length = db.nodes_db.len(txn)?;
     let mut nodes = Vec::with_capacity(nodes_length as usize);
@@ -147,6 +148,7 @@ fn get_all_nodes_edges_json(
 
         if let Some(prop) = &node_label {
             let node = Node::decode_node(&value, id)?;
+            json_node["label"] = json!(node.label());
             if let Some(props) = node.properties {
                 if let Some(prop_value) = props.get(prop) {
                     json_node["label"] = sonic_rs::to_value(&prop_value.to_string())

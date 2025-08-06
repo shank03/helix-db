@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::body::Body;
@@ -8,14 +7,13 @@ use serde::{Deserialize, Serialize};
 use sonic_rs::{JsonValueTrait, json};
 use tracing::info;
 
-use crate::helix_engine::graph_core::ops::tr_val::TraversalVal;
 use crate::helix_engine::storage_core::storage_methods::StorageMethods;
 use crate::helix_engine::types::GraphError;
 use crate::helix_gateway::gateway::AppState;
 use crate::helix_gateway::router::router::{Handler, HandlerInput, HandlerSubmission};
-use crate::protocol::remapping::RemappingMap;
-use crate::protocol::return_values::ReturnValue;
 use crate::protocol::{self, request::RequestType};
+use crate::utils::filterable::Filterable;
+use crate::utils::id::ID;
 
 // get node details by ID
 // curl "http://localhost:PORT/node-details?id=YOUR_NODE_ID"
@@ -23,12 +21,6 @@ use crate::protocol::{self, request::RequestType};
 #[derive(Deserialize)]
 pub struct NodeDetailsQuery {
     id: String,
-}
-
-#[derive(Serialize)]
-pub struct NodeDetailsResponse {
-    pub node: Option<ReturnValue>,
-    pub found: bool,
 }
 
 pub async fn node_details_handler(
@@ -80,38 +72,48 @@ pub fn node_details_inner(input: &HandlerInput) -> Result<protocol::Response, Gr
 
     let node_id = match uuid::Uuid::parse_str(&node_id_str) {
         Ok(uuid) => uuid.as_u128(),
-        Err(_) => {
-            match node_id_str.parse::<u128>() {
-                Ok(id) => id,
-                Err(_) => {
-                    return Err(GraphError::New("invalid ID format: must be UUID or u128".to_string()));
+        Err(_) => match node_id_str.parse::<u128>() {
+            Ok(id) => id,
+            Err(_) => {
+                return Err(GraphError::New(
+                    "invalid ID format: must be UUID or u128".to_string(),
+                ));
+            }
+        },
+    };
+
+    let result = match db.get_node(&txn, &node_id) {
+        Ok(node) => {
+            let id_str = ID::from(node_id).stringify();
+
+            let mut node_json = json!({
+                "id": id_str.clone(),
+                "label": node.label(),
+                "title": id_str
+            });
+
+            if let Some(properties) = &node.properties {
+                for (key, value) in properties {
+                    node_json[key] = sonic_rs::to_value(&value.to_string())
+                        .unwrap_or_else(|_| sonic_rs::Value::from(""));
                 }
             }
+
+            json!({
+                "node": node_json,
+                "found": true
+            })
+        }
+        Err(_) => {
+            json!({
+                "node": null,
+                "found": false
+            })
         }
     };
 
-    let remapping_vals = RemappingMap::new();
-    let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
-    match db.get_node(&txn, &node_id) {
-        Ok(node) => {
-            let traversal_val = TraversalVal::Node(node);
-            return_vals.insert(
-                "node".to_string(),
-                ReturnValue::from_traversal_value_with_mixin(
-                    traversal_val,
-                    remapping_vals.borrow_mut(),
-                ),
-            );
-            return_vals.insert("found".to_string(), ReturnValue::from(true));
-        }
-        Err(_) => {
-            return_vals.insert("node".to_string(), ReturnValue::Empty);
-            return_vals.insert("found".to_string(), ReturnValue::from(false));
-        }
-    }
-
     Ok(protocol::Response {
-        body: sonic_rs::to_vec(&return_vals).map_err(|e| GraphError::New(e.to_string()))?,
+        body: sonic_rs::to_vec(&result).map_err(|e| GraphError::New(e.to_string()))?,
         fmt: Default::default(),
     })
 }
