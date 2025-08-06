@@ -38,8 +38,8 @@ pub(crate) fn validate_query<'a>(ctx: &mut Ctx<'a>, original_query: &'a Query) {
     // Parameter validation
     // -------------------------------------------------
     for param in &original_query.parameters {
-        if let FieldType::Identifier(ref id) = param.param_type.1 {
-            if is_valid_identifier(ctx, original_query, param.param_type.0.clone(), id.as_str()) {
+        if let FieldType::Identifier(ref id) = param.param_type.1
+            && is_valid_identifier(ctx, original_query, param.param_type.0.clone(), id.as_str()) {
                 // TODO: add support for edges
                 if !ctx.node_set.contains(id.as_str()) {
                     generate_error!(
@@ -51,7 +51,6 @@ pub(crate) fn validate_query<'a>(ctx: &mut Ctx<'a>, original_query: &'a Query) {
                         &param.name.1
                     );
                 }
-            }
         }
         // constructs parameters and sub‑parameters for generator
         GeneratedParameter::unwrap_param(

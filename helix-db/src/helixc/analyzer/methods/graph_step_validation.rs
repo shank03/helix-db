@@ -359,10 +359,9 @@ pub(crate) fn apply_graph_step<'a>(
                     cur_ty.kind_str()
                 );
             }
-            if let Some(ref ty) = sv.vector_type {
-                if !ctx.vector_set.contains(ty.as_str()) {
+            if let Some(ref ty) = sv.vector_type
+                && !ctx.vector_set.contains(ty.as_str()) {
                     generate_error!(ctx, original_query, sv.loc.clone(), E103, ty.as_str());
-                }
             }
             let vec = match &sv.data {
                 Some(VectorData::Vector(v)) => {
