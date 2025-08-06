@@ -120,6 +120,7 @@ pub(crate) fn validate_traversal<'a>(
                         };
                         gen_traversal.source_step =
                             Separator::Period(SourceStep::NFromIndex(NFromIndex {
+                                label: GenRef::Literal(node_type.clone()),
                                 index: GenRef::Literal(match *index {
                                     IdType::Identifier { value, loc: _ } => value,
                                     // would be caught by the parser
