@@ -6,8 +6,8 @@ use crate::{
     },
     protocol::value::Value,
 };
+use heed3::{RoTxn, byteorder::BE};
 use helix_macros::debug_trace;
-use heed3::{byteorder::BE, RoTxn};
 use serde::Serialize;
 use std::sync::Arc;
 
@@ -16,6 +16,7 @@ pub struct NFromIndex<'a> {
         heed3::RoPrefix<'a, heed3::types::Bytes, heed3::types::LazyDecode<heed3::types::U128<BE>>>,
     txn: &'a RoTxn<'a>,
     storage: Arc<HelixGraphStorage>,
+    label: &'a str,
 }
 
 impl<'a> Iterator for NFromIndex<'a> {
@@ -23,11 +24,17 @@ impl<'a> Iterator for NFromIndex<'a> {
 
     #[debug_trace("N_FROM_INDEX")]
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(value) = self.iter.by_ref().next() {
+        for value in self.iter.by_ref() {
             let (_, value) = value.unwrap();
             match value.decode() {
                 Ok(value) => match self.storage.get_node(self.txn, &value) {
-                    Ok(node) => return Some(Ok(TraversalVal::Node(node))),
+                    Ok(node) => {
+                        if node.label == self.label {
+                            return Some(Ok(TraversalVal::Node(node)));
+                        } else {
+                            continue;
+                        }
+                    }
                     Err(e) => {
                         println!("{} Error getting node: {:?}", line!(), e);
                         return Some(Err(GraphError::ConversionError(e.to_string())));
@@ -55,7 +62,7 @@ pub trait NFromIndexAdapter<'a, K: Into<Value> + Serialize>:
     ///
     /// Note that both the `index` and `key` must be provided.
     /// The index must be a valid and existing secondary index and the key should match the type of the index.
-    fn n_from_index(self, index: &'a str, key: &'a K) -> Self::OutputIter
+    fn n_from_index(self, label: &'a str, index: &'a str, key: &'a K) -> Self::OutputIter
     where
         K: Into<Value> + Serialize + Clone;
 }
@@ -66,7 +73,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>, K: Into<Value> + 
     type OutputIter = RoTraversalIterator<'a, NFromIndex<'a>>;
 
     #[inline]
-    fn n_from_index(self, index: &'a str, key: &'a K) -> Self::OutputIter
+    fn n_from_index(self, label: &'a str, index: &'a str, key: &'a K) -> Self::OutputIter
     where
         K: Into<Value> + Serialize + Clone,
     {
@@ -88,6 +95,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>, K: Into<Value> + 
             iter: res,
             txn: self.txn,
             storage: Arc::clone(&self.storage),
+            label,
         };
 
         RoTraversalIterator {

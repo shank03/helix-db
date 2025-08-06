@@ -2708,7 +2708,7 @@ fn test_update_of_secondary_indices() {
     let txn = storage.graph_env.read_txn().unwrap();
 
     let node = G::new(Arc::clone(&storage), &txn)
-        .n_from_index("name", &"Jane".to_string())
+        .n_from_index("person", "name", &"Jane".to_string())
         .collect_to::<Vec<_>>();
     assert_eq!(node.len(), 1);
     assert_eq!(node[0].id(), node.id());
@@ -2722,7 +2722,7 @@ fn test_update_of_secondary_indices() {
     }
 
     let node = G::new(Arc::clone(&storage), &txn)
-        .n_from_index("name", &"John".to_string())
+        .n_from_index("person", "name", &"John".to_string())
         .collect_to::<Vec<_>>();
     assert_eq!(node.len(), 0);
 

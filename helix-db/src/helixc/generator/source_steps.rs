@@ -196,11 +196,12 @@ impl Display for SearchVector {
 pub struct NFromIndex {
     pub index: GenRef<String>,
     pub key: GeneratedValue,
+    pub label: GenRef<String>,
 }
 
 impl Display for NFromIndex {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "n_from_index({}, {})", self.index, self.key)
+        write!(f, "n_from_index({}, {}, {})", self.label, self.index, self.key)
     }
 }
 
