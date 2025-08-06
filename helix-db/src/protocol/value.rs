@@ -653,7 +653,6 @@ impl<'de> Deserialize<'de> for Value {
                         Ok(Value::Empty)
                     }
                     _ => {
-                        println!("variant_idx: {}", variant_idx);
                         Err(serde::de::Error::invalid_value(
                             serde::de::Unexpected::Unsigned(variant_idx as u64),
                             &"variant index 0 through 5",
