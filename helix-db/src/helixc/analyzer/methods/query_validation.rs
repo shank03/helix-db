@@ -29,12 +29,9 @@ pub(crate) fn validate_query<'a>(ctx: &mut Ctx<'a>, original_query: &'a Query) {
         ..Default::default()
     };
 
-    match &original_query.built_in_macro {
-        Some(BuiltInMacro::Model(model_name)) => {
-            // handle model macro
-            query.embedding_model_to_use = Some(model_name.clone());
-        }
-        _ => {}
+    if let Some(BuiltInMacro::Model(model_name)) = &original_query.built_in_macro {
+        // handle model macro
+        query.embedding_model_to_use = Some(model_name.clone());
     }
 
     // -------------------------------------------------
@@ -199,21 +196,18 @@ pub(crate) fn validate_query<'a>(ctx: &mut Ctx<'a>, original_query: &'a Query) {
         }
     }
 
-    match &original_query.built_in_macro {
-        Some(BuiltInMacro::MCP) => {
-            if query.return_values.len() != 1 {
-                generate_error!(
-                    ctx,
-                    original_query,
-                    original_query.loc.clone(),
-                    E401,
-                    &query.return_values.len().to_string()
-                );
-            }
-            let return_name = query.return_values.first().unwrap().get_name();
-            query.mcp_handler = Some(return_name);
+    if let Some(BuiltInMacro::MCP) = &original_query.built_in_macro {
+        if query.return_values.len() != 1 {
+            generate_error!(
+                ctx,
+                original_query,
+                original_query.loc.clone(),
+                E401,
+                &query.return_values.len().to_string()
+            );
         }
-        _ => {}
+        let return_name = query.return_values.first().unwrap().get_name();
+        query.mcp_handler = Some(return_name);
     }
 
     ctx.output.queries.push(query);
