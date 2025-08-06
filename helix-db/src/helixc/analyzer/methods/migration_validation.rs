@@ -130,19 +130,17 @@ pub(crate) fn validate_migration(ctx: &mut Ctx, migration: &Migration) {
             }
 
             // check default value is valid for the new field type
-            if let Some(default) = &default {
-                if to_property_field.field_type != *default {
+            if let Some(default) = &default
+                && to_property_field.field_type != *default {
                     // schema error - default value is not valid for the new field type
                     panic!("default value is not valid for the new field type");
-                }
             }
 
             // check the cast is valid for the new field type
-            if let Some(cast) = &cast {
-                if to_property_field.field_type != cast.cast_to {
+            if let Some(cast) = &cast
+                && to_property_field.field_type != cast.cast_to {
                     // schema error - cast is not valid for the new field type
                     panic!("cast is not valid for the new field type");
-                }
             }
 
             // // warnings if name is same

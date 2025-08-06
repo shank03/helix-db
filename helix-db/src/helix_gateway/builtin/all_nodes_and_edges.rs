@@ -144,11 +144,10 @@ fn get_all_nodes_edges_json(
 
         if let Some(prop) = &node_label {
             let node = Node::decode_node(value, id)?;
-            if let Some(props) = node.properties {
-                if let Some(prop_value) = props.get(prop) {
+            if let Some(props) = node.properties
+                && let Some(prop_value) = props.get(prop) {
                     json_node["label"] = sonic_rs::to_value(&prop_value.to_string())
                         .unwrap_or_else(|_| sonic_rs::Value::from(""));
-                }
             }
         }
         nodes.push(json_node);

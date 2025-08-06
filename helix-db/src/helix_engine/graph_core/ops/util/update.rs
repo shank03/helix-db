@@ -58,8 +58,8 @@ impl<'scope, 'env, I: Iterator<Item = Result<TraversalVal, GraphError>>> UpdateA
 
                         if let Some(ref props) = props {
                             for (key, _new_value) in props.iter() {
-                                if let Some(db) = storage.secondary_indices.get(key) {
-                                    if let Some(old_value) = properties.get(key) {
+                                if let Some(db) = storage.secondary_indices.get(key)
+                                    && let Some(old_value) = properties.get(key) {
                                         match bincode::serialize(old_value) {
                                             Ok(old_serialized) => {
                                                 if let Err(e) = db.delete_one_duplicate(
@@ -73,7 +73,6 @@ impl<'scope, 'env, I: Iterator<Item = Result<TraversalVal, GraphError>>> UpdateA
                                             Err(e) => vec.push(Err(GraphError::from(e))),
                                         }
                                     }
-                                }
                             }
                         }
 
@@ -128,13 +127,12 @@ impl<'scope, 'env, I: Iterator<Item = Result<TraversalVal, GraphError>>> UpdateA
                 Ok(TraversalVal::Edge(edge)) => match storage.get_edge(self.txn, &edge.id) {
                     Ok(old_edge) => {
                         let mut old_edge = old_edge.clone();
-                        if let Some(mut properties) = old_edge.properties.clone() {
-                            if let Some(ref props) = props {
+                        if let Some(mut properties) = old_edge.properties.clone()
+                            && let Some(ref props) = props {
                                 for (k, v) in props.iter() {
                                     properties.insert(k.clone(), v.clone());
                                 }
                                 old_edge.properties = Some(properties);
-                            }
                         }
                         match old_edge.encode_edge() {
                             Ok(serialized) => {
