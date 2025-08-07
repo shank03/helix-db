@@ -101,9 +101,10 @@ impl EmbeddingModelImpl {
             }
             Some("local") => Ok((EmbeddingProvider::Local, "local".to_string())),
 
-            Some(m) => Err(GraphError::from(format!(
-                "Unknown embedding model '{m}'. Please use 'openai:', 'gemini:', or 'local' prefix"
-            ))),
+            Some(_) => Ok((
+                EmbeddingProvider::OpenAI,
+                "text-embedding-ada-002".to_string(),
+            )),
             None => Err(GraphError::from("No embedding provider available")),
         }
     }
