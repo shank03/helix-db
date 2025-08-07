@@ -23,4 +23,5 @@ other_data/
 *.jsonl
 !examples/rag_demo/**
 test-store/
+helixdb-cfg/
 

@@ -715,10 +715,9 @@ pub(crate) fn infer_expr_type<'a>(
         //     Type::Vector(add.vector_type.as_deref())
         // }
         SearchVector(sv) => {
-            if let Some(ref ty) = sv.vector_type {
-                if !ctx.vector_set.contains(ty.as_str()) {
+            if let Some(ref ty) = sv.vector_type
+                && !ctx.vector_set.contains(ty.as_str()) {
                     generate_error!(ctx, original_query, sv.loc.clone(), E103, ty.as_str());
-                }
             }
             let vec: VecData = match &sv.data {
                 Some(VectorData::Vector(v)) => {
@@ -980,8 +979,8 @@ pub(crate) fn infer_expr_type<'a>(
         Empty => (Type::Unknown, Some(GeneratedStatement::Empty)),
         BM25Search(bm25_search) => {
             // TODO: look into how best do type checking for type passed in
-            if let Some(ref ty) = bm25_search.type_arg {
-                if !ctx.node_set.contains(ty.as_str()) {
+            if let Some(ref ty) = bm25_search.type_arg
+                && !ctx.node_set.contains(ty.as_str()) {
                     generate_error!(
                         ctx,
                         original_query,
@@ -989,7 +988,6 @@ pub(crate) fn infer_expr_type<'a>(
                         E101,
                         ty.as_str()
                     );
-                }
             }
             let vec = match &bm25_search.data {
                 Some(ValueType::Literal { value, loc: _ }) => {

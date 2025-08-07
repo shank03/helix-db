@@ -98,14 +98,13 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddNAdapter<'
             }
         }
 
-        if let Some(bm25) = &self.storage.bm25 {
-            if let Some(props) = node.properties.as_ref() {
+        if let Some(bm25) = &self.storage.bm25
+            && let Some(props) = node.properties.as_ref() {
                 let mut data = props.flatten_bm25();
                 data.push_str(&node.label);
                 if let Err(e) = bm25.insert_doc(self.txn, node.id, &data) {
                     result = Err(e);
                 }
-            }
         }
 
         if result.is_ok() {
