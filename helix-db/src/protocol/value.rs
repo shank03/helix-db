@@ -702,7 +702,7 @@ impl<'de> Deserialize<'de> for Value {
                 "Value",
                 &[
                     "String", "F32", "F64", "I8", "I16", "I32", "I64", "U8", "U16", "U32", "U64",
-                    "U128", "Boolean", "Array", "Object", "Empty",
+                    "U128", "Date", "Boolean", "Id", "Array", "Object", "Empty",
                 ],
                 ValueVisitor,
             )
