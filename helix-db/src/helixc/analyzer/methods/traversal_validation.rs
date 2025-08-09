@@ -89,17 +89,18 @@ pub(crate) fn validate_traversal<'a>(
                                             );
                                         } else if let ValueType::Literal { ref value, ref loc } =
                                             *value
-                                                && !field.field_type.eq(value) {
-                                                    generate_error!(
-                                                        ctx,
-                                                        original_query,
-                                                        loc.clone(),
-                                                        E205,
-                                                        &value.to_string(),
-                                                        &field.field_type.to_string(),
-                                                        "node",
-                                                        node_type
-                                                    );
+                                            && !field.field_type.eq(value)
+                                        {
+                                            generate_error!(
+                                                ctx,
+                                                original_query,
+                                                loc.clone(),
+                                                E205,
+                                                &value.to_string(),
+                                                &field.field_type.to_string(),
+                                                "node",
+                                                node_type
+                                            );
                                         }
                                     }
                                     None => {
@@ -290,8 +291,9 @@ pub(crate) fn validate_traversal<'a>(
         }
         StartNode::SearchVector(sv) => {
             if let Some(ref ty) = sv.vector_type
-                &&  !ctx.vector_set.contains(ty.as_str()) {
-                    generate_error!(ctx, original_query, sv.loc.clone(), E103, ty.as_str());
+                && !ctx.vector_set.contains(ty.as_str())
+            {
+                generate_error!(ctx, original_query, sv.loc.clone(), E103, ty.as_str());
             }
             let vec: VecData = match &sv.data {
                 Some(VectorData::Vector(v)) => {
@@ -603,6 +605,7 @@ pub(crate) fn validate_traversal<'a>(
                             gen_query,
                         ) {
                             (Type::Scalar(ft), _) => ft.clone(),
+                            (Type::Boolean, _) => FieldType::Boolean,
                             (field_type, _) => {
                                 generate_error!(
                                     ctx,
@@ -1053,8 +1056,9 @@ pub(crate) fn validate_traversal<'a>(
 
             StepType::AddEdge(add) => {
                 if let Some(ref ty) = add.edge_type
-                    && !ctx.edge_map.contains_key(ty.as_str()) {
-                        generate_error!(ctx, original_query, add.loc.clone(), E102, ty);
+                    && !ctx.edge_map.contains_key(ty.as_str())
+                {
+                    generate_error!(ctx, original_query, add.loc.clone(), E102, ty);
                 }
                 cur_ty = Type::Edges(add.edge_type.clone());
                 excluded.clear();
@@ -1074,30 +1078,32 @@ pub(crate) fn validate_traversal<'a>(
                             i.as_str(),
                         );
                         if let Some(ty) = ty
-                            && !ty.is_integer() {
-                                generate_error!(
-                                    ctx,
-                                    original_query,
-                                    start.loc.clone(),
-                                    E633,
-                                    [&start.loc.span, &ty.get_type_name()],
-                                    [i.as_str()]
-                                );
-                                return cur_ty.clone(); // Not sure if this should be here
+                            && !ty.is_integer()
+                        {
+                            generate_error!(
+                                ctx,
+                                original_query,
+                                start.loc.clone(),
+                                E633,
+                                [&start.loc.span, &ty.get_type_name()],
+                                [i.as_str()]
+                            );
+                            return cur_ty.clone(); // Not sure if this should be here
                         };
                         let ty =
                             type_in_scope(ctx, original_query, end.loc.clone(), scope, j.as_str());
                         if let Some(ty) = ty
-                            && !ty.is_integer() {
-                                generate_error!(
-                                    ctx,
-                                    original_query,
-                                    end.loc.clone(),
-                                    E633,
-                                    [&end.loc.span, &ty.get_type_name()],
-                                    [j.as_str()]
-                                );
-                                return cur_ty.clone(); // Not sure if this should be here
+                            && !ty.is_integer()
+                        {
+                            generate_error!(
+                                ctx,
+                                original_query,
+                                end.loc.clone(),
+                                E633,
+                                [&end.loc.span, &ty.get_type_name()],
+                                [j.as_str()]
+                            );
+                            return cur_ty.clone(); // Not sure if this should be here
                         }
                         (
                             gen_identifier_or_param(original_query, i.as_str(), false, true),
@@ -1119,16 +1125,17 @@ pub(crate) fn validate_traversal<'a>(
                             i.as_str(),
                         );
                         if let Some(ty) = ty
-                            && !ty.is_integer() {
-                                generate_error!(
-                                    ctx,
-                                    original_query,
-                                    start.loc.clone(),
-                                    E633,
-                                    [&start.loc.span, &ty.get_type_name()],
-                                    [i.as_str()]
-                                );
-                                return cur_ty.clone(); // Not sure if this should be here
+                            && !ty.is_integer()
+                        {
+                            generate_error!(
+                                ctx,
+                                original_query,
+                                start.loc.clone(),
+                                E633,
+                                [&start.loc.span, &ty.get_type_name()],
+                                [i.as_str()]
+                            );
+                            return cur_ty.clone(); // Not sure if this should be here
                         }
 
                         (
@@ -1141,16 +1148,17 @@ pub(crate) fn validate_traversal<'a>(
                         let ty =
                             type_in_scope(ctx, original_query, end.loc.clone(), scope, j.as_str());
                         if let Some(ty) = ty
-                            && !ty.is_integer() {
-                                generate_error!(
-                                    ctx,
-                                    original_query,
-                                    end.loc.clone(),
-                                    E633,
-                                    [&end.loc.span, &ty.get_type_name()],
-                                    [j.as_str()]
-                                );
-                                return cur_ty.clone();
+                            && !ty.is_integer()
+                        {
+                            generate_error!(
+                                ctx,
+                                original_query,
+                                end.loc.clone(),
+                                E633,
+                                [&end.loc.span, &ty.get_type_name()],
+                                [j.as_str()]
+                            );
+                            return cur_ty.clone();
                         }
                         (
                             GeneratedValue::Primitive(GenRef::Std(i.to_string())),
