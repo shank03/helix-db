@@ -623,6 +623,18 @@ impl<'de> Deserialize<'de> for Value {
                 Ok(Value::Array(values))
             }
 
+            /// Handles object values by recursively deserialising each key-value pair
+            fn visit_map<A>(self, mut map: A) -> Result<Value, A::Error>
+            where
+                A: serde::de::MapAccess<'de>,
+            {
+                let mut object = HashMap::new();
+                while let Some((key, value)) = map.next_entry()? {
+                    object.insert(key, value);
+                }
+                Ok(Value::Object(object))
+            }
+
             /// Handles binary format deserialisation using numeric indices to identify variants
             /// Maps indices 0-5 to corresponding Value enum variants
             fn visit_enum<A>(self, data: A) -> Result<Self::Value, A::Error>
@@ -655,7 +667,7 @@ impl<'de> Deserialize<'de> for Value {
                     _ => {
                         Err(serde::de::Error::invalid_value(
                             serde::de::Unexpected::Unsigned(variant_idx as u64),
-                            &"variant index 0 through 5",
+                            &"variant index 0 through 17",
                         ))
                     }
                 }
@@ -702,7 +714,7 @@ impl<'de> Deserialize<'de> for Value {
                 "Value",
                 &[
                     "String", "F32", "F64", "I8", "I16", "I32", "I64", "U8", "U16", "U32", "U64",
-                    "U128", "Boolean", "Array", "Object", "Empty",
+                    "U128", "Date", "Boolean", "Id", "Array", "Object", "Empty",
                 ],
                 ValueVisitor,
             )
