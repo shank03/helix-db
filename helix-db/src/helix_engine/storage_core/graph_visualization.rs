@@ -124,7 +124,7 @@ impl HelixGraphStorage {
         }
         impl PartialOrd for EdgeCount {
             fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-                Some(self.edges_count.cmp(&other.edges_count))
+                Some(self.cmp(other))
             }
         }
         impl Eq for EdgeCount {}
