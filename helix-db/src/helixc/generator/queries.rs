@@ -1,7 +1,12 @@
 use std::fmt::{self, Display};
 
-use crate::helixc::generator::{
-    return_values::ReturnValue, statements::Statement, utils::GeneratedType,
+use crate::helixc::{
+    generator::{
+        return_values::ReturnValue,
+        statements::Statement,
+        utils::{EmbedData, GeneratedType},
+    },
+    parser::helix_parser::Embed,
 };
 
 pub struct Query {
@@ -13,6 +18,7 @@ pub struct Query {
     pub sub_parameters: Vec<(String, Vec<Parameter>)>,
     pub return_values: Vec<ReturnValue>,
     pub is_mut: bool,
+    pub hoisted_embedding_calls: Vec<EmbedData>,
 }
 impl Display for Query {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -103,7 +109,16 @@ impl Default for Query {
             sub_parameters: vec![],
             return_values: vec![],
             is_mut: false,
+            hoisted_embedding_calls: vec![],
         }
+    }
+}
+
+impl Query {
+    pub fn add_hoisted_embed(&mut self, embed_data: EmbedData) -> String {
+        let name = EmbedData::name_from_index(self.hoisted_embedding_calls.len());
+        self.hoisted_embedding_calls.push(embed_data);
+        name
     }
 }
 
@@ -120,4 +135,3 @@ impl Display for Parameter {
         }
     }
 }
-
