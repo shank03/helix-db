@@ -119,6 +119,20 @@ pub enum VecData {
     Unknown,
 }
 
+impl Display for VecData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            VecData::Standard(v) => write!(f, "{v}"),
+            // VecData::Embed { data, model_name } => match model_name {
+            //     Some(model) => write!(f, "&embed!(db, {data}, {model})"),
+            //     None => write!(f, "&embed!(db, {data})"),
+            // },
+            VecData::Hoisted(ident) => write!(f, "&{ident}"),
+            VecData::Unknown => panic!("Cannot convert to string, VecData is unknown"),
+        }
+    }
+}
+
 pub struct EmbedData {
     pub data: GeneratedValue,
     pub model_name: Option<String>,
@@ -130,16 +144,12 @@ impl EmbedData {
     }
 }
 
-impl Display for VecData {
+impl Display for EmbedData {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            VecData::Standard(v) => write!(f, "{v}"),
-            // VecData::Embed { data, model_name } => match model_name {
-            //     Some(model) => write!(f, "&embed!(db, {data}, {model})"),
-            //     None => write!(f, "&embed!(db, {data})"),
-            // },
-            VecData::Hoisted(ident) => write!(f, "&{ident}"),
-            VecData::Unknown => panic!("Cannot convert to string, VecData is unknown"),
+        let EmbedData { data, model_name } = self;
+        match model_name {
+            Some(model) => write!(f, "embed_async!(db, {data}, {model})"),
+            None => write!(f, "embed_async!(db, {data})"),
         }
     }
 }

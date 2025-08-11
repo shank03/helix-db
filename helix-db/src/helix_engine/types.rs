@@ -1,4 +1,4 @@
-use crate::helixc::parser::parser_methods::ParserError;
+use crate::{helix_gateway::router::router::IoContFn, helixc::parser::parser_methods::ParserError};
 use core::fmt;
 use heed3::Error as HeedError;
 use sonic_rs::Error as SonicError;
@@ -28,6 +28,7 @@ pub enum GraphError {
     ShortestPathNotFound,
     EmbeddingError(String),
     ParamNotFound(&'static str),
+    IoNeeded(IoContFn),
 }
 
 impl std::error::Error for GraphError {}
@@ -61,6 +62,9 @@ impl fmt::Display for GraphError {
             GraphError::ShortestPathNotFound => write!(f, "Shortest path not found"),
             GraphError::EmbeddingError(msg) => write!(f, "Error while embedding text: {msg}"),
             GraphError::ParamNotFound(param) => write!(f, "Parameter {param} not found in request"),
+            GraphError::IoNeeded(_) => {
+                write!(f, "Asyncronous IO is needed to complete the DB operation")
+            }
         }
     }
 }

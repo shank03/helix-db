@@ -1,12 +1,9 @@
 use std::fmt::{self, Display};
 
-use crate::helixc::{
-    generator::{
-        return_values::ReturnValue,
-        statements::Statement,
-        utils::{EmbedData, GeneratedType},
-    },
-    parser::helix_parser::Embed,
+use crate::helixc::generator::{
+    return_values::ReturnValue,
+    statements::Statement,
+    utils::{EmbedData, GeneratedType},
 };
 
 pub struct Query {
@@ -58,22 +55,50 @@ impl Display for Query {
                 }
             )?;
         }
-        writeln!(
-            f,
-            "#[handler({})]",
-            match self.is_mut {
-                true => "with_write",
-                false => "with_read",
-            }
-        )?; // Handler macro
+        // writeln!(
+        //     f,
+        //     "#[handler({})]",
+        //     match self.is_mut {
+        //         true => "with_write",
+        //         false => "with_read",
+        //     }
+        // )?; // Handler macro
 
         // prints the function signature
         writeln!(
             f,
-            "pub fn {} (input: &HandlerInput) -> Result<Response, GraphError> {{",
+            "pub fn {} (input: HandlerInput) -> Result<Response, GraphError> {{",
             self.name
         )?;
-        writeln!(f, "{{")?;
+
+        if !self.hoisted_embedding_calls.is_empty() {
+            writeln!(
+                f,
+                "Err(IoContFn::create_err(|__internal_cont_tx, __internal_ret_chan| async move {{"
+            )?;
+            // (({ }))
+
+            for (i, embed) in self.hoisted_embedding_calls.iter().enumerate() {
+                let name = EmbedData::name_from_index(i);
+                writeln!(f, "let {name} = {embed};")?;
+            }
+
+            writeln!(f, "__internal_cont_tx.send_async((ret_chan, move || {{")?;
+            // (({ })).await.expect("Cont Channel should be alive")
+        }
+
+        writeln!(
+            f,
+            "let data = input.request.in_fmt.deserialize::<{}Input>(&input.request.body)?;",
+            self.name
+        )?;
+        writeln!(f, "let mut remapping_vals = RemappingMap::new();")?;
+        writeln!(f, "let db = Arc::clone(&input.graph.storage);")?;
+
+        match self.is_mut {
+            true => writeln!(f, "let mut txn = db.graph_env.write_txn().unwrap();")?,
+            false => writeln!(f, "let txn = db.graph_env.read_txn().unwrap();")?,
+        }
 
         // prints each statement
         for statement in &self.statements {
@@ -94,8 +119,32 @@ impl Display for Query {
             }
         }
 
+        if !self.hoisted_embedding_calls.is_empty() {
+            writeln!(f, r#"}})).await.expect("Cont Channel should be alive")"#)?;
+            writeln!(f, "}}))")?;
+        }
+
         writeln!(f, "}}")?;
-        writeln!(f, "}}")
+
+        writeln!(f, "#[doc(hidden)]")?;
+        writeln!(f, "#[used]")?;
+        writeln!(
+            f,
+            "static _MAIN_HANDLER_REGISTRATION_{}: () = {{",
+            self.name.to_uppercase()
+        )?;
+        writeln!(f, "inventory::submit! {{")?;
+        writeln!(
+            f,
+            "::helix_db::helix_gateway::router::router::HandlerSubmission("
+        )?;
+        writeln!(
+            f,
+            r#"::helix_db::helix_gateway::router::router::Handler::new( "{}", {}))}}; "#,
+            self.name, self.name
+        )?;
+
+        Ok(())
     }
 }
 impl Default for Query {

@@ -1,14 +1,18 @@
 use crate::helix_engine::graph_core::graph_core::HelixGraphEngine;
+use crate::helix_engine::types::GraphError;
 use crate::helix_gateway::gateway::CoreSetter;
-use crate::protocol::{self, HelixError};
-use flume::{Receiver, Sender};
+use crate::helix_gateway::graphvis;
+use crate::helix_gateway::mcp::mcp::MCPToolInput;
+use crate::protocol::{self, HelixError, Request};
+use flume::{Receiver, Selector, Sender};
 use std::sync::Arc;
 use std::thread::JoinHandle;
+use tokio::runtime::Runtime;
 use tokio::sync::oneshot;
-use tracing::trace;
+use tracing::{error, trace};
 
-use crate::helix_gateway::router::router::HelixRouter;
-use crate::protocol::request::ReqMsg;
+use crate::helix_gateway::router::router::{ContChan, ContMsg, HandlerInput, HelixRouter};
+use crate::protocol::request::{ReqMsg, RequestType, RetChan};
 use crate::protocol::response::Response;
 
 /// A Thread Pool of workers to execute Database operations
@@ -23,26 +27,31 @@ impl WorkerPool {
         core_setter: Option<CoreSetter>,
         graph_access: Arc<HelixGraphEngine>,
         router: Arc<HelixRouter>,
+        io_rt: Arc<Runtime>,
     ) -> WorkerPool {
         assert!(
             size > 0,
             "Expected number of threads in thread pool to be more than 0, got {size}"
         );
 
-        let (tx, rx) = flume::bounded::<ReqMsg>(1000); // TODO: make this configurable
+        let (req_tx, req_rx) = flume::bounded::<ReqMsg>(1000); // TODO: make this configurable
+        let (cont_tx, cont_rx) = flume::bounded::<ContMsg>(1000); // TODO: make this configurable
+
         let workers = (0..size)
             .map(|_| {
                 Worker::start(
-                    rx.clone(),
+                    req_rx.clone(),
                     core_setter.clone(),
                     graph_access.clone(),
                     router.clone(),
+                    io_rt.clone(),
+                    (cont_tx.clone(), cont_rx.clone()),
                 )
             })
             .collect::<Vec<_>>();
 
         WorkerPool {
-            tx,
+            tx: req_tx,
             _workers: workers,
         }
     }
@@ -60,7 +69,7 @@ impl WorkerPool {
             .expect("WorkerPool channel should be open");
 
         // This is sent by the Worker
-        
+
         ret_rx
             .await
             .expect("Worker shouldn't drop sender before replying")
@@ -77,6 +86,8 @@ impl Worker {
         core_setter: Option<CoreSetter>,
         graph_access: Arc<HelixGraphEngine>,
         router: Arc<HelixRouter>,
+        io_rt: Arc<Runtime>,
+        (cont_tx, cont_rx): (ContChan, Receiver<ContMsg>),
     ) -> Worker {
         let handle = std::thread::spawn(move || {
             if let Some(cs) = core_setter {
@@ -85,15 +96,99 @@ impl Worker {
 
             trace!("thread started");
 
-            while let Ok((req, ret_chan)) = rx.recv() {
-                let res = router.handle(graph_access.clone(), req);
+            // while let Ok((request, ret_chan)) = rx.recv() {
 
-                ret_chan
-                    .send(res)
-                    .expect("Should always be able to send, as only one worker processes a request")
+            loop {
+                Selector::new()
+                    .recv(&cont_rx, |m| match m {
+                        Ok((ret_chan, cfn)) => {
+                            ret_chan.send(cfn().map_err(Into::into)).expect("todo")
+                        }
+                        Err(_) => error!("Continuation Channel was dropped"),
+                    })
+                    .recv(&rx, |m| match m {
+                        Ok((req, ret_chan)) => request_mapper(
+                            req,
+                            ret_chan,
+                            graph_access.clone(),
+                            &router,
+                            &io_rt,
+                            &cont_tx,
+                        ),
+                        Err(_) => error!("Request Channel was dropped"),
+                    });
             }
-            trace!("thread shutting down");
+            // trace!("thread shutting down");
         });
         Worker { _handle: handle }
     }
+}
+
+fn request_mapper(
+    request: Request,
+    ret_chan: RetChan,
+    graph_access: Arc<HelixGraphEngine>,
+    router: &HelixRouter,
+    io_rt: &Runtime,
+    cont_tx: &ContChan,
+) {
+    let req_name = request.name.clone();
+    let req_type = request.req_type;
+
+    let res = match request.req_type {
+        RequestType::Query => {
+            if let Some(handler) = router.routes.get(&request.name) {
+                let input = HandlerInput {
+                    request,
+                    graph: graph_access,
+                };
+
+                match handler(input) {
+                    Err(GraphError::IoNeeded(cont_closure)) => {
+                        let fut = cont_closure.0(cont_tx.clone(), ret_chan);
+                        io_rt.spawn(fut);
+                        return;
+                    }
+                    res => Some(res.map_err(Into::into)),
+                    // ResponseWrapper::Res(response) => Some(response.map_err(Into::into)),
+                    // ResponseWrapper::IoNeeded(cont_closure) => {
+                    //     let fut = cont_closure(cont_tx.clone(), ret_chan);
+                    //     io_rt.spawn(fut);
+                    //     return;
+                    // }
+                }
+            } else {
+                None
+            }
+        }
+        RequestType::MCP => {
+            if let Some(mcp_handler) = router.mcp_routes.get(&request.name) {
+                let mut mcp_input = MCPToolInput {
+                    request,
+                    mcp_backend: Arc::clone(graph_access.mcp_backend.as_ref().unwrap()),
+                    mcp_connections: Arc::clone(graph_access.mcp_connections.as_ref().unwrap()),
+                    schema: Some(graph_access.storage.storage_config.schema.clone()),
+                };
+                Some(mcp_handler(&mut mcp_input).map_err(Into::into))
+            } else {
+                None
+            }
+        }
+        RequestType::GraphVis => {
+            let input = HandlerInput {
+                request,
+                graph: graph_access.clone(),
+            };
+            Some(graphvis::graphvis_inner(&input))
+        }
+    };
+
+    let res = res.unwrap_or(Err(HelixError::NotFound {
+        ty: req_type,
+        name: req_name,
+    }));
+
+    ret_chan
+        .send(res)
+        .expect("Should always be able to send, as only one worker processes a request")
 }
