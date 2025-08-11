@@ -119,6 +119,9 @@ impl Display for Query {
             }
         }
 
+        writeln!(f, "txn.commit().unwrap();")?;
+        writeln!(f, "Ok(input.request.out_fmt.create_response(&return_vals))")?;
+
         if !self.hoisted_embedding_calls.is_empty() {
             writeln!(f, r#"}})).await.expect("Cont Channel should be alive")"#)?;
             writeln!(f, "}}))")?;
@@ -140,7 +143,7 @@ impl Display for Query {
         )?;
         writeln!(
             f,
-            r#"::helix_db::helix_gateway::router::router::Handler::new( "{}", {}))}}; "#,
+            r#"::helix_db::helix_gateway::router::router::Handler::new( "{}", {}))}}}}; "#,
             self.name, self.name
         )?;
 
