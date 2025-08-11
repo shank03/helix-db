@@ -74,9 +74,9 @@ impl Display for Query {
         if !self.hoisted_embedding_calls.is_empty() {
             writeln!(
                 f,
-                "Err(IoContFn::create_err(|__internal_cont_tx, __internal_ret_chan| async move {{"
+                "Err(IoContFn::create_err(|__internal_cont_tx, __internal_ret_chan| Box::pin(async move {{"
             )?;
-            // (({ }))
+            // ((({ })))
 
             for (i, embed) in self.hoisted_embedding_calls.iter().enumerate() {
                 let name = EmbedData::name_from_index(i);
@@ -85,9 +85,9 @@ impl Display for Query {
 
             writeln!(
                 f,
-                "__internal_cont_tx.send_async((__internal_ret_chan, move || {{"
+                "__internal_cont_tx.send_async((__internal_ret_chan, Box::new(move || {{"
             )?;
-            // (({ })).await.expect("Cont Channel should be alive")
+            // ((({ }))).await.expect("Cont Channel should be alive")
         }
 
         writeln!(
@@ -126,8 +126,8 @@ impl Display for Query {
         writeln!(f, "Ok(input.request.out_fmt.create_response(&return_vals))")?;
 
         if !self.hoisted_embedding_calls.is_empty() {
-            writeln!(f, r#"}})).await.expect("Cont Channel should be alive")"#)?;
-            writeln!(f, "}}))")?;
+            writeln!(f, r#"}}))).await.expect("Cont Channel should be alive")"#)?;
+            writeln!(f, "}})))")?;
         }
 
         writeln!(f, "}}")?;
