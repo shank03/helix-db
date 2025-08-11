@@ -117,7 +117,8 @@ impl Worker {
                             &cont_tx,
                         ),
                         Err(_) => error!("Request Channel was dropped"),
-                    });
+                    })
+                    .wait();
             }
             // trace!("thread shutting down");
         });
