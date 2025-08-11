@@ -96,7 +96,8 @@ impl Worker {
 
             trace!("thread started");
 
-            // while let Ok((request, ret_chan)) = rx.recv() {
+            // Set thread local context, so we can access the io runtime
+            let _io_guard = io_rt.enter();
 
             loop {
                 Selector::new()
@@ -150,12 +151,6 @@ fn request_mapper(
                         return;
                     }
                     res => Some(res.map_err(Into::into)),
-                    // ResponseWrapper::Res(response) => Some(response.map_err(Into::into)),
-                    // ResponseWrapper::IoNeeded(cont_closure) => {
-                    //     let fut = cont_closure(cont_tx.clone(), ret_chan);
-                    //     io_rt.spawn(fut);
-                    //     return;
-                    // }
                 }
             } else {
                 None

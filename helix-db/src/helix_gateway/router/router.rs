@@ -24,18 +24,18 @@ pub struct HandlerInput {
 
 pub type ContMsg = (
     RetChan,
-    Box<dyn Fn() -> Result<Response, GraphError> + Send + Sync>,
+    Box<dyn FnOnce() -> Result<Response, GraphError> + Send + Sync>,
 );
 pub type ContChan = flume::Sender<ContMsg>;
 
 pub type ContFut = Pin<Box<dyn Future<Output = ()> + Send + Sync>>;
 
-pub struct IoContFn(pub Box<dyn Fn(ContChan, RetChan) -> ContFut + Send + Sync>);
+pub struct IoContFn(pub Box<dyn FnOnce(ContChan, RetChan) -> ContFut + Send + Sync>);
 
 impl IoContFn {
     pub fn create_err<F>(func: F) -> GraphError
     where
-        F: Fn(ContChan, RetChan) -> ContFut + Send + Sync + 'static,
+        F: FnOnce(ContChan, RetChan) -> ContFut + Send + Sync + 'static,
     {
         GraphError::IoNeeded(Self(Box::new(func)))
     }

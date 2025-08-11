@@ -71,10 +71,12 @@ impl Display for Query {
             self.name
         )?;
 
+        writeln!(f, "let db = Arc::clone(&input.graph.storage);")?;
+
         if !self.hoisted_embedding_calls.is_empty() {
             writeln!(
                 f,
-                "Err(IoContFn::create_err(|__internal_cont_tx, __internal_ret_chan| Box::pin(async move {{"
+                "Err(IoContFn::create_err(move |__internal_cont_tx, __internal_ret_chan| Box::pin(async move {{"
             )?;
             // ((({ })))
 
@@ -88,6 +90,11 @@ impl Display for Query {
                 "__internal_cont_tx.send_async((__internal_ret_chan, Box::new(move || {{"
             )?;
             // ((({ }))).await.expect("Cont Channel should be alive")
+
+            for (i, _) in self.hoisted_embedding_calls.iter().enumerate() {
+                let name = EmbedData::name_from_index(i);
+                writeln!(f, "let {name}: Vec<f64> = {name}?;")?;
+            }
         }
 
         writeln!(
@@ -96,7 +103,6 @@ impl Display for Query {
             self.name
         )?;
         writeln!(f, "let mut remapping_vals = RemappingMap::new();")?;
-        writeln!(f, "let db = Arc::clone(&input.graph.storage);")?;
 
         match self.is_mut {
             true => writeln!(f, "let mut txn = db.graph_env.write_txn().unwrap();")?,

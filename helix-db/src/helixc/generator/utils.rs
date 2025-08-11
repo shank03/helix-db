@@ -405,7 +405,7 @@ use helix_db::{
         router::router::{HandlerInput, IoContFn},
         mcp::mcp::{MCPHandlerSubmission, MCPToolInput, MCPHandler}
     },
-    node_matches, props, embed,
+    node_matches, props, embed, embed_async,
     field_remapping, identifier_remapping, 
     traversal_remapping, exclude_field, value_remapping, 
     field_addition_from_old_field, field_type_cast, field_addition_from_value,
