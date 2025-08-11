@@ -83,7 +83,10 @@ impl Display for Query {
                 writeln!(f, "let {name} = {embed};")?;
             }
 
-            writeln!(f, "__internal_cont_tx.send_async((ret_chan, move || {{")?;
+            writeln!(
+                f,
+                "__internal_cont_tx.send_async((__internal_ret_chan, move || {{"
+            )?;
             // (({ })).await.expect("Cont Channel should be alive")
         }
 

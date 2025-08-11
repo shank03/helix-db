@@ -402,7 +402,7 @@ use helix_db::{
     },
     helix_gateway::{
         embedding_providers::embedding_providers::{EmbeddingModel, get_embedding_model},
-        router::router::HandlerInput,
+        router::router::{HandlerInput, IoContFn},
         mcp::mcp::{MCPHandlerSubmission, MCPToolInput, MCPHandler}
     },
     node_matches, props, embed,
