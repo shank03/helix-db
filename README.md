@@ -32,13 +32,15 @@ HelixDB primarily operates with a graph + vector data model, but it can also sup
 
 
 ## Key Features
-- **Agent Native**: Helix has built-in MCP support to allow your agents to discover data and walk the graph rather than having to generate human readable queries, letting agents actually think.
-- **Built-in Embeddings**: Don't worry about needing to embed your data before sending it to Helix, just use the `Embed` function to vectorize text.
-- **Tooling for Knowledge Graphs**: It is super easy to ingest your unstructured data into a knowledge graph, with our integrations for Zep-AI's Graphiti, and our own implementation of OpenAI's KG tool.
-- **Tooling for RAG**: HelixDB has a built-in vector search, keyword search, and hybrid search that can be used to power your RAG applications.
-- **Secure by Default**: HelixDB is private by default. You can only access your data through your compiled HelixQL queries.
-- **Your data is yours**: Each Helix cluster is logically isolated in its own VPC meaning only you can ever see your data. 
-- **Built to be fast**: Helix is built in Rust and uses LMDB as its storage engine to provide extremely low latencies.
+|  |  |
+|---------|-------------|
+| **Built-in MCP tools** | Helix has built-in MCP support to allow your agents to discover data and walk the graph rather than having to generate human readable queries, letting agents actually think. |
+| **Built-in Embeddings** | Don't worry about needing to embed your data before sending it to Helix, just use the `Embed` function to vectorize text. |
+| **Tooling for Knowledge Graphs** | It is super easy to ingest your unstructured data into a knowledge graph, with our integrations for Zep-AI's Graphiti, and our own implementation of OpenAI's KG tool. |
+| **Tooling for RAG** | HelixDB has a built-in vector search, keyword search, and hybrid search that can be used to power your RAG applications. |
+| **Secure by Default** | HelixDB is private by default. You can only access your data through your compiled HelixQL queries. |
+| **Logical Isolation** | Each Helix cluster is logically isolated in its own VPC meaning only you can ever see your data. |
+| **Ultra-Low Latency** | Helix is built in Rust and uses LMDB as its storage engine to provide extremely low latencies. |
 
 ## Getting Started
 #### Helix CLI
