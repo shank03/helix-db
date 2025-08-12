@@ -84,10 +84,6 @@ pub fn node_connections_inner(input: &HandlerInput) -> Result<protocol::Response
         ));
     };
 
-    if db.get_node(&txn, &node_id).is_err() {
-        return Err(GraphError::New("Node not found".to_string()));
-    }
-
     let mut connected_node_ids = HashSet::new();
     let mut connected_nodes = Vec::new();
 
