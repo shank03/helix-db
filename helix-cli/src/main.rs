@@ -6,16 +6,20 @@ use crate::{
 };
 use clap::Parser;
 use helix_db::{helix_engine::graph_core::config::Config, utils::styled_string::StyledString};
-use helix_metrics::HelixMetricsClient;
+use helix_metrics::{
+    HelixMetricsClient,
+    events::{CompileEvent, DeployEvent, EventData, EventType},
+};
 use serde::Deserialize;
 use serde_json::json;
 use spinners::{Spinner, Spinners};
 use std::{
     fmt::Write,
-    fs::{self, read_to_string, File, OpenOptions},
+    fs::{self, File, OpenOptions, read_to_string},
     io::{Read, Write as iWrite},
     path::{Path, PathBuf},
-    process::{Command, ExitCode}, sync::LazyLock,
+    process::{Command, ExitCode},
+    sync::LazyLock,
 };
 
 mod args;
@@ -23,7 +27,8 @@ mod instance_manager;
 mod types;
 mod utils;
 
-pub static HELIX_METRICS_CLIENT: LazyLock<HelixMetricsClient> = LazyLock::new(HelixMetricsClient{});
+pub static HELIX_METRICS_CLIENT: LazyLock<HelixMetricsClient> =
+    LazyLock::new(HelixMetricsClient::new);
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -83,6 +88,18 @@ async fn main() -> ExitCode {
                                 .to_string(),
                         );
                         print_instance(&instance);
+                        HELIX_METRICS_CLIENT.send_event(
+                            EventType::Deploy,
+                            EventData::Deploy(DeployEvent {
+                                cluster_id: instance.id.clone(),
+                                queries_string: "".to_string(),
+                                num_of_queries: 0,
+                                time_taken_sec: 0,
+                                success: true,
+                                error_messages: None,
+                            }),
+                        );
+                        
                     }
                     Err(e) => {
                         sp.stop_with_message("Failed to start instance".red().bold().to_string());
@@ -440,8 +457,6 @@ async fn main() -> ExitCode {
         }
 
         CommandType::Install(command) => {
-
-
             match Command::new("cargo").output() {
                 Ok(_) => {}
                 Err(_) => {

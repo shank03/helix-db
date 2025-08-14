@@ -37,11 +37,7 @@ impl HelixMetricsClient {
         &METRICS_CLIENT
     }
 
-    pub fn send_event(
-        &self,
-        event_type: events::EventType,
-        event_data: events::EventData,
-    ) -> Result<(), MetricError> {
+    pub fn send_event(&self, event_type: events::EventType, event_data: events::EventData) {
         // get OS
         let os = OS.to_string();
 
@@ -51,15 +47,16 @@ impl HelixMetricsClient {
         let _ = self
             .get_client()
             .post(METRICS_URL)
-            .body(sonic_rs::to_vec(&events::RawEvent {
-                ip_hash: None,
-                os,
-                user_id,
-                event_type,
-                event_data,
-            })?)
+            .body(
+                sonic_rs::to_vec(&events::RawEvent {
+                    os,
+                    user_id,
+                    event_type,
+                    event_data,
+                })
+                .unwrap(),
+            )
             .send();
-        Ok(())
     }
 }
 

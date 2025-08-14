@@ -34,7 +34,6 @@ impl EventType {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RawEvent {
-    pub ip_hash: Option<String>,
     pub os: String,
     pub event_type: EventType,
     pub event_data: EventData,
@@ -57,36 +56,36 @@ pub enum EventData {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CompileEvent {
-    cluster_id: String,
-    queries_string: String,
-    num_of_queries: u32,
-    time_taken_seconds: u32,
-    success: bool,
+    pub cluster_id: String,
+    pub queries_string: String,
+    pub num_of_queries: u32,
+    pub time_taken_seconds: u32,
+    pub success: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    error_messages: Option<String>,
+    pub error_messages: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DeployEvent {
-    cluster_id: String,
-    queries_string: String,
-    num_of_queries: u32,
-    time_taken_sec: u32,
-    success: bool,
+    pub cluster_id: String,
+    pub queries_string: String,
+    pub num_of_queries: u32,
+    pub time_taken_sec: u32,
+    pub success: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    error_messages: Option<String>,
+    pub error_messages: Option<String>,
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WriteErrorEvent {
-    cluster_id: String,
-    key: Vec<u8>,
+    pub cluster_id: String,
+    pub key: Vec<u8>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    key_string: Option<String>,
-    value: Vec<u8>,
+    pub key_string: Option<String>,
+    pub value: Vec<u8>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    value_string: Option<String>,
-    time_taken_usec: u32,
-    error_messages: String,
+    pub value_string: Option<String>,
+    pub time_taken_usec: u32,
+    pub error_messages: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

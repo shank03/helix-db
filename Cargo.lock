@@ -1188,7 +1188,7 @@ dependencies = [
  "dotenvy",
  "futures-util",
  "helix-db",
- "helix-metrics 0.1.0",
+ "helix-metrics",
  "indicatif",
  "libc",
  "open",
@@ -1271,21 +1271,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.104",
-]
-
-[[package]]
-name = "helix-metrics"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84207d2085f9eb95e2dd8ec689d930a0823014eb451703d039296c4f61229513"
-dependencies = [
- "async-trait",
- "chrono",
- "reqwest",
- "serde",
- "sonic-rs",
- "tokio",
- "uuid",
 ]
 
 [[package]]
