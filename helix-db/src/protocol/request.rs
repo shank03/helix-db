@@ -8,7 +8,9 @@ use tracing::error;
 
 use crate::protocol::{Format, HelixError, Response};
 
-pub type ReqMsg = (Request, oneshot::Sender<Result<Response, HelixError>>);
+pub type RetChan = oneshot::Sender<Result<Response, HelixError>>;
+
+pub type ReqMsg = (Request, RetChan);
 
 #[derive(Debug)]
 pub struct Request {
@@ -20,7 +22,7 @@ pub struct Request {
     pub out_fmt: Format,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum RequestType {
     Query,
     MCP,

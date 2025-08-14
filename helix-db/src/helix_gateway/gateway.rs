@@ -89,13 +89,6 @@ impl HelixGateway {
             );
         }
 
-        let worker_pool = WorkerPool::new(
-            self.worker_size,
-            worker_setter,
-            self.graph_access.clone(),
-            self.router.clone(),
-        );
-
         let rt = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(self.io_size)
             .on_thread_start({
@@ -108,6 +101,16 @@ impl HelixGateway {
             })
             .enable_all()
             .build()?;
+
+        let rt = Arc::new(rt);
+
+        let worker_pool = WorkerPool::new(
+            self.worker_size,
+            worker_setter,
+            self.graph_access.clone(),
+            self.router.clone(),
+            rt.clone(),
+        );
 
         let mut axum_app = axum::Router::new();
 

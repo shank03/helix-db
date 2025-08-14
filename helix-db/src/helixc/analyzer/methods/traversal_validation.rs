@@ -1,6 +1,6 @@
 use crate::helixc::analyzer::error_codes::*;
 use crate::helixc::generator::source_steps::SearchVector;
-use crate::helixc::generator::utils::VecData;
+use crate::helixc::generator::utils::{EmbedData, VecData};
 use crate::{
     generate_error,
     helixc::{
@@ -316,16 +316,20 @@ pub(crate) fn validate_traversal<'a>(
                         false,
                     ))
                 }
-                Some(VectorData::Embed(e)) => match &e.value {
-                    EvaluatesToString::Identifier(i) => VecData::Embed {
-                        data: gen_identifier_or_param(original_query, i.as_str(), true, false),
-                        model_name: gen_query.embedding_model_to_use.clone(),
-                    },
-                    EvaluatesToString::StringLiteral(s) => VecData::Embed {
-                        data: GeneratedValue::Literal(GenRef::Ref(s.clone())),
-                        model_name: gen_query.embedding_model_to_use.clone(),
-                    },
-                },
+                Some(VectorData::Embed(e)) => {
+                    let embed_data = match &e.value {
+                        EvaluatesToString::Identifier(i) => EmbedData {
+                            data: gen_identifier_or_param(original_query, i.as_str(), true, false),
+                            model_name: gen_query.embedding_model_to_use.clone(),
+                        },
+                        EvaluatesToString::StringLiteral(s) => EmbedData {
+                            data: GeneratedValue::Literal(GenRef::Ref(s.clone())),
+                            model_name: gen_query.embedding_model_to_use.clone(),
+                        },
+                    };
+
+                    VecData::Hoisted(gen_query.add_hoisted_embed(embed_data))
+                }
                 _ => {
                     generate_error!(
                         ctx,

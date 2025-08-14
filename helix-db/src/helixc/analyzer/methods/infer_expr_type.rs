@@ -1,5 +1,6 @@
 //! Semantic analyzer for Helix‑QL.
 use crate::helixc::analyzer::error_codes::ErrorCode;
+use crate::helixc::generator::utils::EmbedData;
 use crate::{
     generate_error,
     helixc::{
@@ -660,21 +661,25 @@ pub(crate) fn infer_expr_type<'a>(
                                 gen_identifier_or_param(original_query, i.as_str(), true, false);
                             VecData::Standard(id)
                         }
-                        VectorData::Embed(e) => match &e.value {
-                            EvaluatesToString::Identifier(i) => VecData::Embed {
-                                data: gen_identifier_or_param(
-                                    original_query,
-                                    i.as_str(),
-                                    true,
-                                    false,
-                                ),
-                                model_name: gen_query.embedding_model_to_use.clone(),
-                            },
-                            EvaluatesToString::StringLiteral(s) => VecData::Embed {
-                                data: GeneratedValue::Literal(GenRef::Ref(s.clone())),
-                                model_name: gen_query.embedding_model_to_use.clone(),
-                            },
-                        },
+                        VectorData::Embed(e) => {
+                            let embed_data = match &e.value {
+                                EvaluatesToString::Identifier(i) => EmbedData {
+                                    data: gen_identifier_or_param(
+                                        original_query,
+                                        i.as_str(),
+                                        true,
+                                        false,
+                                    ),
+                                    model_name: gen_query.embedding_model_to_use.clone(),
+                                },
+                                EvaluatesToString::StringLiteral(s) => EmbedData {
+                                    data: GeneratedValue::Literal(GenRef::Ref(s.clone())),
+                                    model_name: gen_query.embedding_model_to_use.clone(),
+                                },
+                            };
+
+                            VecData::Hoisted(gen_query.add_hoisted_embed(embed_data))
+                        }
                     };
                     let add_v = AddV {
                         vec,
@@ -716,8 +721,9 @@ pub(crate) fn infer_expr_type<'a>(
         // }
         SearchVector(sv) => {
             if let Some(ref ty) = sv.vector_type
-                && !ctx.vector_set.contains(ty.as_str()) {
-                    generate_error!(ctx, original_query, sv.loc.clone(), E103, ty.as_str());
+                && !ctx.vector_set.contains(ty.as_str())
+            {
+                generate_error!(ctx, original_query, sv.loc.clone(), E103, ty.as_str());
             }
             let vec: VecData = match &sv.data {
                 Some(VectorData::Vector(v)) => {
@@ -740,16 +746,20 @@ pub(crate) fn infer_expr_type<'a>(
                         false,
                     ))
                 }
-                Some(VectorData::Embed(e)) => match &e.value {
-                    EvaluatesToString::Identifier(i) => VecData::Embed {
-                        data: gen_identifier_or_param(original_query, i.as_str(), true, false),
-                        model_name: gen_query.embedding_model_to_use.clone(),
-                    },
-                    EvaluatesToString::StringLiteral(s) => VecData::Embed {
-                        data: GeneratedValue::Literal(GenRef::Ref(s.clone())),
-                        model_name: gen_query.embedding_model_to_use.clone(),
-                    },
-                },
+                Some(VectorData::Embed(e)) => {
+                    let embed_data = match &e.value {
+                        EvaluatesToString::Identifier(i) => EmbedData {
+                            data: gen_identifier_or_param(original_query, i.as_str(), true, false),
+                            model_name: gen_query.embedding_model_to_use.clone(),
+                        },
+                        EvaluatesToString::StringLiteral(s) => EmbedData {
+                            data: GeneratedValue::Literal(GenRef::Ref(s.clone())),
+                            model_name: gen_query.embedding_model_to_use.clone(),
+                        },
+                    };
+
+                    VecData::Hoisted(gen_query.add_hoisted_embed(embed_data))
+                }
                 _ => {
                     generate_error!(
                         ctx,
@@ -980,14 +990,15 @@ pub(crate) fn infer_expr_type<'a>(
         BM25Search(bm25_search) => {
             // TODO: look into how best do type checking for type passed in
             if let Some(ref ty) = bm25_search.type_arg
-                && !ctx.node_set.contains(ty.as_str()) {
-                    generate_error!(
-                        ctx,
-                        original_query,
-                        bm25_search.loc.clone(),
-                        E101,
-                        ty.as_str()
-                    );
+                && !ctx.node_set.contains(ty.as_str())
+            {
+                generate_error!(
+                    ctx,
+                    original_query,
+                    bm25_search.loc.clone(),
+                    E101,
+                    ty.as_str()
+                );
             }
             let vec = match &bm25_search.data {
                 Some(ValueType::Literal { value, loc: _ }) => {

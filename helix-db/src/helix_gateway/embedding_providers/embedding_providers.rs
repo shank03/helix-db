@@ -1,5 +1,5 @@
 use crate::helix_engine::types::GraphError;
-use reqwest::blocking::Client;
+use reqwest::Client;
 use sonic_rs::JsonValueTrait;
 use sonic_rs::{JsonContainerTrait, json};
 use std::env;
@@ -9,8 +9,10 @@ use url::Url;
 //      in case we have a gpu or something on the server we're running it on
 
 /// Trait for embedding models to fetch text embeddings.
+#[allow(async_fn_in_trait)]
 pub trait EmbeddingModel {
     fn fetch_embedding(&self, text: &str) -> Result<Vec<f64>, GraphError>;
+    async fn fetch_embedding_async(&self, text: &str) -> Result<Vec<f64>, GraphError>;
 }
 
 #[derive(Debug, Clone)]
@@ -111,7 +113,13 @@ impl EmbeddingModelImpl {
 }
 
 impl EmbeddingModel for EmbeddingModelImpl {
+    /// Must be called with an active tokio context
     fn fetch_embedding(&self, text: &str) -> Result<Vec<f64>, GraphError> {
+        let handle = tokio::runtime::Handle::current();
+        handle.block_on(self.fetch_embedding_async(text))
+    }
+
+    async fn fetch_embedding_async(&self, text: &str) -> Result<Vec<f64>, GraphError> {
         match &self.provider {
             EmbeddingProvider::OpenAI => {
                 let api_key = self
@@ -128,10 +136,12 @@ impl EmbeddingModel for EmbeddingModelImpl {
                         "model": &self.model,
                     }))
                     .send()
+                    .await
                     .map_err(|e| GraphError::from(format!("Failed to send request: {e}")))?;
 
                 let text_response = response
                     .text()
+                    .await
                     .map_err(|e| GraphError::from(format!("Failed to parse response: {e}")))?;
 
                 let response = sonic_rs::from_str::<sonic_rs::Value>(&text_response)
@@ -173,10 +183,12 @@ impl EmbeddingModel for EmbeddingModelImpl {
                         "taskType": task_type
                     }))
                     .send()
+                    .await
                     .map_err(|e| GraphError::from(format!("Failed to send request: {e}")))?;
 
                 let text_response = response
                     .text()
+                    .await
                     .map_err(|e| GraphError::from(format!("Failed to parse response: {e}")))?;
 
                 let response = sonic_rs::from_str::<sonic_rs::Value>(&text_response)
@@ -210,10 +222,12 @@ impl EmbeddingModel for EmbeddingModelImpl {
                         "chunk_size": 100
                     }))
                     .send()
+                    .await
                     .map_err(|e| GraphError::from(format!("Request failed: {e}")))?;
 
                 let text_response = response
                     .text()
+                    .await
                     .map_err(|e| GraphError::from(format!("Failed to parse response: {e}")))?;
 
                 let response = sonic_rs::from_str::<sonic_rs::Value>(&text_response)
@@ -249,6 +263,8 @@ pub fn get_embedding_model(
 ///
 /// If no model or url is provided, it will use the default model and url.
 ///
+/// This must be called on a sync worker, but with a tokio context, and in a place that returns a Result
+///
 /// ## Example Use
 /// ```rust
 /// let query = embed!("Hello, world!");
@@ -269,6 +285,33 @@ macro_rules! embed {
     ($db:expr, $query:expr, $provider:expr, $url:expr) => {{
         let embedding_model = get_embedding_model(None, Some($provider), Some($url))?;
         embedding_model.fetch_embedding($query)?
+    }};
+}
+
+#[macro_export]
+/// Fetches an embedding from the embedding model.
+///
+/// If no model or url is provided, it will use the default model and url.
+///
+macro_rules! embed_async {
+    (INNER_MODEL: $model:expr, $query:expr) => {
+        match $model {
+            Ok(m) => m.fetch_embedding_async($query).await,
+            Err(e) => Err(e),
+        }
+    };
+    ($db:expr, $query:expr) => {{
+        let embedding_model =
+            get_embedding_model(None, $db.storage_config.embedding_model.as_deref(), None);
+        embed_async!(INNER_MODEL: embedding_model, $query)
+    }};
+    ($db:expr, $query:expr, $provider:expr) => {{
+        let embedding_model = get_embedding_model(None, Some($provider), None)?;
+        embed_async!(INNER_MODEL: embedding_model, $query)
+    }};
+    ($db:expr, $query:expr, $provider:expr, $url:expr) => {{
+        let embedding_model = get_embedding_model(None, Some($provider), Some($url))?;
+        embed_async!(INNER_MODEL: embedding_model, $query)
     }};
 }
 
