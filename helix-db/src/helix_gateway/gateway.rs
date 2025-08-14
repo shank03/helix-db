@@ -109,7 +109,9 @@ impl HelixGateway {
             .enable_all()
             .build()?;
 
-        let mut axum_app = axum::Router::new()
+        let mut axum_app = axum::Router::new();
+
+        axum_app = axum_app
             .route("/{*path}", post(post_handler))
             .route("/graphvis", get(graphvis::graphvis_handler))
             .route("/introspect", get(introspect_schema_handler));
