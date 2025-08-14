@@ -11,8 +11,8 @@ use serde_json::json;
 use spinners::{Spinner, Spinners};
 use std::{
     fmt::Write,
-    fs::{self, OpenOptions, read_to_string},
-    io::Write as iWrite,
+    fs::{self, File, OpenOptions, read_to_string},
+    io::{Read, Write as iWrite},
     path::{Path, PathBuf},
     process::{Command, ExitCode},
 };
@@ -570,6 +570,48 @@ async fn main() -> ExitCode {
             );
         }
 
+        CommandType::Metrics(command) => {
+            // get metrics from ~/.helix/credentials
+            let home_dir = std::env::var("HOME").unwrap_or("~/".to_string());
+            let config_path = &format!("{home_dir}/.helix/credentials");
+            let config_path = Path::new(config_path);
+            let metrics = match fs::read_to_string(config_path) {
+                Ok(config) => parse_credentials(&config).metrics.unwrap_or(true),
+                Err(_) => {
+                    // create file
+                    fs::write(config_path, "helix_user_id=\nhelix_user_key=\nmetrics=true")
+                        .unwrap();
+                    true
+                }
+            };
+
+            if command.off {
+                if metrics {
+                    // write to config_path
+                    let mut file = File::open(config_path).unwrap();
+                    let mut contents = String::new();
+                    file.read_to_string(&mut contents).unwrap();
+                    let new_contents = contents.replace("metrics=true", "metrics=false");
+                    file.write_all(new_contents.as_bytes()).unwrap();
+                    println!("{}", "Metrics disabled".yellow().bold());
+                } else {
+                    println!("{}", "Metrics already disabled".yellow().bold());
+                }
+            } else {
+                if !metrics {
+                    // write to config_path
+                    let mut file = File::open(config_path).unwrap();
+                    let mut contents = String::new();
+                    file.read_to_string(&mut contents).unwrap();
+                    let new_contents = contents.replace("metrics=false", "metrics=true");
+                    file.write_all(new_contents.as_bytes()).unwrap();
+                    println!("{}", "Metrics enabled".green().bold());
+                } else {
+                    println!("{}", "Metrics enabled".green().bold());
+                }
+            }
+        }
+
         CommandType::Status => {
             let instance_manager = InstanceManager::new().unwrap();
             match instance_manager.list_instances() {
@@ -889,7 +931,7 @@ async fn main() -> ExitCode {
             let cred_path = config_path.join("credentials");
 
             if let Ok(contents) = read_to_string(&cred_path)
-                && let Some(_key) = parse_credentials(&contents)
+                && let Some(_key) = parse_key_from_creds(&contents)
             {
                 println!(
                     "You have an existing key which may be valid, only continue if it doesn't work or you want to switch accounts. (Key checking is WIP)"
@@ -951,7 +993,7 @@ async fn main() -> ExitCode {
                 }
             };
 
-            let key = match parse_credentials(&contents) {
+            let key = match parse_key_from_creds(&contents) {
                 Some(k) => k,
                 None => {
                     println!("Error: Can't parse credentials, try helix login");

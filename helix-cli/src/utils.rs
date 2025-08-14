@@ -255,8 +255,35 @@ struct ApiKeyMsg {
     key: String,
 }
 
+pub struct Credentials {
+    pub key: Option<String>,
+    pub user_id: Option<String>,
+    pub metrics: Option<bool>,
+}
+
+pub fn parse_credentials(creds: &str) -> Credentials {
+    let mut credentials = Credentials {
+        key: None,
+        user_id: None,
+        metrics: None,
+    };
+
+    for line in creds.lines() {
+        if let Some((key, value)) = line.split_once("=") {
+            match key.to_lowercase().as_str() {
+                "helix_user_key" => credentials.key = Some(value.to_string()),
+                "helix_user_id" => credentials.user_id = Some(value.to_string()),
+                "metrics" => credentials.metrics = Some(value.to_string().parse().unwrap()),
+                _ => {}
+            }
+        }
+    }
+    
+    credentials
+}
+
 /// tries to parse a credential file, returning the key, if any
-pub fn parse_credentials(creds: &str) -> Option<&str> {
+pub fn parse_key_from_creds(creds: &str) -> Option<&str> {
     for line in creds.lines() {
         if let Some((key, value)) = line.split_once("=")
             && key.to_lowercase() == "helix_user_key"
@@ -626,16 +653,16 @@ pub fn compile_and_build_helix(
     println!("building helix at: {}", output.display());
     let mut runner = Command::new("cargo");
     let mut args = vec!["build"];
-    
+
     match release_mode {
         BuildMode::Dev => args.extend_from_slice(&["--profile", "dev"]),
         BuildMode::Release => args.push("--release"),
     }
-    
+
     if enable_dev_instance {
         args.extend_from_slice(&["--features", "dev-instance"]);
     }
-    
+
     runner
         .args(args)
         .current_dir(PathBuf::from(&output))
@@ -674,7 +701,12 @@ pub fn deploy_helix(
     let instance_manager = InstanceManager::new().unwrap();
 
     let binary_path = dirs::home_dir()
-        .map(|path| path.join(format!(".helix/repo/helix-db/target/{}/helix-container", release_mode.to_path())))
+        .map(|path| {
+            path.join(format!(
+                ".helix/repo/helix-db/target/{}/helix-container",
+                release_mode.to_path()
+            ))
+        })
         .unwrap();
 
     let endpoints: Vec<String> = code.source.queries.iter().map(|q| q.name.clone()).collect();
