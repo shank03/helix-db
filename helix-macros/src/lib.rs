@@ -10,61 +10,20 @@ use syn::{
     parse_macro_input,
 };
 
-struct HandlerArgs {
-    txn_type: Ident,
-}
-impl Parse for HandlerArgs {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        Ok(HandlerArgs {
-            txn_type: input.parse()?,
-        })
-    }
-}
-
 #[proc_macro_attribute]
-pub fn handler(args: TokenStream, item: TokenStream) -> TokenStream {
+pub fn handler(_args: TokenStream, item: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(item as ItemFn);
-    let args = parse_macro_input!(args as HandlerArgs);
-    let input_fn_block_contents = &input_fn.block.stmts;
     let fn_name = &input_fn.sig.ident;
     let fn_name_str = fn_name.to_string();
-    let vis = &input_fn.vis;
-    let sig = &input_fn.sig;
     println!("fn_name_str: {fn_name_str}");
     // Create a unique static name for each handler
     let static_name = quote::format_ident!(
         "_MAIN_HANDLER_REGISTRATION_{}",
         fn_name.to_string().to_uppercase()
     );
-    let input_data_name = quote::format_ident!("{}Input", fn_name);
-
-    let query_stmts = match input_fn_block_contents.first() {
-        Some(Stmt::Expr(Expr::Block(block), _)) => block.block.stmts.clone(),
-        _ => panic!("Query block not found"),
-    };
-
-    let txn_type = match args.txn_type.to_string().as_str() {
-        "with_read" => quote! { let txn = db.graph_env.read_txn().unwrap(); },
-        "with_write" => quote! { let mut txn = db.graph_env.write_txn().unwrap(); },
-        _ => panic!("Invalid transaction type: expected 'with_read' or 'with_write'"),
-    };
-
+   
     let expanded = quote! {
-        #[allow(non_camel_case_types)]
-        #vis #sig {
-            let data = input.request.in_fmt.deserialize::<#input_data_name>(&input.request.body)?;
-
-            let mut remapping_vals = RemappingMap::new();
-            let db = Arc::clone(&input.graph.storage);
-            #txn_type
-
-
-            #(#query_stmts)*
-
-            txn.commit().unwrap();
-
-            Ok(input.request.out_fmt.create_response(&return_vals))
-        }
+        #input_fn
 
         #[doc(hidden)]
         #[used]

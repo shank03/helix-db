@@ -17,20 +17,26 @@ pub struct Query {
     pub is_mut: bool,
     pub hoisted_embedding_calls: Vec<EmbedData>,
 }
-impl Display for Query {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // prints sub parameter structs (e.g. (docs: {doc: String, id: String}))
+
+impl Query {
+    fn print_handler(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "#[handler]")
+    }
+
+    fn print_parameters(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (name, parameters) in &self.sub_parameters {
-            writeln!(f, "#[derive(Serialize, Deserialize)]")?;
+            writeln!(f, "#[derive(Serialize, Deserialize, Clone)]")?;
             writeln!(f, "pub struct {name} {{")?;
             for parameter in parameters {
                 writeln!(f, "    pub {}: {},", parameter.name, parameter.field_type)?;
             }
             writeln!(f, "}}")?;
         }
-        // prints top level parameters (e.g. (docs: {doc: String, id: String}))
-        // if !self.parameters.is_empty() {
-        writeln!(f, "#[derive(Serialize, Deserialize)]")?;
+        Ok(())
+    }
+
+    fn print_input_struct(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "#[derive(Serialize, Deserialize, Clone)]")?;
         writeln!(f, "pub struct {}Input {{\n", self.name)?;
         write!(
             f,
@@ -42,37 +48,10 @@ impl Display for Query {
                 .join(",\n")
         )?;
         write!(f, "\n}}\n")?;
-        // }
+        Ok(())
+    }
 
-        if let Some(mcp_handler) = &self.mcp_handler {
-            writeln!(
-                f,
-                "#[tool_call({}, {})]",
-                mcp_handler,
-                match self.is_mut {
-                    true => "with_write",
-                    false => "with_read",
-                }
-            )?;
-        }
-        // writeln!(
-        //     f,
-        //     "#[handler({})]",
-        //     match self.is_mut {
-        //         true => "with_write",
-        //         false => "with_read",
-        //     }
-        // )?; // Handler macro
-
-        // prints the function signature
-        writeln!(
-            f,
-            "pub fn {} (input: HandlerInput) -> Result<Response, GraphError> {{",
-            self.name
-        )?;
-
-        writeln!(f, "let db = Arc::clone(&input.graph.storage);")?;
-
+    fn print_hoisted_embedding_calls(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if !self.hoisted_embedding_calls.is_empty() {
             writeln!(
                 f,
@@ -96,14 +75,43 @@ impl Display for Query {
                 writeln!(f, "let {name}: Vec<f64> = {name}?;")?;
             }
         }
+        Ok(())
+    }
 
+    fn print_txn_commit(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "txn.commit().unwrap();")
+    }
+
+    fn print_query(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // prints the function signature
+        self.print_input_struct(f)?;
+        self.print_parameters(f)?;
+        self.print_handler(f)?;
         writeln!(
             f,
-            "let data = input.request.in_fmt.deserialize::<{}Input>(&input.request.body)?;",
+            "pub fn {} (input: HandlerInput) -> Result<Response, GraphError> {{",
             self.name
         )?;
-        writeln!(f, "let mut remapping_vals = RemappingMap::new();")?;
 
+        // print the db boilerplate
+        writeln!(f, "let db = Arc::clone(&input.graph.storage);")?;
+        match self.hoisted_embedding_calls.is_empty() {
+            true => writeln!(
+                f,
+                "let data = input.request.in_fmt.deserialize::<{}Input>(&input.request.body)?;",
+                self.name
+            )?,
+            false => writeln!(
+                f,
+                "let data = input.request.in_fmt.deserialize::<{}Input>(&input.request.body)?.into_owned();",
+                self.name
+            )?,
+        }
+
+        // print embedding calls
+        self.print_hoisted_embedding_calls(f)?;
+
+        writeln!(f, "let mut remapping_vals = RemappingMap::new();")?;
         match self.is_mut {
             true => writeln!(f, "let mut txn = db.graph_env.write_txn().unwrap();")?,
             false => writeln!(f, "let txn = db.graph_env.read_txn().unwrap();")?,
@@ -128,35 +136,114 @@ impl Display for Query {
             }
         }
 
-        writeln!(f, "txn.commit().unwrap();")?;
+        self.print_txn_commit(f)?;
         writeln!(f, "Ok(input.request.out_fmt.create_response(&return_vals))")?;
 
         if !self.hoisted_embedding_calls.is_empty() {
             writeln!(f, r#"}}))).await.expect("Cont Channel should be alive")"#)?;
             writeln!(f, "}})))")?;
         }
+        writeln!(f, "}}")?;
+        Ok(())
+    }
 
+    fn print_mcp(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.mcp_handler.is_none() {
+            return Ok(());
+        }
+
+        let struct_name = format!("{}Input", self.name);
+        let mcp_struct_name = format!("{}McpInput", self.name);
+        let mcp_function_name = format!("{}Mcp", self.name);
+
+        writeln!(f, "#[derive(Deserialize, Clone)]")?;
+        writeln!(f, "pub struct {mcp_struct_name} {{")?;
+        writeln!(f, "    connection_id: String,")?;
+        writeln!(f, "    data: {struct_name},")?;
         writeln!(f, "}}")?;
 
-        writeln!(f, "#[doc(hidden)]")?;
-        writeln!(f, "#[used]")?;
+        writeln!(f, "#[mcp_handler]")?;
         writeln!(
             f,
-            "static _MAIN_HANDLER_REGISTRATION_{}: () = {{",
-            self.name.to_uppercase()
-        )?;
-        writeln!(f, "inventory::submit! {{")?;
-        writeln!(
-            f,
-            "::helix_db::helix_gateway::router::router::HandlerSubmission("
-        )?;
-        writeln!(
-            f,
-            r#"::helix_db::helix_gateway::router::router::Handler::new( "{}", {}))}}}}; "#,
-            self.name, self.name
+            "pub fn {mcp_function_name}(input: &mut MCPToolInput) -> Result<Response, GraphError> {{"
         )?;
 
+        match self.hoisted_embedding_calls.is_empty() {
+            true => writeln!(
+                f,
+                "let data = input.request.in_fmt.deserialize::<{mcp_struct_name}>(&input.request.body)?;"
+            )?,
+            false => writeln!(
+                f,
+                "let data = input.request.in_fmt.deserialize::<{mcp_struct_name}>(&input.request.body)?.into_owned();"
+            )?,
+        }
+
+        writeln!(
+            f,
+            "let mut connections = input.mcp_connections.lock().unwrap();"
+        )?;
+        writeln!(
+            f,
+            "let mut connection = match connections.remove_connection(&data.connection_id) {{"
+        )?;
+        writeln!(f, "    Some(conn) => conn,")?;
+        writeln!(f, "    None => return Err(GraphError::Default),")?;
+        writeln!(f, "}};")?;
+        writeln!(f, "drop(connections);")?;
+        // print the db boilerplate
+        writeln!(f, "let db = Arc::clone(&input.mcp_backend.db);")?;
+        match self.hoisted_embedding_calls.is_empty() {
+            true => writeln!(f, "let data = &data.data;")?,
+            false => writeln!(f, "let data = data.data;")?,
+        }
+        writeln!(f, "let connections = Arc::clone(&input.mcp_connections);")?;
+
+        self.print_hoisted_embedding_calls(f)?;
+        writeln!(f, "let mut result = {{")?;
+        writeln!(f, "let mut remapping_vals = RemappingMap::new();")?;
+
+        match self.is_mut {
+            true => writeln!(f, "let mut txn = db.graph_env.write_txn().unwrap();")?,
+            false => writeln!(f, "let txn = db.graph_env.read_txn().unwrap();")?,
+        }
+
+        for statement in &self.statements {
+            writeln!(f, "    {statement};")?;
+        }
+        self.print_txn_commit(f)?;
+        writeln!(f, "{}.into_iter()", self.mcp_handler.as_ref().unwrap())?;
+        writeln!(f, "}};")?;
+
+        writeln!(
+            f,
+            "let first = result.next().unwrap_or(TraversalVal::Empty);"
+        )?;
+
+        writeln!(f, "connection.iter = result.into_iter();")?;
+        writeln!(
+            f,
+            "let mut connections = connections.lock().unwrap();"
+        )?;
+        writeln!(f, "connections.add_connection(connection);")?;
+        writeln!(f, "drop(connections);")?;
+        writeln!(
+            f,
+            "Ok(helix_db::protocol::format::Format::Json.create_response(&ReturnValue::from(first)))"
+        )?;
+        if !self.hoisted_embedding_calls.is_empty() {
+            writeln!(f, r#"}}))).await.expect("Cont Channel should be alive")"#)?;
+            writeln!(f, "}})))")?;
+        }
+        writeln!(f, "}}")?;
         Ok(())
+    }
+}
+
+impl Display for Query {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.print_query(f)?;
+        self.print_mcp(f)
     }
 }
 impl Default for Query {
