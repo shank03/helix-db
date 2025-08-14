@@ -6,21 +6,24 @@ use crate::{
 };
 use clap::Parser;
 use helix_db::{helix_engine::graph_core::config::Config, utils::styled_string::StyledString};
+use helix_metrics::HelixMetricsClient;
 use serde::Deserialize;
 use serde_json::json;
 use spinners::{Spinner, Spinners};
 use std::{
     fmt::Write,
-    fs::{self, File, OpenOptions, read_to_string},
+    fs::{self, read_to_string, File, OpenOptions},
     io::{Read, Write as iWrite},
     path::{Path, PathBuf},
-    process::{Command, ExitCode},
+    process::{Command, ExitCode}, sync::LazyLock,
 };
 
 mod args;
 mod instance_manager;
 mod types;
 mod utils;
+
+pub static HELIX_METRICS_CLIENT: LazyLock<HelixMetricsClient> = LazyLock::new(HelixMetricsClient{});
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -437,6 +440,8 @@ async fn main() -> ExitCode {
         }
 
         CommandType::Install(command) => {
+
+
             match Command::new("cargo").output() {
                 Ok(_) => {}
                 Err(_) => {

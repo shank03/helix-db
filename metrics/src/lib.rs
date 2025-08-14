@@ -29,6 +29,10 @@ pub const METRICS_URL: &str = "https://logs.helix-db.com";
 pub struct HelixMetricsClient {}
 
 impl HelixMetricsClient {
+    pub fn new() -> Self {
+        Self {}
+    }
+
     pub fn get_client(&self) -> &'static LazyLock<reqwest::Client> {
         &METRICS_CLIENT
     }
@@ -44,8 +48,8 @@ impl HelixMetricsClient {
         // get user id
         let user_id = Some(HELIX_USER_ID.as_str().to_string());
 
-        let client = self.get_client();
-        let _ = client
+        let _ = self
+            .get_client()
             .post(METRICS_URL)
             .body(sonic_rs::to_vec(&events::RawEvent {
                 ip_hash: None,
