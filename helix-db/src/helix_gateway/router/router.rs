@@ -9,14 +9,11 @@
 
 use crate::{
     helix_engine::{graph_core::graph_core::HelixGraphEngine, types::GraphError},
-    helix_gateway::{
-        graphvis,
-        mcp::mcp::{MCPHandlerFn, MCPToolInput},
-    },
-    protocol::{HelixError, request::RequestType},
+    helix_gateway::mcp::mcp::MCPHandlerFn,
+    protocol::request::RetChan,
 };
 use core::fmt;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, fmt::Debug, pin::Pin, sync::Arc};
 
 use crate::protocol::{Request, Response};
 
@@ -25,11 +22,41 @@ pub struct HandlerInput {
     pub graph: Arc<HelixGraphEngine>,
 }
 
+pub type ContMsg = (
+    RetChan,
+    Box<dyn FnOnce() -> Result<Response, GraphError> + Send + Sync>,
+);
+pub type ContChan = flume::Sender<ContMsg>;
+
+pub type ContFut = Pin<Box<dyn Future<Output = ()> + Send + Sync>>;
+
+pub struct IoContFn(pub Box<dyn FnOnce(ContChan, RetChan) -> ContFut + Send + Sync>);
+
+impl IoContFn {
+    pub fn create_err<F>(func: F) -> GraphError
+    where
+        F: FnOnce(ContChan, RetChan) -> ContFut + Send + Sync + 'static,
+    {
+        GraphError::IoNeeded(Self(Box::new(func)))
+    }
+}
+
+impl Debug for IoContFn {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Asyncronous IO is needed to complete the DB operation")
+    }
+}
+
+// pub enum ResponseWrapper {
+//     Res(Result<Response, GraphError>),
+//     IoNeeded(Box<IoContFn>),
+// }
+
 // basic type for function pointer
-pub type BasicHandlerFn = fn(&HandlerInput) -> Result<Response, GraphError>;
+pub type BasicHandlerFn = fn(HandlerInput) -> Result<Response, GraphError>;
 
 // thread safe type for multi threaded use
-pub type HandlerFn = Arc<dyn Fn(&HandlerInput) -> Result<Response, GraphError> + Send + Sync>;
+pub type HandlerFn = Arc<dyn Fn(HandlerInput) -> Result<Response, GraphError> + Send + Sync>;
 
 #[derive(Clone, Debug)]
 pub struct HandlerSubmission(pub Handler);
@@ -76,57 +103,57 @@ impl HelixRouter {
         self.routes.insert(name.to_string(), Arc::new(handler));
     }
 
-    /// Handle a request by finding the appropriate handler and executing it
-    ///
-    /// ## Arguments
-    ///
-    /// * `graph_access` - A reference to the graph engine
-    /// * `request` - The request to handle
-    ///
-    /// ## Returns
-    ///
-    /// * `Ok(Response)` if the request was handled successfully
-    /// * `Err(RouterError)` if there was an error handling the request
-    pub fn handle(
-        &self,
-        graph_access: Arc<HelixGraphEngine>,
-        request: Request,
-    ) -> Result<Response, HelixError> {
-        match request.req_type {
-            RequestType::Query => {
-                if let Some(handler) = self.routes.get(&request.name) {
-                    let input = HandlerInput {
-                        request,
-                        graph: Arc::clone(&graph_access),
-                    };
-                    return handler(&input).map_err(Into::into);
-                }
-            }
-            RequestType::MCP => {
-                if let Some(mcp_handler) = self.mcp_routes.get(&request.name) {
-                    let mut mcp_input = MCPToolInput {
-                        request,
-                        mcp_backend: Arc::clone(graph_access.mcp_backend.as_ref().unwrap()),
-                        mcp_connections: Arc::clone(graph_access.mcp_connections.as_ref().unwrap()),
-                        schema: Some(graph_access.storage.storage_config.schema.clone()),
-                    };
-                    return mcp_handler(&mut mcp_input).map_err(Into::into);
-                };
-            }
-            RequestType::GraphVis => {
-                let input = HandlerInput {
-                    request,
-                    graph: graph_access.clone(),
-                };
-                return graphvis::graphvis_inner(&input);
-            }
-        }
+    // /// Handle a request by finding the appropriate handler and executing it
+    // ///
+    // /// ## Arguments
+    // ///
+    // /// * `graph_access` - A reference to the graph engine
+    // /// * `request` - The request to handle
+    // ///
+    // /// ## Returns
+    // ///
+    // /// * `Ok(Response)` if the request was handled successfully
+    // /// * `Err(RouterError)` if there was an error handling the request
+    // pub fn handle(
+    //     &self,
+    //     graph_access: Arc<HelixGraphEngine>,
+    //     request: Request,
+    // ) -> Result<Response, HelixError> {
+    //     match request.req_type {
+    //         RequestType::Query => {
+    //             if let Some(handler) = self.routes.get(&request.name) {
+    //                 let input = HandlerInput {
+    //                     request,
+    //                     graph: Arc::clone(&graph_access),
+    //                 };
+    //                 return handler(&input).map_err(Into::into);
+    //             }
+    //         }
+    //         RequestType::MCP => {
+    //             if let Some(mcp_handler) = self.mcp_routes.get(&request.name) {
+    //                 let mut mcp_input = MCPToolInput {
+    //                     request,
+    //                     mcp_backend: Arc::clone(graph_access.mcp_backend.as_ref().unwrap()),
+    //                     mcp_connections: Arc::clone(graph_access.mcp_connections.as_ref().unwrap()),
+    //                     schema: Some(graph_access.storage.storage_config.schema.clone()),
+    //                 };
+    //                 return mcp_handler(&mut mcp_input).map_err(Into::into);
+    //             };
+    //         }
+    //         RequestType::GraphVis => {
+    //             let input = HandlerInput {
+    //                 request,
+    //                 graph: graph_access.clone(),
+    //             };
+    //             return graphvis::graphvis_inner(&input);
+    //         }
+    //     }
 
-        Err(HelixError::NotFound {
-            ty: request.req_type,
-            name: request.name,
-        })
-    }
+    //     Err(HelixError::NotFound {
+    //         ty: request.req_type,
+    //         name: request.name,
+    //     })
+    // }
 }
 
 #[derive(Debug)]

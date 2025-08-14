@@ -65,7 +65,7 @@ pub async fn nodes_edges_handler(
     }
 }
 
-pub fn nodes_edges_inner(input: &HandlerInput) -> Result<protocol::Response, GraphError> {
+pub fn nodes_edges_inner(input: HandlerInput) -> Result<protocol::Response, GraphError> {
     let db = Arc::clone(&input.graph.storage);
     let txn = db.graph_env.read_txn().map_err(GraphError::from)?;
 
@@ -115,7 +115,8 @@ pub fn nodes_edges_inner(input: &HandlerInput) -> Result<protocol::Response, Gra
         })
         .unwrap_or_else(|_| "[]".to_string());
 
-    let combined = format!(r#"{{"data": {json_result}, "vectors": {vectors_result}, "stats": {db_stats}}}"#);
+    let combined =
+        format!(r#"{{"data": {json_result}, "vectors": {vectors_result}, "stats": {db_stats}}}"#);
 
     Ok(protocol::Response {
         body: combined.into_bytes(),
@@ -145,9 +146,10 @@ fn get_all_nodes_edges_json(
         if let Some(prop) = &node_label {
             let node = Node::decode_node(value, id)?;
             if let Some(props) = node.properties
-                && let Some(prop_value) = props.get(prop) {
-                    json_node["label"] = sonic_rs::to_value(&prop_value.to_string())
-                        .unwrap_or_else(|_| sonic_rs::Value::from(""));
+                && let Some(prop_value) = props.get(prop)
+            {
+                json_node["label"] = sonic_rs::to_value(&prop_value.to_string())
+                    .unwrap_or_else(|_| sonic_rs::Value::from(""));
             }
         }
         nodes.push(json_node);
