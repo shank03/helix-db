@@ -1,6 +1,7 @@
 //! Semantic analyzer for Helix‑QL.
 use crate::helixc::analyzer::error_codes::ErrorCode;
 use crate::helixc::analyzer::utils::type_in_scope;
+use crate::helixc::generator::utils::EmbedData;
 use crate::{
     generate_error,
     helix_engine::graph_core::ops::source::add_e::EdgeType,
@@ -12,13 +13,13 @@ use crate::{
             utils::{gen_identifier_or_param, is_valid_identifier},
         },
         generator::{
+            queries::Query as GeneratedQuery,
             traversal_steps::{
                 In as GeneratedIn, InE as GeneratedInE, Out as GeneratedOut, OutE as GeneratedOutE,
                 SearchVectorStep, ShortestPath as GeneratedShortestPath, ShouldCollect,
                 Step as GeneratedStep, Traversal as GeneratedTraversal,
             },
             utils::{GenRef, GeneratedValue, Separator, VecData},
-            queries::Query as GeneratedQuery,
         },
         parser::helix_parser::*,
     },
@@ -360,8 +361,9 @@ pub(crate) fn apply_graph_step<'a>(
                 );
             }
             if let Some(ref ty) = sv.vector_type
-                && !ctx.vector_set.contains(ty.as_str()) {
-                    generate_error!(ctx, original_query, sv.loc.clone(), E103, ty.as_str());
+                && !ctx.vector_set.contains(ty.as_str())
+            {
+                generate_error!(ctx, original_query, sv.loc.clone(), E103, ty.as_str());
             }
             let vec = match &sv.data {
                 Some(VectorData::Vector(v)) => {
@@ -377,19 +379,24 @@ pub(crate) fn apply_graph_step<'a>(
                     is_valid_identifier(ctx, original_query, sv.loc.clone(), i.as_str());
                     // if is in params then use data.
                     let _ = type_in_scope(ctx, original_query, sv.loc.clone(), scope, i.as_str());
-                    let value = gen_identifier_or_param(original_query, i.as_str(), false, true);
+                    let value = gen_identifier_or_param(original_query, i.as_str(), true, false);
                     VecData::Standard(value)
                 }
-                Some(VectorData::Embed(e)) => match &e.value {
-                    EvaluatesToString::Identifier(i) => VecData::Embed {
-                        data: gen_identifier_or_param(original_query, i.as_str(), true, false),
-                        model_name: gen_query.embedding_model_to_use.clone(),
-                    },
-                    EvaluatesToString::StringLiteral(s) => VecData::Embed {
-                        data: GeneratedValue::Literal(GenRef::Ref(s.clone())),
-                        model_name: gen_query.embedding_model_to_use.clone(),
-                    },
-                },
+                Some(VectorData::Embed(e)) => {
+                    let embed_data = match &e.value {
+                        EvaluatesToString::Identifier(i) => EmbedData {
+                            data: gen_identifier_or_param(original_query, i.as_str(), true, false),
+                            model_name: gen_query.embedding_model_to_use.clone(),
+                        },
+                        EvaluatesToString::StringLiteral(s) => EmbedData {
+                            data: GeneratedValue::Literal(GenRef::Ref(s.clone())),
+                            model_name: gen_query.embedding_model_to_use.clone(),
+                        },
+                    };
+                    let name = gen_query.add_hoisted_embed(embed_data);
+
+                    VecData::Hoisted(name)
+                }
                 _ => {
                     generate_error!(
                         ctx,

@@ -133,7 +133,7 @@ pub mod macros {
     macro_rules! field_remapping {
         ($remapping_vals:expr, $var_name:expr, $should_spread:expr, $old_name:expr => $new_name:expr) => {{
             let old_value = match $var_name.check_property($old_name) {
-                Ok(val) => val,
+                Ok(val) => val.into_owned(),
                 Err(e) => {
                     return Err(GraphError::ConversionError(format!(
                         "Error Decoding: {:?}",
@@ -201,7 +201,7 @@ pub mod macros {
     macro_rules! identifier_remapping {
         ($remapping_vals:expr, $var_name:expr, $should_spread:expr, $field_name:expr =>  $identifier_value:expr) => {{
             let value = match $var_name.check_property($field_name) {
-                Ok(val) => val.clone(), // TODO: try and remove clone
+                Ok(val) => val.into_owned(), // TODO: try and remove clone
                 Err(e) => {
                     return Err(GraphError::ConversionError(format!(
                         "Error Decoding: {:?}",
@@ -213,7 +213,7 @@ pub mod macros {
                 false,
                 Some($identifier_value.to_string()),
                 Some(ReturnValue::from(value)),
-            );-
+            );
             $remapping_vals.insert(
                 $var_name.id(),
                 ResponseRemapping::new(
@@ -229,7 +229,7 @@ pub mod macros {
     macro_rules! value_remapping {
         ($remapping_vals:expr, $var_name:expr, $should_spread:expr, $field_name:expr =>  $value:expr) => {{
             let value = match $var_name.check_property($field_name) {
-                Ok(val) => val.clone(),
+                Ok(val) => val.into_owned(),
                 Err(e) => {
                     return Err(GraphError::ConversionError(format!(
                         "Error Decoding: {:?}",

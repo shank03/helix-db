@@ -1,3 +1,11 @@
+QUERY getUserEmbeddedBio (text: String) =>
+    vs <- SearchV<EmbeddedBio>(Embed(text), 10)
+    RETURN vs
+#[mcp]
+QUERY getUserEmbeddedBioMCP (text: String) =>
+    vs <- SearchV<EmbeddedBio>(Embed(text), 10)
+    RETURN vs
+
 // CRUD Operations
 // Create Queries
 

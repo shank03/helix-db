@@ -4,7 +4,7 @@
   <img src="/docs/full_logo.png" alt="HelixDB Logo">
 </picture>
 
-<b>HelixDB</b>: an open-source graph-vector database written in Rust built for RAG and AI applications.
+<b>HelixDB</b>: a database built from scratch to be the storage backend for any AI application.
 
 <h3>
   <a href="https://helix-db.com">Homepage</a> |
@@ -24,16 +24,23 @@
 
 <hr>
 
-HelixDB is a high-performance graph-vector database  designed with a focus on developer experience and performance. Built in Rust and powered by LMDB as its storage engine, it combines the reliability of a proven storage layer with modern features tailored for AI and vector-based applications.
+HelixDB was built on the thesis that current database infrastructure is built for how humans think about data, not AI. So we've built a database that makes it easy to build all the components needed for an AI application in a single platform. 
 
-We are currently using LMDB via Heed3, a rust wrapper built by the amazing team over at [Meilisearch](https://github.com/meilisearch/heed).
+You no longer need a separate application DB, vector DB, graph DB, or application layers to manage the multiple storage locations. All you need to build any application that uses AI, agents or RAG, is a single HelixDB cluster and HelixQL; we take care of the rest.
+
+HelixDB primarily operates with a graph + vector data model, but it can also support support KV, documents, and relational data.
+
 
 ## Key Features
-- **Fast & Efficient**: Built for performance we're currently 1000x faster than Neo4j, 100x faster than TigerGraph and on par with Qdrant for vectors.
-- **RAG-First**: Native support for graph and vector data types, making it ideal for RAG (Retrieval Augmented Generation) and AI applications
-- **Graph-Vector**: Easiest database for storing relationships between nodes, vectors, or nodes AND vectors.
-- **Reliable Storage**: Powered by LMDB (Lightning Memory-Mapped Database) for robust and efficient data persistence
-- **ACID Compliant**: Ensures data integrity and consistency
+|  |  |
+|---------|-------------|
+| **Built-in MCP tools** | Helix has built-in MCP support to allow your agents to discover data and walk the graph rather than having to generate human readable queries, letting agents actually think. |
+| **Built-in Embeddings** | Don't worry about needing to embed your data before sending it to Helix, just use the `Embed` function to vectorize text. |
+| **Tooling for Knowledge Graphs** | It is super easy to ingest your unstructured data into a knowledge graph, with our integrations for Zep-AI's Graphiti, and our own implementation of OpenAI's KG tool. |
+| **Tooling for RAG** | HelixDB has a built-in vector search, keyword search, and hybrid search that can be used to power your RAG applications. |
+| **Secure by Default** | HelixDB is private by default. You can only access your data through your compiled HelixQL queries. |
+| **Logical Isolation** | Each Helix cluster is logically isolated in its own VPC meaning only you can ever see your data. |
+| **Ultra-Low Latency** | Helix is built in Rust and uses LMDB as its storage engine to provide extremely low latencies. |
 
 ## Getting Started
 #### Helix CLI
@@ -115,26 +122,16 @@ Other commands:
 
 ## Roadmap
 Our current focus areas include:
-
-- Expanding vector data type capabilities for RAG applications
-- Implementing a test suite to enable end-to-end testing of queries before deployment
-- Building a Deterministic Simulation Testing engine enabling us to robustly iterate faster
-- Binary quantisation for even better performance
+- Organizational auth to manage teams, and Helix clusters. 
+- Improvements to our server code to massively improve network IO performance and scalability.
+- More 3rd party integrations to make it easier to build with Helix.
+- Guides and educational content to help you get started with Helix.
+- Binary quantisation for even better performance.
 
 Long term projects:
+- In-house SOTA knowledge graph ingestion tool for any data source.
 - In-house graph-vector storage engine (to replace LMDB)
 - In-house network protocol & serdes libraries (similar to protobufs/gRPC)
-
-## Our Software DNA 🧬
-
-- All code should be well-documented so no additional documentation is needed.
-- All code should be well-tested (DST coming soon).
-- If you can build it yourself, do it. Reduce dependencies.
-- If it doesn't need to exist, don't build it.
-- Don't lose users' data.
-- Use asserts in production: make an effort towards putting asserts anywhere you see fit even if the assert should always obviously be true.
-- If there is a more functional way to write a piece of code, do so. ie. pattern matching over if statements, iterators+combinators over loops, closures over small 1-2 line functions, etc.
-- When optimizing pieces of software, first write an eval/benchmark so that you can measure an exact metric for performance change
 
 ## License
 HelixDB is licensed under the The AGPL (Affero General Public License).
