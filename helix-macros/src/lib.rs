@@ -5,10 +5,7 @@ extern crate syn;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
-    Data, DataStruct, DeriveInput, Expr, FnArg, Ident, ItemFn, ItemTrait, LitInt, Pat, Stmt, Token,
-    TraitItem,
-    parse::{Parse, ParseStream},
-    parse_macro_input,
+    parse::{Parse, ParseStream}, parse_macro_input, Data, DataStruct, DeriveInput, Expr, FnArg, Ident, ItemEnum, ItemFn, ItemStruct, ItemTrait, LitInt, Pat, Stmt, Token, TraitItem
 };
 
 #[proc_macro_attribute]
@@ -395,14 +392,11 @@ pub fn migration(args: TokenStream, item: TokenStream) -> TokenStream {
     expanded.into()
 }
 
-#[proc_macro_derive(TraversalValue)]
-pub fn derive_traversal_value(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
+#[proc_macro_attribute]
+pub fn helix_node(_attr: TokenStream, input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as ItemStruct);
     let name = &input.ident;
-    let fields = match &input.data {
-        Data::Struct(DataStruct { fields, .. }) => fields.iter(),
-        _ => panic!("TraversalValue can only be derived for structs"),
-    };
+    let fields = input.fields.iter();
 
     let expanded = quote! {
         pub struct #name {
