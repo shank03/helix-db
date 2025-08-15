@@ -5,7 +5,8 @@ extern crate syn;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
-    Expr, FnArg, Ident, ItemFn, ItemTrait, LitInt, Pat, Stmt, Token, TraitItem,
+    Data, DataStruct, DeriveInput, Expr, FnArg, Ident, ItemFn, ItemTrait, LitInt, Pat, Stmt, Token,
+    TraitItem,
     parse::{Parse, ParseStream},
     parse_macro_input,
 };
@@ -21,7 +22,7 @@ pub fn handler(_args: TokenStream, item: TokenStream) -> TokenStream {
         "_MAIN_HANDLER_REGISTRATION_{}",
         fn_name.to_string().to_uppercase()
     );
-   
+
     let expanded = quote! {
         #input_fn
 
@@ -345,7 +346,6 @@ impl Parse for MigrationArgs {
     }
 }
 
-
 struct MigrationArgs {
     item: Ident,
     _comma: Token![,],
@@ -368,12 +368,11 @@ pub fn migration(args: TokenStream, item: TokenStream) -> TokenStream {
         "_MAIN_HANDLER_REGISTRATION_{}",
         fn_name.to_string().to_uppercase()
     );
-    
-    
+
     let item = &args.item;
     let from_version = &args.from_version;
     let to_version = &args.to_version;
-    
+
     let expanded = quote! {
         #input_fn
 
@@ -394,4 +393,23 @@ pub fn migration(args: TokenStream, item: TokenStream) -> TokenStream {
         };
     };
     expanded.into()
+}
+
+#[proc_macro_derive(TraversalValue)]
+pub fn derive_traversal_value(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+    let fields = match &input.data {
+        Data::Struct(DataStruct { fields, .. }) => fields.iter(),
+        _ => panic!("TraversalValue can only be derived for structs"),
+    };
+
+    let expanded = quote! {
+        pub struct #name {
+            id: String,
+            #(#fields),*
+        }
+    };
+
+    TokenStream::from(expanded)
 }
