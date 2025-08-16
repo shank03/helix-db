@@ -1,6 +1,6 @@
 use crate::helix_engine::vector_core::vector_distance::{MAX_DISTANCE, MIN_DISTANCE, ORTHOGONAL};
 
-use super::vector::HVector;
+use crate::helix_engine::vector_core::vector::HVector;
 
 #[test]
 fn test_hvector_new() {
@@ -98,4 +98,3 @@ fn test_hvector_cosine_similarity() {
     let similarity = v1.distance_to(&v2).unwrap();
     assert!(similarity == 1.0 - 0.9746318461970762);
 }
-
