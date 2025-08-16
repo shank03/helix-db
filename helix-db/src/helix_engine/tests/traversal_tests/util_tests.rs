@@ -59,3 +59,34 @@ fn test_order_by_asc() {
     assert_eq!(traversal[1].id(), node2.id());
     assert_eq!(traversal[2].id(), node.id());
 }
+
+#[test]
+fn test_order_by_desc() {
+    let (storage, _temp_dir) = setup_test_db();
+    let mut txn = storage.graph_env.write_txn().unwrap();
+
+    let node = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_n("person", Some(props! { "age" => 30 }), None)
+        .collect_to_val();
+
+    let node2 = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_n("person", Some(props! { "age" => 20 }), None)
+        .collect_to_val();
+
+    let node3 = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_n("person", Some(props! { "age" => 10 }), None)
+        .collect_to_val();
+
+    txn.commit().unwrap();
+
+    let txn = storage.graph_env.read_txn().unwrap();
+    let traversal = G::new(Arc::clone(&storage), &txn)
+        .n_from_type("person")
+        .order_by_desc("age")
+        .collect_to::<Vec<_>>();
+
+    assert_eq!(traversal.len(), 3);
+    assert_eq!(traversal[0].id(), node.id());
+    assert_eq!(traversal[1].id(), node2.id());
+    assert_eq!(traversal[2].id(), node3.id());
+}
