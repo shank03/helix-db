@@ -171,27 +171,22 @@ impl ReturnValue {
     /// );
     /// ```
     #[inline(always)]
-    pub fn mixin_remapping(self, remappings: HashMap<String, Remapping>) -> Self {
+    pub fn mixin_remapping(self, remappings: Vec<(String, Remapping)>) -> Self {
         match self {
             ReturnValue::Object(mut a) => {
-                println!("a1: {a:?}");
                 remappings.into_iter().for_each(|(k, v)| {
                     if v.exclude {
-                        println!("removing key: {k:?}");
                         let _ = a.remove(&k);
                     } else if let Some(new_name) = v.new_name {
                         if let Some(value) = a.remove(&k) {
                             a.insert(new_name, value);
                         } else {
-                            println!("no value found for key: {k:?}");
                             a.insert(k, v.return_value);
                         }
                     } else {
-                        println!("inserting value: {k:?}");
                         a.insert(k, v.return_value);
                     }
                 });
-                println!("a2: {a:?}");
                 ReturnValue::Object(a)
             }
             _ => unreachable!(),
@@ -312,6 +307,78 @@ impl From<&str> for ReturnValue {
     }
 }
 
+impl From<HashMap<String, ReturnValue>> for ReturnValue {
+    fn from(object: HashMap<String, ReturnValue>) -> Self {
+        ReturnValue::Object(object)
+    }
+}
+
+impl From<&HashMap<String, ReturnValue>> for ReturnValue {
+    fn from(object: &HashMap<String, ReturnValue>) -> Self {
+        ReturnValue::Object(object.clone())
+    }
+}
+
+impl From<Vec<(String, ReturnValue)>> for ReturnValue {
+    fn from(object: Vec<(String, ReturnValue)>) -> Self {
+        ReturnValue::Object(object.into_iter().collect())
+    }
+}
+
+impl From<&Vec<(String, ReturnValue)>> for ReturnValue {
+    fn from(object: &Vec<(String, ReturnValue)>) -> Self {
+        ReturnValue::Object(object.clone().into_iter().collect())
+    }
+}
+
+impl From<i8> for ReturnValue {
+    fn from(integer: i8) -> Self {
+        ReturnValue::Value(Value::I8(integer))
+    }
+}
+
+impl From<i16> for ReturnValue {
+    fn from(integer: i16) -> Self {
+        ReturnValue::Value(Value::I16(integer))
+    }
+}
+
+impl From<i64> for ReturnValue {
+    fn from(integer: i64) -> Self {
+        ReturnValue::Value(Value::I64(integer))
+    }
+}
+
+impl From<u8> for ReturnValue {
+    fn from(integer: u8) -> Self {
+        ReturnValue::Value(Value::U8(integer))
+    }
+}
+
+impl From<u16> for ReturnValue {
+    fn from(integer: u16) -> Self {
+        ReturnValue::Value(Value::U16(integer))
+    }
+}
+
+impl From<u32> for ReturnValue {
+    fn from(integer: u32) -> Self {
+        ReturnValue::Value(Value::U32(integer))
+    }
+}
+
+impl From<u64> for ReturnValue {
+    fn from(integer: u64) -> Self {
+        ReturnValue::Value(Value::U64(integer))
+    }
+}
+
+impl From<u128> for ReturnValue {
+    fn from(integer: u128) -> Self {
+        ReturnValue::Value(Value::U128(integer))
+    }
+}
+
 impl From<i32> for ReturnValue {
     fn from(integer: i32) -> Self {
         ReturnValue::Value(Value::I32(integer))
@@ -324,9 +391,9 @@ impl From<f64> for ReturnValue {
     }
 }
 
-impl From<u128> for ReturnValue {
-    fn from(integer: u128) -> Self {
-        ReturnValue::Value(Value::U128(integer))
+impl From<f32> for ReturnValue {
+    fn from(float: f32) -> Self {
+        ReturnValue::Value(Value::F32(float))
     }
 }
 
