@@ -3,9 +3,6 @@ pub mod ops;
 pub mod traversal_iter;
 pub mod traversal_value;
 
-#[cfg(test)]
-mod traversal_tests;
-
 use crate::helix_engine::storage_core::{HelixGraphStorage, version_info::VersionInfo};
 use crate::helix_engine::traversal_core::config::Config;
 use crate::helix_engine::types::GraphError;

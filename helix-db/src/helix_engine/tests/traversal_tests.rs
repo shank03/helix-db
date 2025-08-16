@@ -3,6 +3,7 @@ use std::{collections::HashMap, sync::Arc, time::Instant};
 use crate::{
     exclude_field,
     helix_engine::{
+        storage_core::HelixGraphStorage,
         traversal_core::{
             ops::{
                 g::G,
@@ -20,7 +21,6 @@ use crate::{
             },
             traversal_value::{Traversable, TraversalValue},
         },
-        storage_core::HelixGraphStorage,
         types::GraphError,
     },
     protocol::{
@@ -51,7 +51,7 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use tempfile::TempDir;
 
-use super::ops::{
+use crate::helix_engine::traversal_core::ops::{
     in_::in_::InAdapter,
     out::out_e::OutEdgesAdapter,
     source::add_e::{AddEAdapter, EdgeType},
@@ -63,7 +63,7 @@ fn setup_test_db() -> (Arc<HelixGraphStorage>, TempDir) {
     let db_path = temp_dir.path().to_str().unwrap();
     let storage = HelixGraphStorage::new(
         db_path,
-        super::config::Config::default(),
+        crate::helix_engine::traversal_core::config::Config::default(),
         Default::default(),
     )
     .unwrap();
@@ -988,7 +988,10 @@ fn test_filter_edges() {
     txn.commit().unwrap();
     let txn = storage.graph_env.read_txn().unwrap();
 
-    fn recent_edge(val: &Result<TraversalValue, GraphError>, year: i32) -> Result<bool, GraphError> {
+    fn recent_edge(
+        val: &Result<TraversalValue, GraphError>,
+        year: i32,
+    ) -> Result<bool, GraphError> {
         if let Ok(TraversalValue::Edge(edge)) = val {
             if let Ok(value) = edge.check_property("since") {
                 match value.as_ref() {
@@ -2690,7 +2693,7 @@ fn test_update_of_secondary_indices() {
     let (storage, _) = {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().to_str().unwrap();
-        let mut config = super::config::Config::default();
+        let mut config = crate::helix_engine::traversal_core::config::Config::default();
         config.graph_config.as_mut().unwrap().secondary_indices = Some(vec!["name".to_string()]);
         let storage = HelixGraphStorage::new(db_path, config, Default::default()).unwrap();
         (Arc::new(storage), temp_dir)
@@ -2736,7 +2739,7 @@ fn test_delete_node_with_secondary_index() {
     let (storage, _) = {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().to_str().unwrap();
-        let mut config = super::config::Config::default();
+        let mut config = crate::helix_engine::traversal_core::config::Config::default();
         config.graph_config.as_mut().unwrap().secondary_indices = Some(vec!["name".to_string()]);
         let storage = HelixGraphStorage::new(db_path, config, Default::default()).unwrap();
         (Arc::new(storage), temp_dir)
