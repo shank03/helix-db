@@ -1,4 +1,4 @@
-use crate::helix_engine::{graph_core::ops::tr_val::TraversalVal, types::GraphError};
+use crate::helix_engine::{graph_core::traversal_value::TraversalValue, types::GraphError};
 
 pub struct Exist<I> {
     pub iter: I,
@@ -6,7 +6,7 @@ pub struct Exist<I> {
 
 impl<I> Exist<I>
 where
-    I: Iterator<Item = Result<TraversalVal, GraphError>>,
+    I: Iterator<Item = Result<TraversalValue, GraphError>>,
 {
     pub fn exists(iter: &mut I) -> bool {
         for item in iter.by_ref() {

@@ -1,9 +1,7 @@
-use super::super::tr_val::TraversalVal;
+
 use crate::{
     helix_engine::{
-        bm25::bm25::{BM25, BM25Flatten},
-        graph_core::traversal_iter::RwTraversalIterator,
-        types::GraphError,
+        bm25::bm25::{BM25Flatten, BM25}, graph_core::{traversal_iter::RwTraversalIterator, traversal_value::TraversalValue}, types::GraphError
     },
     protocol::value::Value,
     utils::{filterable::Filterable, id::v6_uuid, items::Node},
@@ -11,27 +9,27 @@ use crate::{
 use heed3::PutFlags;
 
 pub struct AddNIterator {
-    inner: std::iter::Once<Result<TraversalVal, GraphError>>,
+    inner: std::iter::Once<Result<TraversalValue, GraphError>>,
 }
 
 impl Iterator for AddNIterator {
-    type Item = Result<TraversalVal, GraphError>;
+    type Item = Result<TraversalValue, GraphError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
 }
 
-pub trait AddNAdapter<'a, 'b>: Iterator<Item = Result<TraversalVal, GraphError>> {
+pub trait AddNAdapter<'a, 'b>: Iterator<Item = Result<TraversalValue, GraphError>> {
     fn add_n(
         self,
         label: &'a str,
         properties: Option<Vec<(String, Value)>>,
         secondary_indices: Option<&'a [&str]>,
-    ) -> RwTraversalIterator<'a, 'b, std::iter::Once<Result<TraversalVal, GraphError>>>;
+    ) -> RwTraversalIterator<'a, 'b, std::iter::Once<Result<TraversalValue, GraphError>>>;
 }
 
-impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddNAdapter<'a, 'b>
+impl<'a, 'b, I: Iterator<Item = Result<TraversalValue, GraphError>>> AddNAdapter<'a, 'b>
     for RwTraversalIterator<'a, 'b, I>
 {
     fn add_n(
@@ -39,7 +37,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddNAdapter<'
         label: &'a str,
         properties: Option<Vec<(String, Value)>>,
         secondary_indices: Option<&'a [&str]>,
-    ) -> RwTraversalIterator<'a, 'b, std::iter::Once<Result<TraversalVal, GraphError>>> {
+    ) -> RwTraversalIterator<'a, 'b, std::iter::Once<Result<TraversalValue, GraphError>>> {
         let node = Node {
             id: v6_uuid(),
             label: label.to_string(), // TODO: just &str or Cow<'a, str>
@@ -47,7 +45,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddNAdapter<'
             properties: properties.map(|props| props.into_iter().collect()),
         };
         let secondary_indices = secondary_indices.unwrap_or(&[]).to_vec();
-        let mut result: Result<TraversalVal, GraphError> = Ok(TraversalVal::Empty);
+        let mut result: Result<TraversalValue, GraphError> = Ok(TraversalValue::Empty);
 
         match node.encode_node() {
             Ok(bytes) => {
@@ -108,7 +106,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddNAdapter<'
         }
 
         if result.is_ok() {
-            result = Ok(TraversalVal::Node(node.clone()));
+            result = Ok(TraversalValue::Node(node.clone()));
         } else {
             result = Err(GraphError::New(
                 "Failed to add node to secondary indices".to_string(),

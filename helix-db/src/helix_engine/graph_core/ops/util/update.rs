@@ -2,14 +2,12 @@ use heed3::PutFlags;
 
 use crate::{
     helix_engine::{
-        graph_core::traversal_iter::RwTraversalIterator,
+        graph_core::{traversal_iter::RwTraversalIterator, traversal_value::TraversalValue},
         storage_core::{storage_core::HelixGraphStorage, storage_methods::StorageMethods},
         types::GraphError,
     },
     protocol::value::Value,
 };
-
-use super::super::tr_val::TraversalVal;
 
 pub struct Update<I> {
     iter: I,
@@ -17,9 +15,9 @@ pub struct Update<I> {
 
 impl<I> Iterator for Update<I>
 where
-    I: Iterator<Item = Result<TraversalVal, GraphError>>,
+    I: Iterator<Item = Result<TraversalValue, GraphError>>,
 {
-    type Item = Result<TraversalVal, GraphError>;
+    type Item = Result<TraversalValue, GraphError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.iter.next()
@@ -30,16 +28,16 @@ pub trait UpdateAdapter<'scope, 'env>: Iterator {
     fn update(
         self,
         props: Option<Vec<(String, Value)>>,
-    ) -> RwTraversalIterator<'scope, 'env, impl Iterator<Item = Result<TraversalVal, GraphError>>>;
+    ) -> RwTraversalIterator<'scope, 'env, impl Iterator<Item = Result<TraversalValue, GraphError>>>;
 }
 
-impl<'scope, 'env, I: Iterator<Item = Result<TraversalVal, GraphError>>> UpdateAdapter<'scope, 'env>
+impl<'scope, 'env, I: Iterator<Item = Result<TraversalValue, GraphError>>> UpdateAdapter<'scope, 'env>
     for RwTraversalIterator<'scope, 'env, I>
 {
     fn update(
         self,
         props: Option<Vec<(String, Value)>>,
-    ) -> RwTraversalIterator<'scope, 'env, impl Iterator<Item = Result<TraversalVal, GraphError>>>
+    ) -> RwTraversalIterator<'scope, 'env, impl Iterator<Item = Result<TraversalValue, GraphError>>>
     {
         let storage = self.storage.clone();
 
@@ -52,7 +50,7 @@ impl<'scope, 'env, I: Iterator<Item = Result<TraversalVal, GraphError>>> UpdateA
 
         for item in self.inner {
             match item {
-                Ok(TraversalVal::Node(node)) => match storage.get_node(self.txn, &node.id) {
+                Ok(TraversalValue::Node(node)) => match storage.get_node(self.txn, &node.id) {
                     Ok(mut old_node) => {
                         let mut properties = old_node.properties.unwrap_or_default();
 
@@ -115,7 +113,7 @@ impl<'scope, 'env, I: Iterator<Item = Result<TraversalVal, GraphError>>> UpdateA
                                     HelixGraphStorage::node_key(&node.id),
                                     &serialized,
                                 ) {
-                                    Ok(_) => vec.push(Ok(TraversalVal::Node(old_node))),
+                                    Ok(_) => vec.push(Ok(TraversalValue::Node(old_node))),
                                     Err(e) => vec.push(Err(GraphError::from(e))),
                                 }
                             }
@@ -124,7 +122,7 @@ impl<'scope, 'env, I: Iterator<Item = Result<TraversalVal, GraphError>>> UpdateA
                     }
                     Err(e) => vec.push(Err(e)),
                 },
-                Ok(TraversalVal::Edge(edge)) => match storage.get_edge(self.txn, &edge.id) {
+                Ok(TraversalValue::Edge(edge)) => match storage.get_edge(self.txn, &edge.id) {
                     Ok(old_edge) => {
                         let mut old_edge = old_edge.clone();
                         if let Some(mut properties) = old_edge.properties.clone()
@@ -141,7 +139,7 @@ impl<'scope, 'env, I: Iterator<Item = Result<TraversalVal, GraphError>>> UpdateA
                                     HelixGraphStorage::edge_key(&edge.id),
                                     &serialized,
                                 ) {
-                                    Ok(_) => vec.push(Ok(TraversalVal::Edge(old_edge))),
+                                    Ok(_) => vec.push(Ok(TraversalValue::Edge(old_edge))),
                                     Err(e) => vec.push(Err(GraphError::from(e))),
                                 }
                             }

@@ -18,7 +18,7 @@ use helix_db::{
             n_from_type::NFromTypeAdapter,
             n_from_index::NFromIndexAdapter,
         },
-        tr_val::{Traversable, TraversalVal},
+        tr_val::{Traversable, TraversalValue},
         util::{
             dedup::DedupAdapter, filter_mut::FilterMut,
             filter_ref::FilterRefAdapter, range::RangeAdapter, update::UpdateAdapter,

@@ -1,7 +1,6 @@
-use super::tr_val::TraversalVal;
 use crate::helix_engine::{
     graph_core::{
-        ops::tr_val::IntoTraversalValues,
+        traversal_value::{IntoTraversalValues, TraversalValue},
         traversal_iter::{RoTraversalIterator, RwTraversalIterator},
     },
     storage_core::storage_core::HelixGraphStorage,
@@ -31,12 +30,12 @@ impl G {
     pub fn new<'a>(
         storage: Arc<HelixGraphStorage>,
         txn: &'a RoTxn<'a>,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalValue, GraphError>>>
     where
         Self: Sized,
     {
         RoTraversalIterator {
-            inner: std::iter::once(Ok(TraversalVal::Empty)),
+            inner: std::iter::once(Ok(TraversalValue::Empty)),
             storage,
             txn,
         }
@@ -55,13 +54,13 @@ impl G {
     /// ```rust
     /// let storage = Arc::new(HelixGraphStorage::new());
     /// let txn = storage.graph_env.read_txn().unwrap();
-    /// let traversal = G::new_from(storage, &txn, vec![TraversalVal::Node(Node { id: 1, label: "Person".to_string(), properties: None })]);
+    /// let traversal = G::new_from(storage, &txn, vec![TraversalValue::Node(Node { id: 1, label: "Person".to_string(), properties: None })]);
     /// ```
     pub fn new_from<'a, T: IntoTraversalValues>(
         storage: Arc<HelixGraphStorage>,
         txn: &'a RoTxn<'a>,
         items: T,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>> {
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalValue, GraphError>>> {
         RoTraversalIterator {
             inner: items.into().into_iter().map(Ok),
             storage,
@@ -87,12 +86,12 @@ impl G {
     pub fn new_mut<'scope, 'env>(
         storage: Arc<HelixGraphStorage>,
         txn: &'scope mut RwTxn<'env>,
-    ) -> RwTraversalIterator<'scope, 'env, impl Iterator<Item = Result<TraversalVal, GraphError>>>
+    ) -> RwTraversalIterator<'scope, 'env, impl Iterator<Item = Result<TraversalValue, GraphError>>>
     where
         Self: Sized,
     {
         RwTraversalIterator {
-            inner: std::iter::once(Ok(TraversalVal::Empty)),
+            inner: std::iter::once(Ok(TraversalValue::Empty)),
             storage,
             txn,
         }
@@ -111,13 +110,13 @@ impl G {
     /// ```rust
     /// let storage = Arc::new(HelixGraphStorage::new());
     /// let txn = storage.graph_env.write_txn().unwrap();
-    /// let traversal = G::new_mut_from(storage, &mut txn, vec![TraversalVal::Node(Node { id: 1, label: "Person".to_string(), properties: None })]);
+    /// let traversal = G::new_mut_from(storage, &mut txn, vec![TraversalValue::Node(Node { id: 1, label: "Person".to_string(), properties: None })]);
     /// ```
     pub fn new_mut_from<'scope, 'env, T: IntoTraversalValues>(
         storage: Arc<HelixGraphStorage>,
         txn: &'scope mut RwTxn<'env>,
         vals: T,
-    ) -> RwTraversalIterator<'scope, 'env, impl Iterator<Item = Result<TraversalVal, GraphError>>>
+    ) -> RwTraversalIterator<'scope, 'env, impl Iterator<Item = Result<TraversalValue, GraphError>>>
     {
         RwTraversalIterator {
             inner: vals.into().into_iter().map(Ok),

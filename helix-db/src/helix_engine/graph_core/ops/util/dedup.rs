@@ -2,7 +2,7 @@ use std::{collections::HashSet, sync::Arc};
 
 use crate::helix_engine::{
     graph_core::{
-        ops::tr_val::{Traversable, TraversalVal},
+        traversal_value::{Traversable, TraversalValue},
         traversal_iter::RoTraversalIterator,
     },
     types::GraphError,
@@ -15,7 +15,7 @@ pub struct Dedup<I> {
 
 impl<I> Iterator for Dedup<I>
 where
-    I: Iterator<Item = Result<TraversalVal, GraphError>>,
+    I: Iterator<Item = Result<TraversalValue, GraphError>>,
 {
     type Item = I::Item;
 
@@ -40,15 +40,15 @@ pub trait DedupAdapter<'a>: Iterator {
     /// Dedup returns an iterator that will return unique items when collected
     fn dedup(
         self,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>;
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalValue, GraphError>>>;
 }
 
-impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> DedupAdapter<'a>
+impl<'a, I: Iterator<Item = Result<TraversalValue, GraphError>>> DedupAdapter<'a>
     for RoTraversalIterator<'a, I>
 {
     fn dedup(
         self,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>> {
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalValue, GraphError>>> {
         {
             let upper_bound = match self.inner.size_hint() {
                 (_, Some(upper_bound)) => upper_bound,

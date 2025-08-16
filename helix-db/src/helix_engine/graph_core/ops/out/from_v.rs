@@ -1,5 +1,5 @@
 use crate::helix_engine::{
-    graph_core::{ops::tr_val::TraversalVal, traversal_iter::RoTraversalIterator},
+    graph_core::{traversal_value::TraversalValue, traversal_iter::RoTraversalIterator},
     storage_core::storage_core::HelixGraphStorage,
     types::GraphError,
 };
@@ -16,16 +16,16 @@ pub struct FromVIterator<'a, I, T> {
 // implementing iterator for OutIterator
 impl<'a, I> Iterator for FromVIterator<'a, I, RoTxn<'a>>
 where
-    I: Iterator<Item = Result<TraversalVal, GraphError>>,
+    I: Iterator<Item = Result<TraversalValue, GraphError>>,
 {
-    type Item = Result<TraversalVal, GraphError>;
+    type Item = Result<TraversalValue, GraphError>;
 
     #[debug_trace("FROM_V")]
     fn next(&mut self) -> Option<Self::Item> {
 
         match self.iter.next() {
             Some(item) => match item {
-                Ok(TraversalVal::Edge(item)) => Some(Ok(TraversalVal::Vector(
+                Ok(TraversalValue::Edge(item)) => Some(Ok(TraversalValue::Vector(
                     match self.storage.get_vector(self.txn, &item.from_node) {
                         Ok(vector) => vector,
                         Err(e) => {
@@ -40,19 +40,19 @@ where
         }
     }
 }
-pub trait FromVAdapter<'a, T>: Iterator<Item = Result<TraversalVal, GraphError>> {
+pub trait FromVAdapter<'a, T>: Iterator<Item = Result<TraversalValue, GraphError>> {
     fn from_v(
         self,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>;
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalValue, GraphError>>>;
 }
 
-impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> FromVAdapter<'a, RoTxn<'a>>
+impl<'a, I: Iterator<Item = Result<TraversalValue, GraphError>>> FromVAdapter<'a, RoTxn<'a>>
     for RoTraversalIterator<'a, I>
 {
     #[inline(always)]
     fn from_v(
         self,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>> {
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalValue, GraphError>>> {
         let iter = FromVIterator {
             iter: self.inner,
             storage: Arc::clone(&self.storage),

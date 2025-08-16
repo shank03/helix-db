@@ -1,9 +1,11 @@
 use crate::helix_engine::{
-    graph_core::traversal_iter::{RoTraversalIterator, RwTraversalIterator},
+    graph_core::{
+        traversal_iter::{RoTraversalIterator, RwTraversalIterator},
+        traversal_value::TraversalValue,
+    },
     types::GraphError,
 };
 
-use super::super::tr_val::TraversalVal;
 use heed3::RoTxn;
 
 pub struct Map<'a, I, F> {
@@ -15,8 +17,8 @@ pub struct Map<'a, I, F> {
 // implementing iterator for filter ref
 impl<'a, I, F> Iterator for Map<'a, I, F>
 where
-    I: Iterator<Item = Result<TraversalVal, GraphError>>,
-    F: FnMut(TraversalVal, &RoTxn<'a>) -> Result<TraversalVal, GraphError>,
+    I: Iterator<Item = Result<TraversalValue, GraphError>>,
+    F: FnMut(TraversalValue, &RoTxn<'a>) -> Result<TraversalValue, GraphError>,
 {
     type Item = I::Item;
 
@@ -31,7 +33,7 @@ where
     }
 }
 
-pub trait MapAdapter<'a>: Iterator<Item = Result<TraversalVal, GraphError>> {
+pub trait MapAdapter<'a>: Iterator<Item = Result<TraversalValue, GraphError>> {
     /// MapTraversal maps the iterator by taking a reference
     /// to each item and a transaction.
     ///
@@ -49,21 +51,21 @@ pub trait MapAdapter<'a>: Iterator<Item = Result<TraversalVal, GraphError>> {
     fn map_traversal<F>(
         self,
         f: F,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalValue, GraphError>>>
     where
-        F: FnMut(TraversalVal, &RoTxn<'a>) -> Result<TraversalVal, GraphError>;
+        F: FnMut(TraversalValue, &RoTxn<'a>) -> Result<TraversalValue, GraphError>;
 }
 
-impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> MapAdapter<'a>
+impl<'a, I: Iterator<Item = Result<TraversalValue, GraphError>>> MapAdapter<'a>
     for RoTraversalIterator<'a, I>
 {
     #[inline]
     fn map_traversal<F>(
         self,
         f: F,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalValue, GraphError>>>
     where
-        F: FnMut(TraversalVal, &RoTxn<'a>) -> Result<TraversalVal, GraphError>,
+        F: FnMut(TraversalValue, &RoTxn<'a>) -> Result<TraversalValue, GraphError>,
     {
         RoTraversalIterator {
             inner: Map {
@@ -83,8 +85,8 @@ pub struct MapMut<I, F> {
 }
 impl<I, F> Iterator for MapMut<I, F>
 where
-    I: Iterator<Item = Result<TraversalVal, GraphError>>,
-    F: Fn(I::Item) -> Result<TraversalVal, GraphError>,
+    I: Iterator<Item = Result<TraversalValue, GraphError>>,
+    F: Fn(I::Item) -> Result<TraversalValue, GraphError>,
 {
     type Item = I::Item;
 
@@ -97,7 +99,7 @@ where
         None
     }
 }
-pub trait MapAdapterMut<'scope, 'env>: Iterator<Item = Result<TraversalVal, GraphError>> {
+pub trait MapAdapterMut<'scope, 'env>: Iterator<Item = Result<TraversalValue, GraphError>> {
     /// MapTraversalMut maps the iterator by taking a mutable
     /// reference to each item and a transaction.
     ///
@@ -107,21 +109,21 @@ pub trait MapAdapterMut<'scope, 'env>: Iterator<Item = Result<TraversalVal, Grap
     fn map_traversal_mut<F>(
         self,
         f: F,
-    ) -> RwTraversalIterator<'scope, 'env, impl Iterator<Item = Result<TraversalVal, GraphError>>>
+    ) -> RwTraversalIterator<'scope, 'env, impl Iterator<Item = Result<TraversalValue, GraphError>>>
     where
-        F: Fn(Result<TraversalVal, GraphError>) -> Result<TraversalVal, GraphError>;
+        F: Fn(Result<TraversalValue, GraphError>) -> Result<TraversalValue, GraphError>;
 }
 
-impl<'scope, 'env, I: Iterator<Item = Result<TraversalVal, GraphError>>> MapAdapterMut<'scope, 'env>
+impl<'scope, 'env, I: Iterator<Item = Result<TraversalValue, GraphError>>> MapAdapterMut<'scope, 'env>
     for RwTraversalIterator<'scope, 'env, I>
 {
     #[inline]
     fn map_traversal_mut<F>(
         self,
         f: F,
-    ) -> RwTraversalIterator<'scope, 'env, impl Iterator<Item = Result<TraversalVal, GraphError>>>
+    ) -> RwTraversalIterator<'scope, 'env, impl Iterator<Item = Result<TraversalValue, GraphError>>>
     where
-        F: Fn(I::Item) -> Result<TraversalVal, GraphError>,
+        F: Fn(I::Item) -> Result<TraversalValue, GraphError>,
     {
         RwTraversalIterator {
             inner: MapMut {

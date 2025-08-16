@@ -1,6 +1,6 @@
 use crate::{
     helix_engine::{
-        graph_core::{ops::tr_val::TraversalVal, traversal_iter::RoTraversalIterator},
+        graph_core::{traversal_value::TraversalValue, traversal_iter::RoTraversalIterator},
         storage_core::{storage_core::HelixGraphStorage, storage_methods::StorageMethods},
         types::GraphError,
     },
@@ -11,14 +11,14 @@ use heed3::RoTxn;
 use std::{iter::Once, sync::Arc};
 
 pub struct NFromId<'a, T> {
-    iter: Once<Result<TraversalVal, GraphError>>,
+    iter: Once<Result<TraversalValue, GraphError>>,
     storage: Arc<HelixGraphStorage>,
     txn: &'a T,
     id: u128,
 }
 
 impl<'a> Iterator for NFromId<'a, RoTxn<'a>> {
-    type Item = Result<TraversalVal, GraphError>;
+    type Item = Result<TraversalValue, GraphError>;
 
     #[debug_trace("N_FROM_ID")]
     fn next(&mut self) -> Option<Self::Item> {
@@ -27,13 +27,13 @@ impl<'a> Iterator for NFromId<'a, RoTxn<'a>> {
                 Ok(node) => node,
                 Err(e) => return Err(e),
             };
-            Ok(TraversalVal::Node(node))
+            Ok(TraversalValue::Node(node))
         })
     }
 }
 
-pub trait NFromIdAdapter<'a>: Iterator<Item = Result<TraversalVal, GraphError>> {
-    type OutputIter: Iterator<Item = Result<TraversalVal, GraphError>>;
+pub trait NFromIdAdapter<'a>: Iterator<Item = Result<TraversalValue, GraphError>> {
+    type OutputIter: Iterator<Item = Result<TraversalValue, GraphError>>;
 
     /// Returns an iterator containing the node with the given id.
     ///
@@ -41,7 +41,7 @@ pub trait NFromIdAdapter<'a>: Iterator<Item = Result<TraversalVal, GraphError>> 
     fn n_from_id(self, id: &u128) -> Self::OutputIter;
 }
 
-impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> NFromIdAdapter<'a>
+impl<'a, I: Iterator<Item = Result<TraversalValue, GraphError>>> NFromIdAdapter<'a>
     for RoTraversalIterator<'a, I>
 {
     type OutputIter = RoTraversalIterator<'a, NFromId<'a, RoTxn<'a>>>;
@@ -49,7 +49,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> NFromIdAdapter<'a
     #[inline]
     fn n_from_id(self, id: &u128) -> Self::OutputIter {
         let n_from_id = NFromId {
-            iter: std::iter::once(Ok(TraversalVal::Empty)),
+            iter: std::iter::once(Ok(TraversalValue::Empty)),
             storage: Arc::clone(&self.storage),
             txn: self.txn,
             id: *id,

@@ -1,7 +1,7 @@
 /*
 use heed3::RoTxn;
 
-use super::super::tr_val::TraversalVal;
+use super::super::tr_val::TraversalValue;
 use crate::helix_engine::{
     bm25::bm25::{BM25, HybridSearch},
     graph_core::traversal_iter::RoTraversalIterator,
@@ -19,14 +19,14 @@ pub struct HybridSearchBM25<'scope, 'inner> {
 
 // implementing iterator for HybridSearchBM25
 impl<'scope, 'inner> Iterator for HybridSearchBM25<'scope, 'inner> {
-    type Item = Result<TraversalVal, GraphError>;
+    type Item = Result<TraversalValue, GraphError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let next = self.iter.next()?;
         match self.storage.get_node(self.txn, &next.0) {
             Ok(node) => {
                 if node.label == self.label {
-                    Some(Ok(TraversalVal::Node(node)))
+                    Some(Ok(TraversalValue::Node(node)))
                 } else {
                     return None;
                 }
@@ -36,17 +36,17 @@ impl<'scope, 'inner> Iterator for HybridSearchBM25<'scope, 'inner> {
     }
 }
 
-pub trait HybridSearchBM25Adapter<'a>: Iterator<Item = Result<TraversalVal, GraphError>> {
+pub trait HybridSearchBM25Adapter<'a>: Iterator<Item = Result<TraversalValue, GraphError>> {
     fn hybrid_search_bm25(
         self,
         label: &str,
         query: &str,
         query_vector: Vec<f64>,
         k: usize,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>;
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalValue, GraphError>>>;
 }
 
-impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> HybridSearchBM25Adapter<'a>
+impl<'a, I: Iterator<Item = Result<TraversalValue, GraphError>>> HybridSearchBM25Adapter<'a>
     for RoTraversalIterator<'a, I>
 {
     fn hybrid_search_bm25(
@@ -55,7 +55,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> HybridSearchBM25A
         query: &str,
         query_vector: &Vec<f64>,
         k: usize,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>> {
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalValue, GraphError>>> {
         // check bm25 enabled
 
         let results = self.storage.hybrid_search(

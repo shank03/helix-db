@@ -1,6 +1,6 @@
 use crate::{
     helix_engine::{
-        graph_core::{ops::tr_val::TraversalVal, traversal_iter::RoTraversalIterator},
+        graph_core::{traversal_value::TraversalValue, traversal_iter::RoTraversalIterator},
         storage_core::{storage_core::HelixGraphStorage, storage_methods::StorageMethods},
         types::GraphError,
     },
@@ -11,7 +11,7 @@ use heed3::RoTxn;
 use std::{iter::Once, sync::Arc};
 
 pub struct EFromId<'a, T> {
-    iter: Once<Result<TraversalVal, GraphError>>,
+    iter: Once<Result<TraversalValue, GraphError>>,
     storage: Arc<HelixGraphStorage>,
     txn: &'a T,
     id: &'a u128,
@@ -19,7 +19,7 @@ pub struct EFromId<'a, T> {
 
 impl<'a> Iterator for EFromId<'a, RoTxn<'a>> {
 
-    type Item = Result<TraversalVal, GraphError>;
+    type Item = Result<TraversalValue, GraphError>;
 
     #[debug_trace("E_FROM_ID")]
     fn next(&mut self) -> Option<Self::Item> {
@@ -28,12 +28,12 @@ impl<'a> Iterator for EFromId<'a, RoTxn<'a>> {
                 Ok(edge) => edge,
                 Err(e) => return Err(e),
             };
-            Ok(TraversalVal::Edge(edge))
+            Ok(TraversalValue::Edge(edge))
         })
     }
 }
-pub trait EFromIdAdapter<'a>: Iterator<Item = Result<TraversalVal, GraphError>> {
-    type OutputIter: Iterator<Item = Result<TraversalVal, GraphError>>;
+pub trait EFromIdAdapter<'a>: Iterator<Item = Result<TraversalValue, GraphError>> {
+    type OutputIter: Iterator<Item = Result<TraversalValue, GraphError>>;
 
     /// Returns an iterator containing the edge with the given id.
     ///
@@ -41,7 +41,7 @@ pub trait EFromIdAdapter<'a>: Iterator<Item = Result<TraversalVal, GraphError>> 
     fn e_from_id(self, id: &'a u128) -> Self::OutputIter;
 }
 
-impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> EFromIdAdapter<'a>
+impl<'a, I: Iterator<Item = Result<TraversalValue, GraphError>>> EFromIdAdapter<'a>
     for RoTraversalIterator<'a, I>
 {
     type OutputIter = RoTraversalIterator<'a, EFromId<'a, RoTxn<'a>>>;
@@ -49,7 +49,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> EFromIdAdapter<'a
     #[inline]
     fn e_from_id(self, id: &'a u128) -> Self::OutputIter {
         let e_from_id = EFromId {
-            iter: std::iter::once(Ok(TraversalVal::Empty)),
+            iter: std::iter::once(Ok(TraversalValue::Empty)),
             storage: Arc::clone(&self.storage),
             txn: self.txn,
             id,

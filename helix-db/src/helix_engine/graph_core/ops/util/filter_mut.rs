@@ -1,7 +1,7 @@
 use heed3::RwTxn;
 
 use crate::helix_engine::{
-    graph_core::ops::tr_val::TraversalVal,
+    graph_core::traversal_value::TraversalValue,
     types::GraphError,
 };
 
@@ -13,7 +13,7 @@ pub struct FilterMut<'a, I, F> {
 
 impl<'a, I, F> Iterator for FilterMut<'a, I, F>
 where
-    I: Iterator<Item = Result<TraversalVal, GraphError>>,
+    I: Iterator<Item = Result<TraversalValue, GraphError>>,
     F: FnMut(&mut I::Item, &mut RwTxn) -> bool,
 {
     type Item = I::Item;

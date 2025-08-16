@@ -385,7 +385,7 @@ use helix_db::{
                     n_from_index::NFromIndexAdapter,
                     n_from_type::NFromTypeAdapter,
                 },
-                tr_val::{Traversable, TraversalVal},
+                tr_val::{Traversable, TraversalValue},
                 util::{
                     dedup::DedupAdapter, drop::Drop, exist::Exist, filter_mut::FilterMut,
                     filter_ref::FilterRefAdapter, map::MapAdapter, paths::ShortestPathAdapter,

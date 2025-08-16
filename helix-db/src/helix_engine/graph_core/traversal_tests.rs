@@ -3,20 +3,22 @@ use std::{collections::HashMap, sync::Arc, time::Instant};
 use crate::{
     exclude_field,
     helix_engine::{
-        graph_core::ops::{
-            g::G,
-            in_::{in_e::InEdgesAdapter, to_n::ToNAdapter, to_v::ToVAdapter},
-            out::{from_n::FromNAdapter, from_v::FromVAdapter, out::OutAdapter},
-            source::{
-                add_n::AddNAdapter, e_from_id::EFromIdAdapter, n_from_id::NFromIdAdapter,
-                n_from_index::NFromIndexAdapter,
+        graph_core::{
+            ops::{
+                g::G,
+                in_::{in_e::InEdgesAdapter, to_n::ToNAdapter, to_v::ToVAdapter},
+                out::{from_n::FromNAdapter, from_v::FromVAdapter, out::OutAdapter},
+                source::{
+                    add_n::AddNAdapter, e_from_id::EFromIdAdapter, n_from_id::NFromIdAdapter,
+                    n_from_index::NFromIndexAdapter,
+                },
+                util::{
+                    dedup::DedupAdapter, map::MapAdapter, order::OrderByAdapter,
+                    props::PropsAdapter, range::RangeAdapter,
+                },
+                vectors::brute_force_search::BruteForceSearchVAdapter,
             },
-            tr_val::{Traversable, TraversalVal},
-            util::{
-                dedup::DedupAdapter, map::MapAdapter, order::OrderByAdapter, props::PropsAdapter,
-                range::RangeAdapter,
-            },
-            vectors::brute_force_search::BruteForceSearchVAdapter,
+            traversal_value::{Traversable, TraversalValue},
         },
         storage_core::storage_core::HelixGraphStorage,
         types::GraphError,
@@ -129,7 +131,7 @@ fn test_add_e() {
         Some(edge) => {
             assert_eq!(edge.label(), "knows");
             match edge {
-                TraversalVal::Edge(edge) => {
+                TraversalValue::Edge(edge) => {
                     assert_eq!(edge.from_node(), node1.id());
                     assert_eq!(edge.to_node(), node2.id());
                 }
@@ -697,7 +699,7 @@ fn test_e_from_id() {
     assert_eq!(edges.len(), 1);
     assert_eq!(edges[0].id(), edge_id);
     assert_eq!(edges[0].label(), "knows");
-    if let Some(TraversalVal::Edge(edge)) = edges.first() {
+    if let Some(TraversalValue::Edge(edge)) = edges.first() {
         assert_eq!(edge.from_node(), person1.id());
         assert_eq!(edge.to_node(), person2.id());
     } else {
@@ -849,7 +851,7 @@ fn test_filter_nodes() {
     let traversal = G::new(Arc::clone(&storage), &txn)
         .n_from_type("person")
         .filter_ref(|val, _| {
-            if let Ok(TraversalVal::Node(node)) = val {
+            if let Ok(TraversalValue::Node(node)) = val {
                 if let Ok(value) = node.check_property("age") {
                     match value.as_ref() {
                         Value::F64(age) => Ok(*age > 30.0),
@@ -880,8 +882,8 @@ fn test_filter_macro_single_argument() {
         .add_n("person", Some(props! { "name" => "Bob" }), None)
         .collect_to::<Vec<_>>();
 
-    fn has_name(val: &Result<TraversalVal, GraphError>) -> Result<bool, GraphError> {
-        if let Ok(TraversalVal::Node(node)) = val {
+    fn has_name(val: &Result<TraversalValue, GraphError>) -> Result<bool, GraphError> {
+        if let Ok(TraversalValue::Node(node)) = val {
             node.check_property("name").map_or(Ok(false), |_| Ok(true))
         } else {
             Ok(false)
@@ -898,7 +900,7 @@ fn test_filter_macro_single_argument() {
     assert!(
         traversal
             .iter()
-            .any(|val| if let TraversalVal::Node(node) = val {
+            .any(|val| if let TraversalValue::Node(node) = val {
                 let name = node.check_property("name").unwrap();
                 name.as_ref() == &Value::String("Alice".to_string())
                     || name.as_ref() == &Value::String("Bob".to_string())
@@ -922,10 +924,10 @@ fn test_filter_macro_multiple_arguments() {
     txn.commit().unwrap();
 
     fn age_greater_than(
-        val: &Result<TraversalVal, GraphError>,
+        val: &Result<TraversalValue, GraphError>,
         min_age: i32,
     ) -> Result<bool, GraphError> {
-        if let Ok(TraversalVal::Node(node)) = val {
+        if let Ok(TraversalValue::Node(node)) = val {
             if let Ok(value) = node.check_property("age") {
                 match value.as_ref() {
                     Value::F64(age) => Ok(*age > min_age as f64),
@@ -986,8 +988,8 @@ fn test_filter_edges() {
     txn.commit().unwrap();
     let txn = storage.graph_env.read_txn().unwrap();
 
-    fn recent_edge(val: &Result<TraversalVal, GraphError>, year: i32) -> Result<bool, GraphError> {
-        if let Ok(TraversalVal::Edge(edge)) = val {
+    fn recent_edge(val: &Result<TraversalValue, GraphError>, year: i32) -> Result<bool, GraphError> {
+        if let Ok(TraversalValue::Edge(edge)) = val {
             if let Ok(value) = edge.check_property("since") {
                 match value.as_ref() {
                     Value::I32(since) => Ok(*since > year),
@@ -1025,7 +1027,7 @@ fn test_filter_empty_result() {
     let traversal = G::new(Arc::clone(&storage), &txn)
         .n_from_type("person")
         .filter_ref(|val, _| {
-            if let Ok(TraversalVal::Node(node)) = val {
+            if let Ok(TraversalValue::Node(node)) = val {
                 if let Ok(value) = node.check_property("age") {
                     match value.as_ref() {
                         Value::I32(age) => Ok(*age > 100),
@@ -1069,8 +1071,8 @@ fn test_filter_chain() {
     txn.commit().unwrap();
     let txn = storage.graph_env.read_txn().unwrap();
 
-    fn has_name(val: &Result<TraversalVal, GraphError>) -> Result<bool, GraphError> {
-        if let Ok(TraversalVal::Node(node)) = val {
+    fn has_name(val: &Result<TraversalValue, GraphError>) -> Result<bool, GraphError> {
+        if let Ok(TraversalValue::Node(node)) = val {
             node.check_property("name").map_or(Ok(false), |_| Ok(true))
         } else {
             Ok(false)
@@ -1078,10 +1080,10 @@ fn test_filter_chain() {
     }
 
     fn age_greater_than(
-        val: &Result<TraversalVal, GraphError>,
+        val: &Result<TraversalValue, GraphError>,
         min_age: i32,
     ) -> Result<bool, GraphError> {
-        if let Ok(TraversalVal::Node(node)) = val {
+        if let Ok(TraversalValue::Node(node)) = val {
             if let Ok(value) = node.check_property("age") {
                 match value.as_ref() {
                     Value::F64(age) => Ok(*age > min_age as f64),
@@ -1214,7 +1216,7 @@ fn test_edge_properties() {
         .collect_to::<Vec<_>>();
     let edge = edge.first().unwrap();
     match edge {
-        TraversalVal::Edge(edge) => {
+        TraversalValue::Edge(edge) => {
             assert_eq!(
                 edge.properties.clone().unwrap(),
                 props.into_iter().collect()
@@ -1265,7 +1267,7 @@ fn test_drop_node() {
         .in_e("knows")
         .collect_to::<Vec<_>>();
 
-    assert_eq!(traversal, TraversalVal::Empty);
+    assert_eq!(traversal, TraversalValue::Empty);
     assert_eq!(edges.len(), 0);
 }
 
@@ -1302,7 +1304,7 @@ fn test_drop_edge() {
     let traversal = G::new(Arc::clone(&storage), &txn)
         .e_from_id(&edge.id())
         .collect_to_obj();
-    assert_eq!(traversal, TraversalVal::Empty);
+    assert_eq!(traversal, TraversalValue::Empty);
 
     let edges = G::new(Arc::clone(&storage), &txn)
         .n_from_id(&node1.id())
@@ -1414,7 +1416,7 @@ fn test_shortest_path() {
     assert_eq!(path.len(), 1);
 
     match path.first() {
-        Some(TraversalVal::Path((nodes, edges))) => {
+        Some(TraversalValue::Path((nodes, edges))) => {
             assert_eq!(nodes.len(), 4);
             assert_eq!(edges.len(), 3);
             assert_eq!(*nodes[0].check_property("name").unwrap(), "node1");
@@ -1547,7 +1549,7 @@ fn huge_traversal() {
         .to_n()
         .out("knows", &EdgeType::Node)
         // .filter_ref(|val, _| {
-        //     if let Ok(TraversalVal::Node(node)) = val {
+        //     if let Ok(TraversalValue::Node(node)) = val {
         //         if let Some(value) = node.check_property("name") {
         //             match value {
         //                 Value::I32(name) => return *name < 700000,
@@ -1977,7 +1979,7 @@ fn test_vector_search() {
     // traversal.reverse();
 
     for vec in &traversal[0..10] {
-        if let TraversalVal::Vector(vec) = vec {
+        if let TraversalValue::Vector(vec) = vec {
             println!("vec {:?} {}", vec.get_data(), vec.get_distance());
             assert!(vec.get_distance() < 0.1);
         }
@@ -2043,7 +2045,7 @@ fn test_double_add_and_double_fetch() {
         .collect_to::<Vec<_>>();
     assert_eq!(e.len(), 1);
     assert_eq!(e[0].id(), e.id());
-    if let TraversalVal::Edge(e) = &e[0] {
+    if let TraversalValue::Edge(e) = &e[0] {
         assert_eq!(e.from_node(), node1.id());
         assert_eq!(e.to_node(), node2.id());
     } else {
@@ -2529,7 +2531,7 @@ fn test_node_deletion_in_existing_graph() {
         .collect_to::<Vec<_>>();
     assert_eq!(other_edges.len(), 10);
     assert!(other_edges.iter().all(|edge| {
-        if let TraversalVal::Edge(edge) = edge {
+        if let TraversalValue::Edge(edge) = edge {
             edge.from_node != source_node.id() && edge.to_node != source_node.id()
         } else {
             false
@@ -2589,7 +2591,7 @@ fn test_vector_deletion_in_existing_graph() {
     let (storage, _temp_dir) = setup_test_db();
     let mut txn = storage.graph_env.write_txn().unwrap();
 
-    let node: TraversalVal = G::new_mut(Arc::clone(&storage), &mut txn)
+    let node: TraversalValue = G::new_mut(Arc::clone(&storage), &mut txn)
         .add_n("person", None, None)
         .collect_to_val();
 
@@ -2644,7 +2646,7 @@ fn test_vector_deletion_in_existing_graph() {
             .n_from_id(&node.id())
             .out("knows", &EdgeType::Vec)
             .filter_ref(|val, _| {
-                if let Ok(TraversalVal::Vector(vector)) = val {
+                if let Ok(TraversalValue::Vector(vector)) = val {
                     Ok(*vector.id() == vector_id)
                 } else {
                     Ok(false)
@@ -2673,7 +2675,7 @@ fn test_vector_deletion_in_existing_graph() {
         .collect_to::<Vec<_>>();
     assert_eq!(other_edges.len(), 10);
     assert!(other_edges.iter().all(|edge| {
-        if let TraversalVal::Edge(edge) = edge {
+        if let TraversalValue::Edge(edge) = edge {
             edge.from_node != node.id() && edge.to_node != node.id()
         } else {
             false
@@ -2712,7 +2714,7 @@ fn test_update_of_secondary_indices() {
         .collect_to::<Vec<_>>();
     assert_eq!(node.len(), 1);
     assert_eq!(node[0].id(), node.id());
-    if let TraversalVal::Node(node) = &node[0] {
+    if let TraversalValue::Node(node) = &node[0] {
         assert_eq!(
             *node.properties.as_ref().unwrap().get("name").unwrap(),
             "Jane".to_string()
@@ -2738,7 +2740,6 @@ fn test_delete_node_with_secondary_index() {
         config.graph_config.as_mut().unwrap().secondary_indices = Some(vec!["name".to_string()]);
         let storage = HelixGraphStorage::new(db_path, config, Default::default()).unwrap();
         (Arc::new(storage), temp_dir)
-  
     };
 
     let mut txn = storage.graph_env.write_txn().unwrap();
@@ -2746,11 +2747,11 @@ fn test_delete_node_with_secondary_index() {
     let node = G::new_mut(Arc::clone(&storage), &mut txn)
         .add_n("person", Some(props! { "name" => "John" }), Some(&["name"]))
         .collect_to_val();
-    let node_id = node.id();  // Save the ID before moving
+    let node_id = node.id(); // Save the ID before moving
 
     let _ = G::new_mut_from(Arc::clone(&storage), &mut txn, node)
         .update(Some(props! { "name" => "Jane" }))
-        .collect_to_val();  
+        .collect_to_val();
 
     txn.commit().unwrap();
 
@@ -2760,7 +2761,7 @@ fn test_delete_node_with_secondary_index() {
         .n_from_index("person", "name", &"Jane".to_string())
         .collect_to::<Vec<_>>();
     assert_eq!(jane_nodes.len(), 1);
-    assert_eq!(jane_nodes[0].id(), node_id);  // Compare with original node id
+    assert_eq!(jane_nodes[0].id(), node_id); // Compare with original node id
 
     let john_nodes = G::new(Arc::clone(&storage), &txn)
         .n_from_index("person", "name", &"John".to_string())
@@ -2772,7 +2773,7 @@ fn test_delete_node_with_secondary_index() {
     let mut txn = storage.graph_env.write_txn().unwrap();
     Drop::<Vec<_>>::drop_traversal(
         G::new(Arc::clone(&storage), &txn)
-            .n_from_id(&node_id)  // Use the original node id
+            .n_from_id(&node_id) // Use the original node id
             .collect_to::<Vec<_>>(),
         Arc::clone(&storage),
         &mut txn,
@@ -2787,5 +2788,4 @@ fn test_delete_node_with_secondary_index() {
         .n_from_index("person", "name", &"Jane".to_string())
         .collect_to::<Vec<_>>();
     assert_eq!(node.len(), 0);
-
 }

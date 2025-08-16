@@ -5,7 +5,7 @@ mod tests {
             bm25::bm25::{
                 BM25Flatten, BM25Metadata, HBM25Config, HybridSearch, BM25, METADATA_KEY,
             },
-            graph_core::{config::Config, ops::version_info::VersionInfo},
+            graph_core::{config::Config, version_info::VersionInfo},
             storage_core::storage_core::HelixGraphStorage,
             vector_core::{hnsw::HNSW, vector::HVector},
         },

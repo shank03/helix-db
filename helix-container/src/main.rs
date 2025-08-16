@@ -1,5 +1,5 @@
 use helix_db::helix_engine::graph_core::graph_core::{HelixGraphEngine, HelixGraphEngineOpts};
-use helix_db::helix_engine::graph_core::ops::version_info::{
+use helix_db::helix_engine::graph_core::version_info::{
     ItemInfo, Transition, TransitionFn, TransitionSubmission, VersionInfo,
 };
 use helix_db::helix_gateway::mcp::mcp::{MCPHandlerFn, MCPHandlerSubmission};

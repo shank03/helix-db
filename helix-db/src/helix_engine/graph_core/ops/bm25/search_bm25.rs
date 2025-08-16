@@ -1,9 +1,8 @@
 use heed3::RoTxn;
 
-use super::super::tr_val::TraversalVal;
 use crate::helix_engine::{
     bm25::bm25::BM25,
-    graph_core::traversal_iter::RoTraversalIterator,
+    graph_core::{traversal_iter::RoTraversalIterator, traversal_value::TraversalValue},
     storage_core::{storage_core::HelixGraphStorage, storage_methods::StorageMethods},
     types::GraphError,
 };
@@ -18,14 +17,14 @@ pub struct SearchBM25<'scope, 'inner> {
 
 // implementing iterator for SearchBM25
 impl<'scope, 'inner> Iterator for SearchBM25<'scope, 'inner> {
-    type Item = Result<TraversalVal, GraphError>;
+    type Item = Result<TraversalValue, GraphError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let next = self.iter.next()?;
         match self.storage.get_node(self.txn, &next.0) {
             Ok(node) => {
                 if node.label == self.label {
-                    Some(Ok(TraversalVal::Node(node)))
+                    Some(Ok(TraversalValue::Node(node)))
                 } else {
                     None
                 }
@@ -35,19 +34,19 @@ impl<'scope, 'inner> Iterator for SearchBM25<'scope, 'inner> {
     }
 }
 
-pub trait SearchBM25Adapter<'a>: Iterator<Item = Result<TraversalVal, GraphError>> {
+pub trait SearchBM25Adapter<'a>: Iterator<Item = Result<TraversalValue, GraphError>> {
     fn search_bm25(
         self,
         label: &str,
         query: &str,
         k: usize,
     ) -> Result<
-        RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>,
+        RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalValue, GraphError>>>,
         GraphError,
     >;
 }
 
-impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> SearchBM25Adapter<'a>
+impl<'a, I: Iterator<Item = Result<TraversalValue, GraphError>>> SearchBM25Adapter<'a>
     for RoTraversalIterator<'a, I>
 {
     fn search_bm25(
@@ -56,7 +55,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> SearchBM25Adapter
         query: &str,
         k: usize,
     ) -> Result<
-        RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>,
+        RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalValue, GraphError>>>,
         GraphError,
     > {
         let results = match self.storage.bm25.as_ref() {

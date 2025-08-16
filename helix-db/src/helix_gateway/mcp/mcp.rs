@@ -1,6 +1,6 @@
 use crate::{
     helix_engine::{
-        graph_core::ops::tr_val::TraversalVal, storage_core::storage_core::HelixGraphStorage,
+        graph_core::traversal_value::TraversalValue, storage_core::storage_core::HelixGraphStorage,
         types::GraphError,
     },
     helix_gateway::mcp::tools::ToolArgs,
@@ -82,11 +82,11 @@ impl McpBackend {
 
 pub struct MCPConnection {
     pub connection_id: String,
-    pub iter: IntoIter<TraversalVal>,
+    pub iter: IntoIter<TraversalValue>,
 }
 
 impl MCPConnection {
-    pub fn new(connection_id: String, iter: IntoIter<TraversalVal>) -> Self {
+    pub fn new(connection_id: String, iter: IntoIter<TraversalValue>) -> Self {
         Self {
             connection_id,
             iter,
@@ -164,7 +164,7 @@ pub fn next(input: &mut MCPToolInput) -> Result<Response, GraphError> {
     let next = connection
         .iter
         .next()
-        .unwrap_or(TraversalVal::Empty)
+        .unwrap_or(TraversalValue::Empty)
         .clone();
     drop(connections);
 
@@ -203,8 +203,8 @@ pub fn collect(input: &mut MCPToolInput) -> Result<Response, GraphError> {
             .iter
             .skip(range.start)
             .take(range.end - range.start)
-            .collect::<Vec<TraversalVal>>(),
-        None => connection.iter.collect::<Vec<TraversalVal>>(),
+            .collect::<Vec<TraversalValue>>(),
+        None => connection.iter.collect::<Vec<TraversalValue>>(),
     };
 
     let mut connections = input.mcp_connections.lock().unwrap();

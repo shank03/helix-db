@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use sonic_rs::{JsonValueTrait, json};
 use tracing::info;
 
-use crate::helix_engine::graph_core::ops::tr_val::TraversalVal;
+use crate::helix_engine::graph_core::ops::tr_val::TraversalValue;
 use crate::helix_engine::storage_core::storage_core::HelixGraphStorage;
 use crate::helix_engine::storage_core::storage_methods::StorageMethods;
 use crate::helix_engine::types::GraphError;
@@ -97,12 +97,12 @@ pub fn node_connections_inner(input: &HandlerInput) -> Result<protocol::Response
                         Ok((edge_id, from_node)) => {
                             if connected_node_ids.insert(from_node) {
                                 if let Ok(node) = db.get_node(&txn, &from_node) {
-                                    connected_nodes.push(TraversalVal::Node(node));
+                                    connected_nodes.push(TraversalValue::Node(node));
                                 }
                             }
                             
                             match db.get_edge(&txn, &edge_id) {
-                                Ok(edge) => Some(TraversalVal::Edge(edge)),
+                                Ok(edge) => Some(TraversalValue::Edge(edge)),
                                 Err(_) => None,
                             }
                         }
@@ -124,12 +124,12 @@ pub fn node_connections_inner(input: &HandlerInput) -> Result<protocol::Response
                         Ok((edge_id, to_node)) => {
                             if connected_node_ids.insert(to_node) {
                                 if let Ok(node) = db.get_node(&txn, &to_node) {
-                                    connected_nodes.push(TraversalVal::Node(node));
+                                    connected_nodes.push(TraversalValue::Node(node));
                                 }
                             }
                             
                             match db.get_edge(&txn, &edge_id) {
-                                Ok(edge) => Some(TraversalVal::Edge(edge)),
+                                Ok(edge) => Some(TraversalValue::Edge(edge)),
                                 Err(_) => None,
                             }
                         }
@@ -144,7 +144,7 @@ pub fn node_connections_inner(input: &HandlerInput) -> Result<protocol::Response
     let connected_nodes_json: Vec<sonic_rs::Value> = connected_nodes
         .into_iter()
         .filter_map(|tv| {
-            if let TraversalVal::Node(node) = tv {
+            if let TraversalValue::Node(node) = tv {
                 let id_str = ID::from(node.id).stringify();
                 let mut node_json = json!({
                     "id": id_str.clone(),
@@ -167,7 +167,7 @@ pub fn node_connections_inner(input: &HandlerInput) -> Result<protocol::Response
     let incoming_edges_json: Vec<sonic_rs::Value> = incoming_edges
         .into_iter()
         .filter_map(|tv| {
-            if let TraversalVal::Edge(edge) = tv {
+            if let TraversalValue::Edge(edge) = tv {
                 Some(json!({
                     "id": ID::from(edge.id).stringify(),
                     "from_node": ID::from(edge.from_node).stringify(),
@@ -183,7 +183,7 @@ pub fn node_connections_inner(input: &HandlerInput) -> Result<protocol::Response
     let outgoing_edges_json: Vec<sonic_rs::Value> = outgoing_edges
         .into_iter()
         .filter_map(|tv| {
-            if let TraversalVal::Edge(edge) = tv {
+            if let TraversalValue::Edge(edge) = tv {
                 Some(json!({
                     "id": ID::from(edge.id).stringify(),
                     "from_node": ID::from(edge.from_node).stringify(),

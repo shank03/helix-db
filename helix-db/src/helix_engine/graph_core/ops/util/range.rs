@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::helix_engine::{
-    graph_core::{ops::tr_val::TraversalVal, traversal_iter::RoTraversalIterator},
+    graph_core::{traversal_value::TraversalValue, traversal_iter::RoTraversalIterator},
     types::GraphError,
 };
 
@@ -15,7 +15,7 @@ pub struct Range<I> {
 // implementing iterator for Range
 impl<I> Iterator for Range<I>
 where
-    I: Iterator<Item = Result<TraversalVal, GraphError>>,
+    I: Iterator<Item = Result<TraversalValue, GraphError>>,
 {
     type Item = I::Item;
 
@@ -61,7 +61,7 @@ pub trait RangeAdapter<'a>: Iterator {
         self,
         start: N,
         end: K,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalValue, GraphError>>>
     where
         Self: Sized + Iterator,
         Self::Item: Send,
@@ -71,7 +71,7 @@ pub trait RangeAdapter<'a>: Iterator {
         K::Error: std::fmt::Debug;
 }
 
-impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> RangeAdapter<'a>
+impl<'a, I: Iterator<Item = Result<TraversalValue, GraphError>> + 'a> RangeAdapter<'a>
     for RoTraversalIterator<'a, I>
 {   
     #[inline(always)]
@@ -79,7 +79,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> RangeAdapter
         self,
         start: N,
         end: K,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalValue, GraphError>>>
     where
         Self: Sized + Iterator,
         Self::Item: Send,

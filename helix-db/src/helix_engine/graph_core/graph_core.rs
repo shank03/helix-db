@@ -1,5 +1,5 @@
 use crate::helix_engine::graph_core::config::Config;
-use crate::helix_engine::graph_core::ops::version_info::VersionInfo;
+use crate::helix_engine::graph_core::version_info::VersionInfo;
 use crate::helix_engine::storage_core::storage_core::HelixGraphStorage;
 use crate::helix_engine::types::GraphError;
 use crate::helix_gateway::mcp::mcp::{McpBackend, McpConnections};

@@ -1,7 +1,7 @@
 use crate::{
     helix_engine::{
         graph_core::{
-            ops::tr_val::{Traversable, TraversalVal},
+            traversal_value::{Traversable, TraversalValue},
             traversal_iter::RoTraversalIterator,
         },
         storage_core::{storage_core::HelixGraphStorage, storage_methods::StorageMethods},
@@ -25,7 +25,7 @@ pub struct InEdgesIterator<'a, T> {
 }
 
 impl<'a> Iterator for InEdgesIterator<'a, RoTxn<'a>> {
-    type Item = Result<TraversalVal, GraphError>;
+    type Item = Result<TraversalValue, GraphError>;
 
     #[debug_trace("IN_EDGES")]
     fn next(&mut self) -> Option<Self::Item> {
@@ -40,7 +40,7 @@ impl<'a> Iterator for InEdgesIterator<'a, RoTxn<'a>> {
                         }
                     };
                     if let Ok(edge) = self.storage.get_edge(self.txn, &edge_id) {
-                        return Some(Ok(TraversalVal::Edge(edge)));
+                        return Some(Ok(TraversalValue::Edge(edge)));
                     }
                 }
                 Err(e) => {
@@ -53,7 +53,7 @@ impl<'a> Iterator for InEdgesIterator<'a, RoTxn<'a>> {
     }
 }
 
-pub trait InEdgesAdapter<'a, T>: Iterator<Item = Result<TraversalVal, GraphError>> {
+pub trait InEdgesAdapter<'a, T>: Iterator<Item = Result<TraversalValue, GraphError>> {
     /// Returns an iterator containing the edges that have an incoming edge with the given label.
     ///
     /// Note that the `edge_label` cannot be empty and must be a valid, existing edge label.
@@ -63,17 +63,17 @@ pub trait InEdgesAdapter<'a, T>: Iterator<Item = Result<TraversalVal, GraphError
     fn in_e(
         self,
         edge_label: &'a str,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>;
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalValue, GraphError>>>;
 }
 
-impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> InEdgesAdapter<'a, RoTxn<'a>>
+impl<'a, I: Iterator<Item = Result<TraversalValue, GraphError>>> InEdgesAdapter<'a, RoTxn<'a>>
     for RoTraversalIterator<'a, I>
 {
     #[inline]
     fn in_e(
         self,
         edge_label: &'a str,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>> {
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalValue, GraphError>>> {
         let db = Arc::clone(&self.storage);
         let storage = Arc::clone(&self.storage);
         let txn = self.txn;

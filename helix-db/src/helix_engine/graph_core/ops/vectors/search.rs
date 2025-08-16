@@ -1,21 +1,20 @@
 use heed3::RoTxn;
 
-use super::super::tr_val::TraversalVal;
 use crate::helix_engine::{
-    graph_core::traversal_iter::RoTraversalIterator,
+    graph_core::{traversal_iter::RoTraversalIterator, traversal_value::TraversalValue},
     types::{GraphError, VectorError},
     vector_core::{hnsw::HNSW, vector::HVector},
 };
 use helix_macros::debug_trace;
 use std::iter::once;
 
-pub struct SearchV<I: Iterator<Item = Result<TraversalVal, GraphError>>> {
+pub struct SearchV<I: Iterator<Item = Result<TraversalValue, GraphError>>> {
     iter: I,
 }
 
 // implementing iterator for OutIterator
-impl<I: Iterator<Item = Result<TraversalVal, GraphError>>> Iterator for SearchV<I> {
-    type Item = Result<TraversalVal, GraphError>;
+impl<I: Iterator<Item = Result<TraversalValue, GraphError>>> Iterator for SearchV<I> {
+    type Item = Result<TraversalValue, GraphError>;
 
     #[debug_trace("SEARCH_V")]
     fn next(&mut self) -> Option<Self::Item> {
@@ -23,21 +22,21 @@ impl<I: Iterator<Item = Result<TraversalVal, GraphError>>> Iterator for SearchV<
     }
 }
 
-pub trait SearchVAdapter<'a>: Iterator<Item = Result<TraversalVal, GraphError>> {
+pub trait SearchVAdapter<'a>: Iterator<Item = Result<TraversalValue, GraphError>> {
     fn search_v<F, K>(
         self,
         query: &[f64],
         k: K,
         label: &str,
         filter: Option<&[F]>,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalValue, GraphError>>>
     where
         F: Fn(&HVector, &RoTxn) -> bool,
         K: TryInto<usize>,
         K::Error: std::fmt::Debug;
 }
 
-impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> SearchVAdapter<'a>
+impl<'a, I: Iterator<Item = Result<TraversalValue, GraphError>> + 'a> SearchVAdapter<'a>
     for RoTraversalIterator<'a, I>
 {
     fn search_v<F, K>(
@@ -46,7 +45,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> SearchVAdapt
         k: K,
         label: &str,
         filter: Option<&[F]>,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalValue, GraphError>>>
     where
         F: Fn(&HVector, &RoTxn) -> bool,
         K: TryInto<usize>,
@@ -60,7 +59,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> SearchVAdapt
         let iter = match vectors {
             Ok(vectors) => vectors
                 .into_iter()
-                .map(|vector| Ok::<TraversalVal, GraphError>(TraversalVal::Vector(vector)))
+                .map(|vector| Ok::<TraversalValue, GraphError>(TraversalValue::Vector(vector)))
                 .collect::<Vec<_>>()
                 .into_iter(),
             Err(VectorError::VectorNotFound(id)) => {

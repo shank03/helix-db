@@ -3,8 +3,8 @@ use crate::{
         graph_core::{
             ops::{
                 source::add_e::EdgeType,
-                tr_val::{Traversable, TraversalVal},
             },
+            traversal_value::{Traversable, TraversalValue},
             traversal_iter::RoTraversalIterator,
         },
         storage_core::{storage_core::HelixGraphStorage, storage_methods::StorageMethods},
@@ -29,7 +29,7 @@ pub struct InNodesIterator<'a, T> {
 }
 
 impl<'a> Iterator for InNodesIterator<'a, RoTxn<'a>> {
-    type Item = Result<TraversalVal, GraphError>;
+    type Item = Result<TraversalValue, GraphError>;
 
     #[debug_trace("IN_NODES")]
     fn next(&mut self) -> Option<Self::Item> {
@@ -46,12 +46,12 @@ impl<'a> Iterator for InNodesIterator<'a, RoTxn<'a>> {
                     match self.edge_type {
                         EdgeType::Node => {
                             if let Ok(node) = self.storage.get_node(self.txn, &node_id) {
-                                return Some(Ok(TraversalVal::Node(node)));
+                                return Some(Ok(TraversalValue::Node(node)));
                             }
                         }
                         EdgeType::Vec => {
                             if let Ok(vector) = self.storage.get_vector(self.txn, &node_id) {
-                                return Some(Ok(TraversalVal::Vector(vector)));
+                                return Some(Ok(TraversalValue::Vector(vector)));
                             }
                         }
                     }
@@ -66,7 +66,7 @@ impl<'a> Iterator for InNodesIterator<'a, RoTxn<'a>> {
     }
 }
 
-pub trait InAdapter<'a, T>: Iterator<Item = Result<TraversalVal, GraphError>> {
+pub trait InAdapter<'a, T>: Iterator<Item = Result<TraversalValue, GraphError>> {
     /// Returns an iterator containing the nodes that have an incoming edge with the given label.
     ///
     /// Note that the `edge_label` cannot be empty and must be a valid, existing edge label.
@@ -77,10 +77,10 @@ pub trait InAdapter<'a, T>: Iterator<Item = Result<TraversalVal, GraphError>> {
         self,
         edge_label: &'a str,
         edge_type: &'a EdgeType,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>;
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalValue, GraphError>>>;
 }
 
-impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> InAdapter<'a, RoTxn<'a>>
+impl<'a, I: Iterator<Item = Result<TraversalValue, GraphError>> + 'a> InAdapter<'a, RoTxn<'a>>
     for RoTraversalIterator<'a, I>
 {
     #[inline]
@@ -88,7 +88,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> InAdapter<'a
         self,
         edge_label: &'a str,
         edge_type: &'a EdgeType,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>> {
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalValue, GraphError>>> {
         let db = Arc::clone(&self.storage);
         let storage = Arc::clone(&self.storage);
         let txn = self.txn;

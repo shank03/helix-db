@@ -1,6 +1,6 @@
 use crate::{
     helix_engine::{
-        graph_core::{ops::tr_val::TraversalVal, traversal_iter::RoTraversalIterator},
+        graph_core::{traversal_value::TraversalValue, traversal_iter::RoTraversalIterator},
         storage_core::{storage_core::HelixGraphStorage, storage_methods::StorageMethods},
         types::GraphError,
     },
@@ -20,7 +20,7 @@ pub struct NFromIndex<'a> {
 }
 
 impl<'a> Iterator for NFromIndex<'a> {
-    type Item = Result<TraversalVal, GraphError>;
+    type Item = Result<TraversalValue, GraphError>;
 
     #[debug_trace("N_FROM_INDEX")]
     fn next(&mut self) -> Option<Self::Item> {
@@ -30,7 +30,7 @@ impl<'a> Iterator for NFromIndex<'a> {
                 Ok(value) => match self.storage.get_node(self.txn, &value) {
                     Ok(node) => {
                         if node.label == self.label {
-                            return Some(Ok(TraversalVal::Node(node)));
+                            return Some(Ok(TraversalValue::Node(node)));
                         } else {
                             continue;
                         }
@@ -49,9 +49,9 @@ impl<'a> Iterator for NFromIndex<'a> {
 }
 
 pub trait NFromIndexAdapter<'a, K: Into<Value> + Serialize>:
-    Iterator<Item = Result<TraversalVal, GraphError>>
+    Iterator<Item = Result<TraversalValue, GraphError>>
 {
-    type OutputIter: Iterator<Item = Result<TraversalVal, GraphError>>;
+    type OutputIter: Iterator<Item = Result<TraversalValue, GraphError>>;
 
     /// Returns a new iterator that will return the node from the secondary index.
     ///
@@ -67,7 +67,7 @@ pub trait NFromIndexAdapter<'a, K: Into<Value> + Serialize>:
         K: Into<Value> + Serialize + Clone;
 }
 
-impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>, K: Into<Value> + Serialize + 'a>
+impl<'a, I: Iterator<Item = Result<TraversalValue, GraphError>>, K: Into<Value> + Serialize + 'a>
     NFromIndexAdapter<'a, K> for RoTraversalIterator<'a, I>
 {
     type OutputIter = RoTraversalIterator<'a, NFromIndex<'a>>;

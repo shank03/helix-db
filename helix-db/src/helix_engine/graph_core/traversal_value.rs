@@ -10,7 +10,7 @@ use crate::{
 use std::{borrow::Cow, hash::Hash};
 
 #[derive(Clone, Debug)]
-pub enum TraversalVal {
+pub enum TraversalValue {
     /// A node in the graph
     Node(Node),
     /// An edge in the graph
@@ -27,35 +27,35 @@ pub enum TraversalVal {
     Empty,
 }
 
-impl Hash for TraversalVal {
+impl Hash for TraversalValue {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         match self {
-            TraversalVal::Node(node) => node.id.hash(state),
-            TraversalVal::Edge(edge) => edge.id.hash(state),
-            TraversalVal::Vector(vector) => vector.id.hash(state),
-            TraversalVal::Empty => state.write_u8(0),
+            TraversalValue::Node(node) => node.id.hash(state),
+            TraversalValue::Edge(edge) => edge.id.hash(state),
+            TraversalValue::Vector(vector) => vector.id.hash(state),
+            TraversalValue::Empty => state.write_u8(0),
             _ => state.write_u8(0),
         }
     }
 }
 
-impl Eq for TraversalVal {}
-impl PartialEq for TraversalVal {
+impl Eq for TraversalValue {}
+impl PartialEq for TraversalValue {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (TraversalVal::Node(node1), TraversalVal::Node(node2)) => node1.id == node2.id,
-            (TraversalVal::Edge(edge1), TraversalVal::Edge(edge2)) => edge1.id == edge2.id,
-            (TraversalVal::Vector(vector1), TraversalVal::Vector(vector2)) => {
+            (TraversalValue::Node(node1), TraversalValue::Node(node2)) => node1.id == node2.id,
+            (TraversalValue::Edge(edge1), TraversalValue::Edge(edge2)) => edge1.id == edge2.id,
+            (TraversalValue::Vector(vector1), TraversalValue::Vector(vector2)) => {
                 vector1.id() == vector2.id()
             }
-            (TraversalVal::Empty, TraversalVal::Empty) => true,
+            (TraversalValue::Empty, TraversalValue::Empty) => true,
             _ => false,
         }
     }
 }
 
-impl IntoIterator for TraversalVal {
-    type Item = TraversalVal;
+impl IntoIterator for TraversalValue {
+    type Item = TraversalValue;
     type IntoIter = std::vec::IntoIter<Self::Item>;
     fn into_iter(self) -> Self::IntoIter {
         vec![self].into_iter()
@@ -72,15 +72,15 @@ pub trait Traversable {
     fn uuid(&self) -> String;
 }
 
-impl Traversable for TraversalVal {
+impl Traversable for TraversalValue {
     fn id(&self) -> u128 {
         match self {
-            TraversalVal::Node(node) => node.id,
-            TraversalVal::Edge(edge) => edge.id,
+            TraversalValue::Node(node) => node.id,
+            TraversalValue::Edge(edge) => edge.id,
 
-            TraversalVal::Vector(vector) => vector.id,
-            TraversalVal::Value(_) => unreachable!(),
-            TraversalVal::Empty => 0,
+            TraversalValue::Vector(vector) => vector.id,
+            TraversalValue::Value(_) => unreachable!(),
+            TraversalValue::Empty => 0,
             t => {
                 println!("invalid traversal value {t:?}");
                 panic!("Invalid traversal value")
@@ -90,32 +90,32 @@ impl Traversable for TraversalVal {
 
     fn uuid(&self) -> String {
         match self {
-            TraversalVal::Node(node) => uuid::Uuid::from_u128(node.id).to_string(),
-            TraversalVal::Edge(edge) => uuid::Uuid::from_u128(edge.id).to_string(),
-            TraversalVal::Vector(vector) => uuid::Uuid::from_u128(vector.id).to_string(),
+            TraversalValue::Node(node) => uuid::Uuid::from_u128(node.id).to_string(),
+            TraversalValue::Edge(edge) => uuid::Uuid::from_u128(edge.id).to_string(),
+            TraversalValue::Vector(vector) => uuid::Uuid::from_u128(vector.id).to_string(),
             _ => panic!("Invalid traversal value"),
         }
     }
 
     fn label(&self) -> String {
         match self {
-            TraversalVal::Node(node) => node.label.clone(),
-            TraversalVal::Edge(edge) => edge.label.clone(),
+            TraversalValue::Node(node) => node.label.clone(),
+            TraversalValue::Edge(edge) => edge.label.clone(),
             _ => panic!("Invalid traversal value"),
         }
     }
 
     fn check_property(&self, prop: &str) -> Result<Cow<'_,Value>, GraphError> {
         match self {
-            TraversalVal::Node(node) => node.check_property(prop),
-            TraversalVal::Edge(edge) => edge.check_property(prop),
-            TraversalVal::Vector(vector) => vector.check_property(prop),
+            TraversalValue::Node(node) => node.check_property(prop),
+            TraversalValue::Edge(edge) => edge.check_property(prop),
+            TraversalValue::Vector(vector) => vector.check_property(prop),
             _ => Err(GraphError::ConversionError("Invalid traversal value".to_string())),
         }
     }
 }
 
-impl Traversable for Vec<TraversalVal> {
+impl Traversable for Vec<TraversalValue> {
     fn id(&self) -> u128 {
         if self.is_empty() {
             return 0;
@@ -146,17 +146,17 @@ impl Traversable for Vec<TraversalVal> {
 }
 
 pub trait IntoTraversalValues {
-    fn into(self) -> Vec<TraversalVal>;
+    fn into(self) -> Vec<TraversalValue>;
 }
 
-impl IntoTraversalValues for Vec<TraversalVal> {
-    fn into(self) -> Vec<TraversalVal> {
+impl IntoTraversalValues for Vec<TraversalValue> {
+    fn into(self) -> Vec<TraversalValue> {
         self
     }
 }
 
-impl IntoTraversalValues for TraversalVal {
-    fn into(self) -> Vec<TraversalVal> {
+impl IntoTraversalValues for TraversalValue {
+    fn into(self) -> Vec<TraversalValue> {
         vec![self]
     }
 }

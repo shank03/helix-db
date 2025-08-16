@@ -4,7 +4,7 @@ use itertools::Itertools;
 
 use crate::{
     helix_engine::{
-        graph_core::{ops::tr_val::TraversalVal, traversal_iter::RoTraversalIterator},
+        graph_core::{traversal_value::TraversalValue, traversal_iter::RoTraversalIterator},
         types::GraphError,
     },
     utils::filterable::Filterable,
@@ -16,7 +16,7 @@ pub struct OrderByAsc<I> {
 
 impl<I> Iterator for OrderByAsc<I>
 where
-    I: Iterator<Item = Result<TraversalVal, GraphError>>,
+    I: Iterator<Item = Result<TraversalValue, GraphError>>,
 {
     type Item = I::Item;
 
@@ -31,7 +31,7 @@ pub struct OrderByDesc<I> {
 
 impl<I> Iterator for OrderByDesc<I>
 where
-    I: Iterator<Item = Result<TraversalVal, GraphError>>,
+    I: Iterator<Item = Result<TraversalValue, GraphError>>,
 {
     type Item = I::Item;
 
@@ -44,26 +44,26 @@ pub trait OrderByAdapter<'a>: Iterator {
     fn order_by_asc(
         self,
         property: &str,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>;
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalValue, GraphError>>>;
 
     fn order_by_desc(
         self,
         property: &str,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>;
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalValue, GraphError>>>;
 }
 
-impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> OrderByAdapter<'a>
+impl<'a, I: Iterator<Item = Result<TraversalValue, GraphError>>> OrderByAdapter<'a>
     for RoTraversalIterator<'a, I>
 {
     fn order_by_asc(
         self,
         property: &str,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>> {
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalValue, GraphError>>> {
         RoTraversalIterator {
             inner: OrderByAsc {
                 iter: self.inner.sorted_by(|a, b| match (a, b) {
                     (Ok(a), Ok(b)) => match (a, b) {
-                        (TraversalVal::Node(a), TraversalVal::Node(b)) => {
+                        (TraversalValue::Node(a), TraversalValue::Node(b)) => {
                             match (a.check_property(property), b.check_property(property)) {
                                 (Ok(val_a), Ok(val_b)) => val_a.cmp(&val_b),
                                 (Ok(_), Err(_)) => Ordering::Less,
@@ -71,7 +71,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> OrderByAdapter<'a
                                 (Err(_), Err(_)) => Ordering::Equal,
                             }
                         }
-                        (TraversalVal::Edge(a), TraversalVal::Edge(b)) => {
+                        (TraversalValue::Edge(a), TraversalValue::Edge(b)) => {
                             match (a.check_property(property), b.check_property(property)) {
                                 (Ok(val_a), Ok(val_b)) => val_a.cmp(&val_b),
                                 (Ok(_), Err(_)) => Ordering::Less,
@@ -79,7 +79,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> OrderByAdapter<'a
                                 (Err(_), Err(_)) => Ordering::Equal,
                             }
                         }
-                        (TraversalVal::Vector(a), TraversalVal::Vector(b)) => {
+                        (TraversalValue::Vector(a), TraversalValue::Vector(b)) => {
                             match (a.check_property(property), b.check_property(property)) {
                                 (Ok(val_a), Ok(val_b)) => val_a.cmp(&val_b),
                                 (Ok(_), Err(_)) => Ordering::Less,
@@ -87,10 +87,10 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> OrderByAdapter<'a
                                 (Err(_), Err(_)) => Ordering::Equal,
                             }
                         }
-                        (TraversalVal::Count(val_a), TraversalVal::Count(val_b)) => {
+                        (TraversalValue::Count(val_a), TraversalValue::Count(val_b)) => {
                             val_a.cmp(val_b)
                         }
-                        (TraversalVal::Value(val_a), TraversalVal::Value(val_b)) => {
+                        (TraversalValue::Value(val_a), TraversalValue::Value(val_b)) => {
                             val_a.cmp(val_b)
                         }
                         _ => Ordering::Equal,
@@ -107,12 +107,12 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> OrderByAdapter<'a
     fn order_by_desc(
         self,
         property: &str,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>> {
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalValue, GraphError>>> {
         RoTraversalIterator {
             inner: OrderByAsc {
                 iter: self.inner.sorted_by(|a, b| match (a, b) {
                     (Ok(a), Ok(b)) => match (a, b) {
-                        (TraversalVal::Node(a), TraversalVal::Node(b)) => {
+                        (TraversalValue::Node(a), TraversalValue::Node(b)) => {
                             match (a.check_property(property), b.check_property(property)) {
                                 (Ok(val_a), Ok(val_b)) => val_b.cmp(&val_a),
                                 (Ok(_), Err(_)) => Ordering::Less,
@@ -120,7 +120,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> OrderByAdapter<'a
                                 (Err(_), Err(_)) => Ordering::Equal,
                             }
                         }
-                        (TraversalVal::Edge(a), TraversalVal::Edge(b)) => {
+                        (TraversalValue::Edge(a), TraversalValue::Edge(b)) => {
                             match (a.check_property(property), b.check_property(property)) {
                                 (Ok(val_a), Ok(val_b)) => val_b.cmp(&val_a),
                                 (Ok(_), Err(_)) => Ordering::Less,
@@ -128,7 +128,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> OrderByAdapter<'a
                                 (Err(_), Err(_)) => Ordering::Equal,
                             }
                         }
-                        (TraversalVal::Vector(a), TraversalVal::Vector(b)) => {
+                        (TraversalValue::Vector(a), TraversalValue::Vector(b)) => {
                             match (a.check_property(property), b.check_property(property)) {
                                 (Ok(val_a), Ok(val_b)) => val_b.cmp(&val_a),
                                 (Ok(_), Err(_)) => Ordering::Less,
@@ -136,10 +136,10 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> OrderByAdapter<'a
                                 (Err(_), Err(_)) => Ordering::Equal,
                             }
                         }
-                        (TraversalVal::Count(val_a), TraversalVal::Count(val_b)) => {
+                        (TraversalValue::Count(val_a), TraversalValue::Count(val_b)) => {
                             val_b.cmp(val_a)
                         }
-                        (TraversalVal::Value(val_a), TraversalVal::Value(val_b)) => {
+                        (TraversalValue::Value(val_a), TraversalValue::Value(val_b)) => {
                             val_b.cmp(val_a)
                         }
                         _ => Ordering::Equal,

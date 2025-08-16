@@ -1,6 +1,6 @@
 use crate::{
     helix_engine::{
-        graph_core::{ops::tr_val::TraversalVal, traversal_iter::RoTraversalIterator},
+        graph_core::{traversal_value::TraversalValue, traversal_iter::RoTraversalIterator},
         types::GraphError,
     },
     utils::items::Node,
@@ -17,7 +17,7 @@ pub struct NFromType<'a> {
 }
 
 impl<'a> Iterator for NFromType<'a> {
-    type Item = Result<TraversalVal, GraphError>;
+    type Item = Result<TraversalValue, GraphError>;
 
     #[debug_trace("N_FROM_TYPE")]
     fn next(&mut self) -> Option<Self::Item> {
@@ -26,7 +26,7 @@ impl<'a> Iterator for NFromType<'a> {
             match value.decode() {
                 Ok(value) => match Node::decode_node(value, key_) {
                     Ok(node) => match &node.label {
-                        label if label == self.label => return Some(Ok(TraversalVal::Node(node))),
+                        label if label == self.label => return Some(Ok(TraversalValue::Node(node))),
                         _ => continue,
                     },
                     Err(e) => {
@@ -40,23 +40,23 @@ impl<'a> Iterator for NFromType<'a> {
         None
     }
 }
-pub trait NFromTypeAdapter<'a>: Iterator<Item = Result<TraversalVal, GraphError>> {
+pub trait NFromTypeAdapter<'a>: Iterator<Item = Result<TraversalValue, GraphError>> {
     /// Returns an iterator containing the nodes with the given label.
     ///
     /// Note that the `label` cannot be empty and must be a valid, existing node label.
     fn n_from_type(
         self,
         label: &'a str,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>;
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalValue, GraphError>>>;
 }
-impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> NFromTypeAdapter<'a>
+impl<'a, I: Iterator<Item = Result<TraversalValue, GraphError>>> NFromTypeAdapter<'a>
     for RoTraversalIterator<'a, I>
 {
     #[inline]
     fn n_from_type(
         self,
         label: &'a str,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>> {
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalValue, GraphError>>> {
         let iter = self
             .storage
             .nodes_db

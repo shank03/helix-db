@@ -1,6 +1,6 @@
 use crate::{
     helix_engine::{
-        graph_core::{ops::tr_val::TraversalVal, traversal_iter::RoTraversalIterator},
+        graph_core::{traversal_value::TraversalValue, traversal_iter::RoTraversalIterator},
         storage_core::{storage_core::HelixGraphStorage, storage_methods::StorageMethods},
         types::GraphError,
     },
@@ -26,15 +26,15 @@ pub struct ShortestPathIterator<'a, I> {
     txn: &'a RoTxn<'a>,
 }
 
-impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> Iterator
+impl<'a, I: Iterator<Item = Result<TraversalValue, GraphError>>> Iterator
     for ShortestPathIterator<'a, I>
 {
-    type Item = Result<TraversalVal, GraphError>;
+    type Item = Result<TraversalValue, GraphError>;
 
     /// Returns the next outgoing node by decoding the edge id and then getting the edge and node
     fn next(&mut self) -> Option<Self::Item> {
         match self.iter.next() {
-            Some(Ok(TraversalVal::Node(node))) => {
+            Some(Ok(TraversalValue::Node(node))) => {
                 let (from, to) = match self.path_type {
                     PathType::From(from) => (from, node.id),
                     PathType::To(to) => (node.id, to),
@@ -49,7 +49,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> Iterator
                 let reconstruct_path = |parent: &HashMap<u128, (u128, Edge)>,
                                         start_id: &u128,
                                         end_id: &u128|
-                 -> Result<TraversalVal, GraphError> {
+                 -> Result<TraversalValue, GraphError> {
                     let mut nodes = Vec::with_capacity(parent.len());
                     let mut edges = Vec::with_capacity(parent.len() - 1);
 
@@ -68,7 +68,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> Iterator
                     nodes.reverse();
                     edges.reverse();
 
-                    Ok(TraversalVal::Path((nodes, edges)))
+                    Ok(TraversalValue::Path((nodes, edges)))
                 };
 
                 while let Some(current_id) = queue.pop_front() {
@@ -112,7 +112,7 @@ impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> Iterator
     }
 }
 
-pub trait ShortestPathAdapter<'a, I>: Iterator<Item = Result<TraversalVal, GraphError>> {
+pub trait ShortestPathAdapter<'a, I>: Iterator<Item = Result<TraversalValue, GraphError>> {
     /// ShortestPath finds the shortest path between two nodes
     ///
     /// # Arguments
@@ -138,7 +138,7 @@ pub trait ShortestPathAdapter<'a, I>: Iterator<Item = Result<TraversalVal, Graph
         I: 'a;
 }
 
-impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>> + 'a> ShortestPathAdapter<'a, I>
+impl<'a, I: Iterator<Item = Result<TraversalValue, GraphError>> + 'a> ShortestPathAdapter<'a, I>
     for RoTraversalIterator<'a, I>
 {
     #[inline]

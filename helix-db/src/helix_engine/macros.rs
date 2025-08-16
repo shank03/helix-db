@@ -150,7 +150,7 @@ pub mod macros {
                     $should_spread,
                 ),
             );
-            Ok::<TraversalVal, GraphError>($var_name) // Return the Ok value
+            Ok::<TraversalValue, GraphError>($var_name) // Return the Ok value
         }};
     }
 
@@ -170,7 +170,7 @@ pub mod macros {
                     $should_spread,
                 ),
             );
-            Ok::<TraversalVal, GraphError>($var_name)
+            Ok::<TraversalValue, GraphError>($var_name)
         }};
     }
 
@@ -193,7 +193,7 @@ pub mod macros {
                 );
                 println!("inserting remapping: {:?}", $remapping_vals.borrow_mut());
             )*
-                Ok::<TraversalVal, GraphError>($var_name)
+                Ok::<TraversalValue, GraphError>($var_name)
         }};
     }
 
@@ -221,7 +221,7 @@ pub mod macros {
                     $should_spread,
                 ),
             );
-            Ok::<TraversalVal, GraphError>($var_name)
+            Ok::<TraversalValue, GraphError>($var_name)
         }};
     }
 
@@ -249,7 +249,7 @@ pub mod macros {
                     $should_spread,
                 ),
             );
-            Ok::<TraversalVal, GraphError>($var_name) // Return the Ok value
+            Ok::<TraversalValue, GraphError>($var_name) // Return the Ok value
         }};
     }
 

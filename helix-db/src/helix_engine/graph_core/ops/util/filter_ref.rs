@@ -1,6 +1,7 @@
-use crate::helix_engine::{graph_core::traversal_iter::RoTraversalIterator, types::GraphError};
-
-use super::super::tr_val::TraversalVal;
+use crate::helix_engine::{
+    graph_core::{traversal_iter::RoTraversalIterator, traversal_value::TraversalValue},
+    types::GraphError,
+};
 use heed3::RoTxn;
 use helix_macros::debug_trace;
 
@@ -12,7 +13,7 @@ pub struct FilterRef<'a, I, F> {
 
 impl<'a, I, F> Iterator for FilterRef<'a, I, F>
 where
-    I: Iterator<Item = Result<TraversalVal, GraphError>>,
+    I: Iterator<Item = Result<TraversalValue, GraphError>>,
     F: Fn(&I::Item, &RoTxn) -> Result<bool, GraphError>,
 {
     type Item = I::Item;
@@ -40,21 +41,21 @@ pub trait FilterRefAdapter<'a>: Iterator {
     fn filter_ref<F>(
         self,
         f: F,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalValue, GraphError>>>
     where
-        F: Fn(&Result<TraversalVal, GraphError>, &RoTxn) -> Result<bool, GraphError>;
+        F: Fn(&Result<TraversalValue, GraphError>, &RoTxn) -> Result<bool, GraphError>;
 }
 
-impl<'a, I: Iterator<Item = Result<TraversalVal, GraphError>>> FilterRefAdapter<'a>
+impl<'a, I: Iterator<Item = Result<TraversalValue, GraphError>>> FilterRefAdapter<'a>
     for RoTraversalIterator<'a, I>
 {
     #[inline]
     fn filter_ref<F>(
         self,
         f: F,
-    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalVal, GraphError>>>
+    ) -> RoTraversalIterator<'a, impl Iterator<Item = Result<TraversalValue, GraphError>>>
     where
-        F: Fn(&Result<TraversalVal, GraphError>, &RoTxn) -> Result<bool, GraphError>,
+        F: Fn(&Result<TraversalValue, GraphError>, &RoTxn) -> Result<bool, GraphError>,
     {
         RoTraversalIterator {
             inner: FilterRef {

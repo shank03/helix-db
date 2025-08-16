@@ -1,6 +1,6 @@
 use crate::helix_engine::{
     bm25::bm25::BM25,
-    graph_core::ops::tr_val::TraversalVal,
+    graph_core::traversal_value::TraversalValue,
     storage_core::{storage_core::HelixGraphStorage, storage_methods::StorageMethods},
     types::GraphError,
 };
@@ -13,7 +13,7 @@ pub struct Drop<I> {
 
 impl<T> Drop<Vec<Result<T, GraphError>>>
 where
-    T: IntoIterator<Item = TraversalVal> + Debug,
+    T: IntoIterator<Item = TraversalValue> + Debug,
 {
     pub fn drop_traversal(
         iter: T,
@@ -23,7 +23,7 @@ where
         iter.into_iter()
             .try_for_each(|item| -> Result<(), GraphError> {
                 match item {
-                    TraversalVal::Node(node) => match storage.drop_node(txn, &node.id) {
+                    TraversalValue::Node(node) => match storage.drop_node(txn, &node.id) {
                         Ok(_) => {
                             if let Some(bm25) = &storage.bm25
                                 && let Err(e) = bm25.delete_doc(txn, node.id) {
@@ -34,11 +34,11 @@ where
                         }
                         Err(e) => Err(e),
                     },
-                    TraversalVal::Edge(edge) => match storage.drop_edge(txn, &edge.id) {
+                    TraversalValue::Edge(edge) => match storage.drop_edge(txn, &edge.id) {
                         Ok(_) => Ok(()),
                         Err(e) => Err(e),
                     },
-                    TraversalVal::Vector(vector) => match storage.drop_vector(txn, &vector.id) {
+                    TraversalValue::Vector(vector) => match storage.drop_vector(txn, &vector.id) {
                         Ok(_) => Ok(()),
                         Err(e) => Err(e),
                     },

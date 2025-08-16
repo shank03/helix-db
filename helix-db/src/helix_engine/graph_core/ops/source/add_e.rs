@@ -1,10 +1,10 @@
 use std::fmt::Display;
 
-use super::super::tr_val::TraversalVal;
 use crate::{
     helix_engine::{
         graph_core::traversal_iter::RwTraversalIterator,
-        storage_core::storage_core::HelixGraphStorage, types::GraphError, vector_core::hnsw::HNSW,
+        graph_core::traversal_value::TraversalValue, storage_core::storage_core::HelixGraphStorage,
+        types::GraphError, vector_core::hnsw::HNSW,
     },
     protocol::value::Value,
     utils::{id::v6_uuid, items::Edge, label_hash::hash_label},
@@ -29,18 +29,18 @@ impl Display for EdgeType {
     }
 }
 pub struct AddE {
-    inner: std::iter::Once<Result<TraversalVal, GraphError>>,
+    inner: std::iter::Once<Result<TraversalValue, GraphError>>,
 }
 
 impl Iterator for AddE {
-    type Item = Result<TraversalVal, GraphError>;
+    type Item = Result<TraversalValue, GraphError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
 }
 
-pub trait AddEAdapter<'a, 'b>: Iterator<Item = Result<TraversalVal, GraphError>> {
+pub trait AddEAdapter<'a, 'b>: Iterator<Item = Result<TraversalValue, GraphError>> {
     fn add_e(
         self,
         label: &'a str,
@@ -49,12 +49,12 @@ pub trait AddEAdapter<'a, 'b>: Iterator<Item = Result<TraversalVal, GraphError>>
         to_node: u128,
         should_check: bool,
         edge_type: EdgeType,
-    ) -> RwTraversalIterator<'a, 'b, impl Iterator<Item = Result<TraversalVal, GraphError>>>;
+    ) -> RwTraversalIterator<'a, 'b, impl Iterator<Item = Result<TraversalValue, GraphError>>>;
 
     fn node_vec_exists(&self, node_vec_id: &u128, edge_type: EdgeType) -> bool;
 }
 
-impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddEAdapter<'a, 'b>
+impl<'a, 'b, I: Iterator<Item = Result<TraversalValue, GraphError>>> AddEAdapter<'a, 'b>
     for RwTraversalIterator<'a, 'b, I>
 {
     #[inline(always)]
@@ -68,7 +68,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddEAdapter<'
         should_check: bool,
         // edge_types: (EdgeType, EdgeType),
         edge_type: EdgeType,
-    ) -> RwTraversalIterator<'a, 'b, impl Iterator<Item = Result<TraversalVal, GraphError>>> {
+    ) -> RwTraversalIterator<'a, 'b, impl Iterator<Item = Result<TraversalValue, GraphError>>> {
         let version = self.storage.version_info.get_latest(label);
         let edge = Edge {
             id: v6_uuid(),
@@ -79,7 +79,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddEAdapter<'
             to_node,
         };
 
-        let mut result: Result<TraversalVal, GraphError> = Ok(TraversalVal::Empty);
+        let mut result: Result<TraversalValue, GraphError> = Ok(TraversalValue::Empty);
 
         /*
         if should_check {
@@ -163,7 +163,7 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalVal, GraphError>>> AddEAdapter<'
         }
 
         let result = match result {
-            Ok(_) => Ok(TraversalVal::Edge(edge)),
+            Ok(_) => Ok(TraversalValue::Edge(edge)),
             Err(_) => Err(GraphError::EdgeNotFound),
         };
 
