@@ -1,7 +1,7 @@
 use crate::{
     debug_println,
     helix_engine::{
-        graph_core::{
+        traversal_core::{
             ops::{
                 bm25::search_bm25::SearchBM25Adapter,
                 g::G,
@@ -18,7 +18,7 @@ use crate::{
             },
             traversal_value::{Traversable, TraversalValue},
         },
-        storage_core::storage_core::HelixGraphStorage,
+        storage_core::HelixGraphStorage,
         types::GraphError,
         vector_core::vector::HVector,
     },

@@ -9,7 +9,7 @@ use sonic_rs::{JsonValueTrait, json};
 use tracing::info;
 
 use crate::helix_engine::graph_core::ops::tr_val::TraversalValue;
-use crate::helix_engine::storage_core::storage_core::HelixGraphStorage;
+use crate::helix_engine::storage_core::HelixGraphStorage;
 use crate::helix_engine::storage_core::storage_methods::StorageMethods;
 use crate::helix_engine::types::GraphError;
 use crate::helix_gateway::gateway::AppState;

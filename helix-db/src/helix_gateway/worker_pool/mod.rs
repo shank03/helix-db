@@ -1,4 +1,4 @@
-use crate::helix_engine::graph_core::graph_core::HelixGraphEngine;
+use crate::helix_engine::traversal_core::HelixGraphEngine;
 use crate::helix_engine::types::GraphError;
 use crate::helix_gateway::gateway::CoreSetter;
 use crate::helix_gateway::graphvis;

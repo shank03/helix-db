@@ -2,7 +2,7 @@ use super::{
     remapping::{Remapping, ResponseRemapping},
     value::Value,
 };
-use crate::helix_engine::graph_core::traversal_value::TraversalValue;
+use crate::helix_engine::traversal_core::traversal_value::TraversalValue;
 use crate::utils::{
     count::Count,
     filterable::{Filterable, FilterableType},

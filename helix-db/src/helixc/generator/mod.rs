@@ -2,7 +2,7 @@ use core::fmt;
 use std::fmt::Display;
 
 use crate::{
-    helix_engine::graph_core::config::Config,
+    helix_engine::traversal_core::config::Config,
     helixc::generator::{
         migrations::GeneratedMigration,
         queries::Query,

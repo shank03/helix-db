@@ -1,6 +1,6 @@
 use crate::{
     helix_engine::{
-        graph_core::traversal_value::TraversalValue, storage_core::storage_core::HelixGraphStorage,
+        traversal_core::traversal_value::TraversalValue, storage_core::HelixGraphStorage,
         types::GraphError,
     },
     helix_gateway::mcp::tools::ToolArgs,

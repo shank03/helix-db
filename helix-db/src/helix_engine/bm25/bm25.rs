@@ -1,6 +1,6 @@
 use crate::{
     helix_engine::{
-        storage_core::storage_core::HelixGraphStorage,
+        storage_core::HelixGraphStorage,
         types::GraphError,
         vector_core::{hnsw::HNSW, vector::HVector},
     },

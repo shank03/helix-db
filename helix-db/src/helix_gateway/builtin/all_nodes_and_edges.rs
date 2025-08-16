@@ -125,7 +125,7 @@ pub fn nodes_edges_inner(input: HandlerInput) -> Result<protocol::Response, Grap
 }
 
 fn get_all_nodes_edges_json(
-    db: &Arc<crate::helix_engine::storage_core::storage_core::HelixGraphStorage>,
+    db: &Arc<crate::helix_engine::storage_core::HelixGraphStorage>,
     txn: &RoTxn,
     node_label: Option<String>,
 ) -> Result<String, GraphError> {
