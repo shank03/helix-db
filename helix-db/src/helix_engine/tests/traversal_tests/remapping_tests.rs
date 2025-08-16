@@ -16,15 +16,12 @@ use crate::{
         storage_core::HelixGraphStorage,
         traversal_core::{
             ops::{
-                g::G,
-                out::out::OutAdapter,
-                source::{
+                g::G, in_::in_::InAdapter, out::out::OutAdapter, source::{
                     add_e::{AddEAdapter, EdgeType},
                     add_n::AddNAdapter,
                     n_from_id::NFromIdAdapter,
                     n_from_type::NFromTypeAdapter,
-                },
-                util::map::MapAdapter,
+                }, util::map::MapAdapter
             },
             traversal_value::{Traversable, TraversalValue},
         },
@@ -566,6 +563,84 @@ fn test_nested_remapping() {
 
     assert_eq!(
         *value.get("nested").unwrap(),
+        ReturnValue::Array(vec![ReturnValue::Object(HashMap::from([(
+            "old_name".to_string(),
+            ReturnValue::from("new_name".to_string())
+        )]))])
+    );
+}
+
+#[test]
+fn test_double_nested_remapping() {
+    let (storage, _temp_dir) = setup_test_db();
+    let mut txn = storage.graph_env.write_txn().unwrap();
+
+    let _node = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_n("person", Some(props! {}), None)
+        .collect_to_val();
+    let _other_node = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_n("thing", Some(props! {}), None)
+        .collect_to_val();
+    let _edge = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_e(
+            "knows",
+            Some(props!()),
+            _node.id(),
+            _other_node.id(),
+            false,
+            EdgeType::Node,
+        )
+        .collect_to_val();
+
+    let user = G::new(Arc::clone(&storage), &txn)
+        .n_from_id(&_node.id())
+        .collect_to::<Vec<_>>();
+
+    let remapping_vals = RemappingMap::new();
+
+    let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
+    let traversal = G::new_from(Arc::clone(&storage), &txn, user.clone())
+    .map_traversal(|item, _txn| {
+        traversal_remapping!(remapping_vals, item.clone(), false, "nested" =>
+            G::new_from(Arc::clone(&storage), &txn, vec![item.clone()]).out("knows", &EdgeType::Node).map_traversal(|node, _txn| {
+                traversal_remapping!(remapping_vals, node.clone(), false, "nested" => 
+                    G::new_from(Arc::clone(&storage), &txn, vec![node.clone()]).in_("knows", &EdgeType::Node).map_traversal(|node, _txn| {
+                        println!("node: {node:?}");
+                        value_remapping!(remapping_vals, node.clone(), false, "old_name" => "new_name")?;
+                        Ok(node)
+                    }).collect_to::<Vec<_>>())?;
+                Ok(node)
+            }).collect_to::<Vec<_>>())?;
+        
+        Ok(item)
+    })
+    .collect_to::<Vec<_>>();
+
+    println!("traversal: {traversal:#?}");
+    println!("remapping_vals: {:#?}", remapping_vals.borrow_mut());
+
+    return_vals.insert(
+        "user".to_string(),
+        ReturnValue::from_traversal_value_array_with_mixin(traversal, remapping_vals.borrow_mut()),
+    );
+
+    assert_eq!(return_vals.len(), 1);
+    println!("value: {return_vals:#?}");
+
+    let to_object = |value: &ReturnValue| match value {
+        ReturnValue::Array(array) => match array.first().unwrap() {
+            ReturnValue::Object(object) => object.clone(),
+            _ => panic!("Expected Node"),
+        },
+        _ => panic!("Expected Array"),
+    };
+
+    let value = to_object(return_vals.get("user").unwrap());
+    let nested = to_object(value.get("nested").unwrap());
+
+
+    assert_eq!(
+        *nested.get("nested").unwrap(),
         ReturnValue::Array(vec![ReturnValue::Object(HashMap::from([(
             "old_name".to_string(),
             ReturnValue::from("new_name".to_string())
