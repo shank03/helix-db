@@ -138,13 +138,13 @@ QUERY dedup() =>
 #### deps
 
 ```rs
-f: Fn(&Result<TraversalVal, GraphError>, &RoTxn) -> Result<bool, GraphError>
+f: Fn(&Result<TraversalValue, GraphError>, &RoTxn) -> Result<bool, GraphError>
 
-.filter_ref(|val: TraversalVal, txn: &'a RoTxn<'a>| -> Result<bool, GraphError> {
+.filter_ref(|val: TraversalValue, txn: &'a RoTxn<'a>| -> Result<bool, GraphError> {
     // return true if val should be included
     // return false if val should be excluded
     // e.g. the following filters out all nodes with a name that is not "John"
-    if let Ok(TraversalVal::Node(node)) = val {
+    if let Ok(TraversalValue::Node(node)) = val {
         if let Some(value) = node.check_property("name") {
             match value {
                 Value::String(name) => return Ok(name == "John"),

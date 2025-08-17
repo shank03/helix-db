@@ -217,7 +217,7 @@ impl Query {
 
         writeln!(
             f,
-            "let first = result.next().unwrap_or(TraversalVal::Empty);"
+            "let first = result.next().unwrap_or(TraversalValue::Empty);"
         )?;
 
         writeln!(f, "connection.iter = result.into_iter();")?;

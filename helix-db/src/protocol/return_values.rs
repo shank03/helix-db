@@ -2,7 +2,7 @@ use super::{
     remapping::{Remapping, ResponseRemapping},
     value::Value,
 };
-use crate::helix_engine::graph_core::ops::tr_val::TraversalVal;
+use crate::helix_engine::traversal_core::traversal_value::TraversalValue;
 use crate::utils::{
     count::Count,
     filterable::{Filterable, FilterableType},
@@ -55,26 +55,26 @@ impl ReturnValue {
 
     #[inline]
     pub fn from_traversal_value_array_with_mixin(
-        traversal_value: Vec<TraversalVal>,
+        traversal_value: Vec<TraversalValue>,
         mut mixin: RefMut<HashMap<u128, ResponseRemapping>>,
     ) -> Self {
         ReturnValue::Array(
             traversal_value
                 .into_iter()
                 .map(|val| match val {
-                    TraversalVal::Node(node) => {
+                    TraversalValue::Node(node) => {
                         ReturnValue::process_items_with_mixin(node, &mut mixin)
                     }
-                    TraversalVal::Edge(edge) => {
+                    TraversalValue::Edge(edge) => {
                         ReturnValue::process_items_with_mixin(edge, &mut mixin)
                     }
-                    TraversalVal::Vector(vector) => {
+                    TraversalValue::Vector(vector) => {
                         ReturnValue::process_items_with_mixin(vector, &mut mixin)
                     }
-                    TraversalVal::Count(count) => ReturnValue::from(count),
-                    TraversalVal::Empty => ReturnValue::Empty,
-                    TraversalVal::Value(value) => ReturnValue::from(value),
-                    TraversalVal::Path((nodes, edges)) => {
+                    TraversalValue::Count(count) => ReturnValue::from(count),
+                    TraversalValue::Empty => ReturnValue::Empty,
+                    TraversalValue::Value(value) => ReturnValue::from(value),
+                    TraversalValue::Path((nodes, edges)) => {
                         let mut properties = HashMap::with_capacity(2);
                         properties.insert(
                             "nodes".to_string(),
@@ -93,22 +93,22 @@ impl ReturnValue {
 
     #[inline]
     pub fn from_traversal_value_with_mixin(
-        traversal_value: TraversalVal,
+        traversal_value: TraversalValue,
         mut mixin: RefMut<HashMap<u128, ResponseRemapping>>,
     ) -> Self {
         match traversal_value {
-            TraversalVal::Node(node) => {
+            TraversalValue::Node(node) => {
                 println!("node processing");
                 ReturnValue::process_items_with_mixin(node, &mut mixin)
             }
-            TraversalVal::Edge(edge) => ReturnValue::process_items_with_mixin(edge, &mut mixin),
-            TraversalVal::Vector(vector) => {
+            TraversalValue::Edge(edge) => ReturnValue::process_items_with_mixin(edge, &mut mixin),
+            TraversalValue::Vector(vector) => {
                 ReturnValue::process_items_with_mixin(vector, &mut mixin)
             }
-            TraversalVal::Count(count) => ReturnValue::from(count),
-            TraversalVal::Empty => ReturnValue::Empty,
-            TraversalVal::Value(value) => ReturnValue::from(value),
-            TraversalVal::Path((nodes, edges)) => {
+            TraversalValue::Count(count) => ReturnValue::from(count),
+            TraversalValue::Empty => ReturnValue::Empty,
+            TraversalValue::Value(value) => ReturnValue::from(value),
+            TraversalValue::Path((nodes, edges)) => {
                 let mut properties = HashMap::with_capacity(2);
                 properties.insert(
                     "nodes".to_string(),
@@ -171,27 +171,22 @@ impl ReturnValue {
     /// );
     /// ```
     #[inline(always)]
-    pub fn mixin_remapping(self, remappings: HashMap<String, Remapping>) -> Self {
+    pub fn mixin_remapping(self, remappings: Vec<(String, Remapping)>) -> Self {
         match self {
             ReturnValue::Object(mut a) => {
-                println!("a1: {a:?}");
                 remappings.into_iter().for_each(|(k, v)| {
                     if v.exclude {
-                        println!("removing key: {k:?}");
                         let _ = a.remove(&k);
                     } else if let Some(new_name) = v.new_name {
                         if let Some(value) = a.remove(&k) {
                             a.insert(new_name, value);
                         } else {
-                            println!("no value found for key: {k:?}");
                             a.insert(k, v.return_value);
                         }
                     } else {
-                        println!("inserting value: {k:?}");
                         a.insert(k, v.return_value);
                     }
                 });
-                println!("a2: {a:?}");
                 ReturnValue::Object(a)
             }
             _ => unreachable!(),
@@ -312,6 +307,78 @@ impl From<&str> for ReturnValue {
     }
 }
 
+impl From<HashMap<String, ReturnValue>> for ReturnValue {
+    fn from(object: HashMap<String, ReturnValue>) -> Self {
+        ReturnValue::Object(object)
+    }
+}
+
+impl From<&HashMap<String, ReturnValue>> for ReturnValue {
+    fn from(object: &HashMap<String, ReturnValue>) -> Self {
+        ReturnValue::Object(object.clone())
+    }
+}
+
+impl From<Vec<(String, ReturnValue)>> for ReturnValue {
+    fn from(object: Vec<(String, ReturnValue)>) -> Self {
+        ReturnValue::Object(object.into_iter().collect())
+    }
+}
+
+impl From<&Vec<(String, ReturnValue)>> for ReturnValue {
+    fn from(object: &Vec<(String, ReturnValue)>) -> Self {
+        ReturnValue::Object(object.clone().into_iter().collect())
+    }
+}
+
+impl From<i8> for ReturnValue {
+    fn from(integer: i8) -> Self {
+        ReturnValue::Value(Value::I8(integer))
+    }
+}
+
+impl From<i16> for ReturnValue {
+    fn from(integer: i16) -> Self {
+        ReturnValue::Value(Value::I16(integer))
+    }
+}
+
+impl From<i64> for ReturnValue {
+    fn from(integer: i64) -> Self {
+        ReturnValue::Value(Value::I64(integer))
+    }
+}
+
+impl From<u8> for ReturnValue {
+    fn from(integer: u8) -> Self {
+        ReturnValue::Value(Value::U8(integer))
+    }
+}
+
+impl From<u16> for ReturnValue {
+    fn from(integer: u16) -> Self {
+        ReturnValue::Value(Value::U16(integer))
+    }
+}
+
+impl From<u32> for ReturnValue {
+    fn from(integer: u32) -> Self {
+        ReturnValue::Value(Value::U32(integer))
+    }
+}
+
+impl From<u64> for ReturnValue {
+    fn from(integer: u64) -> Self {
+        ReturnValue::Value(Value::U64(integer))
+    }
+}
+
+impl From<u128> for ReturnValue {
+    fn from(integer: u128) -> Self {
+        ReturnValue::Value(Value::U128(integer))
+    }
+}
+
 impl From<i32> for ReturnValue {
     fn from(integer: i32) -> Self {
         ReturnValue::Value(Value::I32(integer))
@@ -324,27 +391,27 @@ impl From<f64> for ReturnValue {
     }
 }
 
-impl From<u128> for ReturnValue {
-    fn from(integer: u128) -> Self {
-        ReturnValue::Value(Value::U128(integer))
+impl From<f32> for ReturnValue {
+    fn from(float: f32) -> Self {
+        ReturnValue::Value(Value::F32(float))
     }
 }
 
-impl From<Vec<TraversalVal>> for ReturnValue {
-    fn from(array: Vec<TraversalVal>) -> Self {
+impl From<Vec<TraversalValue>> for ReturnValue {
+    fn from(array: Vec<TraversalValue>) -> Self {
         ReturnValue::Array(array.into_iter().map(|val| val.into()).collect())
     }
 }
 
-impl From<TraversalVal> for ReturnValue {
-    fn from(val: TraversalVal) -> Self {
+impl From<TraversalValue> for ReturnValue {
+    fn from(val: TraversalValue) -> Self {
         match val {
-            TraversalVal::Node(node) => ReturnValue::from(node),
-            TraversalVal::Edge(edge) => ReturnValue::from(edge),
-            TraversalVal::Vector(vector) => ReturnValue::from(vector),
-            TraversalVal::Count(count) => ReturnValue::from(count),
-            TraversalVal::Value(value) => ReturnValue::from(value),
-            TraversalVal::Empty => ReturnValue::Empty,
+            TraversalValue::Node(node) => ReturnValue::from(node),
+            TraversalValue::Edge(edge) => ReturnValue::from(edge),
+            TraversalValue::Vector(vector) => ReturnValue::from(vector),
+            TraversalValue::Count(count) => ReturnValue::from(count),
+            TraversalValue::Value(value) => ReturnValue::from(value),
+            TraversalValue::Empty => ReturnValue::Empty,
             _ => unreachable!(),
         }
     }

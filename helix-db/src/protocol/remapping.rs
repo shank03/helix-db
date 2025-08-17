@@ -37,7 +37,7 @@ impl Remapping {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct ResponseRemapping {
-    pub remappings: HashMap<String, Remapping>,
+    pub remappings: Vec<(String, Remapping)>,
     pub should_spread: bool,
 }
 
@@ -51,15 +51,11 @@ impl Serialize for ResponseRemapping {
 }
 
 impl ResponseRemapping {
-    pub fn new(remappings: HashMap<String, Remapping>, should_spread: bool) -> Self {
+    pub fn new(remappings: Vec<(String, Remapping)>, should_spread: bool) -> Self {
         Self {
             remappings,
             should_spread,
         }
-    }
-
-    pub fn insert(&mut self, key: String, remapping: Remapping) {
-        self.remappings.insert(key, remapping);
     }
 }
 

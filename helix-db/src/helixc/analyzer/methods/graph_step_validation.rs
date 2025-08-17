@@ -4,7 +4,7 @@ use crate::helixc::analyzer::utils::type_in_scope;
 use crate::helixc::generator::utils::EmbedData;
 use crate::{
     generate_error,
-    helix_engine::graph_core::ops::source::add_e::EdgeType,
+    helix_engine::traversal_core::ops::source::add_e::EdgeType,
     helixc::{
         analyzer::{
             analyzer::Ctx,

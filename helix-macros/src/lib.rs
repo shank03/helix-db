@@ -5,7 +5,7 @@ extern crate syn;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
-    parse::{Parse, ParseStream}, parse_macro_input, Data, DataStruct, DeriveInput, Expr, FnArg, Ident, ItemEnum, ItemFn, ItemStruct, ItemTrait, LitInt, Pat, Stmt, Token, TraitItem
+    parse::{Parse, ParseStream}, parse_macro_input, Expr, FnArg, Ident, ItemFn, ItemStruct, ItemTrait, LitInt, Pat, Stmt, Token, TraitItem
 };
 
 #[proc_macro_attribute]
@@ -206,7 +206,7 @@ pub fn tool_calls(_attr: TokenStream, input: TokenStream) -> TokenStream {
 
                     let result = input.mcp_backend.#fn_name(&txn, &connection, #(data.data.#field_names),*)?;
 
-                    let first = result.first().unwrap_or(&TraversalVal::Empty).clone();
+                    let first = result.first().unwrap_or(&TraversalValue::Empty).clone();
 
                     connection.iter = result.into_iter();
                     let mut connections = input.mcp_connections.lock().unwrap();
@@ -306,7 +306,7 @@ pub fn tool_call(args: TokenStream, input: TokenStream) -> TokenStream {
 
             let mut result = #mcp_query_block;
 
-            let first = result.next().unwrap_or(TraversalVal::Empty);
+            let first = result.next().unwrap_or(TraversalValue::Empty);
 
             connection.iter = result.into_iter();
             let mut connections = input.mcp_connections.lock().unwrap();
