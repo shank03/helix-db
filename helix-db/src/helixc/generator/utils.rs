@@ -394,9 +394,9 @@ use helix_db::{
                         brute_force_search::BruteForceSearchVAdapter, insert::InsertVAdapter,
                         search::SearchVAdapter,
                     },
-                }
+                },
+                traversal_value::{Traversable, TraversalValue},
             },
-        traversal_value::{Traversable, TraversalValue},
         types::GraphError,
         vector_core::vector::HVector,
     },
