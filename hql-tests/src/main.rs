@@ -26,7 +26,7 @@ impl GitHubConfig {
     }
 }
 
-fn generate_error_hash(error_type: &str, error_message: &str, _file_num: u32) -> String {
+fn generate_error_hash(error_type: &str, error_message: &str, _test_name: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(format!(
         "{}:{}",
@@ -67,7 +67,7 @@ async fn create_github_issue(
     github_config: &GitHubConfig,
     error_type: &str,
     error_message: &str,
-    file_num: u32,
+    test_name: &str,
     error_hash: &str,
     query: &str,
     schema: &str,
@@ -82,12 +82,12 @@ async fn create_github_issue(
         .personal_token(github_config.token.clone())
         .build()?;
 
-    let title = format!("Auto-generated: {error_type} Error in file{file_num}");
+    let title = format!("Auto-generated: {error_type} Error in {test_name}");
 
     let body = format!(
         "## Automatic Error Report\n\n\
         **Error Type:** {error_type}\n\
-        **File:** file{file_num}\n\
+        **Test:** {test_name}\n\
         **Error Hash:** ERROR_HASH:{error_hash}\n\n\
         ### Query\n\
         ```js\n{query}\n```\n\n\
@@ -120,8 +120,8 @@ async fn create_github_issue(
         .await?;
 
     println!(
-        "Created GitHub issue #{} for {} error in file{}",
-        issue.number, error_type, file_num
+        "Created GitHub issue #{} for {} error in {}",
+        issue.number, error_type, test_name
     );
     Ok(())
 }
@@ -130,15 +130,15 @@ async fn handle_error_with_github(
     github_config: &GitHubConfig,
     error_type: &str,
     error_message: &str,
-    file_num: u32,
+    test_name: &str,
     query: &str,
     schema: &str,
     generated_rust_code: &str,
 ) -> Result<()> {
-    let error_hash = generate_error_hash(error_type, error_message, file_num);
+    let error_hash = generate_error_hash(error_type, error_message, test_name);
 
     println!(
-        "DEBUG: Handling error with GitHub - Type: {error_type}, File: {file_num}, Hash: {error_hash}"
+        "DEBUG: Handling error with GitHub - Type: {error_type}, Test: {test_name}, Hash: {error_hash}"
     );
 
     match check_issue_exists(github_config, &error_hash).await {
@@ -150,7 +150,7 @@ async fn handle_error_with_github(
                     github_config,
                     error_type,
                     error_message,
-                    file_num,
+                    test_name,
                     &error_hash,
                     query,
                     schema,
@@ -162,7 +162,7 @@ async fn handle_error_with_github(
                 }
             } else {
                 println!(
-                    "Issue already exists for {error_type} error in file{file_num} (hash: {error_hash})"
+                    "Issue already exists for {error_type} error in {test_name} (hash: {error_hash})"
                 );
             }
         }
@@ -174,7 +174,7 @@ async fn handle_error_with_github(
                 github_config,
                 error_type,
                 error_message,
-                file_num,
+                test_name,
                 &error_hash,
                 query,
                 schema,
@@ -193,11 +193,11 @@ async fn handle_error_with_github(
 #[tokio::main]
 async fn main() -> Result<()> {
     let matches = ClapCommand::new("queries-test")
-        .about("Process helix files")
+        .about("Process helix test directories")
         .arg(
-            Arg::new("file_number")
-                .help("File number to process (1-100)")
-                .value_parser(clap::value_parser!(u32))
+            Arg::new("test_name")
+                .help("Specific test directory name to process")
+                .value_parser(clap::value_parser!(String))
                 .required(false),
         )
         .arg(
@@ -219,6 +219,11 @@ async fn main() -> Result<()> {
         .get_matches();
 
     let current_dir = env::current_dir().context("Failed to get current directory")?;
+    let tests_dir = current_dir.join("tests");
+    
+    if !tests_dir.exists() {
+        bail!("Tests directory not found at: {}", tests_dir.display());
+    }
 
     // Initialize GitHub configuration (optional - will print warning if not available)
     let github_config = match GitHubConfig::from_env() {
@@ -332,14 +337,30 @@ async fn main() -> Result<()> {
         }
     }
 
-    if let Some(file_num) = matches.get_one::<u32>("file_number") {
-        // Process single file
-        if *file_num < 1 || *file_num > 100 {
-            bail!("Error: Please provide a number between 1 and 100");
+    // Get all test directories
+    let mut test_dirs = Vec::new();
+    let mut entries = fs::read_dir(&tests_dir).await?;
+    while let Some(entry) = entries.next_entry().await? {
+        let path = entry.path();
+        if path.is_dir() {
+            if let Some(dir_name) = path.file_name() {
+                if let Some(name_str) = dir_name.to_str() {
+                    test_dirs.push(name_str.to_string());
+                }
+            }
+        }
+    }
+    test_dirs.sort();
+    println!("Found {} test directories", test_dirs.len());
+
+    if let Some(test_name) = matches.get_one::<String>("test_name") {
+        // Process single test directory
+        if !test_dirs.contains(test_name) {
+            bail!("Error: Test directory '{}' not found. Available tests: {:?}", test_name, test_dirs);
         }
 
-        process_file_parallel(*file_num, &current_dir, &temp_repo, &github_config).await?;
-        println!("✅ Successfully processed file{file_num}");
+        process_test_directory(test_name, &tests_dir, &temp_repo, &github_config).await?;
+        println!("✅ Successfully processed {test_name}");
     } else if let Some(batch_args) = matches.get_many::<u32>("batch") {
         // Process in batch mode
         let batch_values: Vec<u32> = batch_args.copied().collect();
@@ -362,59 +383,68 @@ async fn main() -> Result<()> {
             bail!("Error: Total batches must be greater than 0");
         }
 
-        // Calculate which files this batch should process
-        let files_per_batch = 100 / total_batches;
-        let remainder = 100 % total_batches;
+        // Calculate which tests this batch should process
+        let total_tests = test_dirs.len();
+        let tests_per_batch = total_tests / total_batches as usize;
+        let remainder = total_tests % total_batches as usize;
 
         // Calculate start and end for this batch
-        let start_file = ((current_batch - 1) * files_per_batch) + 1;
-        let mut end_file = current_batch * files_per_batch;
+        let start_idx = (current_batch - 1) as usize * tests_per_batch;
+        let mut end_idx = current_batch as usize * tests_per_batch;
 
-        // Add remainder files to the last batch
+        // Add remainder tests to the last batch
         if current_batch == total_batches {
-            end_file += remainder;
+            end_idx += remainder;
         }
+        
+        // Ensure we don't go out of bounds
+        end_idx = end_idx.min(total_tests);
 
         println!(
-            "Processing batch {current_batch}/{total_batches}: files {start_file}-{end_file}"
+            "Processing batch {current_batch}/{total_batches}: tests {}-{} ({})",
+            start_idx + 1,
+            end_idx,
+            test_dirs[start_idx..end_idx].join(", ")
         );
 
-        let tasks: Vec<_> = (start_file..=end_file)
-            .map(|file_num| {
-                let current_dir = current_dir.clone();
+        let tasks: Vec<_> = test_dirs[start_idx..end_idx]
+            .iter()
+            .map(|test_name| {
+                let test_name = test_name.clone();
+                let tests_dir = tests_dir.clone();
                 let temp_repo = temp_repo.clone();
                 let github_config = github_config.clone();
                 tokio::spawn(async move {
-                    process_file_parallel(file_num, &current_dir, &temp_repo, &github_config).await
+                    process_test_directory(&test_name, &tests_dir, &temp_repo, &github_config).await
                 })
             })
             .collect();
 
         // Wait for all tasks to complete and collect results
-        let mut failed_files = Vec::new();
+        let mut failed_tests = Vec::new();
         for (i, task) in tasks.into_iter().enumerate() {
-            let file_num = start_file + i as u32;
+            let test_name = &test_dirs[start_idx + i];
             match task.await {
                 Ok(Ok(())) => {
-                    println!("Successfully processed file{file_num}");
+                    println!("Successfully processed {test_name}");
                 }
                 Ok(Err(e)) => {
-                    eprintln!("Error processing file{file_num}: {e}");
-                    failed_files.push(file_num);
+                    eprintln!("Error processing {test_name}: {e}");
+                    failed_tests.push(test_name.clone());
                 }
                 Err(e) => {
-                    eprintln!("Task error for file{file_num}: {e}");
-                    failed_files.push(file_num);
+                    eprintln!("Task error for {test_name}: {e}");
+                    failed_tests.push(test_name.clone());
                 }
             }
         }
 
-        if !failed_files.is_empty() {
+        if !failed_tests.is_empty() {
             bail!(
-                "❌ BATCH PROCESSING FAILED: {} out of {} files failed compilation/check: {:?}",
-                failed_files.len(),
-                end_file - start_file + 1,
-                failed_files
+                "❌ BATCH PROCESSING FAILED: {} out of {} tests failed compilation/check: {:?}",
+                failed_tests.len(),
+                end_idx - start_idx,
+                failed_tests
             );
         }
 
@@ -422,80 +452,107 @@ async fn main() -> Result<()> {
             "✅ Finished processing batch {current_batch}/{total_batches} successfully"
         );
     } else {
-        // Process all files in parallel (default behavior)
-        println!("Processing all files 1-100 in parallel...");
+        // Process all test directories in parallel (default behavior)
+        println!("Processing all {} test directories in parallel...", test_dirs.len());
 
-        let tasks: Vec<_> = (1..=100)
-            .map(|file_num| {
-                let current_dir = current_dir.clone();
+        let tasks: Vec<_> = test_dirs
+            .iter()
+            .map(|test_name| {
+                let test_name = test_name.clone();
+                let tests_dir = tests_dir.clone();
                 let temp_repo = temp_repo.clone();
                 let github_config = github_config.clone();
                 tokio::spawn(async move {
-                    process_file_parallel(file_num, &current_dir, &temp_repo, &github_config).await
+                    process_test_directory(&test_name, &tests_dir, &temp_repo, &github_config).await
                 })
             })
             .collect();
 
         // Wait for all tasks to complete and collect results
-        let mut failed_files = Vec::new();
+        let mut failed_tests = Vec::new();
         for (i, task) in tasks.into_iter().enumerate() {
-            let file_num = i as u32 + 1;
+            let test_name = &test_dirs[i];
             match task.await {
                 Ok(Ok(())) => {
-                    println!("Successfully processed file{file_num}");
+                    println!("Successfully processed {test_name}");
                 }
                 Ok(Err(e)) => {
-                    eprintln!("Error processing file{file_num}: {e}");
-                    failed_files.push(file_num);
+                    eprintln!("Error processing {test_name}: {e}");
+                    failed_tests.push(test_name.clone());
                 }
                 Err(e) => {
-                    eprintln!("Task error for file{file_num}: {e}");
-                    failed_files.push(file_num);
+                    eprintln!("Task error for {test_name}: {e}");
+                    failed_tests.push(test_name.clone());
                 }
             }
         }
 
-        if !failed_files.is_empty() {
+        if !failed_tests.is_empty() {
             bail!(
-                "❌ PROCESSING FAILED: {} out of 100 files failed compilation/check: {:?}",
-                failed_files.len(),
-                failed_files
+                "❌ PROCESSING FAILED: {} out of {} tests failed compilation/check: {:?}",
+                failed_tests.len(),
+                test_dirs.len(),
+                failed_tests
             );
         }
 
-        println!("✅ Finished processing all 100 files successfully");
+        println!("✅ Finished processing all {} tests successfully", test_dirs.len());
     }
 
     Ok(())
 }
 
-async fn process_file_parallel(
-    file_num: u32,
-    current_dir: &Path,
+async fn process_test_directory(
+    test_name: &str,
+    tests_dir: &Path,
     temp_repo: &Path,
     github_config: &Option<GitHubConfig>,
 ) -> Result<()> {
-    let folder = format!("file{file_num}");
-    let folder_path = current_dir.join(&folder);
+    let folder_path = tests_dir.join(test_name);
 
     if !folder_path.exists() {
-        // Skip non-existent files silently in parallel mode
+        // Skip non-existent directories silently in parallel mode
         return Ok(());
     }
 
-    // if queries.hx is empty, skip
-    let queries_hx_path = folder_path.join(format!("{folder}.hx"));
+    // Find the query file - could be queries.hx or file*.hx
+    let mut query_file_path = None;
     let schema_hx_path = folder_path.join("schema.hx");
+    
+    // First check for queries.hx
+    let queries_hx_path = folder_path.join("queries.hx");
     if queries_hx_path.exists() && queries_hx_path.is_file() {
-        let content = fs::read_to_string(&queries_hx_path).await?;
+        query_file_path = Some(queries_hx_path);
+    } else {
+        // Look for file*.hx pattern
+        let entries = fs::read_dir(&folder_path).await?;
+        let mut entries = entries;
+        while let Some(entry) = entries.next_entry().await? {
+            let path = entry.path();
+            if let Some(file_name) = path.file_name() {
+                if let Some(name_str) = file_name.to_str() {
+                    if name_str.starts_with("file") && name_str.ends_with(".hx") && !name_str.contains("schema") {
+                        query_file_path = Some(path);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
+    // Skip if no query file found or if it's empty
+    if let Some(ref query_path) = query_file_path {
+        let content = fs::read_to_string(query_path).await?;
         if content.is_empty() {
             return Ok(());
         }
+    } else {
+        // No query file found, skip this test
+        return Ok(());
     }
 
-    // Create a temporary directory for this file
-    let temp_dir = env::temp_dir().join(format!("helix_temp_{file_num}"));
-    // let temp_dir = current_dir.join(format!("helix_temp_{}", file_num));
+    // Create a temporary directory for this test
+    let temp_dir = env::temp_dir().join(format!("helix_temp_{}", test_name));
     if temp_dir.exists() {
         fs::remove_dir_all(&temp_dir)
             .await
@@ -539,31 +596,32 @@ async fn process_file_parallel(
         let stdout = String::from_utf8_lossy(&output.stdout);
         // For helix compilation, we'll show the raw output since it's not cargo format
         let error_message = format!(
-            "❌ HELIX COMPILE FAILED for file{file_num}\nStderr: {stderr}\nStdout: {stdout}"
+            "❌ HELIX COMPILE FAILED for {test_name}\nStderr: {stderr}\nStdout: {stdout}"
         );
 
         // Create GitHub issue if configuration is available
         if let Some(config) = github_config {
-            println!("DEBUG: Helix compilation failed in parellel mode, creating GitHub issue...");
-            let query_content = fs::read_to_string(&queries_hx_path).await.map_err(|e| {
-                println!("DEBUG: Failed to read queries.hx: {e}");
-                e
-            })?;
+            println!("DEBUG: Helix compilation failed in parallel mode, creating GitHub issue...");
+            let query_content = if let Some(ref query_path) = query_file_path {
+                fs::read_to_string(query_path).await.map_err(|e| {
+                    println!("DEBUG: Failed to read query file: {e}");
+                    e
+                })?
+            } else {
+                String::new()
+            };
             let schema_content = fs::read_to_string(&schema_hx_path).await.map_err(|e| {
                 println!("DEBUG: Failed to read schema.hx: {e}");
                 e
             })?;
             let generated_rust_code = fs::read_to_string(&compile_output_path.join("queries.rs"))
                 .await
-                .map_err(|e| {
-                    println!("DEBUG: Failed to read queries.rs: {e}");
-                    e
-                })?;
+                .unwrap_or_else(|_| String::from("Failed to read generated queries.rs"));
             handle_error_with_github(
                 config,
                 "Helix Compilation",
                 &error_message,
-                file_num,
+                test_name,
                 &query_content,
                 &schema_content,
                 &generated_rust_code,
@@ -589,15 +647,19 @@ async fn process_file_parallel(
             let stderr = String::from_utf8_lossy(&output.stderr);
             let _stdout = String::from_utf8_lossy(&output.stdout);
             // let filtered_errors = extract_cargo_errors(&stderr, &stdout);
-            let error_message = format!("❌ CARGO CHECK FAILED for file{file_num}\n{stderr}");
+            let error_message = format!("❌ CARGO CHECK FAILED for {test_name}\n{stderr}");
 
             // Create GitHub issue if configuration is available
             if let Some(config) = github_config {
                 println!("DEBUG: Cargo check failed in parallel mode, creating GitHub issue...");
-                let query_content = fs::read_to_string(&queries_hx_path).await.map_err(|e| {
-                    println!("DEBUG: Failed to read queries.hx: {e}");
-                    e
-                })?;
+                let query_content = if let Some(ref query_path) = query_file_path {
+                    fs::read_to_string(query_path).await.map_err(|e| {
+                        println!("DEBUG: Failed to read query file: {e}");
+                        e
+                    })?
+                } else {
+                    String::new()
+                };
                 let schema_content = fs::read_to_string(&schema_hx_path).await.map_err(|e| {
                     println!("DEBUG: Failed to read schema.hx: {e}");
                     e
@@ -605,15 +667,12 @@ async fn process_file_parallel(
                 let generated_rust_code =
                     fs::read_to_string(&compile_output_path.join("queries.rs"))
                         .await
-                        .map_err(|e| {
-                            println!("DEBUG: Failed to read queries.rs: {e}");
-                            e
-                        })?;
+                        .unwrap_or_else(|_| String::from("Failed to read generated queries.rs"));
                 handle_error_with_github(
                     config,
                     "Cargo Check",
                     &error_message,
-                    file_num,
+                    test_name,
                     &query_content,
                     &schema_content,
                     &generated_rust_code,
@@ -627,7 +686,7 @@ async fn process_file_parallel(
         }
     }
 
-    println!("Cargo check passed for {file_num}");
+    println!("Cargo check passed for {test_name}");
     // Clean up temp directory
     fs::remove_dir_all(&temp_dir).await.ok();
 
