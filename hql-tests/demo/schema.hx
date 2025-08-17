@@ -1,31 +1,32 @@
+// N::Doc {
+//     content: String
+// }
+//     
+// V::Embedding {
+//     chunk: String
+// }
+// 
+// N::Chunk {
+//     content: String
+// }
+// 
+// E::EmbeddingOf {
+//     From: Doc,
+//     To: Embedding, 
+//     Properties: {
+//     }
+// }
 
-N::User {
-    name: String,
-    age: U32,
-    email: String,
-    created_at: Date DEFAULT NOW,
-    updated_at: Date DEFAULT NOW,
-}
+// N::User {
+//     name: String,
+//     age: I32
+// }
+// 
+// E::Knows {
+//     From: User,
+//     To: User,
+//     Properties: {
+//         since: I32,
+//     }
+// }
 
-N::Post {
-    content: String,
-    created_at: Date DEFAULT NOW,
-    updated_at: Date DEFAULT NOW,
-}
-
-E::Follows {
-    From: User,
-    To: User,
-    Properties: {
-        since: Date DEFAULT NOW,
-    }
-}
-
-E::Created {
-    From: User,
-    To: Post,
-    Properties: {
-        created_at: Date DEFAULT NOW,
-    }
-}
-            

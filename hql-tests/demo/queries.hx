@@ -1,3 +1,33 @@
+N::User {
+    name: String,
+    age: U32,
+    email: String,
+    created_at: Date DEFAULT NOW,
+    updated_at: Date DEFAULT NOW,
+}
+
+N::Post {
+    content: String,
+    created_at: Date DEFAULT NOW,
+    updated_at: Date DEFAULT NOW,
+}
+
+E::Follows {
+    From: User,
+    To: User,
+    Properties: {
+        since: Date DEFAULT NOW,
+    }
+}
+
+E::Created {
+    From: User,
+    To: Post,
+    Properties: {
+        created_at: Date DEFAULT NOW,
+    }
+}
+
 
 QUERY CreateUser(name: String, age: U32, email: String) =>
     user <- AddN<User>({name: name, age: age, email: email})
@@ -7,7 +37,7 @@ QUERY CreateUser(name: String, age: U32, email: String) =>
 QUERY CreateFollow(follower_id: ID, followed_id: ID) =>
     follower <- N<User>(follower_id)
     followed <- N<User>(followed_id)
-    AddE<Follows>::From(follower)::To(followed) // don't need to specify the `since` property because it has a default value
+    AddE<Follows>::From(follower)::To(followed_id) // don't need to specify the `since` property because it has a default value
     RETURN "success"
 
 
@@ -39,7 +69,6 @@ QUERY GetFollowedUsersPosts(user_id: ID) =>
     followers <- N<User>(user_id)::Out<Follows>
     posts <- followers::Out<Created>::RANGE(0, 40)
     RETURN posts::{
-        post: _::{content},
+        post: content,
         creatorID: _::In<Created>::ID,
     }
-            
