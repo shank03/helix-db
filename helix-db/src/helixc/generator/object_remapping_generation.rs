@@ -15,7 +15,7 @@ impl Display for TraversalRemapping {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "traversal_remapping!(remapping_vals, {}.clone(), {}, \"{}\" => {})?",
+            "traversal_remapping!(remapping_vals, {}.clone(), {}, \"{}\" => {})",
             self.variable_name, self.should_spread, self.new_field, self.new_value
         )
     }
@@ -33,7 +33,7 @@ impl Display for FieldRemapping {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "field_remapping!(remapping_vals, {}.clone(), {}, \"{}\" => \"{}\")?",
+            "field_remapping!(remapping_vals, {}.clone(), {}, \"{}\" => \"{}\")",
             self.variable_name, self.should_spread, self.field_name, self.new_name
         )
     }
@@ -49,7 +49,7 @@ impl Display for ExcludeField {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "exclude_field!(remapping_vals, {}.clone(), {})?",
+            "exclude_field!(remapping_vals, {}.clone(), {})",
             self.variable_name,
             self.fields_to_exclude
                 .iter()
@@ -102,7 +102,7 @@ impl Display for ValueRemapping {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "value_remapping!(remapping_vals, {}.clone(), {}, \"{}\" => {})?",
+            "value_remapping!(remapping_vals, {}.clone(), {}, \"{}\" => {})",
             self.variable_name, self.should_spread, self.field_name, self.value
         )
     }
@@ -119,7 +119,7 @@ impl Display for IdentifierRemapping {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "identifier_remapping!(remapping_vals, {}.clone(), {}, \"{}\" => \"{}\")?",
+            "identifier_remapping!(remapping_vals, {}.clone(), {}, \"{}\" => \"{}\")",
             self.variable_name, self.should_spread, self.field_name, self.identifier_value
         )
     }
