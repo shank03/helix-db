@@ -23,9 +23,6 @@ pub mod traversal_steps;
 pub mod tsdisplay;
 pub mod utils;
 
-#[cfg(test)]
-mod generator_tests;
-
 pub struct Source {
     pub nodes: Vec<NodeSchema>,
     pub edges: Vec<EdgeSchema>,
