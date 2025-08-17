@@ -220,7 +220,7 @@ async fn main() -> Result<()> {
 
     let current_dir = env::current_dir().context("Failed to get current directory")?;
     let tests_dir = current_dir.join("tests");
-    
+
     if !tests_dir.exists() {
         bail!("Tests directory not found at: {}", tests_dir.display());
     }
@@ -342,12 +342,11 @@ async fn main() -> Result<()> {
     let mut entries = fs::read_dir(&tests_dir).await?;
     while let Some(entry) = entries.next_entry().await? {
         let path = entry.path();
-        if path.is_dir() {
-            if let Some(dir_name) = path.file_name() {
-                if let Some(name_str) = dir_name.to_str() {
-                    test_dirs.push(name_str.to_string());
-                }
-            }
+        if path.is_dir()
+            && let Some(dir_name) = path.file_name()
+            && let Some(name_str) = dir_name.to_str()
+        {
+            test_dirs.push(name_str.to_string());
         }
     }
     test_dirs.sort();
@@ -356,7 +355,11 @@ async fn main() -> Result<()> {
     if let Some(test_name) = matches.get_one::<String>("test_name") {
         // Process single test directory
         if !test_dirs.contains(test_name) {
-            bail!("Error: Test directory '{}' not found. Available tests: {:?}", test_name, test_dirs);
+            bail!(
+                "Error: Test directory '{}' not found. Available tests: {:?}",
+                test_name,
+                test_dirs
+            );
         }
 
         process_test_directory(test_name, &tests_dir, &temp_repo, &github_config).await?;
@@ -396,7 +399,7 @@ async fn main() -> Result<()> {
         if current_batch == total_batches {
             end_idx += remainder;
         }
-        
+
         // Ensure we don't go out of bounds
         end_idx = end_idx.min(total_tests);
 
@@ -448,12 +451,13 @@ async fn main() -> Result<()> {
             );
         }
 
-        println!(
-            "✅ Finished processing batch {current_batch}/{total_batches} successfully"
-        );
+        println!("✅ Finished processing batch {current_batch}/{total_batches} successfully");
     } else {
         // Process all test directories in parallel (default behavior)
-        println!("Processing all {} test directories in parallel...", test_dirs.len());
+        println!(
+            "Processing all {} test directories in parallel...",
+            test_dirs.len()
+        );
 
         let tasks: Vec<_> = test_dirs
             .iter()
@@ -496,7 +500,10 @@ async fn main() -> Result<()> {
             );
         }
 
-        println!("✅ Finished processing all {} tests successfully", test_dirs.len());
+        println!(
+            "✅ Finished processing all {} tests successfully",
+            test_dirs.len()
+        );
     }
 
     Ok(())
@@ -518,7 +525,7 @@ async fn process_test_directory(
     // Find the query file - could be queries.hx or file*.hx
     let mut query_file_path = None;
     let schema_hx_path = folder_path.join("schema.hx");
-    
+
     // First check for queries.hx
     let queries_hx_path = folder_path.join("queries.hx");
     if queries_hx_path.exists() && queries_hx_path.is_file() {
@@ -529,17 +536,18 @@ async fn process_test_directory(
         let mut entries = entries;
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
-            if let Some(file_name) = path.file_name() {
-                if let Some(name_str) = file_name.to_str() {
-                    if name_str.starts_with("file") && name_str.ends_with(".hx") && !name_str.contains("schema") {
-                        query_file_path = Some(path);
-                        break;
-                    }
-                }
+            if let Some(file_name) = path.file_name()
+                && let Some(name_str) = file_name.to_str()
+                && name_str.starts_with("file")
+                && name_str.ends_with(".hx")
+                && !name_str.contains("schema")
+            {
+                query_file_path = Some(path);
+                break;
             }
         }
     }
-    
+
     // Skip if no query file found or if it's empty
     if let Some(ref query_path) = query_file_path {
         let content = fs::read_to_string(query_path).await?;
@@ -552,7 +560,7 @@ async fn process_test_directory(
     }
 
     // Create a temporary directory for this test
-    let temp_dir = env::temp_dir().join(format!("helix_temp_{}", test_name));
+    let temp_dir = env::temp_dir().join(format!("helix_temp_{test_name}"));
     if temp_dir.exists() {
         fs::remove_dir_all(&temp_dir)
             .await
@@ -595,9 +603,8 @@ async fn process_test_directory(
         let stderr = String::from_utf8_lossy(&output.stderr);
         let stdout = String::from_utf8_lossy(&output.stdout);
         // For helix compilation, we'll show the raw output since it's not cargo format
-        let error_message = format!(
-            "❌ HELIX COMPILE FAILED for {test_name}\nStderr: {stderr}\nStdout: {stdout}"
-        );
+        let error_message =
+            format!("❌ HELIX COMPILE FAILED for {test_name}\nStderr: {stderr}\nStdout: {stdout}");
 
         // Create GitHub issue if configuration is available
         if let Some(config) = github_config {
