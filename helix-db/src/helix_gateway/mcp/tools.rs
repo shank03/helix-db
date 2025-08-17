@@ -1,22 +1,24 @@
 use crate::{
     debug_println,
     helix_engine::{
-        graph_core::ops::{
-            bm25::search_bm25::SearchBM25Adapter,
-            g::G,
-            in_::{
-                in_::{InAdapter, InNodesIterator},
-                in_e::{InEdgesAdapter, InEdgesIterator},
+        traversal_core::{
+            ops::{
+                bm25::search_bm25::SearchBM25Adapter,
+                g::G,
+                in_::{
+                    in_::{InAdapter, InNodesIterator},
+                    in_e::{InEdgesAdapter, InEdgesIterator},
+                },
+                out::{
+                    out::{OutAdapter, OutNodesIterator},
+                    out_e::{OutEdgesAdapter, OutEdgesIterator},
+                },
+                source::{add_e::EdgeType, e_from_type::EFromType, n_from_type::NFromType},
+                vectors::{brute_force_search::BruteForceSearchVAdapter, search::SearchVAdapter},
             },
-            out::{
-                out::{OutAdapter, OutNodesIterator},
-                out_e::{OutEdgesAdapter, OutEdgesIterator},
-            },
-            source::{add_e::EdgeType, e_from_type::EFromType, n_from_type::NFromType},
-            tr_val::{Traversable, TraversalVal},
-            vectors::{brute_force_search::BruteForceSearchVAdapter, search::SearchVAdapter},
+            traversal_value::{Traversable, TraversalValue},
         },
-        storage_core::storage_core::HelixGraphStorage,
+        storage_core::HelixGraphStorage,
         types::GraphError,
         vector_core::vector::HVector,
     },
@@ -119,14 +121,14 @@ trait McpTools<'a> {
         connection: &'a MCPConnection,
         edge_label: String,
         edge_type: EdgeType,
-    ) -> Result<Vec<TraversalVal>, GraphError>;
+    ) -> Result<Vec<TraversalValue>, GraphError>;
 
     fn out_e_step(
         &'a self,
         txn: &'a RoTxn,
         connection: &'a MCPConnection,
         edge_label: String,
-    ) -> Result<Vec<TraversalVal>, GraphError>;
+    ) -> Result<Vec<TraversalValue>, GraphError>;
 
     fn in_step(
         &'a self,
@@ -134,28 +136,28 @@ trait McpTools<'a> {
         connection: &'a MCPConnection,
         edge_label: String,
         edge_type: EdgeType,
-    ) -> Result<Vec<TraversalVal>, GraphError>;
+    ) -> Result<Vec<TraversalValue>, GraphError>;
 
     fn in_e_step(
         &'a self,
         txn: &'a RoTxn,
         connection: &'a MCPConnection,
         edge_label: String,
-    ) -> Result<Vec<TraversalVal>, GraphError>;
+    ) -> Result<Vec<TraversalValue>, GraphError>;
 
     fn n_from_type(
         &'a self,
         txn: &'a RoTxn,
         connection: &'a MCPConnection,
         node_type: String,
-    ) -> Result<Vec<TraversalVal>, GraphError>;
+    ) -> Result<Vec<TraversalValue>, GraphError>;
 
     fn e_from_type(
         &'a self,
         txn: &'a RoTxn,
         connection: &'a MCPConnection,
         edge_type: String,
-    ) -> Result<Vec<TraversalVal>, GraphError>;
+    ) -> Result<Vec<TraversalValue>, GraphError>;
 
     /// filters items based on properies and traversal existence
     /// a node or edge needs to have been search first though
@@ -164,7 +166,7 @@ trait McpTools<'a> {
         txn: &'a RoTxn,
         connection: &'a MCPConnection,
         filter: FilterTraversal,
-    ) -> Result<Vec<TraversalVal>, GraphError>;
+    ) -> Result<Vec<TraversalValue>, GraphError>;
 
     /// BM25
     fn search_keyword(
@@ -174,7 +176,7 @@ trait McpTools<'a> {
         query: String,
         limit: usize,
         label: String,
-    ) -> Result<Vec<TraversalVal>, GraphError>;
+    ) -> Result<Vec<TraversalValue>, GraphError>;
 
     /// HNSW Search with built int embedding model
     fn search_vector_text(
@@ -183,7 +185,7 @@ trait McpTools<'a> {
         connection: &'a MCPConnection,
         query: String,
         label: String,
-    ) -> Result<Vec<TraversalVal>, GraphError>;
+    ) -> Result<Vec<TraversalValue>, GraphError>;
 
     fn search_vector(
         &'a self,
@@ -192,7 +194,7 @@ trait McpTools<'a> {
         vector: Vec<f64>,
         k: usize,
         min_score: Option<f64>,
-    ) -> Result<Vec<TraversalVal>, GraphError>;
+    ) -> Result<Vec<TraversalValue>, GraphError>;
 }
 
 impl<'a> McpTools<'a> for McpBackend {
@@ -202,7 +204,7 @@ impl<'a> McpTools<'a> for McpBackend {
         connection: &'a MCPConnection,
         edge_label: String,
         edge_type: EdgeType,
-    ) -> Result<Vec<TraversalVal>, GraphError> {
+    ) -> Result<Vec<TraversalValue>, GraphError> {
         let db = Arc::clone(&self.db);
 
         let iter = connection
@@ -242,7 +244,7 @@ impl<'a> McpTools<'a> for McpBackend {
         txn: &'a RoTxn,
         connection: &'a MCPConnection,
         edge_label: String,
-    ) -> Result<Vec<TraversalVal>, GraphError> {
+    ) -> Result<Vec<TraversalValue>, GraphError> {
         let db = Arc::clone(&self.db);
 
         let iter = connection
@@ -282,7 +284,7 @@ impl<'a> McpTools<'a> for McpBackend {
         connection: &'a MCPConnection,
         edge_label: String,
         edge_type: EdgeType,
-    ) -> Result<Vec<TraversalVal>, GraphError> {
+    ) -> Result<Vec<TraversalValue>, GraphError> {
         let db = Arc::clone(&self.db);
 
         let iter = connection
@@ -322,7 +324,7 @@ impl<'a> McpTools<'a> for McpBackend {
         txn: &'a RoTxn,
         connection: &'a MCPConnection,
         edge_label: String,
-    ) -> Result<Vec<TraversalVal>, GraphError> {
+    ) -> Result<Vec<TraversalValue>, GraphError> {
         let db = Arc::clone(&self.db);
 
         let iter = connection
@@ -361,7 +363,7 @@ impl<'a> McpTools<'a> for McpBackend {
         txn: &'a RoTxn,
         _connection: &'a MCPConnection,
         node_type: String,
-    ) -> Result<Vec<TraversalVal>, GraphError> {
+    ) -> Result<Vec<TraversalValue>, GraphError> {
         let db = Arc::clone(&self.db);
 
         let iter = NFromType {
@@ -379,7 +381,7 @@ impl<'a> McpTools<'a> for McpBackend {
         txn: &'a RoTxn,
         _connection: &'a MCPConnection,
         edge_type: String,
-    ) -> Result<Vec<TraversalVal>, GraphError> {
+    ) -> Result<Vec<TraversalValue>, GraphError> {
         let db = Arc::clone(&self.db);
 
         let iter = EFromType {
@@ -397,7 +399,7 @@ impl<'a> McpTools<'a> for McpBackend {
         txn: &'a RoTxn,
         connection: &'a MCPConnection,
         filter: FilterTraversal,
-    ) -> Result<Vec<TraversalVal>, GraphError> {
+    ) -> Result<Vec<TraversalValue>, GraphError> {
         let result = _filter_items(Arc::clone(&self.db), txn, connection.iter.clone(), &filter);
 
         Ok(result)
@@ -410,14 +412,17 @@ impl<'a> McpTools<'a> for McpBackend {
         query: String,
         limit: usize,
         label: String,
-    ) -> Result<Vec<TraversalVal>, GraphError> {
+    ) -> Result<Vec<TraversalValue>, GraphError> {
         let db = Arc::clone(&self.db);
 
-//         let items = connection.iter.clone().collect::<Vec<_>>();
+        //         let items = connection.iter.clone().collect::<Vec<_>>();
 
         // Check if BM25 is enabled and has metadata
         if let Some(bm25) = &db.bm25 {
-            match bm25.metadata_db.get(txn, crate::helix_engine::bm25::bm25::METADATA_KEY) {
+            match bm25
+                .metadata_db
+                .get(txn, crate::helix_engine::bm25::bm25::METADATA_KEY)
+            {
                 Ok(Some(_)) => {
                     let results = G::new(db, txn)
                         .search_bm25(&label, &query, limit)?
@@ -425,15 +430,18 @@ impl<'a> McpTools<'a> for McpBackend {
 
                     println!("BM25 search results: {results:?}");
                     Ok(results)
-                },
+                }
                 Ok(None) => {
                     // BM25 metadata not found - index not initialized yet
                     debug_println!("BM25 index not initialized yet - returning empty results");
                     Ok(vec![])
-                },
+                }
                 Err(_e) => {
                     // Error accessing metadata database
-                    debug_println!("Error checking BM25 metadata: {:?} - returning empty results", e);
+                    debug_println!(
+                        "Error checking BM25 metadata: {:?} - returning empty results",
+                        e
+                    );
                     Ok(vec![])
                 }
             }
@@ -450,7 +458,7 @@ impl<'a> McpTools<'a> for McpBackend {
         _connection: &'a MCPConnection,
         query: String,
         label: String,
-    ) -> Result<Vec<TraversalVal>, GraphError> {
+    ) -> Result<Vec<TraversalValue>, GraphError> {
         let db = Arc::clone(&self.db);
 
         let model = get_embedding_model(None, None, None)?;
@@ -472,7 +480,7 @@ impl<'a> McpTools<'a> for McpBackend {
         vector: Vec<f64>,
         k: usize,
         min_score: Option<f64>,
-    ) -> Result<Vec<TraversalVal>, GraphError> {
+    ) -> Result<Vec<TraversalValue>, GraphError> {
         let db = Arc::clone(&self.db);
 
         let items = connection.iter.clone().collect::<Vec<_>>();
@@ -483,7 +491,7 @@ impl<'a> McpTools<'a> for McpBackend {
 
         if let Some(min_score) = min_score {
             res.retain(|item| {
-                if let TraversalVal::Vector(vector) = item {
+                if let TraversalValue::Vector(vector) = item {
                     vector.get_distance() > min_score
                 } else {
                     false
@@ -503,9 +511,9 @@ pub trait FilterValues {
 pub(super) fn _filter_items(
     db: Arc<HelixGraphStorage>,
     txn: &RoTxn,
-    iter: impl Iterator<Item = TraversalVal>,
+    iter: impl Iterator<Item = TraversalValue>,
     filter: &FilterTraversal,
-) -> Vec<TraversalVal> {
+) -> Vec<TraversalValue> {
     let db = Arc::clone(&db);
 
     debug_println!("properties: {:?}", filter);
@@ -514,7 +522,7 @@ pub(super) fn _filter_items(
     let initial_filtered_iter = match &filter.properties {
         Some(properties) => iter
             .filter(move |item| {
-                properties.iter().any( |filters| {
+                properties.iter().any(|filters| {
                     filters.iter().all(|filter| {
                         debug_println!("filter: {:?}", filter);
                         match item.check_property(&filter.key) {
@@ -614,4 +622,3 @@ pub(super) fn _filter_items(
     debug_println!("result: {:?}", result);
     result
 }
-

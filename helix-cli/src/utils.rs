@@ -4,7 +4,7 @@ use crate::{
 };
 use futures_util::StreamExt;
 use helix_db::{
-    helix_engine::graph_core::config::Config,
+    helix_engine::traversal_core::config::Config,
     helixc::{
         analyzer::analyzer::analyze,
         generator::{Source as GeneratedSource, tsdisplay::ToTypeScript},

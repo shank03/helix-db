@@ -367,7 +367,7 @@ use heed3::RoTxn;
 use helix_macros::{handler, tool_call, mcp_handler, migration};
 use helix_db::{
     helix_engine::{
-        graph_core::{
+        traversal_core::{
             config::{Config, GraphConfig, VectorConfig},
             ops::{
                 bm25::search_bm25::SearchBM25Adapter,
@@ -385,18 +385,18 @@ use helix_db::{
                     n_from_index::NFromIndexAdapter,
                     n_from_type::NFromTypeAdapter,
                 },
-                tr_val::{Traversable, TraversalVal},
                 util::{
                     dedup::DedupAdapter, drop::Drop, exist::Exist, filter_mut::FilterMut,
                     filter_ref::FilterRefAdapter, map::MapAdapter, paths::ShortestPathAdapter,
                     props::PropsAdapter, range::RangeAdapter, update::UpdateAdapter, order::OrderByAdapter,
-                },
-                vectors::{
-                    brute_force_search::BruteForceSearchVAdapter, insert::InsertVAdapter,
-                    search::SearchVAdapter,
-                },
-            }
-        },
+                    },
+                    vectors::{
+                        brute_force_search::BruteForceSearchVAdapter, insert::InsertVAdapter,
+                        search::SearchVAdapter,
+                    },
+                }
+            },
+        traversal_value::{Traversable, TraversalValue},
         types::GraphError,
         vector_core::vector::HVector,
     },

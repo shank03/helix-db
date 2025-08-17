@@ -5,9 +5,7 @@ extern crate syn;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
-    Expr, FnArg, Ident, ItemFn, ItemTrait, LitInt, Pat, Stmt, Token, TraitItem,
-    parse::{Parse, ParseStream},
-    parse_macro_input,
+    parse::{Parse, ParseStream}, parse_macro_input, Expr, FnArg, Ident, ItemFn, ItemStruct, ItemTrait, LitInt, Pat, Stmt, Token, TraitItem
 };
 
 #[proc_macro_attribute]
@@ -21,7 +19,7 @@ pub fn handler(_args: TokenStream, item: TokenStream) -> TokenStream {
         "_MAIN_HANDLER_REGISTRATION_{}",
         fn_name.to_string().to_uppercase()
     );
-   
+
     let expanded = quote! {
         #input_fn
 
@@ -208,7 +206,7 @@ pub fn tool_calls(_attr: TokenStream, input: TokenStream) -> TokenStream {
 
                     let result = input.mcp_backend.#fn_name(&txn, &connection, #(data.data.#field_names),*)?;
 
-                    let first = result.first().unwrap_or(&TraversalVal::Empty).clone();
+                    let first = result.first().unwrap_or(&TraversalValue::Empty).clone();
 
                     connection.iter = result.into_iter();
                     let mut connections = input.mcp_connections.lock().unwrap();
@@ -308,7 +306,7 @@ pub fn tool_call(args: TokenStream, input: TokenStream) -> TokenStream {
 
             let mut result = #mcp_query_block;
 
-            let first = result.next().unwrap_or(TraversalVal::Empty);
+            let first = result.next().unwrap_or(TraversalValue::Empty);
 
             connection.iter = result.into_iter();
             let mut connections = input.mcp_connections.lock().unwrap();
@@ -345,7 +343,6 @@ impl Parse for MigrationArgs {
     }
 }
 
-
 struct MigrationArgs {
     item: Ident,
     _comma: Token![,],
@@ -368,12 +365,11 @@ pub fn migration(args: TokenStream, item: TokenStream) -> TokenStream {
         "_MAIN_HANDLER_REGISTRATION_{}",
         fn_name.to_string().to_uppercase()
     );
-    
-    
+
     let item = &args.item;
     let from_version = &args.from_version;
     let to_version = &args.to_version;
-    
+
     let expanded = quote! {
         #input_fn
 
@@ -394,4 +390,20 @@ pub fn migration(args: TokenStream, item: TokenStream) -> TokenStream {
         };
     };
     expanded.into()
+}
+
+#[proc_macro_attribute]
+pub fn helix_node(_attr: TokenStream, input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as ItemStruct);
+    let name = &input.ident;
+    let fields = input.fields.iter();
+
+    let expanded = quote! {
+        pub struct #name {
+            id: String,
+            #(#fields),*
+        }
+    };
+
+    TokenStream::from(expanded)
 }

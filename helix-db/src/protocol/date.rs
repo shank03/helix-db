@@ -8,7 +8,7 @@ use core::fmt;
 use std::ops::Deref;
 
 use chrono::{DateTime, NaiveDate, Utc};
-use serde::{de::Visitor, Deserializer, Serialize};
+use serde::{Deserializer, Serialize, de::Visitor};
 use sonic_rs::Deserialize;
 
 use super::value::Value;
@@ -52,7 +52,7 @@ impl Date {
                     None => {
                         return Err(DateError::ParseError(
                             "Date must be a valid date".to_string(),
-                        ))
+                        ));
                     }
                 };
                 Ok(Date(date))
@@ -63,7 +63,7 @@ impl Date {
                     None => {
                         return Err(DateError::ParseError(
                             "Date must be a valid date".to_string(),
-                        ))
+                        ));
                     }
                 };
                 Ok(Date(date))
@@ -86,7 +86,7 @@ impl<'de> Visitor<'de> for DateVisitor {
 
     /// Visits a string and parses it into a chrono DateTime<Utc>.
     ///
-    /// TODO: check if this is correct -> is the same as implementation above so should be fine. 
+    /// TODO: check if this is correct -> is the same as implementation above so should be fine.
     fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
     where
         E: serde::de::Error,
@@ -167,5 +167,52 @@ impl Deref for Date {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_naive_date_serialization() {
+        let date = Date::new(&Value::String("2021-01-01".to_string())).unwrap();
+        let serialized = sonic_rs::to_string(&date).unwrap();
+        assert_eq!(serialized, "\"2021-01-01T00:00:00+00:00\"");
+    }
+
+    #[test]
+    fn test_naive_date_deserialization() {
+        let date = Date::new(&Value::String("2021-01-01".to_string())).unwrap();
+        let serialized = sonic_rs::to_string(&date).unwrap();
+        assert_eq!(serialized, "\"2021-01-01T00:00:00+00:00\"");
+    }
+
+    #[test]
+    fn test_timestamp_serialization() {
+        let date = Date::new(&Value::I64(1609459200)).unwrap();
+        let serialized = sonic_rs::to_string(&date).unwrap();
+        assert_eq!(serialized, "\"2021-01-01T00:00:00+00:00\"");
+    }
+
+    #[test]
+    fn test_timestamp_deserialization() {
+        let date = Date::new(&Value::I64(1609459200)).unwrap();
+        let serialized = sonic_rs::to_string(&date).unwrap();
+        assert_eq!(serialized, "\"2021-01-01T00:00:00+00:00\"");
+    }
+
+    #[test]
+    fn test_rfc3339_serialization() {
+        let date = Date::new(&Value::String("2021-01-01T00:00:00Z".to_string())).unwrap();
+        let serialized = sonic_rs::to_string(&date).unwrap();
+        assert_eq!(serialized, "\"2021-01-01T00:00:00+00:00\"");
+    }
+
+    #[test]
+    fn test_rfc3339_deserialization() {
+        let date = Date::new(&Value::String("2021-01-01T00:00:00Z".to_string())).unwrap();
+        let serialized = sonic_rs::to_string(&date).unwrap();
+        assert_eq!(serialized, "\"2021-01-01T00:00:00+00:00\"");
     }
 }

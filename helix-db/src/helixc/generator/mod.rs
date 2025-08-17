@@ -2,7 +2,7 @@ use core::fmt;
 use std::fmt::Display;
 
 use crate::{
-    helix_engine::graph_core::config::Config,
+    helix_engine::traversal_core::config::Config,
     helixc::generator::{
         migrations::GeneratedMigration,
         queries::Query,
@@ -22,9 +22,6 @@ pub mod statements;
 pub mod traversal_steps;
 pub mod tsdisplay;
 pub mod utils;
-
-#[cfg(test)]
-mod generator_tests;
 
 pub struct Source {
     pub nodes: Vec<NodeSchema>,
