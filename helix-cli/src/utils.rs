@@ -13,7 +13,7 @@ use helix_db::{
     },
     utils::styled_string::StyledString,
 };
-use helix_metrics::events::{DeployEvent, EventData, EventType};
+use helix_metrics::events::{DeployEvent, EventType};
 use reqwest::Client;
 use serde::Deserialize;
 use sonic_rs::{JsonValueTrait, Value as JsonValue, json};

@@ -30,6 +30,12 @@ pub const METRICS_URL: &str = "https://logs.helix-db.com";
 
 pub struct HelixMetricsClient {}
 
+impl Default for HelixMetricsClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HelixMetricsClient {
     pub fn new() -> Self {
         Self {}
@@ -53,11 +59,12 @@ impl HelixMetricsClient {
             event_data,
         };
 
-        let _ = self
-            .get_client()
-            .post(METRICS_URL)
-            .body(sonic_rs::to_vec(&raw_event).unwrap())
-            .send();
+        drop(
+            self.get_client()
+                .post(METRICS_URL)
+                .body(sonic_rs::to_vec(&raw_event).unwrap())
+                .send(),
+        );
     }
 }
 

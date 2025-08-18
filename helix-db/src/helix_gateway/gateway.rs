@@ -160,7 +160,7 @@ async fn post_handler(
 ) -> axum::http::Response<Body> {
     // #[cfg(feature = "metrics")]
     let start_time = Instant::now();
-    let body = req.body.clone();
+    let body = req.body.to_vec();
     let query_name = req.name.clone();
     let res = state.worker_pool.process(req).await;
 

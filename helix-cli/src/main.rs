@@ -5,11 +5,11 @@ use crate::{
     utils::*,
 };
 use clap::Parser;
+use helix_db::{helix_engine::traversal_core::config::Config, utils::styled_string::StyledString};
 use helix_metrics::{
     HelixMetricsClient,
-    events::{CompileEvent, DeployEvent, EventData, EventType},
+    events::{DeployEvent, EventType},
 };
-use helix_db::{helix_engine::traversal_core::config::Config, utils::styled_string::StyledString};
 use serde::Deserialize;
 use sonic_rs::json;
 use spinners::{Spinner, Spinners};
@@ -639,18 +639,14 @@ async fn main() -> ExitCode {
                 } else {
                     println!("{}", "Metrics already disabled".yellow().bold());
                 }
-            } else {
-                if !metrics {
-                    // write to config_path
-                    let mut file = File::open(config_path).unwrap();
-                    let mut contents = String::new();
-                    file.read_to_string(&mut contents).unwrap();
-                    let new_contents = contents.replace("metrics=false", "metrics=true");
-                    file.write_all(new_contents.as_bytes()).unwrap();
-                    println!("{}", "Metrics enabled".green().bold());
-                } else {
-                    println!("{}", "Metrics enabled".green().bold());
-                }
+            } else if !metrics {
+                // write to config_path
+                let mut file = File::open(config_path).unwrap();
+                let mut contents = String::new();
+                file.read_to_string(&mut contents).unwrap();
+                let new_contents = contents.replace("metrics=false", "metrics=true");
+                file.write_all(new_contents.as_bytes()).unwrap();
+                println!("{}", "Metrics enabled".green().bold());
             }
         }
 
