@@ -5,11 +5,11 @@ use crate::{
     utils::*,
 };
 use clap::Parser;
-use helix_db::{helix_engine::graph_core::config::Config, utils::styled_string::StyledString};
 use helix_metrics::{
     HelixMetricsClient,
     events::{CompileEvent, DeployEvent, EventData, EventType},
 };
+use helix_db::{helix_engine::traversal_core::config::Config, utils::styled_string::StyledString};
 use serde::Deserialize;
 use sonic_rs::json;
 use spinners::{Spinner, Spinners};

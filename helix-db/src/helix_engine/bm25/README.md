@@ -27,7 +27,7 @@ The BM25 implementation uses four LMDB databases:
 ```rust
 use helixdb::helix_engine::{
     bm25::BM25,
-    storage_core::storage_core::HelixGraphStorage,
+    storage_core::HelixGraphStorage,
 };
 
 // Assuming you have a HelixGraphStorage instance

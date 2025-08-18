@@ -14,7 +14,6 @@ use sonic_rs::json;
 use tracing::{info, trace, warn};
 
 use super::router::router::{HandlerFn, HelixRouter};
-use crate::helix_engine::graph_core::graph_core::HelixGraphEngineOpts;
 #[cfg(feature = "dev-instance")]
 use crate::helix_gateway::builtin::all_nodes_and_edges::nodes_edges_handler;
 #[cfg(feature = "dev-instance")]
@@ -28,7 +27,8 @@ use crate::helix_gateway::introspect_schema::introspect_schema_handler;
 use crate::helix_gateway::worker_pool::WorkerPool;
 use crate::protocol;
 use crate::{
-    helix_engine::graph_core::graph_core::HelixGraphEngine, helix_gateway::mcp::mcp::MCPHandlerFn,
+    helix_engine::traversal_core::{HelixGraphEngine, HelixGraphEngineOpts},
+    helix_gateway::mcp::mcp::MCPHandlerFn,
 };
 
 pub struct GatewayOpts {}

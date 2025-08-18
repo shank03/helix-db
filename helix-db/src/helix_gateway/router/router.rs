@@ -8,7 +8,7 @@
 // returns response
 
 use crate::{
-    helix_engine::{graph_core::graph_core::HelixGraphEngine, types::GraphError},
+    helix_engine::{traversal_core::HelixGraphEngine, types::GraphError},
     helix_gateway::mcp::mcp::MCPHandlerFn,
     protocol::request::RetChan,
 };

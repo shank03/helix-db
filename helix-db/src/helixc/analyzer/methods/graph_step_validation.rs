@@ -4,7 +4,7 @@ use crate::helixc::analyzer::utils::type_in_scope;
 use crate::helixc::generator::utils::EmbedData;
 use crate::{
     generate_error,
-    helix_engine::graph_core::ops::source::add_e::EdgeType,
+    helix_engine::traversal_core::ops::source::add_e::EdgeType,
     helixc::{
         analyzer::{
             analyzer::Ctx,
@@ -379,7 +379,7 @@ pub(crate) fn apply_graph_step<'a>(
                     is_valid_identifier(ctx, original_query, sv.loc.clone(), i.as_str());
                     // if is in params then use data.
                     let _ = type_in_scope(ctx, original_query, sv.loc.clone(), scope, i.as_str());
-                    let value = gen_identifier_or_param(original_query, i.as_str(), false, true);
+                    let value = gen_identifier_or_param(original_query, i.as_str(), true, false);
                     VecData::Standard(value)
                 }
                 Some(VectorData::Embed(e)) => {

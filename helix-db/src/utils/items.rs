@@ -21,6 +21,7 @@ pub struct Node {
     /// The label of the node.
     pub label: String,
     /// The version of the node.
+    #[serde(default)]
     pub version: u8,
     /// The properties of the node.
     ///
@@ -104,6 +105,8 @@ pub struct Edge {
     pub id: u128,
     /// The label of the edge.
     pub label: String,
+    /// The version of the edge.
+    #[serde(default)]
     pub version: u8,
     /// The ID of the from node.
     pub from_node: u128,

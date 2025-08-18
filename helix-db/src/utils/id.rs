@@ -116,3 +116,39 @@ impl From<ID> for u128 {
 pub fn v6_uuid() -> u128 {
     uuid::Uuid::now_v6(&[1, 2, 3, 4, 5, 6]).as_u128()
 }
+
+
+#[cfg(test)]
+mod tests {
+    use sonic_rs::json;
+
+    use super::*;
+
+    
+    #[test]
+    fn test_uuid_deserialization() {
+        let uuid = json!({ "id": "1f07ae4b-e354-6660-b5f0-fd3ce8bc4b49" });
+
+        #[derive(Deserialize)]
+        struct IDWrapper {
+            id: ID,
+        }
+
+
+        let deserialized: IDWrapper = sonic_rs::from_value(&uuid).unwrap();
+        assert_eq!(deserialized.id.stringify(), "1f07ae4b-e354-6660-b5f0-fd3ce8bc4b49");
+    }
+
+    #[test]
+    fn test_uuid_serialization() {
+        let uuid = "1f07ae4b-e354-6660-b5f0-fd3ce8bc4b49";
+        let id = ID::from(uuid);
+
+        let serialized = sonic_rs::to_string(&id).unwrap();
+
+        let uuid_u128 = str::parse::<u128>(&serialized).unwrap();
+        let uuid = uuid::Uuid::from_u128(uuid_u128);
+
+        assert_eq!(uuid.to_string(), "1f07ae4b-e354-6660-b5f0-fd3ce8bc4b49");
+    }
+}
