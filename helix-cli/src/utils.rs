@@ -1,4 +1,5 @@
 use crate::{
+    HELIX_METRICS_CLIENT,
     instance_manager::{InstanceInfo, InstanceManager},
     types::*,
 };
@@ -12,9 +13,10 @@ use helix_db::{
     },
     utils::styled_string::StyledString,
 };
+use helix_metrics::events::{DeployEvent, EventData, EventType};
 use reqwest::Client;
 use serde::Deserialize;
-use serde_json::{Value as JsonValue, json};
+use sonic_rs::{JsonValueTrait, Value as JsonValue, json};
 use spinners::{Spinner, Spinners};
 use std::{
     env,
@@ -278,7 +280,7 @@ pub fn parse_credentials(creds: &str) -> Credentials {
             }
         }
     }
-    
+
     credentials
 }
 
@@ -695,7 +697,7 @@ pub fn deploy_helix(
     code: Content,
     instance_id: Option<String>,
     release_mode: BuildMode,
-) -> Result<(), String> {
+) -> Result<String, String> {
     let mut sp = Spinner::new(Spinners::Dots9, "Starting Helix instance".into());
 
     let instance_manager = InstanceManager::new().unwrap();
@@ -730,7 +732,7 @@ pub fn deploy_helix(
                         .to_string(),
                 );
                 print_instance(&instance);
-                Ok(())
+                Ok(instance.id)
             }
             Err(e) => {
                 sp.stop_with_message("Failed to start Helix instance".red().bold().to_string());
@@ -749,7 +751,7 @@ pub fn deploy_helix(
                         .to_string(),
                 );
                 print_instance(&instance);
-                Ok(())
+                Ok(instance.id)
             }
             Err(e) => {
                 sp.stop_with_message("Failed to start Helix instance".red().bold().to_string());
@@ -861,6 +863,21 @@ pub async fn redeploy_helix_remote(
         }
     };
 
+    let deployment = DeployEvent {
+        cluster_id: cluster.clone(),
+        queries_string: content
+            .source
+            .queries
+            .iter()
+            .map(|q| q.name.clone())
+            .collect::<Vec<String>>()
+            .join("\n"),
+        num_of_queries: content.source.queries.len() as u32,
+        time_taken_sec: 0,
+        success: true,
+        error_messages: None,
+    };
+
     // upload queries to central server
     let payload = json!({
         "user_id": user_id,
@@ -885,6 +902,7 @@ pub async fn redeploy_helix_remote(
         Ok(response) => {
             if response.status().is_success() {
                 sp.stop_with_message("Queries uploaded to remote db".green().bold().to_string());
+                HELIX_METRICS_CLIENT.send_event(EventType::Deploy, deployment);
             } else {
                 sp.stop_with_message(
                     "Error uploading queries to remote db"

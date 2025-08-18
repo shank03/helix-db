@@ -1,5 +1,7 @@
+use std::sync::LazyLock;
 use std::sync::atomic::{self, AtomicUsize};
 use std::thread::available_parallelism;
+use std::time::Instant;
 use std::{collections::HashMap, sync::Arc};
 
 use axum::body::Body;
@@ -7,6 +9,8 @@ use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use core_affinity::{CoreId, set_for_current};
+use helix_metrics::events::{EventType, QueryErrorEvent, QuerySuccessEvent};
+use sonic_rs::json;
 use tracing::{info, trace, warn};
 
 use super::router::router::{HandlerFn, HelixRouter};
@@ -33,6 +37,9 @@ impl GatewayOpts {
     pub const DEFAULT_POOL_SIZE: usize = 8;
 }
 
+pub static HELIX_METRICS_CLIENT: LazyLock<helix_metrics::HelixMetricsClient> =
+    LazyLock::new(helix_metrics::HelixMetricsClient::new);
+
 pub struct HelixGateway {
     address: String,
     worker_size: usize,
@@ -40,6 +47,7 @@ pub struct HelixGateway {
     graph_access: Arc<HelixGraphEngine>,
     router: Arc<HelixRouter>,
     opts: Option<HelixGraphEngineOpts>,
+    cluster_id: Option<String>,
 }
 
 impl HelixGateway {
@@ -53,6 +61,7 @@ impl HelixGateway {
         opts: Option<HelixGraphEngineOpts>,
     ) -> HelixGateway {
         let router = Arc::new(HelixRouter::new(routes, mcp_routes));
+        let cluster_id = std::env::var("CLUSTER_ID").ok();
         HelixGateway {
             address: address.to_string(),
             graph_access,
@@ -60,6 +69,7 @@ impl HelixGateway {
             worker_size,
             io_size,
             opts,
+            cluster_id,
         }
     }
 
@@ -131,6 +141,7 @@ impl HelixGateway {
         let axum_app = axum_app.with_state(Arc::new(AppState {
             worker_pool,
             schema_json: self.opts.and_then(|o| o.config.schema),
+            cluster_id: self.cluster_id,
         }));
 
         rt.block_on(async move {
@@ -147,12 +158,39 @@ async fn post_handler(
     State(state): State<Arc<AppState>>,
     req: protocol::request::Request,
 ) -> axum::http::Response<Body> {
+    // #[cfg(feature = "metrics")]
+    let start_time = Instant::now();
+    let body = req.body.clone();
+    let query_name = req.name.clone();
     let res = state.worker_pool.process(req).await;
 
     match res {
-        Ok(r) => r.into_response(),
+        Ok(r) => {
+            // #[cfg(feature = "metrics")]
+            {
+                HELIX_METRICS_CLIENT.send_event(
+                    EventType::QuerySuccess,
+                    QuerySuccessEvent {
+                        cluster_id: state.cluster_id.clone(),
+                        query_name,
+                        time_taken_usec: start_time.elapsed().as_micros() as u32,
+                    },
+                );
+            }
+            r.into_response()
+        }
         Err(e) => {
             info!(?e, "Got error");
+            HELIX_METRICS_CLIENT.send_event(
+                EventType::QueryError,
+                QueryErrorEvent {
+                    cluster_id: state.cluster_id.clone(),
+                    query_name,
+                    input_json: sonic_rs::to_string(&body).ok(),
+                    output_json: sonic_rs::to_string(&json!({ "error": e.to_string() })).ok(),
+                    time_taken_usec: start_time.elapsed().as_micros() as u32,
+                },
+            );
             e.into_response()
         }
     }
@@ -161,6 +199,7 @@ async fn post_handler(
 pub struct AppState {
     pub worker_pool: WorkerPool,
     pub schema_json: Option<String>,
+    pub cluster_id: Option<String>,
 }
 
 #[derive(Clone)]

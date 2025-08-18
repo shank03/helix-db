@@ -33,10 +33,10 @@ impl EventType {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct RawEvent {
+pub struct RawEvent<D: Serialize> {
     pub os: String,
     pub event_type: EventType,
-    pub event_data: EventData,
+    pub event_data: D,
     pub user_id: Option<String>,
 }
 
@@ -51,8 +51,6 @@ pub enum EventData {
     WriteError(WriteErrorEvent),
     ReadError(ReadErrorEvent),
 }
-
-
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CompileEvent {
@@ -90,40 +88,33 @@ pub struct WriteErrorEvent {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ReadErrorEvent {
-    cluster_id: String,
-    key: Vec<u8>,
+    pub cluster_id: String,
+    pub key: Vec<u8>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    key_string: Option<String>,
-    value: Vec<u8>,
+    pub key_string: Option<String>,
+    pub value: Vec<u8>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    value_string: Option<String>,
-    time_taken_usec: u32,
-    error_messages: String,
+    pub value_string: Option<String>,
+    pub time_taken_usec: u32,
+    pub error_messages: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct QueryErrorEvent {
-    cluster_id: String,
-    query_string: String,
-    input_json: String,
-    output_json: String,
-    time_taken_usec: u32,
-    uses_embeddings: bool,
-    uses_bm25: bool,
-    uses_vectors: bool,
+    pub query_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cluster_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input_json: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_json: Option<String>,
+    pub time_taken_usec: u32,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct QuerySuccessEvent {
-    cluster_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    query_string: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    input_json: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    output_json: Option<String>,
-    time_taken_usec: u32,
-    uses_embeddings: bool,
-    uses_bm25: bool,
-    uses_vectors: bool,
+    pub cluster_id: Option<String>,
+    pub query_name: String,
+    pub time_taken_usec: u32,
 }

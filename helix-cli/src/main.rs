@@ -11,7 +11,7 @@ use helix_metrics::{
     events::{CompileEvent, DeployEvent, EventData, EventType},
 };
 use serde::Deserialize;
-use serde_json::json;
+use sonic_rs::json;
 use spinners::{Spinner, Spinners};
 use std::{
     fmt::Write,
@@ -20,6 +20,7 @@ use std::{
     path::{Path, PathBuf},
     process::{Command, ExitCode},
     sync::LazyLock,
+    time::Instant,
 };
 
 mod args;
@@ -37,6 +38,7 @@ async fn main() -> ExitCode {
     let args = HelixCli::parse();
     match args.command {
         CommandType::Deploy(command) => {
+            let start_time = Instant::now();
             match Command::new("cargo").output() {
                 Ok(_) => {}
                 Err(_) => {
@@ -90,16 +92,15 @@ async fn main() -> ExitCode {
                         print_instance(&instance);
                         HELIX_METRICS_CLIENT.send_event(
                             EventType::Deploy,
-                            EventData::Deploy(DeployEvent {
+                            DeployEvent {
                                 cluster_id: instance.id.clone(),
                                 queries_string: "".to_string(),
                                 num_of_queries: 0,
                                 time_taken_sec: 0,
                                 success: true,
                                 error_messages: None,
-                            }),
+                            },
                         );
-                        
                     }
                     Err(e) => {
                         sp.stop_with_message("Failed to start instance".red().bold().to_string());
@@ -138,6 +139,22 @@ async fn main() -> ExitCode {
                 ) {
                     Ok(code) => code,
                     Err(_) => return ExitCode::FAILURE,
+                };
+                let queries_string = code
+                    .source
+                    .queries
+                    .iter()
+                    .map(|q| q.name.clone())
+                    .collect::<Vec<String>>()
+                    .join("\n");
+                let num_of_queries = code.source.queries.len() as u32;
+                let event = |instance_id: String, time_taken_sec: u32| DeployEvent {
+                    cluster_id: instance_id,
+                    queries_string,
+                    num_of_queries,
+                    time_taken_sec,
+                    success: true,
+                    error_messages: None,
                 };
 
                 if command.cluster.is_some()
@@ -182,7 +199,12 @@ async fn main() -> ExitCode {
                         }
                     };
                     match deploy_helix(port, code, None, BuildMode::from_release(command.release)) {
-                        Ok(_) => {}
+                        Ok(cluster_id) => {
+                            HELIX_METRICS_CLIENT.send_event(
+                                EventType::Deploy,
+                                event(cluster_id, start_time.elapsed().as_secs() as u32),
+                            );
+                        }
                         Err(_) => return ExitCode::FAILURE,
                     }
                     return ExitCode::FAILURE;

@@ -2,6 +2,8 @@ pub mod events;
 
 use std::{env::consts::OS, fs, path::Path, sync::LazyLock};
 
+use serde::Serialize;
+
 pub static METRICS_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Client::new);
 pub static HELIX_USER_ID: LazyLock<String> = LazyLock::new(|| {
     // read from credentials file
@@ -37,25 +39,24 @@ impl HelixMetricsClient {
         &METRICS_CLIENT
     }
 
-    pub fn send_event(&self, event_type: events::EventType, event_data: events::EventData) {
+    pub fn send_event<D: Serialize>(&self, event_type: events::EventType, event_data: D) {
         // get OS
         let os = OS.to_string();
 
         // get user id
         let user_id = Some(HELIX_USER_ID.as_str().to_string());
 
+        let raw_event = events::RawEvent {
+            os,
+            user_id,
+            event_type,
+            event_data,
+        };
+
         let _ = self
             .get_client()
             .post(METRICS_URL)
-            .body(
-                sonic_rs::to_vec(&events::RawEvent {
-                    os,
-                    user_id,
-                    event_type,
-                    event_data,
-                })
-                .unwrap(),
-            )
+            .body(sonic_rs::to_vec(&raw_event).unwrap())
             .send();
     }
 }
