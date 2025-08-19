@@ -51,7 +51,7 @@ fn test_from_v() {
     let mut txn = storage.graph_env.write_txn().unwrap();
 
     let node = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", None, None)
+        .add_n("person", None, None, None)
         .collect_to_val();
 
     let vector = G::new_mut(Arc::clone(&storage), &mut txn)
@@ -59,7 +59,15 @@ fn test_from_v() {
         .collect_to_val();
 
     let _ = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_e("knows", None, vector.id(), node.id(), false, EdgeType::Vec)
+        .add_e(
+            "knows",
+            None,
+            vector.id(),
+            node.id(),
+            false,
+            EdgeType::Vec,
+            None,
+        )
         .collect_to_val();
 
     txn.commit().unwrap();
@@ -82,7 +90,7 @@ fn test_to_v() {
     let mut txn = storage.graph_env.write_txn().unwrap();
 
     let node = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", None, None)
+        .add_n("person", None, None, None)
         .collect_to_val();
 
     let vector = G::new_mut(Arc::clone(&storage), &mut txn)
@@ -90,7 +98,15 @@ fn test_to_v() {
         .collect_to_val();
 
     let _ = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_e("knows", None, node.id(), vector.id(), false, EdgeType::Vec)
+        .add_e(
+            "knows",
+            None,
+            node.id(),
+            vector.id(),
+            false,
+            EdgeType::Vec,
+            None,
+        )
         .collect_to_val();
 
     txn.commit().unwrap();
@@ -115,7 +131,7 @@ fn test_brute_force_vector_search() {
     let mut txn = storage.graph_env.write_txn().unwrap();
 
     let node = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", None, None)
+        .add_n("person", None, None, None)
         .collect_to_val();
 
     let vectors = vec![
@@ -138,6 +154,7 @@ fn test_brute_force_vector_search() {
                 vector_id,
                 false,
                 EdgeType::Vec,
+                None,
             )
             .collect_to_val()
             .id();
@@ -168,15 +185,15 @@ fn test_order_by_desc() {
     let mut txn = storage.graph_env.write_txn().unwrap();
 
     let node = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "age" => 10 }), None)
+        .add_n("person", Some(props! { "age" => 10 }), None, None)
         .collect_to_val();
 
     let node2 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "age" => 20 }), None)
+        .add_n("person", Some(props! { "age" => 20 }), None, None)
         .collect_to_val();
 
     let node3 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "age" => 30 }), None)
+        .add_n("person", Some(props! { "age" => 30 }), None, None)
         .collect_to_val();
 
     txn.commit().unwrap();
@@ -271,10 +288,18 @@ fn test_delete_vector() {
         .insert_v::<fn(&HVector, &RoTxn) -> bool>(&[1.0, 1.0, 1.0, 1.0, 1.0, 1.0], "vector", None)
         .collect_to_val();
     let node = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", None, None)
+        .add_n("person", None, None, None)
         .collect_to_val();
     let _ = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_e("knows", None, node.id(), vector.id(), false, EdgeType::Vec)
+        .add_e(
+            "knows",
+            None,
+            node.id(),
+            vector.id(),
+            false,
+            EdgeType::Vec,
+            None,
+        )
         .collect_to_val();
 
     txn.commit().unwrap();
@@ -348,7 +373,7 @@ fn test_drop_vectors_then_add_them_back() {
     let mut txn = storage.graph_env.write_txn().unwrap();
 
     let entity = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("Entity", Some(props! { "name" => "entity1" }), None)
+        .add_n("Entity", Some(props! { "name" => "entity1" }), None, None)
         .collect_to_val();
 
     let embedding = G::new_mut(Arc::clone(&storage), &mut txn)
@@ -363,6 +388,7 @@ fn test_drop_vectors_then_add_them_back() {
             embedding.id(),
             false,
             EdgeType::Node,
+            None,
         )
         .collect_to_val();
 
@@ -422,6 +448,7 @@ fn test_drop_vectors_then_add_them_back() {
             embedding.id(),
             true,
             EdgeType::Node,
+            None,
         )
         .collect_to_obj();
 
@@ -461,6 +488,7 @@ fn test_drop_vectors_then_add_them_back() {
             embedding.id(),
             false,
             EdgeType::Node,
+            None,
         )
         .collect_to_val();
 
@@ -500,6 +528,7 @@ fn test_drop_vectors_then_add_them_back() {
             embedding.id(),
             true,
             EdgeType::Node,
+            None,
         )
         .collect_to_obj();
 

@@ -40,7 +40,7 @@ fn test_count_single_node() {
     let (storage, _temp_dir) = setup_test_db();
     let mut txn = storage.graph_env.write_txn().unwrap();
     let person = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props!()), None)
+        .add_n("person", Some(props!()), None, None)
         .collect_to::<Vec<_>>();
     let person = person.first().unwrap();
     txn.commit().unwrap();
@@ -57,13 +57,13 @@ fn test_count_node_array() {
     let (storage, _temp_dir) = setup_test_db();
     let mut txn = storage.graph_env.write_txn().unwrap();
     let _ = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props!()), None)
+        .add_n("person", Some(props!()), None, None)
         .collect_to::<Vec<_>>();
     let _ = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props!()), None)
+        .add_n("person", Some(props!()), None, None)
         .collect_to::<Vec<_>>();
     let _ = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props!()), None)
+        .add_n("person", Some(props!()), None, None)
         .collect_to::<Vec<_>>();
 
     txn.commit().unwrap();
@@ -81,15 +81,15 @@ fn test_count_mixed_steps() {
 
     // Create a graph with multiple paths
     let person1 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props!()), None)
+        .add_n("person", Some(props!()), None, None)
         .collect_to::<Vec<_>>();
     let person1 = person1.first().unwrap();
     let person2 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props!()), None)
+        .add_n("person", Some(props!()), None, None)
         .collect_to::<Vec<_>>();
     let person2 = person2.first().unwrap();
     let person3 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props!()), None)
+        .add_n("person", Some(props!()), None, None)
         .collect_to::<Vec<_>>();
     let person3 = person3.first().unwrap();
 
@@ -101,6 +101,7 @@ fn test_count_mixed_steps() {
             person2.id(),
             false,
             EdgeType::Node,
+            None,
         )
         .collect_to::<Vec<_>>();
     G::new_mut(Arc::clone(&storage), &mut txn)
@@ -111,6 +112,7 @@ fn test_count_mixed_steps() {
             person3.id(),
             false,
             EdgeType::Node,
+            None,
         )
         .collect_to::<Vec<_>>();
     txn.commit().unwrap();

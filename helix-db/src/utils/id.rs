@@ -117,14 +117,12 @@ pub fn v6_uuid() -> u128 {
     uuid::Uuid::now_v6(&[1, 2, 3, 4, 5, 6]).as_u128()
 }
 
-
 #[cfg(test)]
 mod tests {
     use sonic_rs::json;
 
     use super::*;
 
-    
     #[test]
     fn test_uuid_deserialization() {
         let uuid = json!({ "id": "1f07ae4b-e354-6660-b5f0-fd3ce8bc4b49" });
@@ -134,9 +132,11 @@ mod tests {
             id: ID,
         }
 
-
         let deserialized: IDWrapper = sonic_rs::from_value(&uuid).unwrap();
-        assert_eq!(deserialized.id.stringify(), "1f07ae4b-e354-6660-b5f0-fd3ce8bc4b49");
+        assert_eq!(
+            deserialized.id.stringify(),
+            "1f07ae4b-e354-6660-b5f0-fd3ce8bc4b49"
+        );
     }
 
     #[test]

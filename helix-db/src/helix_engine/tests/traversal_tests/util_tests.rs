@@ -43,15 +43,15 @@ fn test_order_node_by_asc() {
     let mut txn = storage.graph_env.write_txn().unwrap();
 
     let node = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "age" => 30 }), None)
+        .add_n("person", Some(props! { "age" => 30 }), None, None)
         .collect_to_val();
 
     let node2 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "age" => 20 }), None)
+        .add_n("person", Some(props! { "age" => 20 }), None, None)
         .collect_to_val();
 
     let node3 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "age" => 10 }), None)
+        .add_n("person", Some(props! { "age" => 10 }), None, None)
         .collect_to_val();
 
     txn.commit().unwrap();
@@ -74,15 +74,15 @@ fn test_order_node_by_desc() {
     let mut txn = storage.graph_env.write_txn().unwrap();
 
     let node = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "age" => 30 }), None)
+        .add_n("person", Some(props! { "age" => 30 }), None, None)
         .collect_to_val();
 
     let node2 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "age" => 20 }), None)
+        .add_n("person", Some(props! { "age" => 20 }), None, None)
         .collect_to_val();
 
     let node3 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "age" => 10 }), None)
+        .add_n("person", Some(props! { "age" => 10 }), None, None)
         .collect_to_val();
 
     txn.commit().unwrap();
@@ -105,15 +105,15 @@ fn test_order_edge_by_asc() {
     let mut txn = storage.graph_env.write_txn().unwrap();
 
     let node = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "age" => 30 }), None)
+        .add_n("person", Some(props! { "age" => 30 }), None, None)
         .collect_to_val();
 
     let node2 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "age" => 20 }), None)
+        .add_n("person", Some(props! { "age" => 20 }), None, None)
         .collect_to_val();
 
     let node3 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "age" => 10 }), None)
+        .add_n("person", Some(props! { "age" => 10 }), None, None)
         .collect_to_val();
 
     let edge = G::new_mut(Arc::clone(&storage), &mut txn)
@@ -124,6 +124,7 @@ fn test_order_edge_by_asc() {
             node2.id(),
             false,
             EdgeType::Node,
+            None,
         )
         .collect_to_val();
 
@@ -135,6 +136,7 @@ fn test_order_edge_by_asc() {
             node2.id(),
             false,
             EdgeType::Node,
+            None,
         )
         .collect_to_val();
 
@@ -158,15 +160,15 @@ fn test_order_edge_by_desc() {
     let mut txn = storage.graph_env.write_txn().unwrap();
 
     let node = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "age" => 30 }), None)
+        .add_n("person", Some(props! { "age" => 30 }), None, None)
         .collect_to_val();
 
     let node2 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "age" => 20 }), None)
+        .add_n("person", Some(props! { "age" => 20 }), None, None)
         .collect_to_val();
 
     let node3 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "age" => 10 }), None)
+        .add_n("person", Some(props! { "age" => 10 }), None, None)
         .collect_to_val();
 
     let edge = G::new_mut(Arc::clone(&storage), &mut txn)
@@ -177,6 +179,7 @@ fn test_order_edge_by_desc() {
             node2.id(),
             false,
             EdgeType::Node,
+            None,
         )
         .collect_to_val();
 
@@ -188,6 +191,7 @@ fn test_order_edge_by_desc() {
             node2.id(),
             false,
             EdgeType::Node,
+            None,
         )
         .collect_to_val();
 
@@ -275,15 +279,15 @@ fn test_dedup() {
     let mut txn = storage.graph_env.write_txn().unwrap();
 
     let node = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "age" => 30 }), None)
+        .add_n("person", Some(props! { "age" => 30 }), None, None)
         .collect_to_val();
 
     let node2 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "age" => 20 }), None)
+        .add_n("person", Some(props! { "age" => 20 }), None, None)
         .collect_to_val();
 
     let node3 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "age" => 10 }), None)
+        .add_n("person", Some(props! { "age" => 10 }), None, None)
         .collect_to_val();
 
     let _edge = G::new_mut(Arc::clone(&storage), &mut txn)
@@ -294,6 +298,7 @@ fn test_dedup() {
             node2.id(),
             false,
             EdgeType::Node,
+            None,
         )
         .collect_to_val();
 
@@ -305,6 +310,7 @@ fn test_dedup() {
             node2.id(),
             false,
             EdgeType::Node,
+            None,
         )
         .collect_to_val();
 

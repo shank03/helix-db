@@ -47,7 +47,7 @@ fn test_add_n() {
     let mut txn = storage.graph_env.write_txn().unwrap();
 
     let nodes = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "name" => "John"}), None)
+        .add_n("person", Some(props! { "name" => "John"}), None, None)
         .filter_map(|node| node.ok())
         .collect::<Vec<_>>();
 
@@ -75,15 +75,15 @@ fn test_out() {
 
     // Create graph: (person1)-[knows]->(person2)-[knows]->(person3)
     let person1 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props!()), None)
+        .add_n("person", Some(props!()), None, None)
         .collect_to::<Vec<_>>();
     let person1 = person1.first().unwrap();
     let person2 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props!()), None)
+        .add_n("person", Some(props!()), None, None)
         .collect_to::<Vec<_>>();
     let person2 = person2.first().unwrap();
     let person3 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props!()), None)
+        .add_n("person", Some(props!()), None, None)
         .collect_to::<Vec<_>>();
     let person3 = person3.first().unwrap();
 
@@ -95,6 +95,7 @@ fn test_out() {
             person2.id(),
             false,
             EdgeType::Node,
+            None,
         )
         .collect_to::<Vec<_>>();
     G::new_mut(Arc::clone(&storage), &mut txn)
@@ -105,6 +106,7 @@ fn test_out() {
             person3.id(),
             false,
             EdgeType::Node,
+            None,
         )
         .collect_to::<Vec<_>>();
 
@@ -134,11 +136,11 @@ fn test_in() {
 
     // Create graph: (person1)-[knows]->(person2)
     let person1 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props!()), None)
+        .add_n("person", Some(props!()), None, None)
         .collect_to::<Vec<_>>();
     let person1 = person1.first().unwrap();
     let person2 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props!()), None)
+        .add_n("person", Some(props!()), None, None)
         .collect_to::<Vec<_>>();
     let person2 = person2.first().unwrap();
 
@@ -150,6 +152,7 @@ fn test_in() {
             person2.id(),
             false,
             EdgeType::Node,
+            None,
         )
         .collect_to::<Vec<_>>();
     txn.commit().unwrap();
@@ -176,15 +179,15 @@ fn test_complex_traversal() {
     //     +-------<------[follows]------<-------+
 
     let person1 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props!()), None)
+        .add_n("person", Some(props!()), None, None)
         .collect_to::<Vec<_>>();
     let person1 = person1.first().unwrap();
     let person2 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props!()), None)
+        .add_n("person", Some(props!()), None, None)
         .collect_to::<Vec<_>>();
     let person2 = person2.first().unwrap();
     let person3 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props!()), None)
+        .add_n("person", Some(props!()), None, None)
         .collect_to::<Vec<_>>();
     let person3 = person3.first().unwrap();
 
@@ -196,6 +199,7 @@ fn test_complex_traversal() {
             person2.id(),
             false,
             EdgeType::Node,
+            None,
         )
         .collect_to::<Vec<_>>();
     G::new_mut(Arc::clone(&storage), &mut txn)
@@ -206,6 +210,7 @@ fn test_complex_traversal() {
             person3.id(),
             false,
             EdgeType::Node,
+            None,
         )
         .collect_to::<Vec<_>>();
     G::new_mut(Arc::clone(&storage), &mut txn)
@@ -216,6 +221,7 @@ fn test_complex_traversal() {
             person1.id(),
             false,
             EdgeType::Node,
+            None,
         )
         .collect_to::<Vec<_>>();
     txn.commit().unwrap();
@@ -257,7 +263,7 @@ fn test_n_from_id() {
 
     // Create a test node
     let person = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props!()), None)
+        .add_n("person", Some(props!()), None, None)
         .collect_to::<Vec<_>>();
     let node_id = person.id();
 
@@ -277,10 +283,10 @@ fn test_n_from_id_with_traversal() {
 
     // Create test graph: (person1)-[knows]->(person2)
     let person1 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props!()), None)
+        .add_n("person", Some(props!()), None, None)
         .collect_to::<Vec<_>>();
     let person2 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props!()), None)
+        .add_n("person", Some(props!()), None, None)
         .collect_to::<Vec<_>>();
     G::new_mut(Arc::clone(&storage), &mut txn)
         .add_e(
@@ -290,6 +296,7 @@ fn test_n_from_id_with_traversal() {
             person2.id(),
             true,
             EdgeType::Node,
+            None,
         )
         .collect_to::<Vec<_>>();
 
@@ -322,16 +329,16 @@ fn test_n_from_id_chain_operations() {
 
     // Create test graph: (person1)-[knows]->(person2)-[likes]->(person3)
     let person1 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props!()), None)
+        .add_n("person", Some(props!()), None, None)
         .collect_to::<Vec<_>>();
     let person2 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props!()), None)
+        .add_n("person", Some(props!()), None, None)
         .collect_to::<Vec<_>>();
     let _ = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props!()), None)
+        .add_n("person", Some(props!()), None, None)
         .collect_to::<Vec<_>>();
     let person3 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props!()), None)
+        .add_n("person", Some(props!()), None, None)
         .collect_to::<Vec<_>>();
 
     G::new_mut(Arc::clone(&storage), &mut txn)
@@ -342,6 +349,7 @@ fn test_n_from_id_chain_operations() {
             person2.id(),
             false,
             EdgeType::Node,
+            None,
         )
         .collect_to::<Vec<_>>();
     G::new_mut(Arc::clone(&storage), &mut txn)
@@ -352,6 +360,7 @@ fn test_n_from_id_chain_operations() {
             person3.id(),
             false,
             EdgeType::Node,
+            None,
         )
         .collect_to::<Vec<_>>();
 
@@ -374,7 +383,7 @@ fn test_with_id_type() {
     let mut txn = storage.graph_env.write_txn().unwrap();
 
     let node = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "name" => "test" }), None)
+        .add_n("person", Some(props! { "name" => "test" }), None, None)
         .collect_to_val();
     txn.commit().unwrap();
     #[derive(Serialize, Deserialize, Debug)]
@@ -406,11 +415,21 @@ fn test_double_add_and_double_fetch() {
     let mut txn = db.graph_env.write_txn().unwrap();
 
     let original_node1 = G::new_mut(Arc::clone(&db), &mut txn)
-        .add_n("person", Some(props! { "entity_name" => "person1" }), None)
+        .add_n(
+            "person",
+            Some(props! { "entity_name" => "person1" }),
+            None,
+            None,
+        )
         .collect_to_val();
 
     let original_node2 = G::new_mut(Arc::clone(&db), &mut txn)
-        .add_n("person", Some(props! { "entity_name" => "person2" }), None)
+        .add_n(
+            "person",
+            Some(props! { "entity_name" => "person2" }),
+            None,
+            None,
+        )
         .collect_to_val();
 
     txn.commit().unwrap();
@@ -448,7 +467,15 @@ fn test_double_add_and_double_fetch() {
     assert_eq!(node2[0].id(), original_node2.id());
 
     let _e = G::new_mut(Arc::clone(&db), &mut txn)
-        .add_e("knows", None, node1.id(), node2.id(), false, EdgeType::Node)
+        .add_e(
+            "knows",
+            None,
+            node1.id(),
+            node2.id(),
+            false,
+            EdgeType::Node,
+            None,
+        )
         .collect_to_val();
 
     txn.commit().unwrap();

@@ -43,7 +43,7 @@ fn test_range_subset() {
     let _: Vec<_> = (0..5)
         .map(|_| {
             G::new_mut(Arc::clone(&storage), &mut txn)
-                .add_n("person", Some(props!()), None)
+                .add_n("person", Some(props!()), None, None)
                 .collect_to::<Vec<_>>()
                 .first()
                 .unwrap();
@@ -69,7 +69,7 @@ fn test_range_chaining() {
     let nodes: Vec<_> = (0..5)
         .map(|i| {
             G::new_mut(Arc::clone(&storage), &mut txn)
-                .add_n("person", Some(props! { "name" => i }), None)
+                .add_n("person", Some(props! { "name" => i }), None, None)
                 .collect_to::<Vec<_>>()
                 .first()
                 .unwrap()
@@ -87,6 +87,7 @@ fn test_range_chaining() {
                 nodes[i + 1].id(),
                 false,
                 EdgeType::Node,
+                None,
             )
             .collect_to::<Vec<_>>();
     }
@@ -99,6 +100,7 @@ fn test_range_chaining() {
             nodes[0].id(),
             false,
             EdgeType::Node,
+            None,
         )
         .collect_to::<Vec<_>>();
     txn.commit().unwrap();

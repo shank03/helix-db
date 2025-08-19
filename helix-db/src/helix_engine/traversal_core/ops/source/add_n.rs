@@ -26,6 +26,7 @@ pub trait AddNAdapter<'a, 'b>: Iterator<Item = Result<TraversalValue, GraphError
         label: &'a str,
         properties: Option<Vec<(String, Value)>>,
         secondary_indices: Option<&'a [&str]>,
+        id: Option<u128>,
     ) -> RwTraversalIterator<'a, 'b, std::iter::Once<Result<TraversalValue, GraphError>>>;
 }
 
@@ -37,9 +38,10 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalValue, GraphError>>> AddNAdapter
         label: &'a str,
         properties: Option<Vec<(String, Value)>>,
         secondary_indices: Option<&'a [&str]>,
+        id: Option<u128>,
     ) -> RwTraversalIterator<'a, 'b, std::iter::Once<Result<TraversalValue, GraphError>>> {
         let node = Node {
-            id: v6_uuid(),
+            id: id.unwrap_or(v6_uuid()),
             label: label.to_string(), // TODO: just &str or Cow<'a, str>
             version: 1,
             properties: properties.map(|props| props.into_iter().collect()),

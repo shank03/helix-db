@@ -36,13 +36,13 @@ fn test_filter_nodes() {
 
     // Create nodes with different properties
     let _ = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "age" => 25 }), None)
+        .add_n("person", Some(props! { "age" => 25 }), None, None)
         .collect_to::<Vec<_>>();
     let _ = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "age" => 30 }), None)
+        .add_n("person", Some(props! { "age" => 30 }), None, None)
         .collect_to::<Vec<_>>();
     let person3 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "age" => 35 }), None)
+        .add_n("person", Some(props! { "age" => 35 }), None, None)
         .collect_to::<Vec<_>>();
 
     txn.commit().unwrap();
@@ -76,10 +76,10 @@ fn test_filter_macro_single_argument() {
     let mut txn = storage.graph_env.write_txn().unwrap();
 
     let _ = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "name" => "Alice" }), None)
+        .add_n("person", Some(props! { "name" => "Alice" }), None, None)
         .collect_to::<Vec<_>>();
     let _ = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "name" => "Bob" }), None)
+        .add_n("person", Some(props! { "name" => "Bob" }), None, None)
         .collect_to::<Vec<_>>();
 
     fn has_name(val: &Result<TraversalValue, GraphError>) -> Result<bool, GraphError> {
@@ -116,10 +116,10 @@ fn test_filter_macro_multiple_arguments() {
     let mut txn = storage.graph_env.write_txn().unwrap();
 
     let _ = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "age" => 25 }), None)
+        .add_n("person", Some(props! { "age" => 25 }), None, None)
         .collect_to::<Vec<_>>();
     let person2 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "age" => 30 }), None)
+        .add_n("person", Some(props! { "age" => 30 }), None, None)
         .collect_to::<Vec<_>>();
     txn.commit().unwrap();
 
@@ -158,10 +158,10 @@ fn test_filter_edges() {
     let mut txn = storage.graph_env.write_txn().unwrap();
 
     let person1 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props!()), None)
+        .add_n("person", Some(props!()), None, None)
         .collect_to::<Vec<_>>();
     let person2 = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props!()), None)
+        .add_n("person", Some(props!()), None, None)
         .collect_to::<Vec<_>>();
 
     let _ = G::new_mut(Arc::clone(&storage), &mut txn)
@@ -172,6 +172,7 @@ fn test_filter_edges() {
             person2.id(),
             false,
             EdgeType::Node,
+            None,
         )
         .collect_to::<Vec<_>>();
     let edge2 = G::new_mut(Arc::clone(&storage), &mut txn)
@@ -182,6 +183,7 @@ fn test_filter_edges() {
             person1.id(),
             false,
             EdgeType::Node,
+            None,
         )
         .collect_to::<Vec<_>>();
 
@@ -222,7 +224,7 @@ fn test_filter_empty_result() {
     let mut txn = storage.graph_env.write_txn().unwrap();
 
     let _ = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "age" => 25 }), None)
+        .add_n("person", Some(props! { "age" => 25 }), None, None)
         .collect_to::<Vec<_>>();
 
     txn.commit().unwrap();
@@ -258,6 +260,7 @@ fn test_filter_chain() {
             "person",
             Some(props! { "age" => 25, "name" => "Alice" }),
             None,
+            None,
         )
         .collect_to_val();
     let person2 = G::new_mut(Arc::clone(&storage), &mut txn)
@@ -265,10 +268,11 @@ fn test_filter_chain() {
             "person",
             Some(props! { "age" => 30, "name" => "Bob" }),
             None,
+            None,
         )
         .collect_to_val();
     let _ = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! { "age" => 35 }), None)
+        .add_n("person", Some(props! { "age" => 35 }), None, None)
         .collect_to_val();
 
     txn.commit().unwrap();

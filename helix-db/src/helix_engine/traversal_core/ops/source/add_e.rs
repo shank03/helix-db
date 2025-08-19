@@ -49,6 +49,7 @@ pub trait AddEAdapter<'a, 'b>: Iterator<Item = Result<TraversalValue, GraphError
         to_node: u128,
         should_check: bool,
         edge_type: EdgeType,
+        id: Option<u128>,
     ) -> RwTraversalIterator<'a, 'b, impl Iterator<Item = Result<TraversalValue, GraphError>>>;
 
     fn node_vec_exists(&self, node_vec_id: &u128, edge_type: EdgeType) -> bool;
@@ -68,10 +69,11 @@ impl<'a, 'b, I: Iterator<Item = Result<TraversalValue, GraphError>>> AddEAdapter
         should_check: bool,
         // edge_types: (EdgeType, EdgeType),
         edge_type: EdgeType,
+        id: Option<u128>,
     ) -> RwTraversalIterator<'a, 'b, impl Iterator<Item = Result<TraversalValue, GraphError>>> {
         let version = self.storage.version_info.get_latest(label);
         let edge = Edge {
-            id: v6_uuid(),
+            id: id.unwrap_or(v6_uuid()),
             label: label.to_string(),
             version,
             properties: properties.map(|props| props.into_iter().collect()),
