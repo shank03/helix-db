@@ -1,7 +1,10 @@
 use core::fmt;
 use std::fmt::Display;
 
-use crate::helixc::generator::utils::{write_properties, write_secondary_indices, VecData};
+use crate::{
+    helixc::generator::utils::{VecData, write_properties, write_secondary_indices},
+    utils::id::ID,
+};
 
 use super::{
     bool_op::BoExp,
@@ -30,6 +33,7 @@ pub struct AddN {
     pub label: GenRef<String>,
     pub properties: Option<Vec<(String, GeneratedValue)>>,
     pub secondary_indices: Option<Vec<String>>,
+    pub id: Option<GeneratedValue>,
 }
 impl Display for AddN {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -37,8 +41,9 @@ impl Display for AddN {
         let secondary_indices = write_secondary_indices(&self.secondary_indices);
         write!(
             f,
-            "add_n({}, {}, {})",
-            self.label, properties, secondary_indices
+            "add_n({}, {}, {}, {})",
+            self.label, properties, secondary_indices,
+            self.id.as_ref().map(|id| format!("Some({})", id)).unwrap_or("None".to_string())
         )
     }
 }
@@ -49,17 +54,22 @@ pub struct AddE {
     pub properties: Option<Vec<(String, GeneratedValue)>>,
     pub from: GeneratedValue,
     pub to: GeneratedValue,
+    pub id: Option<GeneratedValue>,
     // pub secondary_indices: Option<Vec<String>>,
 }
 impl Display for AddE {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "add_e({}, {}, {}, {}, true, EdgeType::Node)",
+            "add_e({}, {}, {}, {}, true, EdgeType::Node, {})",
             self.label,
             write_properties(&self.properties),
             self.from,
-            self.to
+            self.to,
+            self.id
+                .as_ref()
+                .map(|id| format!("Some({})", id))
+                .unwrap_or("None".to_string())
         )
     }
 }
@@ -80,7 +90,6 @@ impl Display for AddV {
         )
     }
 }
-
 
 #[derive(Clone)]
 pub struct NFromID {
@@ -134,7 +143,11 @@ pub struct SearchBM25 {
 
 impl Display for SearchBM25 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "search_bm25({}, {}, {})?", self.type_arg, self.query, self.k)
+        write!(
+            f,
+            "search_bm25({}, {}, {})?",
+            self.type_arg, self.query, self.k
+        )
     }
 }
 
@@ -184,9 +197,7 @@ impl Display for SearchVector {
             None => write!(
                 f,
                 "search_v::<fn(&HVector, &RoTxn) -> bool, _>({}, {}, {}, None)",
-                self.vec,
-                self.k,
-                self.label,
+                self.vec, self.k, self.label,
             ),
         }
     }
@@ -201,7 +212,10 @@ pub struct NFromIndex {
 
 impl Display for NFromIndex {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "n_from_index({}, {}, {})", self.label, self.index, self.key)
+        write!(
+            f,
+            "n_from_index({}, {}, {})",
+            self.label, self.index, self.key
+        )
     }
 }
-

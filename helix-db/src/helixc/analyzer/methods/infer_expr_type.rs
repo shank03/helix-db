@@ -284,10 +284,28 @@ pub(crate) fn infer_expr_type<'a>(
                         }
                     };
 
+                    let id = match &add.id {
+                        Some(id) => match id {
+                            IdType::Identifier { value, loc } => {
+                                // TODO: check that type of id is ID 
+                                is_valid_identifier(ctx, original_query, loc.clone(), value.as_str());
+                                Some(gen_id_access_or_param(original_query, value.as_str()))
+                            }
+                            IdType::Literal { value, loc: _ } => {
+                                // TODO: Check literal is valid UUID
+
+                                Some(GeneratedValue::Literal(GenRef::Literal(value.clone())))
+                            }
+                            _ => unreachable!(),
+                        }
+                        None => None,
+                    };
+
                     let add_n = AddN {
                         label,
                         properties: Some(properties.into_iter().collect()),
                         secondary_indices,
+                        id,
                     };
 
                     let stmt = GeneratedStatement::Traversal(GeneratedTraversal {
@@ -482,12 +500,30 @@ pub(crate) fn infer_expr_type<'a>(
                         GeneratedValue::Unknown
                     }
                 };
+
+                let id = match &add.id {
+                    Some(id) => match id {
+                        IdType::Identifier { value, loc } => {
+                            // TODO: check that type of id is ID 
+                            is_valid_identifier(ctx, original_query, loc.clone(), value.as_str());
+                            Some(gen_id_access_or_param(original_query, value.as_str()))
+                        }
+                        IdType::Literal { value, loc: _ } => {
+                            // TODO: Check literal is valid UUID
+
+                            Some(GeneratedValue::Literal(GenRef::Literal(value.clone())))
+                        }
+                        _ => unreachable!(),
+                    }
+                    None => None,
+                };
                 let add_e = AddE {
                     to,
                     from,
                     label,
                     properties,
                     // secondary_indices: None, // TODO: Add secondary indices by checking against labeled `INDEX` fields in schema
+                    id,
                 };
                 let stmt = GeneratedStatement::Traversal(GeneratedTraversal {
                     source_step: Separator::Period(SourceStep::AddE(add_e)),

@@ -108,6 +108,12 @@ impl From<ID> for u128 {
     }
 }
 
+impl std::fmt::Display for ID {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.stringify())
+    }
+}
+
 /// Generates a new v6 UUID.
 ///
 /// This is used to generate a new UUID for a node or edge.

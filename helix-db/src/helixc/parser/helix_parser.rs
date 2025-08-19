@@ -2,7 +2,7 @@ use super::{
     location::{HasLoc, Loc},
     parser_methods::ParserError,
 };
-use crate::protocol::value::Value;
+use crate::{protocol::value::Value, utils::id::ID};
 use chrono::{DateTime, NaiveDate, Utc};
 use itertools::Itertools;
 use pest::{
@@ -780,6 +780,7 @@ pub struct AddNode {
     pub loc: Loc,
     pub node_type: Option<String>,
     pub fields: Option<HashMap<String, ValueType>>,
+    pub id: Option<IdType>,
 }
 
 #[derive(Debug, Clone)]
@@ -789,6 +790,7 @@ pub struct AddEdge {
     pub fields: Option<HashMap<String, ValueType>>,
     pub connection: EdgeConnection,
     pub from_identifier: bool,
+    pub id: Option<IdType>,
 }
 
 #[derive(Debug, Clone)]
@@ -2022,7 +2024,7 @@ impl HelixParser {
     fn parse_add_node(&self, pair: Pair<Rule>) -> Result<AddNode, ParserError> {
         let mut node_type = None;
         let mut fields = None;
-
+        let mut id = None;
         for p in pair.clone().into_inner() {
             match p.as_rule() {
                 Rule::identifier_upper => {
@@ -2030,6 +2032,9 @@ impl HelixParser {
                 }
                 Rule::create_field => {
                     fields = Some(self.parse_property_assignments(p)?);
+                }
+                Rule::id_arg => {
+                    id = self.parse_id_args(p)?;
                 }
                 _ => {
                     return Err(ParserError::from(format!(
@@ -2045,6 +2050,7 @@ impl HelixParser {
             node_type,
             fields,
             loc: pair.loc(),
+            id,
         })
     }
 
@@ -2110,7 +2116,7 @@ impl HelixParser {
         let mut edge_type = None;
         let mut fields = None;
         let mut connection = None;
-
+        let mut id = None;
         for p in pair.clone().into_inner() {
             match p.as_rule() {
                 Rule::identifier_upper => {
@@ -2121,6 +2127,9 @@ impl HelixParser {
                 }
                 Rule::to_from => {
                     connection = Some(self.parse_to_from(p)?);
+                }
+                Rule::id_arg => {
+                    id = self.parse_id_args(p)?;
                 }
                 _ => {
                     return Err(ParserError::from(format!(
@@ -2142,6 +2151,7 @@ impl HelixParser {
             connection: connection.ok_or_else(|| ParserError::from("Missing edge connection"))?,
             from_identifier,
             loc: pair.loc(),
+            id,
         })
     }
 

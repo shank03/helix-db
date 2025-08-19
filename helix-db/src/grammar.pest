@@ -139,8 +139,8 @@ to            = { "::" ~ "To" ~ "(" ~ id_arg ~ ")" }
 from          = { "::" ~ "From" ~ "(" ~ id_arg ~ ")" }
 vec_literal   = { "[" ~ (float) ~ ("," ~ (float))* ~ "]" }
 vector_data = { vec_literal | embed_method | identifier }
-AddN          = { "AddN" ~ ("<" ~ identifier_upper ~ ">") ~ ("(" ~ create_field? ~ ")")? }
-AddE          = { "AddE" ~ ("<" ~ identifier_upper ~ ">") ~ ("(" ~ create_field? ~ ")")? ~ to_from }
+AddN          = { "AddN" ~ ("<" ~ identifier_upper ~ ">") ~ ("(" ~ create_field? ~ ("," ~ id_arg)? ~ ")")? }
+AddE          = { "AddE" ~ ("<" ~ identifier_upper ~ ">") ~ ("(" ~ create_field? ~ ("," ~ id_arg)? ~ ")")? ~ to_from }
 AddV          = { "AddV" ~ ("<" ~ identifier_upper ~ ">") ~ ("(" ~ vector_data ~ ("," ~ create_field)* ~ ")") }
 
 // ---------------------------------------------------------------------
