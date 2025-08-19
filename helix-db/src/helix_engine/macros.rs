@@ -180,10 +180,12 @@ pub mod macros {
         ($remapping_vals:expr, $var_name:expr, $should_spread:expr, $new_name:expr => $traversal:expr) => {{
             // TODO: ref?
             // Apply remappings to the nested traversal result
+
             let nested_return_value = ReturnValue::from_traversal_value_array_with_mixin(
                 $traversal,
                 $remapping_vals.borrow_mut(),
             );
+
             let new_remapping = Remapping::new(
                 false,
                 Some($new_name.to_string()),

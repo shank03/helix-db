@@ -1,5 +1,6 @@
 //! Semantic analyzer for Helix‑QL.
 use crate::helixc::analyzer::error_codes::ErrorCode;
+use crate::helixc::generator::object_remapping_generation::SingleFieldTraversalRemapping;
 use crate::{
     generate_error,
     helixc::{
@@ -14,17 +15,17 @@ use crate::{
             },
         },
         generator::{
-            queries::Query as GeneratedQuery,
             object_remapping_generation::{
                 ExistsRemapping, IdentifierRemapping, ObjectRemapping, Remapping, RemappingType,
                 TraversalRemapping, ValueRemapping,
             },
+            queries::Query as GeneratedQuery,
             source_steps::SourceStep,
+            statements::Statement,
             traversal_steps::{
                 ShouldCollect, Step as GeneratedStep, Traversal as GeneratedTraversal,
                 TraversalType,
             },
-            statements::Statement,
             utils::{GenRef, Separator},
         },
         parser::{helix_parser::*, location::Loc},
@@ -185,16 +186,6 @@ pub(crate) fn parse_object_remapping<'a>(
                         ));
                     }
                 };
-
-                match closure_variable.get_variable_ty() {
-                    Type::Node(_) | Type::Edge(_) | Type::Vector(_) => {
-                        inner_traversal.should_collect = ShouldCollect::ToVal;
-                    }
-                    Type::Nodes(_) | Type::Edges(_) | Type::Vectors(_) => {
-                        inner_traversal.should_collect = ShouldCollect::ToVec;
-                    }
-                    _ => unreachable!(),
-                }
                 match &traversal.steps.last() {
                     Some(step) => match step.step {
                         StepType::Count | StepType::BooleanOperation(_) => {
@@ -204,6 +195,18 @@ pub(crate) fn parse_object_remapping<'a>(
                                 value: GenRef::Std(inner_traversal.to_string()),
                                 should_spread,
                             })
+                        }
+                        StepType::Object(ref object)
+                            if object.fields.len() == 1 && traversal.steps.len() == 1 =>
+                        {
+                            RemappingType::SingleFieldTraversalRemapping(
+                                SingleFieldTraversalRemapping {
+                                    variable_name: closure_variable.get_variable_name(),
+                                    new_field: key.clone(),
+                                    new_value: inner_traversal,
+                                    should_spread,
+                                },
+                            )
                         }
                         _ => RemappingType::TraversalRemapping(TraversalRemapping {
                             variable_name: closure_variable.get_variable_name(),
@@ -249,15 +252,6 @@ pub(crate) fn parse_object_remapping<'a>(
                             );
                         }
                     };
-                    match closure_variable.get_variable_ty() {
-                        Type::Node(_) | Type::Edge(_) | Type::Vector(_) => {
-                            inner_traversal.should_collect = ShouldCollect::ToVal;
-                        }
-                        Type::Nodes(_) | Type::Edges(_) | Type::Vectors(_) => {
-                            inner_traversal.should_collect = ShouldCollect::ToVec;
-                        }
-                        _ => unreachable!(),
-                    }
                     RemappingType::TraversalRemapping(TraversalRemapping {
                         variable_name: closure_variable.get_variable_name(),
                         new_field: key.clone(),
@@ -343,21 +337,23 @@ pub(crate) fn parse_object_remapping<'a>(
                             parent_ty.get_type_name(),
                         );
                         match is_valid_field {
-                            true => RemappingType::TraversalRemapping(TraversalRemapping {
-                                variable_name: closure_variable.get_variable_name(),
-                                new_field: key.clone(),
-                                new_value: GeneratedTraversal {
-                                    traversal_type: TraversalType::NestedFrom(GenRef::Std(
-                                        closure_variable.get_variable_name(),
-                                    )),
-                                    source_step: Separator::Empty(SourceStep::Anonymous),
-                                    steps: vec![Separator::Period(gen_property_access(
-                                        identifier.as_str(),
-                                    ))],
-                                    should_collect: ShouldCollect::ToVal,
+                            true => RemappingType::SingleFieldTraversalRemapping(
+                                SingleFieldTraversalRemapping {
+                                    variable_name: closure_variable.get_variable_name(),
+                                    new_field: key.clone(),
+                                    new_value: GeneratedTraversal {
+                                        traversal_type: TraversalType::NestedFrom(GenRef::Std(
+                                            closure_variable.get_variable_name(),
+                                        )),
+                                        source_step: Separator::Empty(SourceStep::Anonymous),
+                                        steps: vec![Separator::Period(gen_property_access(
+                                            identifier.as_str(),
+                                        ))],
+                                        should_collect: ShouldCollect::ToVal,
+                                    },
+                                    should_spread,
                                 },
-                                should_spread,
-                            }),
+                            ),
                             false => {
                                 generate_error!(
                                     ctx,
@@ -428,21 +424,23 @@ pub(crate) fn parse_object_remapping<'a>(
                         _ => unreachable!(),
                     };
                     match is_valid_field {
-                        true => RemappingType::TraversalRemapping(TraversalRemapping {
-                            variable_name: closure_variable.get_variable_name(),
-                            new_field: key.clone(),
-                            new_value: GeneratedTraversal {
-                                traversal_type: TraversalType::NestedFrom(GenRef::Std(
-                                    closure_variable.get_variable_name(),
-                                )),
-                                source_step: Separator::Empty(SourceStep::Anonymous),
-                                steps: vec![Separator::Period(GeneratedStep::PropertyFetch(
-                                    GenRef::Literal(identifier.to_string()),
-                                ))],
-                                should_collect: ShouldCollect::ToVec,
+                        true => RemappingType::SingleFieldTraversalRemapping(
+                            SingleFieldTraversalRemapping {
+                                variable_name: closure_variable.get_variable_name(),
+                                new_field: key.clone(),
+                                new_value: GeneratedTraversal {
+                                    traversal_type: TraversalType::NestedFrom(GenRef::Std(
+                                        closure_variable.get_variable_name(),
+                                    )),
+                                    source_step: Separator::Empty(SourceStep::Anonymous),
+                                    steps: vec![Separator::Period(GeneratedStep::PropertyFetch(
+                                        GenRef::Literal(identifier.to_string()),
+                                    ))],
+                                    should_collect: ShouldCollect::ToVal,
+                                },
+                                should_spread,
                             },
-                            should_spread,
-                        }),
+                        ),
                         false => {
                             generate_error!(
                                 ctx,

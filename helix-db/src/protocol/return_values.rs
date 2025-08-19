@@ -219,10 +219,7 @@ impl ReturnValue {
     }
 }
 
-impl<I> From<I> for ReturnValue
-where
-    I: Filterable + Clone,
-{
+impl<I: Filterable + Clone> From<I> for ReturnValue {
     #[inline]
     fn from(item: I) -> Self {
         let length = match item.properties_ref() {
