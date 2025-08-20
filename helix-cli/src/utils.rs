@@ -38,7 +38,7 @@ use toml::Value;
 
 pub const DB_DIR: &str = "helixdb-cfg/";
 
-const DEFAULT_CLOUD_AUTHORITY: &str = "ec2-184-72-27-116.us-west-1.compute.amazonaws.com";
+const DEFAULT_CLOUD_AUTHORITY: &str = "ec2-184-72-27-116.us-west-1.compute.amazonaws.com:3000";
 
 pub static CLOUD_AUTHORITY: LazyLock<String> = LazyLock::new(|| {
     env::var("HELIX_CLOUD_AUTHORITY").unwrap_or(DEFAULT_CLOUD_AUTHORITY.to_string())
