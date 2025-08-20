@@ -25,6 +25,7 @@ use std::{
     net::{SocketAddr, TcpListener},
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    sync::LazyLock,
 };
 use tokio_tungstenite::{
     connect_async,
@@ -36,6 +37,12 @@ use tokio_tungstenite::{
 use toml::Value;
 
 pub const DB_DIR: &str = "helixdb-cfg/";
+
+const DEFAULT_CLOUD_AUTHORITY: &str = "ec2-184-72-27-116.us-west-1.compute.amazonaws.com";
+
+pub static CLOUD_AUTHORITY: LazyLock<String> = LazyLock::new(|| {
+    env::var("HELIX_CLOUD_AUTHORITY").unwrap_or(DEFAULT_CLOUD_AUTHORITY.to_string())
+});
 
 pub const DEFAULT_SCHEMA: &str = r#"// Start building your schema here.
 //
@@ -212,7 +219,7 @@ pub async fn get_remote_helix_version() -> Result<Version, Box<dyn Error>> {
 }
 
 pub async fn github_login() -> Result<(String, String), Box<dyn Error>> {
-    let url = "ws://ec2-184-72-27-116.us-west-1.compute.amazonaws.com:3000/login";
+    let url = format!("ws://{}/login", *CLOUD_AUTHORITY);
     let (mut ws_stream, _) = connect_async(url).await?;
 
     let init_msg: UserCodeMsg = match ws_stream.next().await {
@@ -626,16 +633,16 @@ pub fn compile_and_build_helix(
     println!("building helix at: {}", output.display());
     let mut runner = Command::new("cargo");
     let mut args = vec!["build"];
-    
+
     match release_mode {
         BuildMode::Dev => args.extend_from_slice(&["--profile", "dev"]),
         BuildMode::Release => args.push("--release"),
     }
-    
+
     if enable_dev_instance {
         args.extend_from_slice(&["--features", "dev-instance"]);
     }
-    
+
     runner
         .args(args)
         .current_dir(PathBuf::from(&output))
@@ -674,7 +681,12 @@ pub fn deploy_helix(
     let instance_manager = InstanceManager::new().unwrap();
 
     let binary_path = dirs::home_dir()
-        .map(|path| path.join(format!(".helix/repo/helix-db/target/{}/helix-container", release_mode.to_path())))
+        .map(|path| {
+            path.join(format!(
+                ".helix/repo/helix-db/target/{}/helix-container",
+                release_mode.to_path()
+            ))
+        })
         .unwrap();
 
     let endpoints: Vec<String> = code.source.queries.iter().map(|q| q.name.clone()).collect();
@@ -839,10 +851,10 @@ pub async fn redeploy_helix_remote(
     });
     let client = reqwest::Client::new();
 
+    let cloud_url = format!("http://{}/clusters/deploy-queries", *CLOUD_AUTHORITY);
+
     match client
-        .post(
-            "http://ec2-184-72-27-116.us-west-1.compute.amazonaws.com:3000/clusters/deploy-queries",
-        )
+        .post(cloud_url)
         .header("x-api-key", user_key) // used to verify user
         .header("x-cluster-id", &cluster) // used to verify instance with user
         .header("Content-Type", "application/json")

@@ -961,8 +961,10 @@ async fn main() -> ExitCode {
 
             let client = reqwest::Client::new();
 
+            let cloud_url = format!("http://{}/clusters/create_api_key", *CLOUD_AUTHORITY);
+
             let res = client
-                .post("http://ec2-184-72-27-116.us-west-1.compute.amazonaws.com:3000/clusters/create_api_key")
+                .post(cloud_url)
                 .bearer_auth(key)
                 .header("x-cluster-id", &cluster)
                 .json(&json!({
