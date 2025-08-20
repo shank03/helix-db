@@ -10,6 +10,7 @@ use serde::Deserialize;
 use serde_json::json;
 use spinners::{Spinner, Spinners};
 use std::{
+    env,
     fmt::Write,
     fs::{self, OpenOptions, read_to_string},
     io::Write as iWrite,
@@ -387,20 +388,23 @@ async fn main() -> ExitCode {
         }
 
         CommandType::Check(command) => {
-            let path = if let Some(p) = &command.path {
-                p
-            } else {
-                println!(
-                    "{} '{}'",
-                    "No path provided, defaulting to".yellow().bold(),
-                    DB_DIR.yellow().bold()
-                );
-                DB_DIR
+            let path = match &command.path {
+                Some(path) => PathBuf::from(path),
+                None => env::current_dir().expect("Failed to get current working directory"),
             };
 
             let mut sp = Spinner::new(Spinners::Dots9, "Checking Helix queries".into());
 
-            let files = match check_and_read_files(path) {
+            let path_str = match path.to_str() {
+                Some(s) => s,
+                None => {
+                    sp.stop_with_message("Invalid path encoding".red().bold().to_string());
+                    println!("└── Path contains invalid UTF-8 characters: {:?}", path);
+                    return ExitCode::FAILURE;
+                }
+            };
+
+            let files = match check_and_read_files(path_str) {
                 Ok(files) => files,
                 Err(e) => {
                     sp.stop_with_message("Error checking files".red().bold().to_string());
@@ -419,7 +423,7 @@ async fn main() -> ExitCode {
                 return ExitCode::FAILURE;
             }
 
-            match generate(&files, path) {
+            match generate(&files, path_str) {
                 Ok(_) => {}
                 Err(e) => {
                     sp.stop_with_message("Failed to generate queries".red().bold().to_string());
