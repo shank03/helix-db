@@ -28,10 +28,9 @@ pub static HELIX_USER_ID: LazyLock<String> = LazyLock::new(|| {
 
 pub const METRICS_URL: &str = "https://logs.helix-db.com";
 
-use std::sync::{Arc, Mutex};
-
 pub struct HelixMetricsClient {
-    threads: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>>,
+    threads_tx: flume::Sender<tokio::task::JoinHandle<()>>,
+    threads_rx: flume::Receiver<tokio::task::JoinHandle<()>>,
 }
 
 impl Default for HelixMetricsClient {
@@ -40,12 +39,12 @@ impl Default for HelixMetricsClient {
     }
 }
 
-
-
 impl HelixMetricsClient {
     pub fn new() -> Self {
+        let (tx, rx) = flume::unbounded();
         Self {
-            threads: Arc::new(Mutex::new(Vec::new())),
+            threads_tx: tx,
+            threads_rx: rx,
         }
     }
 
@@ -54,11 +53,7 @@ impl HelixMetricsClient {
     }
 
     pub async fn flush(&self) {
-        let handles = {
-            let mut threads = self.threads.lock().unwrap();
-            threads.drain(..).collect::<Vec<_>>()
-        };
-        for handle in handles {
+        for handle in self.threads_rx.try_iter().collect::<Vec<_>>() {
             let _ = handle.await;
         }
     }
@@ -95,7 +90,7 @@ impl HelixMetricsClient {
                 .send()
                 .await;
         });
-        self.threads.lock().unwrap().push(handle);
+        let _ = self.threads_tx.send(handle);
     }
 
     pub async fn send_event_async<D: Serialize + std::fmt::Debug>(
@@ -183,18 +178,17 @@ mod tests {
     #[tokio::test]
     async fn test_send_event() {
         let client = HelixMetricsClient::new();
-        client
-            .send_event(
-                events::EventType::Deploy,
-                events::DeployEvent {
-                    cluster_id: "test".to_string(),
-                    queries_string: "test".to_string(),
-                    num_of_queries: 1,
-                    time_taken_sec: 1,
-                    success: true,
-                    error_messages: None,
-                },
-            );
+        client.send_event(
+            events::EventType::Deploy,
+            events::DeployEvent {
+                cluster_id: "test".to_string(),
+                queries_string: "test".to_string(),
+                num_of_queries: 1,
+                time_taken_sec: 1,
+                success: true,
+                error_messages: None,
+            },
+        );
 
         client.flush().await;
 
