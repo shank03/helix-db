@@ -33,7 +33,7 @@ impl EventType {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct RawEvent<D: Serialize> {
+pub struct RawEvent<D: Serialize + std::fmt::Debug> {
     pub os: String,
     pub event_type: EventType,
     pub event_data: D,

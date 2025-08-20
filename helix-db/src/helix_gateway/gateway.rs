@@ -147,12 +147,44 @@ impl HelixGateway {
         rt.block_on(async move {
             let listener = tokio::net::TcpListener::bind(self.address).await.unwrap();
             info!("Listener has been bound, starting server");
-            axum::serve(listener, axum_app).await.unwrap()
+            axum::serve(listener, axum_app)
+                .with_graceful_shutdown(shutdown())
+                .await
+                .unwrap();
         });
 
         Ok(())
     }
 }
+
+async fn shutdown() {
+
+    tokio::select! {
+        _ = tokio::signal::ctrl_c() => {
+            info!("Received Ctrl-C, starting graceful shutdown…");
+        }
+        // #[cfg(unix)]
+        _ = sigterm() => {
+            info!("Received SIGTERM, starting graceful shutdown…");
+        }
+    }
+    HELIX_METRICS_CLIENT.flush().await;
+}
+
+async fn sigterm() {
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::{SignalKind, signal};
+        let mut term = signal(SignalKind::terminate()).expect("install SIGTERM handler");
+        term.recv().await;
+    }
+    #[cfg(not(unix))]
+    {
+        use tokio::signal::ctrl_c;
+        ctrl_c().await;
+    }
+}
+
 
 async fn post_handler(
     State(state): State<Arc<AppState>>,

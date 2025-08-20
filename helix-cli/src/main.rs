@@ -7,8 +7,7 @@ use crate::{
 use clap::Parser;
 use helix_db::{helix_engine::traversal_core::config::Config, utils::styled_string::StyledString};
 use helix_metrics::{
-    HelixMetricsClient,
-    events::{DeployEvent, EventType},
+    events::{DeployEvent, EventType}, HelixMetricsClient
 };
 use serde::Deserialize;
 use sonic_rs::json;
@@ -33,6 +32,12 @@ pub static HELIX_METRICS_CLIENT: LazyLock<HelixMetricsClient> =
 
 #[tokio::main]
 async fn main() -> ExitCode {
+    let exit_code = run().await;
+    HELIX_METRICS_CLIENT.flush().await;
+    exit_code
+}
+
+async fn run() -> ExitCode {
     check_helix_version().await;
 
     let args = HelixCli::parse();

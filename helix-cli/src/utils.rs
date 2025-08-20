@@ -194,6 +194,8 @@ pub async fn get_remote_helix_version() -> Result<Version, Box<dyn Error>> {
 
     let url = "https://api.github.com/repos/HelixDB/helix-db/releases/latest";
 
+    // if response is not returned within timeout just return. 
+    // At the moment this is stopping cli be used offline
     let response = client
         .get(url)
         .header("User-Agent", "rust")
