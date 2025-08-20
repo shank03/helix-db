@@ -111,7 +111,7 @@ pub fn check_helix_installation() -> Option<PathBuf> {
     Some(container_path)
 }
 
-pub fn print_instance(instance: &InstanceInfo) {
+pub fn print_instance(mut instance: InstanceInfo) {
     let rg: bool = instance.running;
     println!(
         "{} {} {}{}",
@@ -154,6 +154,9 @@ pub fn print_instance(instance: &InstanceInfo) {
     println!("└── Port: {}", instance.port);
     println!("└── Available endpoints:");
 
+    instance
+        .available_endpoints
+        .sort();
     instance
         .available_endpoints
         .iter()
@@ -697,7 +700,7 @@ pub fn deploy_helix(
                         .bold()
                         .to_string(),
                 );
-                print_instance(&instance);
+                print_instance(instance);
                 Ok(())
             }
             Err(e) => {
@@ -716,7 +719,7 @@ pub fn deploy_helix(
                         .bold()
                         .to_string(),
                 );
-                print_instance(&instance);
+                print_instance(instance);
                 Ok(())
             }
             Err(e) => {

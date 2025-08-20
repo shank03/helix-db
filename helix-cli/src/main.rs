@@ -79,7 +79,7 @@ async fn main() -> ExitCode {
                                 .bold()
                                 .to_string(),
                         );
-                        print_instance(&instance);
+                        print_instance(instance);
                     }
                     Err(e) => {
                         sp.stop_with_message("Failed to start instance".red().bold().to_string());
@@ -579,7 +579,7 @@ async fn main() -> ExitCode {
                         return ExitCode::FAILURE;
                     }
                     for instance in instances {
-                        print_instance(&instance);
+                        print_instance(instance);
                         println!();
                     }
                 }
@@ -641,7 +641,7 @@ async fn main() -> ExitCode {
                         );
                         println!("Available instances (green=running, yellow=stopped): ");
                         for instance in instances {
-                            print_instance(&instance);
+                            print_instance(instance);
                         }
                     }
                 }
