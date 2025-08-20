@@ -6,8 +6,12 @@ pub enum EventType {
     CliInstall,
     #[serde(rename = "compile")]
     Compile,
-    #[serde(rename = "deploy")]
-    Deploy,
+    #[serde(rename = "deploy_local")]
+    DeployLocal,
+    #[serde(rename = "redeploy_cloud")]
+    DeployCloud,
+    #[serde(rename = "redeploy_local")]
+    RedeployLocal,
     #[serde(rename = "query_success")]
     QuerySuccess,
     #[serde(rename = "query_error")]
@@ -23,7 +27,9 @@ impl EventType {
         match self {
             EventType::CliInstall => "cli_install",
             EventType::Compile => "compile",
-            EventType::Deploy => "deploy",
+            EventType::DeployLocal => "deploy_local",
+            EventType::DeployCloud => "deploy_cloud",
+            EventType::RedeployLocal => "redeploy_local",
             EventType::QuerySuccess => "query_success",
             EventType::QueryError => "query_error",
             EventType::WriteError => "write_error",
@@ -45,7 +51,9 @@ pub struct RawEvent<D: Serialize + std::fmt::Debug> {
 pub enum EventData {
     CliInstall,
     Compile(CompileEvent),
-    Deploy(DeployEvent),
+    DeployLocal(DeployLocalEvent),
+    DeployCloud(DeployCloudEvent),
+    RedeployLocal(RedeployLocalEvent),
     QuerySuccess(QuerySuccessEvent),
     QueryError(QueryErrorEvent),
     WriteError(WriteErrorEvent),
@@ -64,7 +72,29 @@ pub struct CompileEvent {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct DeployEvent {
+pub struct DeployLocalEvent {
+    pub cluster_id: String,
+    pub queries_string: String,
+    pub num_of_queries: u32,
+    pub time_taken_sec: u32,
+    pub success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_messages: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RedeployLocalEvent {
+    pub cluster_id: String,
+    pub queries_string: String,
+    pub num_of_queries: u32,
+    pub time_taken_sec: u32,
+    pub success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_messages: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DeployCloudEvent {
     pub cluster_id: String,
     pub queries_string: String,
     pub num_of_queries: u32,

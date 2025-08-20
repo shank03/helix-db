@@ -13,7 +13,7 @@ use helix_db::{
     },
     utils::styled_string::StyledString,
 };
-use helix_metrics::events::{DeployEvent, EventType};
+use helix_metrics::events::{DeployCloudEvent, EventType};
 use reqwest::Client;
 use serde::Deserialize;
 use sonic_rs::{JsonValueTrait, Value as JsonValue, json};
@@ -163,9 +163,7 @@ pub fn print_instance(mut instance: InstanceInfo) {
     println!("└── Port: {}", instance.port);
     println!("└── Available endpoints:");
 
-    instance
-        .available_endpoints
-        .sort();
+    instance.available_endpoints.sort();
     instance
         .available_endpoints
         .iter()
@@ -204,7 +202,7 @@ pub async fn get_remote_helix_version() -> Result<Version, Box<dyn Error>> {
 
     let url = "https://api.github.com/repos/HelixDB/helix-db/releases/latest";
 
-    // if response is not returned within timeout just return. 
+    // if response is not returned within timeout just return.
     // At the moment this is stopping cli be used offline
     let response = client
         .get(url)
@@ -877,7 +875,7 @@ pub async fn redeploy_helix_remote(
         }
     };
 
-    let deployment = DeployEvent {
+    let deployment = DeployCloudEvent {
         cluster_id: cluster.clone(),
         queries_string: content
             .source
@@ -916,7 +914,7 @@ pub async fn redeploy_helix_remote(
         Ok(response) => {
             if response.status().is_success() {
                 sp.stop_with_message("Queries uploaded to remote db".green().bold().to_string());
-                HELIX_METRICS_CLIENT.send_event(EventType::Deploy, deployment);
+                HELIX_METRICS_CLIENT.send_event(EventType::DeployCloud, deployment);
             } else {
                 sp.stop_with_message(
                     "Error uploading queries to remote db"

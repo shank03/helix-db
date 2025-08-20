@@ -7,7 +7,8 @@ use crate::{
 use clap::Parser;
 use helix_db::{helix_engine::traversal_core::config::Config, utils::styled_string::StyledString};
 use helix_metrics::{
-    events::{DeployEvent, EventType}, HelixMetricsClient
+    HelixMetricsClient,
+    events::{DeployLocalEvent, EventType, RedeployLocalEvent},
 };
 use serde::Deserialize;
 use sonic_rs::json;
@@ -96,8 +97,8 @@ async fn run() -> ExitCode {
                                 .to_string(),
                         );
                         HELIX_METRICS_CLIENT.send_event(
-                            EventType::Deploy,
-                            DeployEvent {
+                            EventType::DeployLocal,
+                            DeployLocalEvent {
                                 cluster_id: instance.id.clone(),
                                 queries_string: "".to_string(),
                                 num_of_queries: 0,
@@ -154,24 +155,41 @@ async fn run() -> ExitCode {
                     .collect::<Vec<String>>()
                     .join("\n");
                 let num_of_queries = code.source.queries.len() as u32;
-                let event = |instance_id: String, time_taken_sec: u32| DeployEvent {
+                let event = |instance_id: String, time_taken_sec: u32| DeployLocalEvent {
                     cluster_id: instance_id,
-                    queries_string,
+                    queries_string: queries_string.clone(),
                     num_of_queries,
                     time_taken_sec,
                     success: true,
                     error_messages: None,
                 };
+                let redeploy_event =
+                    |instance_id: String, time_taken_sec: u32| RedeployLocalEvent {
+                        cluster_id: instance_id,
+                        queries_string: queries_string.clone(),
+                        num_of_queries,
+                        time_taken_sec,
+                        success: true,
+                        error_messages: None,
+                    };
 
                 if command.cluster.is_some()
                     && (command.path.is_some() || Path::new(&format!("./{DB_DIR}")).is_dir())
                 {
                     match redeploy_helix(
-                        command.cluster.unwrap(),
+                        command.cluster.clone().unwrap(),
                         code,
                         BuildMode::from_release(command.release),
                     ) {
-                        Ok(_) => {}
+                        Ok(_) => {
+                            HELIX_METRICS_CLIENT.send_event(
+                                EventType::RedeployLocal,
+                                redeploy_event(
+                                    command.cluster.unwrap(),
+                                    start_time.elapsed().as_secs() as u32,
+                                ),
+                            );
+                        }
                         Err(_) => return ExitCode::FAILURE,
                     }
                     return ExitCode::FAILURE;
@@ -207,7 +225,7 @@ async fn run() -> ExitCode {
                     match deploy_helix(port, code, None, BuildMode::from_release(command.release)) {
                         Ok(cluster_id) => {
                             HELIX_METRICS_CLIENT.send_event(
-                                EventType::Deploy,
+                                EventType::DeployLocal,
                                 event(cluster_id, start_time.elapsed().as_secs() as u32),
                             );
                         }
@@ -216,8 +234,10 @@ async fn run() -> ExitCode {
                     return ExitCode::FAILURE;
                 }
             } else if let Some(cluster) = command.cluster {
-                match redeploy_helix_remote(cluster, path, files).await {
-                    Ok(_) => {}
+                match redeploy_helix_remote(cluster.clone(), path, files).await {
+                    Ok(_) => {
+                        return ExitCode::SUCCESS;
+                    }
                     Err(_) => return ExitCode::FAILURE,
                 }
             } else {
