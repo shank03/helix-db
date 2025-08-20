@@ -51,22 +51,20 @@ impl<'a, I: Iterator<Item = Result<TraversalValue, GraphError>> + 'a> BruteForce
         K: TryInto<usize>,
         K::Error: std::fmt::Debug,
     {
-        let iter = self.inner.map(|v| match v {
-            Ok(TraversalValue::Vector(mut v)) => {
-                let d = cosine_similarity(v.get_data(), query).unwrap();
-                v.set_distance(d);
-                v
-            }
-            other => {
-                println!("expected vector traversal values, got: {other:?}");
-                panic!("expected vector traversal values")
-            }
-        });
-
         let storage = Arc::clone(&self.storage);
         let txn = self.txn;
 
-        let iter = iter
+        let iter = self
+            .inner
+            .filter_map(|v| match v {
+                Ok(TraversalValue::Vector(mut v)) => {
+                    let d = cosine_similarity(v.get_data(), query).unwrap();
+                    v.set_distance(d);
+                    Some(v)
+                }
+                // TODO: handle other types of traversal values
+                _ => None,
+            })
             .sorted_by(|v1, v2| v1.partial_cmp(v2).unwrap())
             .take(k.try_into().unwrap())
             .filter_map(move |mut item| {
