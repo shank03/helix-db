@@ -392,11 +392,17 @@ async fn main() -> ExitCode {
                 Some(path) => PathBuf::from(path),
                 None => env::current_dir().expect("Failed to get current working directory"),
             };
-            let path_str = path
-                .to_str()
-                .unwrap_or_else(|| panic!("Path contains invalid UTF-8 characters: {:?}", path));
 
             let mut sp = Spinner::new(Spinners::Dots9, "Checking Helix queries".into());
+
+            let path_str = match path.to_str() {
+                Some(s) => s,
+                None => {
+                    sp.stop_with_message("Invalid path encoding".red().bold().to_string());
+                    println!("└── Path contains invalid UTF-8 characters: {:?}", path);
+                    return ExitCode::FAILURE;
+                }
+            };
 
             let files = match check_and_read_files(path_str) {
                 Ok(files) => files,
