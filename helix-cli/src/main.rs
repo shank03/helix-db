@@ -392,10 +392,9 @@ async fn main() -> ExitCode {
                 Some(path) => PathBuf::from(path),
                 None => env::current_dir().expect("Failed to get current working directory"),
             };
-            let path_str = path.to_str().expect(&format!(
-                "Path contains invalid UTF-8 characters: {:?}",
-                path
-            ));
+            let path_str = path
+                .to_str()
+                .unwrap_or_else(|| panic!("Path contains invalid UTF-8 characters: {:?}", path));
 
             let mut sp = Spinner::new(Spinners::Dots9, "Checking Helix queries".into());
 
