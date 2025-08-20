@@ -668,14 +668,18 @@ async fn run() -> ExitCode {
                 } else {
                     println!("{}", "Metrics already disabled".yellow().bold());
                 }
-            } else if !metrics {
-                // write to config_path
-                let mut file = File::open(config_path).unwrap();
-                let mut contents = String::new();
-                file.read_to_string(&mut contents).unwrap();
-                let new_contents = contents.replace("metrics=false", "metrics=true");
-                file.write_all(new_contents.as_bytes()).unwrap();
-                println!("{}", "Metrics enabled".green().bold());
+            } else if command.on {
+                if !metrics {
+                    // write to config_path
+                    let mut file = File::open(config_path).unwrap();
+                    let mut contents = String::new();
+                    file.read_to_string(&mut contents).unwrap();
+                    let new_contents = contents.replace("metrics=false", "metrics=true");
+                    file.write_all(new_contents.as_bytes()).unwrap();
+                    println!("{}", "Metrics enabled".green().bold());
+                } else {
+                    println!("{}", "Metrics already enabled".green().bold());
+                }
             }
         }
 
