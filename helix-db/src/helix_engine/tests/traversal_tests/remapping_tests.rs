@@ -23,7 +23,7 @@ use crate::{
                     n_from_type::NFromTypeAdapter,
                 }, util::map::MapAdapter
             },
-            traversal_value::{Traversable, TraversalValue, TraversableType},
+            traversal_value::{Traversable, TraversalValue},
         },
         types::GraphError,
     },
