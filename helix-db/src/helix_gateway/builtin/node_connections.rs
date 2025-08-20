@@ -4,13 +4,13 @@ use std::sync::Arc;
 use axum::body::Body;
 use axum::extract::{Query, State};
 use axum::response::IntoResponse;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use sonic_rs::{JsonValueTrait, json};
 use tracing::info;
 
-use crate::helix_engine::graph_core::ops::tr_val::TraversalValue;
 use crate::helix_engine::storage_core::HelixGraphStorage;
 use crate::helix_engine::storage_core::storage_methods::StorageMethods;
+use crate::helix_engine::traversal_core::traversal_value::TraversalValue;
 use crate::helix_engine::types::GraphError;
 use crate::helix_gateway::gateway::AppState;
 use crate::helix_gateway::router::router::{Handler, HandlerInput, HandlerSubmission};
@@ -55,7 +55,7 @@ pub async fn node_connections_handler(
     }
 }
 
-pub fn node_connections_inner(input: &HandlerInput) -> Result<protocol::Response, GraphError> {
+pub fn node_connections_inner(input: HandlerInput) -> Result<protocol::Response, GraphError> {
     let db = Arc::clone(&input.graph.storage);
     let txn = db.graph_env.read_txn().map_err(GraphError::from)?;
 
@@ -90,54 +90,46 @@ pub fn node_connections_inner(input: &HandlerInput) -> Result<protocol::Response
     let incoming_edges = db
         .in_edges_db
         .prefix_iter(&txn, &node_id.to_be_bytes())?
-        .filter_map(|result| {
-            match result {
-                Ok((_, value)) => {
-                    match HelixGraphStorage::unpack_adj_edge_data(value) {
-                        Ok((edge_id, from_node)) => {
-                            if connected_node_ids.insert(from_node) {
-                                if let Ok(node) = db.get_node(&txn, &from_node) {
-                                    connected_nodes.push(TraversalValue::Node(node));
-                                }
-                            }
-                            
-                            match db.get_edge(&txn, &edge_id) {
-                                Ok(edge) => Some(TraversalValue::Edge(edge)),
-                                Err(_) => None,
-                            }
+        .filter_map(|result| match result {
+            Ok((_, value)) => match HelixGraphStorage::unpack_adj_edge_data(value) {
+                Ok((edge_id, from_node)) => {
+                    if connected_node_ids.insert(from_node) {
+                        if let Ok(node) = db.get_node(&txn, &from_node) {
+                            connected_nodes.push(TraversalValue::Node(node));
                         }
+                    }
+
+                    match db.get_edge(&txn, &edge_id) {
+                        Ok(edge) => Some(TraversalValue::Edge(edge)),
                         Err(_) => None,
                     }
                 }
                 Err(_) => None,
-            }
+            },
+            Err(_) => None,
         })
         .collect::<Vec<_>>();
 
     let outgoing_edges = db
         .out_edges_db
         .prefix_iter(&txn, &node_id.to_be_bytes())?
-        .filter_map(|result| {
-            match result {
-                Ok((_, value)) => {
-                    match HelixGraphStorage::unpack_adj_edge_data(value) {
-                        Ok((edge_id, to_node)) => {
-                            if connected_node_ids.insert(to_node) {
-                                if let Ok(node) = db.get_node(&txn, &to_node) {
-                                    connected_nodes.push(TraversalValue::Node(node));
-                                }
-                            }
-                            
-                            match db.get_edge(&txn, &edge_id) {
-                                Ok(edge) => Some(TraversalValue::Edge(edge)),
-                                Err(_) => None,
-                            }
+        .filter_map(|result| match result {
+            Ok((_, value)) => match HelixGraphStorage::unpack_adj_edge_data(value) {
+                Ok((edge_id, to_node)) => {
+                    if connected_node_ids.insert(to_node) {
+                        if let Ok(node) = db.get_node(&txn, &to_node) {
+                            connected_nodes.push(TraversalValue::Node(node));
                         }
+                    }
+
+                    match db.get_edge(&txn, &edge_id) {
+                        Ok(edge) => Some(TraversalValue::Edge(edge)),
                         Err(_) => None,
                     }
                 }
                 Err(_) => None,
-            }
+            },
+            Err(_) => None,
         })
         .collect::<Vec<_>>();
 
