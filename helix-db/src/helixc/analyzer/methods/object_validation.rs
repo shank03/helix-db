@@ -196,6 +196,7 @@ pub(crate) fn parse_object_remapping<'a>(
                                 should_spread,
                             })
                         }
+                        // TODO: IF CLOSURE
                         StepType::Object(ref object)
                             if object.fields.len() == 1 && traversal.steps.len() == 1 =>
                         {
@@ -252,12 +253,43 @@ pub(crate) fn parse_object_remapping<'a>(
                             );
                         }
                     };
-                    RemappingType::TraversalRemapping(TraversalRemapping {
-                        variable_name: closure_variable.get_variable_name(),
-                        new_field: key.clone(),
-                        new_value: inner_traversal,
-                        should_spread,
-                    })
+                    match &traversal.steps.last() {
+                        Some(step) => match step.step {
+                            StepType::Count | StepType::BooleanOperation(_) => {
+                                RemappingType::ValueRemapping(ValueRemapping {
+                                    variable_name: closure_variable.get_variable_name(),
+                                    field_name: key.clone(),
+                                    value: GenRef::Std(inner_traversal.to_string()),
+                                    should_spread,
+                                })
+                            }
+                            // TODO: IF CLOSURE
+                            StepType::Object(ref object)
+                                if object.fields.len() == 1 && traversal.steps.len() == 1 =>
+                            {
+                                RemappingType::SingleFieldTraversalRemapping(
+                                    SingleFieldTraversalRemapping {
+                                        variable_name: closure_variable.get_variable_name(),
+                                        new_field: key.clone(),
+                                        new_value: inner_traversal,
+                                        should_spread,
+                                    },
+                                )
+                            }
+                            _ => RemappingType::TraversalRemapping(TraversalRemapping {
+                                variable_name: closure_variable.get_variable_name(),
+                                new_field: key.clone(),
+                                new_value: inner_traversal,
+                                should_spread,
+                            }),
+                        },
+                        None => RemappingType::TraversalRemapping(TraversalRemapping {
+                            variable_name: closure_variable.get_variable_name(),
+                            new_field: key.clone(),
+                            new_value: inner_traversal,
+                            should_spread,
+                        }),
+                    }
                 }
                 ExpressionType::Exists(expr) => {
                     let (_, stmt) = infer_expr_type(

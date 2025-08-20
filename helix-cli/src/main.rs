@@ -117,7 +117,10 @@ async fn main() -> ExitCode {
                     command.dev,
                 ) {
                     Ok(code) => code,
-                    Err(_) => return ExitCode::FAILURE,
+                    Err(_) => {
+                        println!("{}", "Failed to compile Helix queries".red().bold());
+                        return ExitCode::FAILURE;
+                    }
                 };
 
                 if command.cluster.is_some()
@@ -129,9 +132,13 @@ async fn main() -> ExitCode {
                         BuildMode::from_release(command.release),
                     ) {
                         Ok(_) => {}
-                        Err(_) => return ExitCode::FAILURE,
+                        Err(_) => {
+                            println!("{}", "Failed to deploy Helix queries".red().bold());
+                            return ExitCode::FAILURE;
+                        }
                     }
-                    return ExitCode::FAILURE;
+                    println!("{}", "Successfully deployed Helix queries".green().bold());
+                    return ExitCode::SUCCESS;
                 }
 
                 // -- helix deploy --
@@ -163,14 +170,21 @@ async fn main() -> ExitCode {
                     };
                     match deploy_helix(port, code, None, BuildMode::from_release(command.release)) {
                         Ok(_) => {}
-                        Err(_) => return ExitCode::FAILURE,
+                        Err(_) => {
+                            println!("{}", "Failed to deploy Helix queries".red().bold());
+                            return ExitCode::FAILURE;
+                        }
                     }
-                    return ExitCode::FAILURE;
+                    println!("{}", "Successfully deployed Helix queries".green().bold());
+                    return ExitCode::SUCCESS;
                 }
             } else if let Some(cluster) = command.cluster {
                 match redeploy_helix_remote(cluster, path, files).await {
                     Ok(_) => {}
-                    Err(_) => return ExitCode::FAILURE,
+                    Err(_) => {
+                        println!("{}", "Failed to deploy Helix queries".red().bold());
+                        return ExitCode::FAILURE;
+                    }
                 }
             } else {
                 println!(
