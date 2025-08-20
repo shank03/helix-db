@@ -1,0 +1,3 @@
+V::Preference {
+    preference: String
+}
