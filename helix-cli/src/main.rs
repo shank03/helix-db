@@ -13,6 +13,7 @@ use serde::Deserialize;
 use sonic_rs::json;
 use spinners::{Spinner, Spinners};
 use std::{
+    env,
     fmt::Write,
     fs::{self, File, OpenOptions, read_to_string},
     io::{Read, Write as iWrite},
@@ -94,7 +95,6 @@ async fn run() -> ExitCode {
                                 .bold()
                                 .to_string(),
                         );
-                        print_instance(&instance);
                         HELIX_METRICS_CLIENT.send_event(
                             EventType::Deploy,
                             DeployEvent {
@@ -106,6 +106,7 @@ async fn run() -> ExitCode {
                                 error_messages: None,
                             },
                         );
+                        print_instance(instance);
                     }
                     Err(e) => {
                         sp.stop_with_message("Failed to start instance".red().bold().to_string());
@@ -434,20 +435,23 @@ async fn run() -> ExitCode {
         }
 
         CommandType::Check(command) => {
-            let path = if let Some(p) = &command.path {
-                p
-            } else {
-                println!(
-                    "{} '{}'",
-                    "No path provided, defaulting to".yellow().bold(),
-                    DB_DIR.yellow().bold()
-                );
-                DB_DIR
+            let path = match &command.path {
+                Some(path) => PathBuf::from(path),
+                None => env::current_dir().expect("Failed to get current working directory"),
             };
 
             let mut sp = Spinner::new(Spinners::Dots9, "Checking Helix queries".into());
 
-            let files = match check_and_read_files(path) {
+            let path_str = match path.to_str() {
+                Some(s) => s,
+                None => {
+                    sp.stop_with_message("Invalid path encoding".red().bold().to_string());
+                    println!("└── Path contains invalid UTF-8 characters: {:?}", path);
+                    return ExitCode::FAILURE;
+                }
+            };
+
+            let files = match check_and_read_files(path_str) {
                 Ok(files) => files,
                 Err(e) => {
                     sp.stop_with_message("Error checking files".red().bold().to_string());
@@ -466,7 +470,7 @@ async fn run() -> ExitCode {
                 return ExitCode::FAILURE;
             }
 
-            match generate(&files, path) {
+            match generate(&files, path_str) {
                 Ok(_) => {}
                 Err(e) => {
                     sp.stop_with_message("Failed to generate queries".red().bold().to_string());
@@ -664,7 +668,7 @@ async fn run() -> ExitCode {
                         return ExitCode::FAILURE;
                     }
                     for instance in instances {
-                        print_instance(&instance);
+                        print_instance(instance);
                         println!();
                     }
                 }
@@ -726,7 +730,7 @@ async fn run() -> ExitCode {
                         );
                         println!("Available instances (green=running, yellow=stopped): ");
                         for instance in instances {
-                            print_instance(&instance);
+                            print_instance(instance);
                         }
                     }
                 }
@@ -1046,8 +1050,10 @@ async fn run() -> ExitCode {
 
             let client = reqwest::Client::new();
 
+            let cloud_url = format!("http://{}/clusters/create_api_key", *CLOUD_AUTHORITY);
+
             let res = client
-                .post("http://ec2-184-72-27-116.us-west-1.compute.amazonaws.com:3000/clusters/create_api_key")
+                .post(cloud_url)
                 .bearer_auth(key)
                 .header("x-cluster-id", &cluster)
                 .json(&json!({

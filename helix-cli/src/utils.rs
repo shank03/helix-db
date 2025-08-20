@@ -27,6 +27,7 @@ use std::{
     net::{SocketAddr, TcpListener},
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    sync::LazyLock,
 };
 use tokio_tungstenite::{
     connect_async,
@@ -38,6 +39,12 @@ use tokio_tungstenite::{
 use toml::Value;
 
 pub const DB_DIR: &str = "helixdb-cfg/";
+
+const DEFAULT_CLOUD_AUTHORITY: &str = "ec2-184-72-27-116.us-west-1.compute.amazonaws.com:3000";
+
+pub static CLOUD_AUTHORITY: LazyLock<String> = LazyLock::new(|| {
+    env::var("HELIX_CLOUD_AUTHORITY").unwrap_or(DEFAULT_CLOUD_AUTHORITY.to_string())
+});
 
 pub const DEFAULT_SCHEMA: &str = r#"// Start building your schema here.
 //
@@ -113,7 +120,7 @@ pub fn check_helix_installation() -> Option<PathBuf> {
     Some(container_path)
 }
 
-pub fn print_instance(instance: &InstanceInfo) {
+pub fn print_instance(mut instance: InstanceInfo) {
     let rg: bool = instance.running;
     println!(
         "{} {} {}{}",
@@ -156,6 +163,9 @@ pub fn print_instance(instance: &InstanceInfo) {
     println!("└── Port: {}", instance.port);
     println!("└── Available endpoints:");
 
+    instance
+        .available_endpoints
+        .sort();
     instance
         .available_endpoints
         .iter()
@@ -216,7 +226,7 @@ pub async fn get_remote_helix_version() -> Result<Version, Box<dyn Error>> {
 }
 
 pub async fn github_login() -> Result<(String, String), Box<dyn Error>> {
-    let url = "ws://ec2-184-72-27-116.us-west-1.compute.amazonaws.com:3000/login";
+    let url = format!("ws://{}/login", *CLOUD_AUTHORITY);
     let (mut ws_stream, _) = connect_async(url).await?;
 
     let init_msg: UserCodeMsg = match ws_stream.next().await {
@@ -733,8 +743,9 @@ pub fn deploy_helix(
                         .bold()
                         .to_string(),
                 );
-                print_instance(&instance);
-                Ok(instance.id)
+                let instance_id = instance.id.clone();
+                print_instance(instance);
+                Ok(instance_id)
             }
             Err(e) => {
                 sp.stop_with_message("Failed to start Helix instance".red().bold().to_string());
@@ -752,8 +763,9 @@ pub fn deploy_helix(
                         .bold()
                         .to_string(),
                 );
-                print_instance(&instance);
-                Ok(instance.id)
+                let instance_id = instance.id.clone();
+                print_instance(instance);
+                Ok(instance_id)
             }
             Err(e) => {
                 sp.stop_with_message("Failed to start Helix instance".red().bold().to_string());
@@ -890,10 +902,10 @@ pub async fn redeploy_helix_remote(
     });
     let client = reqwest::Client::new();
 
+    let cloud_url = format!("http://{}/clusters/deploy-queries", *CLOUD_AUTHORITY);
+
     match client
-        .post(
-            "http://ec2-184-72-27-116.us-west-1.compute.amazonaws.com:3000/clusters/deploy-queries",
-        )
+        .post(cloud_url)
         .header("x-api-key", user_key) // used to verify user
         .header("x-cluster-id", &cluster) // used to verify instance with user
         .header("Content-Type", "application/json")
