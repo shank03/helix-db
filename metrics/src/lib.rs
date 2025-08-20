@@ -13,10 +13,10 @@ pub static HELIX_USER_ID: LazyLock<String> = LazyLock::new(|| {
     let user_id = match fs::read_to_string(config_path) {
         Ok(config) => {
             for line in config.lines() {
-                if let Some((key, value)) = line.split_once("=") {
-                    if key.to_lowercase() == "helix_user_id" {
-                        return value.to_string();
-                    }
+                if let Some((key, value)) = line.split_once("=")
+                    && key.to_lowercase() == "helix_user_id"
+                {
+                    return value.to_string();
                 }
             }
             "".to_string()
