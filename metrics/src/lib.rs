@@ -30,10 +30,10 @@ pub static HELIX_USER_ID: LazyLock<String> = LazyLock::new(|| {
 
 pub static METRICS_ENABLED: LazyLock<bool> = LazyLock::new(|| {
     for line in CONFIG.lines() {
-        if let Some((key, value)) = line.split_once("=") {
-            if key.to_lowercase().as_str() == "metrics" {
-                return value.to_string().parse().unwrap_or(true);
-            }
+        if let Some((key, value)) = line.split_once("=")
+            && key.to_lowercase().as_str() == "metrics"
+        {
+            return value.to_string().parse().unwrap_or(true);
         }
     }
     true
