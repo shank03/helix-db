@@ -31,11 +31,8 @@ pub static HELIX_USER_ID: LazyLock<String> = LazyLock::new(|| {
 pub static METRICS_ENABLED: LazyLock<bool> = LazyLock::new(|| {
     for line in CONFIG.lines() {
         if let Some((key, value)) = line.split_once("=") {
-            match key.to_lowercase().as_str() {
-                "metrics" => {
-                    return value.to_string().parse().unwrap_or(true);
-                }
-                _ => {}
+            if key.to_lowercase().as_str() == "metrics" {
+                return value.to_string().parse().unwrap_or(true);
             }
         }
     }
@@ -89,17 +86,12 @@ impl HelixMetricsClient {
         // get user id
         let user_id = Some(HELIX_USER_ID.as_str().to_string());
 
-        println!("Sending event: {:?}", event_type);
         let raw_event = events::RawEvent {
             os,
             user_id,
             event_type,
             event_data,
         };
-        println!(
-            "Raw event: {}",
-            sonic_rs::to_string_pretty(&raw_event).unwrap()
-        );
 
         // Spawn the request in the background for fire-and-forget behavior
         let handle = tokio::spawn(async move {
@@ -111,45 +103,6 @@ impl HelixMetricsClient {
                 .await;
         });
         let _ = self.threads_tx.send(handle);
-    }
-
-    pub async fn send_event_async<D: Serialize + std::fmt::Debug>(
-        &self,
-        event_type: events::EventType,
-        event_data: D,
-    ) {
-        if !*METRICS_ENABLED {
-            return;
-        }
-
-        // get OS
-        let os = OS.to_string();
-
-        // get user id
-        let user_id = Some(HELIX_USER_ID.as_str().to_string());
-
-        println!("Sending event: {:?}", event_type);
-        let raw_event = events::RawEvent {
-            os,
-            user_id,
-            event_type,
-            event_data,
-        };
-        println!(
-            "Raw event: {}",
-            sonic_rs::to_string_pretty(&raw_event).unwrap()
-        );
-
-        let res = self
-            .get_client()
-            .post(METRICS_URL)
-            .header("Content-Type", "application/json")
-            .body(sonic_rs::to_vec(&raw_event).unwrap())
-            .send()
-            .await
-            .unwrap();
-
-        println!("Response: {:?}", res);
     }
 }
 
@@ -181,38 +134,9 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_send_event_async() {
-        let client = HelixMetricsClient::new();
-        client
-            .send_event_async(
-                events::EventType::DeployLocal,
-                events::DeployLocalEvent {
-                    cluster_id: "test".to_string(),
-                    queries_string: "test".to_string(),
-                    num_of_queries: 1,
-                    time_taken_sec: 1,
-                    success: true,
-                    error_messages: None,
-                },
-            )
-            .await;
-        assert!(false);
-    }
-
-    #[tokio::test]
     async fn test_send_event() {
         let client = HelixMetricsClient::new();
-        client.send_event(
-            events::EventType::DeployLocal,
-            events::DeployLocalEvent {
-                cluster_id: "test".to_string(),
-                queries_string: "test".to_string(),
-                num_of_queries: 1,
-                time_taken_sec: 1,
-                success: true,
-                error_messages: None,
-            },
-        );
+        client.send_event(events::EventType::Test, events::TestEvent::default());
 
         client.flush().await;
 

@@ -466,7 +466,7 @@ async fn run() -> ExitCode {
                 Some(s) => s,
                 None => {
                     sp.stop_with_message("Invalid path encoding".red().bold().to_string());
-                    println!("└── Path contains invalid UTF-8 characters: {:?}", path);
+                    println!("└── Path contains invalid UTF-8 characters: {path:?}");
                     return ExitCode::FAILURE;
                 }
             };

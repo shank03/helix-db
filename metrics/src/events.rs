@@ -20,6 +20,8 @@ pub enum EventType {
     WriteError,
     #[serde(rename = "read_error")]
     ReadError,
+    #[serde(rename = "test")]
+    Test,
 }
 
 impl EventType {
@@ -34,6 +36,7 @@ impl EventType {
             EventType::QueryError => "query_error",
             EventType::WriteError => "write_error",
             EventType::ReadError => "read_error",
+            EventType::Test => "test",
         }
     }
 }
@@ -58,6 +61,31 @@ pub enum EventData {
     QueryError(QueryErrorEvent),
     WriteError(WriteErrorEvent),
     ReadError(ReadErrorEvent),
+    Test(TestEvent),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TestEvent {
+    pub cluster_id: String,
+    pub queries_string: String,
+    pub num_of_queries: u32,
+    pub time_taken_sec: u32,
+    pub success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_messages: Option<String>, 
+}
+
+impl Default for TestEvent {
+    fn default() -> Self {
+        TestEvent {
+            cluster_id: "test_cluster".to_string(),
+            queries_string: "test_queries".to_string(),
+            num_of_queries: 0,
+            time_taken_sec: 0,
+            success: true,
+            error_messages: None,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
