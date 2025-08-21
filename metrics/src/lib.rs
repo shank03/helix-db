@@ -5,25 +5,41 @@ use std::{env::consts::OS, fs, path::Path, sync::LazyLock};
 use serde::Serialize;
 
 pub static METRICS_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Client::new);
-pub static HELIX_USER_ID: LazyLock<String> = LazyLock::new(|| {
-    // read from credentials file
+
+static CONFIG: LazyLock<String> = LazyLock::new(|| {
     let home_dir = std::env::var("HOME").unwrap_or("~/".to_string());
     let config_path = &format!("{home_dir}/.helix/credentials");
     let config_path = Path::new(config_path);
-    let user_id = match fs::read_to_string(config_path) {
-        Ok(config) => {
-            for line in config.lines() {
-                if let Some((key, value)) = line.split_once("=")
-                    && key.to_lowercase() == "helix_user_id"
-                {
-                    return value.to_string();
-                }
+    fs::read_to_string(config_path).unwrap_or_default()
+});
+
+pub static HELIX_USER_ID: LazyLock<String> = LazyLock::new(|| {
+    // read from credentials file
+    let user_id = {
+        for line in CONFIG.lines() {
+            if let Some((key, value)) = line.split_once("=")
+                && key.to_lowercase() == "helix_user_id"
+            {
+                return value.to_string();
             }
-            "".to_string()
         }
-        Err(_) => "".to_string(),
+        "".to_string()
     };
     user_id
+});
+
+pub static METRICS_ENABLED: LazyLock<bool> = LazyLock::new(|| {
+    for line in CONFIG.lines() {
+        if let Some((key, value)) = line.split_once("=") {
+            match key.to_lowercase().as_str() {
+                "metrics" => {
+                    return value.to_string().parse().unwrap_or(true);
+                }
+                _ => {}
+            }
+        }
+    }
+    true
 });
 
 pub const METRICS_URL: &str = "https://logs.helix-db.com";
@@ -63,6 +79,10 @@ impl HelixMetricsClient {
         event_type: events::EventType,
         event_data: D,
     ) {
+        if !*METRICS_ENABLED {
+            return;
+        }
+
         // get OS
         let os = OS.to_string();
 
@@ -98,6 +118,10 @@ impl HelixMetricsClient {
         event_type: events::EventType,
         event_data: D,
     ) {
+        if !*METRICS_ENABLED {
+            return;
+        }
+
         // get OS
         let os = OS.to_string();
 
@@ -161,8 +185,8 @@ mod tests {
         let client = HelixMetricsClient::new();
         client
             .send_event_async(
-                events::EventType::Deploy,
-                events::DeployEvent {
+                events::EventType::DeployLocal,
+                events::DeployLocalEvent {
                     cluster_id: "test".to_string(),
                     queries_string: "test".to_string(),
                     num_of_queries: 1,
@@ -179,8 +203,8 @@ mod tests {
     async fn test_send_event() {
         let client = HelixMetricsClient::new();
         client.send_event(
-            events::EventType::Deploy,
-            events::DeployEvent {
+            events::EventType::DeployLocal,
+            events::DeployLocalEvent {
                 cluster_id: "test".to_string(),
                 queries_string: "test".to_string(),
                 num_of_queries: 1,
