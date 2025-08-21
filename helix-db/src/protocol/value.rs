@@ -182,6 +182,8 @@ impl PartialEq<ID> for Value {
     fn eq(&self, other: &ID) -> bool {
         match self {
             Value::Id(id) => id == other,
+            Value::String(s) => &ID::from(s) == other,
+            Value::U128(u) => &ID::from(*u) == other,
             _ => false,
         }
     }

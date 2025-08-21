@@ -1,14 +1,12 @@
 use std::{borrow::Cow, collections::HashMap};
 
 use crate::{
-    helix_engine::types::GraphError,
-    utils::{
-        items::{Edge, Node},
-    },
-    protocol:: {
+    helix_engine::types::GraphError, protocol:: {
         return_values::ReturnValue,
         value::Value,
-    },
+    }, utils::{
+        id::ID, items::{Edge, Node}
+    }
 };
 
 #[derive(Debug, Clone)]
@@ -125,7 +123,7 @@ impl Filterable for Node {
     #[inline(always)]
     fn check_property(&self, key: &str) -> Result<Cow<'_,Value>, GraphError> {
         match key {
-            "id" => Ok(Cow::Owned(Value::from(self.uuid()))),
+            "id" => Ok(Cow::Owned(Value::Id(ID::from(self.id)))),
             "label" => Ok(Cow::Owned(Value::from(self.label.to_string()))),
             _ =>  match &self.properties {
                 Some(properties) => properties

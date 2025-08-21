@@ -12,7 +12,7 @@ pub type RetChan = oneshot::Sender<Result<Response, HelixError>>;
 
 pub type ReqMsg = (Request, RetChan);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Request {
     pub name: String,
     pub req_type: RequestType,
