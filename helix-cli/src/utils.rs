@@ -1,4 +1,5 @@
 use crate::{
+    HELIX_METRICS_CLIENT,
     instance_manager::{InstanceInfo, InstanceManager},
     types::*,
 };
@@ -12,9 +13,10 @@ use helix_db::{
     },
     utils::styled_string::StyledString,
 };
+use helix_metrics::events::{DeployCloudEvent, EventType};
 use reqwest::Client;
 use serde::Deserialize;
-use serde_json::{Value as JsonValue, json};
+use sonic_rs::{JsonValueTrait, Value as JsonValue, json};
 use spinners::{Spinner, Spinners};
 use std::{
     env,
@@ -161,9 +163,7 @@ pub fn print_instance(mut instance: InstanceInfo) {
     println!("└── Port: {}", instance.port);
     println!("└── Available endpoints:");
 
-    instance
-        .available_endpoints
-        .sort();
+    instance.available_endpoints.sort();
     instance
         .available_endpoints
         .iter()
@@ -202,6 +202,8 @@ pub async fn get_remote_helix_version() -> Result<Version, Box<dyn Error>> {
 
     let url = "https://api.github.com/repos/HelixDB/helix-db/releases/latest";
 
+    // if response is not returned within timeout just return.
+    // At the moment this is stopping cli be used offline
     let response = client
         .get(url)
         .header("User-Agent", "rust")
@@ -265,8 +267,35 @@ struct ApiKeyMsg {
     key: String,
 }
 
+pub struct Credentials {
+    pub key: Option<String>,
+    pub user_id: Option<String>,
+    pub metrics: Option<bool>,
+}
+
+pub fn parse_credentials(creds: &str) -> Credentials {
+    let mut credentials = Credentials {
+        key: None,
+        user_id: None,
+        metrics: None,
+    };
+
+    for line in creds.lines() {
+        if let Some((key, value)) = line.split_once("=") {
+            match key.to_lowercase().as_str() {
+                "helix_user_key" => credentials.key = Some(value.to_string()),
+                "helix_user_id" => credentials.user_id = Some(value.to_string()),
+                "metrics" => credentials.metrics = Some(value.to_string().parse().unwrap()),
+                _ => {}
+            }
+        }
+    }
+
+    credentials
+}
+
 /// tries to parse a credential file, returning the key, if any
-pub fn parse_credentials(creds: &str) -> Option<&str> {
+pub fn parse_key_from_creds(creds: &str) -> Option<&str> {
     for line in creds.lines() {
         if let Some((key, value)) = line.split_once("=")
             && key.to_lowercase() == "helix_user_key"
@@ -678,7 +707,7 @@ pub fn deploy_helix(
     code: Content,
     instance_id: Option<String>,
     release_mode: BuildMode,
-) -> Result<(), String> {
+) -> Result<String, String> {
     let mut sp = Spinner::new(Spinners::Dots9, "Starting Helix instance".into());
 
     let instance_manager = InstanceManager::new().unwrap();
@@ -712,8 +741,9 @@ pub fn deploy_helix(
                         .bold()
                         .to_string(),
                 );
+                let instance_id = instance.id.clone();
                 print_instance(instance);
-                Ok(())
+                Ok(instance_id)
             }
             Err(e) => {
                 sp.stop_with_message("Failed to start Helix instance".red().bold().to_string());
@@ -731,8 +761,9 @@ pub fn deploy_helix(
                         .bold()
                         .to_string(),
                 );
+                let instance_id = instance.id.clone();
                 print_instance(instance);
-                Ok(())
+                Ok(instance_id)
             }
             Err(e) => {
                 sp.stop_with_message("Failed to start Helix instance".red().bold().to_string());
@@ -844,6 +875,21 @@ pub async fn redeploy_helix_remote(
         }
     };
 
+    let deployment = DeployCloudEvent {
+        cluster_id: cluster.clone(),
+        queries_string: content
+            .source
+            .queries
+            .iter()
+            .map(|q| q.name.clone())
+            .collect::<Vec<String>>()
+            .join("\n"),
+        num_of_queries: content.source.queries.len() as u32,
+        time_taken_sec: 0,
+        success: true,
+        error_messages: None,
+    };
+
     // upload queries to central server
     let payload = json!({
         "user_id": user_id,
@@ -868,6 +914,7 @@ pub async fn redeploy_helix_remote(
         Ok(response) => {
             if response.status().is_success() {
                 sp.stop_with_message("Queries uploaded to remote db".green().bold().to_string());
+                HELIX_METRICS_CLIENT.send_event(EventType::DeployCloud, deployment);
             } else {
                 sp.stop_with_message(
                     "Error uploading queries to remote db"

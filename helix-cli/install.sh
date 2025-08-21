@@ -226,3 +226,7 @@ else
     echo "Please try running 'source $SHELL_CONFIG' or restart your terminal."
     exit 1
 fi
+
+
+echo "Metrics are enabled by default. To disable them, run 'helix metrics --off'"
+echo "Note that metrics are completely anonymous and do not contain any personal information."

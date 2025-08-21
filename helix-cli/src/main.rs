@@ -6,16 +6,22 @@ use crate::{
 };
 use clap::Parser;
 use helix_db::{helix_engine::traversal_core::config::Config, utils::styled_string::StyledString};
+use helix_metrics::{
+    HelixMetricsClient,
+    events::{DeployLocalEvent, EventType, RedeployLocalEvent},
+};
 use serde::Deserialize;
-use serde_json::json;
+use sonic_rs::json;
 use spinners::{Spinner, Spinners};
 use std::{
     env,
     fmt::Write,
-    fs::{self, OpenOptions, read_to_string},
-    io::Write as iWrite,
+    fs::{self, File, OpenOptions, read_to_string},
+    io::{Read, Write as iWrite},
     path::{Path, PathBuf},
     process::{Command, ExitCode},
+    sync::LazyLock,
+    time::Instant,
 };
 
 mod args;
@@ -23,13 +29,23 @@ mod instance_manager;
 mod types;
 mod utils;
 
+pub static HELIX_METRICS_CLIENT: LazyLock<HelixMetricsClient> =
+    LazyLock::new(HelixMetricsClient::new);
+
 #[tokio::main]
 async fn main() -> ExitCode {
+    let exit_code = run().await;
+    HELIX_METRICS_CLIENT.flush().await;
+    exit_code
+}
+
+async fn run() -> ExitCode {
     check_helix_version().await;
 
     let args = HelixCli::parse();
     match args.command {
         CommandType::Deploy(command) => {
+            let start_time = Instant::now();
             match Command::new("cargo").output() {
                 Ok(_) => {}
                 Err(_) => {
@@ -80,6 +96,17 @@ async fn main() -> ExitCode {
                                 .bold()
                                 .to_string(),
                         );
+                        HELIX_METRICS_CLIENT.send_event(
+                            EventType::DeployLocal,
+                            DeployLocalEvent {
+                                cluster_id: instance.id.clone(),
+                                queries_string: "".to_string(),
+                                num_of_queries: 0,
+                                time_taken_sec: 0,
+                                success: true,
+                                error_messages: None,
+                            },
+                        );
                         print_instance(instance);
                     }
                     Err(e) => {
@@ -120,16 +147,49 @@ async fn main() -> ExitCode {
                     Ok(code) => code,
                     Err(_) => return ExitCode::FAILURE,
                 };
+                let queries_string = code
+                    .source
+                    .queries
+                    .iter()
+                    .map(|q| q.name.clone())
+                    .collect::<Vec<String>>()
+                    .join("\n");
+                let num_of_queries = code.source.queries.len() as u32;
+                let event = |instance_id: String, time_taken_sec: u32| DeployLocalEvent {
+                    cluster_id: instance_id,
+                    queries_string: queries_string.clone(),
+                    num_of_queries,
+                    time_taken_sec,
+                    success: true,
+                    error_messages: None,
+                };
+                let redeploy_event =
+                    |instance_id: String, time_taken_sec: u32| RedeployLocalEvent {
+                        cluster_id: instance_id,
+                        queries_string: queries_string.clone(),
+                        num_of_queries,
+                        time_taken_sec,
+                        success: true,
+                        error_messages: None,
+                    };
 
                 if command.cluster.is_some()
                     && (command.path.is_some() || Path::new(&format!("./{DB_DIR}")).is_dir())
                 {
                     match redeploy_helix(
-                        command.cluster.unwrap(),
+                        command.cluster.clone().unwrap(),
                         code,
                         BuildMode::from_release(command.release),
                     ) {
-                        Ok(_) => {}
+                        Ok(_) => {
+                            HELIX_METRICS_CLIENT.send_event(
+                                EventType::RedeployLocal,
+                                redeploy_event(
+                                    command.cluster.unwrap(),
+                                    start_time.elapsed().as_secs() as u32,
+                                ),
+                            );
+                        }
                         Err(_) => return ExitCode::FAILURE,
                     }
                     return ExitCode::FAILURE;
@@ -163,14 +223,21 @@ async fn main() -> ExitCode {
                         }
                     };
                     match deploy_helix(port, code, None, BuildMode::from_release(command.release)) {
-                        Ok(_) => {}
+                        Ok(cluster_id) => {
+                            HELIX_METRICS_CLIENT.send_event(
+                                EventType::DeployLocal,
+                                event(cluster_id, start_time.elapsed().as_secs() as u32),
+                            );
+                        }
                         Err(_) => return ExitCode::FAILURE,
                     }
                     return ExitCode::FAILURE;
                 }
             } else if let Some(cluster) = command.cluster {
-                match redeploy_helix_remote(cluster, path, files).await {
-                    Ok(_) => {}
+                match redeploy_helix_remote(cluster.clone(), path, files).await {
+                    Ok(_) => {
+                        return ExitCode::SUCCESS;
+                    }
                     Err(_) => return ExitCode::FAILURE,
                 }
             } else {
@@ -399,7 +466,7 @@ async fn main() -> ExitCode {
                 Some(s) => s,
                 None => {
                     sp.stop_with_message("Invalid path encoding".red().bold().to_string());
-                    println!("└── Path contains invalid UTF-8 characters: {:?}", path);
+                    println!("└── Path contains invalid UTF-8 characters: {path:?}");
                     return ExitCode::FAILURE;
                 }
             };
@@ -572,6 +639,48 @@ async fn main() -> ExitCode {
                 "Helix project initialised at".green().bold(),
                 path.display()
             );
+        }
+
+        CommandType::Metrics(command) => {
+            // get metrics from ~/.helix/credentials
+            let home_dir = std::env::var("HOME").unwrap_or("~/".to_string());
+            let config_path = &format!("{home_dir}/.helix/credentials");
+            let config_path = Path::new(config_path);
+            let metrics = match fs::read_to_string(config_path) {
+                Ok(config) => parse_credentials(&config).metrics.unwrap_or(true),
+                Err(_) => {
+                    // create file
+                    fs::write(config_path, "helix_user_id=\nhelix_user_key=\nmetrics=true")
+                        .unwrap();
+                    true
+                }
+            };
+
+            if command.off {
+                if metrics {
+                    // write to config_path
+                    let mut file = File::open(config_path).unwrap();
+                    let mut contents = String::new();
+                    file.read_to_string(&mut contents).unwrap();
+                    let new_contents = contents.replace("metrics=true", "metrics=false");
+                    file.write_all(new_contents.as_bytes()).unwrap();
+                    println!("{}", "Metrics disabled".yellow().bold());
+                } else {
+                    println!("{}", "Metrics already disabled".yellow().bold());
+                }
+            } else if command.on {
+                if !metrics {
+                    // write to config_path
+                    let mut file = File::open(config_path).unwrap();
+                    let mut contents = String::new();
+                    file.read_to_string(&mut contents).unwrap();
+                    let new_contents = contents.replace("metrics=false", "metrics=true");
+                    file.write_all(new_contents.as_bytes()).unwrap();
+                    println!("{}", "Metrics enabled".green().bold());
+                } else {
+                    println!("{}", "Metrics already enabled".green().bold());
+                }
+            }
         }
 
         CommandType::Status => {
@@ -893,7 +1002,7 @@ async fn main() -> ExitCode {
             let cred_path = config_path.join("credentials");
 
             if let Ok(contents) = read_to_string(&cred_path)
-                && let Some(_key) = parse_credentials(&contents)
+                && let Some(_key) = parse_key_from_creds(&contents)
             {
                 println!(
                     "You have an existing key which may be valid, only continue if it doesn't work or you want to switch accounts. (Key checking is WIP)"
@@ -955,7 +1064,7 @@ async fn main() -> ExitCode {
                 }
             };
 
-            let key = match parse_credentials(&contents) {
+            let key = match parse_key_from_creds(&contents) {
                 Some(k) => k,
                 None => {
                     println!("Error: Can't parse credentials, try helix login");

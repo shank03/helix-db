@@ -4,6 +4,7 @@ version = "1.0.133"
 edition = "2024"
 
 [dependencies]
+helix-metrics = { path = "../metrics" }
 helix-db = { path = "../helix-db" }
 clap = { version = "4.5.40", features = ["derive"] }
 tempfile = "3.19.1"
