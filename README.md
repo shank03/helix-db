@@ -129,8 +129,7 @@ Our current focus areas include:
 - Binary quantisation for even better performance.
 
 Long term projects:
-- Complete E2E testing suite for HelixDB.
-- Advanced tooling for building agents with HelixDB
+- In-house SOTA knowledge graph ingestion tool for any data source.
 - In-house graph-vector storage engine (to replace LMDB)
 - In-house network protocol & serdes libraries (similar to protobufs/gRPC)
 
