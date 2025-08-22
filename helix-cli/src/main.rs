@@ -956,41 +956,6 @@ async fn run() -> ExitCode {
             None => println!("helix-db: not installed (run 'helix install' to install)"),
         },
 
-        CommandType::Visualize(command) => {
-            let instance_manager = InstanceManager::new().unwrap();
-            let iid = &command.cluster;
-
-            match instance_manager.get_instance(iid) {
-                Ok(Some(instance)) => {
-                    println!("{}", "Helix instance found!".green().bold());
-                    let port = instance.port;
-                    let url = format!("http://localhost:{port}/get/graphvis");
-
-                    if webbrowser::open(&url).is_ok() {
-                    } else {
-                        println!(
-                            "{} {}",
-                            "Failed to open graph visualizer for instance".red().bold(),
-                            iid.red().bold()
-                        );
-                        return ExitCode::FAILURE;
-                    }
-                }
-                Ok(None) => {
-                    println!(
-                        "{} {}",
-                        "No Helix instance found with id".red().bold(),
-                        iid.red().bold()
-                    );
-                    return ExitCode::FAILURE;
-                }
-                Err(e) => {
-                    println!("{} {}", "Error:".red().bold(), e);
-                    return ExitCode::FAILURE;
-                }
-            };
-        }
-
         CommandType::Login => {
             let home_dir = std::env::var("HOME").unwrap_or("~/".to_string());
             let config_path = &format!("{home_dir}/.helix");

@@ -54,9 +54,6 @@ pub enum CommandType {
     /// Get the current version of the cli and core database
     Version,
 
-    /// Open graph visualizer in default browser
-    Visualize(VisualizeCommand),
-
     /// Check login credentials or login with github
     Login,
 
@@ -156,13 +153,6 @@ pub struct DeleteCommand {
 
     #[clap(short, long, help = "Delete all clusters")]
     pub all: bool,
-}
-
-#[derive(Debug, Args)]
-#[clap(name = "visualize", about = "Visualize the Helix graph")]
-pub struct VisualizeCommand {
-    #[clap(help = "Cluster ID to visualize")]
-    pub cluster: String,
 }
 
 #[derive(Debug, Args)]
