@@ -36,6 +36,9 @@ pub enum CommandType {
     /// Initialise a new Helix project
     Init(InitCommand),
 
+    /// Turn metrics on or off
+    Metrics(MetricsCommand),
+
     /// List all Helix instances
     Status,
 
@@ -160,4 +163,14 @@ pub struct DeleteCommand {
 pub struct VisualizeCommand {
     #[clap(help = "Cluster ID to visualize")]
     pub cluster: String,
+}
+
+#[derive(Debug, Args)]
+#[clap(name = "metrics", about = "Turn metrics on or off")]
+pub struct MetricsCommand {
+    #[clap(short, long, help = "Turn metrics off")]
+    pub off: bool,
+
+    #[clap(short, long, help = "Turn metrics on")]
+    pub on: bool,
 }

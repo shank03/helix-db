@@ -3,6 +3,13 @@ use crate::types::BuildMode;
 use super::utils::find_available_port;
 use helix_db::utils::styled_string::StyledString;
 use serde::{Deserialize, Serialize};
+use nix::errno::Errno;
+use nix::sys::signal::{Signal, kill};
+use nix::sys::wait::{WaitPidFlag, WaitStatus, waitpid};
+use nix::unistd::Pid;
+use serde::{Deserialize, Serialize};
+use std::thread::sleep;
+use std::time::Duration;
 use std::{
     fs::{self, File, OpenOptions},
     io::{self, Read, Write},
@@ -251,10 +258,10 @@ impl InstanceManager {
                 return Ok(false);
             }
             instances[pos].running = false;
-            #[cfg(unix)]
-            unsafe {
-                libc::kill(instances[pos].pid as i32, libc::SIGTERM);
-            }
+            // #[cfg(unix)]
+            // unsafe {
+            //     libc::kill(instances[pos].pid as i32, libc::SIGTERM);
+            // }
             #[cfg(windows)]
             {
                 use windows::Win32::System::Threading::{
@@ -266,6 +273,19 @@ impl InstanceManager {
                     unsafe { TerminateProcess(handle, 0) };
                 }
             }
+
+            // wait until pid is no longer running
+            #[cfg(unix)]
+            {
+                println!("Stopping cluster {instance_id}");
+                let pid = Pid::from_raw(instances[pos].pid as i32);
+                println!("Killing pid {pid}");
+                while !kill_and_check_pid(pid) {
+                    sleep(Duration::from_millis(500));
+                }
+                println!("Cluster {instance_id} stopped");
+            }
+
             self.save_instances(&instances)?;
             return Ok(true);
         }
@@ -341,5 +361,24 @@ impl InstanceManager {
         } else {
             Ok(false)
         }
+    }
+}
+
+fn kill_and_check_pid(pid: Pid) -> bool {
+    println!("Checking pid {pid}");
+    match kill(pid, Signal::SIGTERM) {
+        Ok(_) => {
+            println!("Killed pid {pid}");
+        }
+        Err(Errno::ESRCH) => return true, // already gone
+        Err(e) => return false,
+    }
+    match waitpid(pid, None) {
+        Ok(WaitStatus::Exited(_, _)) => true,
+        Ok(other) => {
+            println!("Other: {other:?}");
+            false
+        }
+        _ => false,
     }
 }

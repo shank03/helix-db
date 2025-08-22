@@ -5,6 +5,7 @@ members = [
     "helix-macros",
     "helix-cli",
     "hql-tests",
+    "metrics",
 ]
 resolver = "2"
 
@@ -22,4 +23,3 @@ lto = false
 panic = "abort"
 incremental = true
 debug = 1
-

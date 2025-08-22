@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::body::Body;
 use axum::extract::{Query, State};
 use axum::response::IntoResponse;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use sonic_rs::{JsonValueTrait, json};
 use tracing::info;
 
@@ -52,7 +52,7 @@ pub async fn node_details_handler(
     }
 }
 
-pub fn node_details_inner(input: &HandlerInput) -> Result<protocol::Response, GraphError> {
+pub fn node_details_inner(input: HandlerInput) -> Result<protocol::Response, GraphError> {
     let db = Arc::clone(&input.graph.storage);
     let txn = db.graph_env.read_txn().map_err(GraphError::from)?;
 

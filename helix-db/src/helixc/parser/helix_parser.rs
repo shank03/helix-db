@@ -24,8 +24,11 @@ pub struct HelixParser {
 }
 
 pub struct Content {
+    /// Source code of the content
     pub content: String,
+    /// Parsed source code
     pub source: Source,
+    /// Files in the content
     pub files: Vec<HxFile>,
 }
 
