@@ -782,8 +782,11 @@ pub fn redeploy_helix(
     let instance_manager = InstanceManager::new().unwrap();
     let iid = instance;
 
-    match instance_manager.get_instance(&iid) {
-        Ok(Some(_)) => println!("{}", "Helix instance found!".green().bold()),
+    let instance = match instance_manager.get_instance(&iid) {
+        Ok(Some(instance)) => {
+            println!("{}", "Helix instance found!".green().bold());
+            instance
+        },
         Ok(None) => {
             println!(
                 "{} {}",

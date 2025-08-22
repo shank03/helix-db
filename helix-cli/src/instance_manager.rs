@@ -282,7 +282,7 @@ impl InstanceManager {
                 println!("Stopping cluster {instance_id}");
                 let pid = Pid::from_raw(instances[pos].pid as i32);
                 println!("Killing pid {pid}");
-                while !kill_and_check_pid(pid) || !port_is_available(instances[pos].port) {
+                while !kill_and_check_pid(pid) && !port_is_available(instances[pos].port) {
                     sleep(Duration::from_millis(500));
                 }
                 println!("Cluster {instance_id} stopped");
@@ -391,7 +391,7 @@ fn kill_and_check_pid(pid: Pid) -> bool {
 
 fn port_is_available(port: u16) -> bool {
     match TcpListener::bind(format!("127.0.0.1:{}", port)) {
-        Ok(_) => true,
-        Err(_) => false,
+        Ok(_) => false,
+        Err(_) => true,
     }
 }

@@ -158,7 +158,7 @@ pub mod macros {
             $remapping_vals.insert(
                 $item.id(),
                 ResponseRemapping::new(
-                    vec![($new_name.to_string(), old_value_remapping)],
+                    HashMap::from([($new_name.to_string(), old_value_remapping)]),
                     $should_spread,
                 ),
             );
@@ -194,7 +194,7 @@ pub mod macros {
             $remapping_vals.insert(
                 $var_name.id(),
                 ResponseRemapping::new(
-                    vec![($new_name.to_string(), new_remapping)],
+                    HashMap::from([($new_name.to_string(), new_remapping)]),
                     $should_spread,
                 ),
             );
@@ -222,7 +222,7 @@ pub mod macros {
                 $remapping_vals.insert(
                     $var_name.id(),
                     ResponseRemapping::new(
-                        vec![($field_to_exclude.to_string(), field_to_exclude_remapping)],
+                        HashMap::from([($field_to_exclude.to_string(), field_to_exclude_remapping)]),
                         true,
                     ),
                 );
@@ -252,7 +252,7 @@ pub mod macros {
             $remapping_vals.insert(
                 $var_name.id(),
                 ResponseRemapping::new(
-                    vec![($field_name.to_string(), old_value_remapping)],
+                    HashMap::from([($field_name.to_string(), old_value_remapping)]),
                     $should_spread,
                 ),
             );
@@ -280,7 +280,7 @@ pub mod macros {
             $remapping_vals.insert(
                 $var_name.id(),
                 ResponseRemapping::new(
-                    vec![($field_name.to_string(), old_value_remapping)],
+                    HashMap::from([($field_name.to_string(), old_value_remapping)]),
                     $should_spread,
                 ),
             );
@@ -313,7 +313,7 @@ pub mod macros {
             $remapping_vals.insert(
                 $var_name.id(),
                 ResponseRemapping::new(
-                    vec![($field_name.to_string(), value_remapping)],
+                    HashMap::from([($field_name.to_string(), value_remapping)]),
                     $should_spread,
                 ),
             );

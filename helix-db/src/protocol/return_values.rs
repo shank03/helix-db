@@ -44,7 +44,7 @@ impl ReturnValue {
     {
         if let Some(m) = mixin.remove(item.id()) {
             if m.should_spread {
-                ReturnValue::from(item).mixin_remapping(m.remappings)
+                ReturnValue::from_traversal_value(item, &m.remappings).mixin_remapping(m.remappings)
             } else {
                 ReturnValue::default().mixin_remapping(m.remappings)
             }
@@ -171,7 +171,7 @@ impl ReturnValue {
     /// );
     /// ```
     #[inline(always)]
-    pub fn mixin_remapping(self, remappings: Vec<(String, Remapping)>) -> Self {
+    pub fn mixin_remapping(self, remappings: HashMap<String, Remapping>) -> Self {
         match self {
             ReturnValue::Object(mut a) => {
                 remappings.into_iter().for_each(|(k, v)| {
@@ -216,6 +216,67 @@ impl ReturnValue {
         }
         return_val = return_val.mixin_remapping(secondary_properties.remappings);
         return_val
+    }
+
+    #[inline]
+    pub fn from_traversal_value<T: Filterable + Clone>(
+        item: T,
+        remappings: &HashMap<String, Remapping>,
+    ) -> Self {
+        let length = match item.properties_ref() {
+            Some(properties) => properties.len(),
+            None => 0,
+        };
+        let mut properties = match item.type_name() {
+            FilterableType::Node => HashMap::with_capacity(Node::NUM_PROPERTIES + length),
+            FilterableType::Edge => {
+                let mut properties = HashMap::with_capacity(Edge::NUM_PROPERTIES + length);
+                properties.check_and_insert(
+                    remappings,
+                    "from_node".to_string(),
+                    ReturnValue::from(item.from_node_uuid()),
+                );
+                properties.check_and_insert(
+                    remappings,
+                    "to_node".to_string(),
+                    ReturnValue::from(item.to_node_uuid()),
+                );
+                properties
+            }
+            FilterableType::Vector => {
+                let data = item.vector_data();
+                let score = item.score();
+
+                let mut properties = HashMap::with_capacity(2 + length);
+                properties.check_and_insert(
+                    remappings,
+                    "data".to_string(),
+                    ReturnValue::from(data),
+                );
+                properties.check_and_insert(
+                    remappings,
+                    "score".to_string(),
+                    ReturnValue::from(score),
+                );
+                properties
+            }
+        };
+        properties.check_and_insert(remappings, "id".to_string(), ReturnValue::from(item.uuid()));
+        properties.check_and_insert(
+            remappings,
+            "label".to_string(),
+            ReturnValue::from(item.label().to_string()),
+        );
+        if item.properties_ref().is_some() {
+            properties.extend(
+                item.properties()
+                    .unwrap()
+                    .into_iter()
+                    .map(|(k, v)| (k, ReturnValue::from(v))),
+            );
+        }
+
+        ReturnValue::Object(properties)
     }
 }
 
@@ -437,5 +498,30 @@ impl Serialize for ReturnValue {
 impl Default for ReturnValue {
     fn default() -> Self {
         ReturnValue::Object(HashMap::new())
+    }
+}
+
+trait IfPresentThereInsertHere {
+    fn check_and_insert(
+        &mut self,
+        there: &HashMap<String, Remapping>,
+        key: String,
+        value: ReturnValue,
+    );
+}
+
+impl IfPresentThereInsertHere for HashMap<String, ReturnValue> {
+    fn check_and_insert(
+        &mut self,
+        there: &HashMap<String, Remapping>,
+        key: String,
+        value: ReturnValue,
+    ) {
+        // value in mixin
+        if let Some(existing_value) = there.get(&key)
+            && !existing_value.exclude
+        {
+            self.insert(key, value);
+        }
     }
 }
