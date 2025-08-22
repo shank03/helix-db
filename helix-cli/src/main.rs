@@ -371,15 +371,13 @@ async fn run() -> ExitCode {
         }
 
         CommandType::Compile(command) => {
-            let path = if let Some(p) = &command.path {
-                p
-            } else {
-                println!(
-                    "{} '{}'",
-                    "No path provided, defaulting to".yellow().bold(),
-                    DB_DIR.yellow().bold()
-                );
-                DB_DIR
+            let path = match get_path_or_cwd(command.path.as_ref()) {
+                Ok(path) => path,
+                Err(e) => {
+                    println!("{}", "Error: failed to get path".red().bold());
+                    println!("└── {e}");
+                    return ExitCode::FAILURE;
+                }
             };
 
             let output = match &command.output {
@@ -388,7 +386,7 @@ async fn run() -> ExitCode {
             };
 
             let mut sp = Spinner::new(Spinners::Dots9, "Compiling Helix queries".into());
-            let files = match check_and_read_files(path) {
+            let files = match check_and_read_files(&path) {
                 Ok(files) => files,
                 Err(e) => {
                     sp.stop_with_message("Failed to read files".red().bold().to_string());
@@ -407,7 +405,7 @@ async fn run() -> ExitCode {
                 return ExitCode::FAILURE;
             }
 
-            let analyzed_source = match generate(&files, path) {
+            let analyzed_source = match generate(&files, &path) {
                 Ok((_, analyzed_source)) => analyzed_source,
                 Err(e) => {
                     sp.stop_with_message(e.to_string().red().bold().to_string());
