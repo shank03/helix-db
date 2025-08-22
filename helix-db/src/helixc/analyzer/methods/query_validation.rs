@@ -71,9 +71,12 @@ pub(crate) fn validate_query<'a>(ctx: &mut Ctx<'a>, original_query: &'a Query) {
         );
     }
     for stmt in &original_query.statements {
-        match validate_statements(ctx, &mut scope, original_query, &mut query, stmt) {
-            Some(s) => query.statements.push(s),
-            None => return,
+        let statement = validate_statements(ctx, &mut scope, original_query, &mut query, stmt);
+        if let Some(s) = statement {
+            query.statements.push(s);
+        } else {
+            // given all erroneous statements are caught by the analyzer, this should never happen
+            unreachable!()
         }
     }
 
