@@ -5,9 +5,8 @@ use helix_db::utils::styled_string::StyledString;
 use serde::{Deserialize, Serialize};
 use nix::errno::Errno;
 use nix::sys::signal::{Signal, kill};
-use nix::sys::wait::{WaitPidFlag, WaitStatus, waitpid};
+use nix::sys::wait::{WaitStatus, waitpid};
 use nix::unistd::Pid;
-use serde::{Deserialize, Serialize};
 use std::thread::sleep;
 use std::time::Duration;
 use std::{
@@ -371,7 +370,10 @@ fn kill_and_check_pid(pid: Pid) -> bool {
             println!("Killed pid {pid}");
         }
         Err(Errno::ESRCH) => return true, // already gone
-        Err(e) => return false,
+        Err(e) => {
+            println!("Error killing pid {pid}: {e}");
+            return false;
+        }
     }
     match waitpid(pid, None) {
         Ok(WaitStatus::Exited(_, _)) => true,
