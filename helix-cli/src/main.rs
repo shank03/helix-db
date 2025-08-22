@@ -176,6 +176,11 @@ async fn run() -> ExitCode {
                 if command.cluster.is_some()
                     && (command.path.is_some() || Path::new(&format!("./{DB_DIR}")).is_dir())
                 {
+                    println!(
+                        "{} {}",
+                        "Redeploying cluster".green().bold(),
+                        command.cluster.clone().unwrap()
+                    );
                     match redeploy_helix(
                         command.cluster.clone().unwrap(),
                         code,

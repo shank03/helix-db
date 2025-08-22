@@ -2,11 +2,12 @@ use crate::types::BuildMode;
 
 use super::utils::find_available_port;
 use helix_db::utils::styled_string::StyledString;
-use serde::{Deserialize, Serialize};
 use nix::errno::Errno;
 use nix::sys::signal::{Signal, kill};
 use nix::sys::wait::{WaitStatus, waitpid};
 use nix::unistd::Pid;
+use serde::{Deserialize, Serialize};
+use std::net::TcpListener;
 use std::thread::sleep;
 use std::time::Duration;
 use std::{
@@ -242,18 +243,20 @@ impl InstanceManager {
     pub fn stop_instance(&self, instance_id: &str) -> Result<bool, String> {
         let instance_id = match instance_id.parse() {
             Ok(n) => match self.id_from_short_id(n) {
-                Ok(n) => n.id,
+                Ok(n) => n.id.trim_matches('"').to_string(),
                 Err(_) => return Err(format!("No instance found with id {}", &instance_id)),
             },
-            Err(_) => instance_id.to_string(),
+            Err(_) => instance_id.trim_matches('"').to_string(),
         };
-
+        println!("Stopping instance {instance_id:?}");
         let mut instances = match self.list_instances() {
             Ok(val) => val,
             Err(e) => return Err(format!("Error occured stopping instnace! {e}")),
         };
         if let Some(pos) = instances.iter().position(|i| i.id == instance_id) {
+            println!("Instance {instance_id} found at position {pos}");
             if !instances[pos].running {
+                println!("Instance {instance_id} is not running");
                 return Ok(false);
             }
             instances[pos].running = false;
@@ -279,7 +282,7 @@ impl InstanceManager {
                 println!("Stopping cluster {instance_id}");
                 let pid = Pid::from_raw(instances[pos].pid as i32);
                 println!("Killing pid {pid}");
-                while !kill_and_check_pid(pid) {
+                while !kill_and_check_pid(pid) || !port_is_available(instances[pos].port) {
                     sleep(Duration::from_millis(500));
                 }
                 println!("Cluster {instance_id} stopped");
@@ -288,6 +291,7 @@ impl InstanceManager {
             self.save_instances(&instances)?;
             return Ok(true);
         }
+        println!("Instance {instance_id} not found");
         Ok(false)
     }
 
@@ -382,5 +386,12 @@ fn kill_and_check_pid(pid: Pid) -> bool {
             false
         }
         _ => false,
+    }
+}
+
+fn port_is_available(port: u16) -> bool {
+    match TcpListener::bind(format!("127.0.0.1:{}", port)) {
+        Ok(_) => true,
+        Err(_) => false,
     }
 }
