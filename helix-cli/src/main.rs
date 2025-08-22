@@ -597,13 +597,18 @@ async fn run() -> ExitCode {
         CommandType::Init(command) => {
             println!("{}", "Initialising Helix project...".bold());
 
-            let path = match command.path {
-                Some(path) => PathBuf::from(path),
-                None => PathBuf::from(DB_DIR),
+            let path_str = match get_path_or_cwd(command.path.as_ref()) {
+                Ok(path) => path,
+                Err(e) => {
+                    println!("{}", "Error: failed to get path".red().bold());
+                    println!("└── {e}");
+                    return ExitCode::FAILURE;
+                }
             };
-            let path_str = path.to_str().unwrap();
 
-            match check_and_read_files(path_str) {
+            let path = PathBuf::from(&path_str);
+
+            match check_and_read_files(&path_str) {
                 Ok(files) if !files.is_empty() => {
                     println!(
                         "{} {}",
