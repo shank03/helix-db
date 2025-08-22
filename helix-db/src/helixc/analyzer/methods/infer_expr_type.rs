@@ -124,6 +124,7 @@ pub(crate) fn infer_expr_type<'a>(
             if let Some(ref ty) = add.node_type {
                 if !ctx.node_set.contains(ty.as_str()) {
                     generate_error!(ctx, original_query, add.loc.clone(), E101, ty.as_str());
+                    return (Type::Node(None), None);
                 }
                 let label = GenRef::Literal(ty.clone());
 
