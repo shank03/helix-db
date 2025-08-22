@@ -14,7 +14,6 @@ use serde::Deserialize;
 use sonic_rs::json;
 use spinners::{Spinner, Spinners};
 use std::{
-    env,
     fmt::Write,
     fs::{self, File, OpenOptions, read_to_string},
     io::{Read, Write as iWrite},
@@ -455,23 +454,18 @@ async fn run() -> ExitCode {
         }
 
         CommandType::Check(command) => {
-            let path = match &command.path {
-                Some(path) => PathBuf::from(path),
-                None => env::current_dir().expect("Failed to get current working directory"),
-            };
-
-            let mut sp = Spinner::new(Spinners::Dots9, "Checking Helix queries".into());
-
-            let path_str = match path.to_str() {
-                Some(s) => s,
-                None => {
-                    sp.stop_with_message("Invalid path encoding".red().bold().to_string());
-                    println!("└── Path contains invalid UTF-8 characters: {path:?}");
+            let path = match get_path_or_cwd(command.path.as_ref()) {
+                Ok(path) => path,
+                Err(e) => {
+                    println!("{}", "Error: failed to get path".red().bold());
+                    println!("└── {e}");
                     return ExitCode::FAILURE;
                 }
             };
 
-            let files = match check_and_read_files(path_str) {
+            let mut sp = Spinner::new(Spinners::Dots9, "Checking Helix queries".into());
+
+            let files = match check_and_read_files(&path) {
                 Ok(files) => files,
                 Err(e) => {
                     sp.stop_with_message("Error checking files".red().bold().to_string());
@@ -490,7 +484,7 @@ async fn run() -> ExitCode {
                 return ExitCode::FAILURE;
             }
 
-            match generate(&files, path_str) {
+            match generate(&files, &path) {
                 Ok(_) => {}
                 Err(e) => {
                     sp.stop_with_message("Failed to generate queries".red().bold().to_string());
@@ -604,6 +598,7 @@ async fn run() -> ExitCode {
 
         CommandType::Init(command) => {
             println!("{}", "Initialising Helix project...".bold());
+
             let path = match command.path {
                 Some(path) => PathBuf::from(path),
                 None => PathBuf::from(DB_DIR),
