@@ -24,7 +24,7 @@
 
 <hr>
 
-HelixDB was built on the thesis that current database infrastructure is built for how humans think about data, not AI. So we've built a database that makes it easy to build all the components needed for an AI application in a single platform. 
+HelixDB was built on the thesis that current database infrastructure is built for how humans think about data, not AI. So we've built a database that makes it easy to build all the components needed for an AI application in a single platform.
 
 You no longer need a separate application DB, vector DB, graph DB, or application layers to manage the multiple storage locations. All you need to build any application that uses AI, agents or RAG, is a single HelixDB cluster and HelixQL; we take care of the rest.
 
@@ -122,7 +122,7 @@ Other commands:
 
 ## Roadmap
 Our current focus areas include:
-- Organizational auth to manage teams, and Helix clusters. 
+- Organizational auth to manage teams, and Helix clusters.
 - Improvements to our server code to massively improve network IO performance and scalability.
 - More 3rd party integrations to make it easier to build with Helix.
 - Guides and educational content to help you get started with Helix.

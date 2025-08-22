@@ -11,8 +11,8 @@ use crate::{
     protocol::value::Value,
 };
 use heed3::{
-    Database, Env, RoTxn, RwTxn,
     types::{Bytes, Unit},
+    Database, Env, RoTxn, RwTxn,
 };
 use itertools::Itertools;
 use rand::prelude::Rng;
@@ -80,13 +80,15 @@ impl VectorCore {
         })
     }
 
-    #[inline(always)]
+    // TODO: describe key structure
+    #[inline]
     fn vector_key(id: u128, level: usize) -> Vec<u8> {
         [VECTOR_PREFIX, &id.to_be_bytes(), &level.to_be_bytes()].concat()
     }
 
-    #[inline(always)]
-    fn out_edges_key(source_id: u128, level: usize, sink_id: Option<u128>) -> Vec<u8> {
+    // TODO: describe key structure
+    #[inline]
+    fn edge_key(source_id: u128, level: usize, sink_id: Option<u128>) -> Vec<u8> {
         match sink_id {
             Some(sink_id) => [
                 source_id.to_be_bytes().as_slice(),
@@ -139,7 +141,7 @@ impl VectorCore {
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn put_vector(&self, txn: &mut RwTxn, vector: &HVector) -> Result<(), VectorError> {
         self.vectors_db
             .put(
@@ -151,7 +153,21 @@ impl VectorCore {
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
+    fn add_bidir_edge(
+        &self,
+        txn: &mut RwTxn,
+        id: u128,
+        n_id: u128,
+        level: usize,
+    ) -> Result<(Vec<u8>, Vec<u8>), VectorError> {
+        let out_key = Self::edge_key(id, level, Some(n_id));
+        let in_key = Self::edge_key(n_id, level, Some(id));
+        self.edges_db.put(txn, &out_key, &())?;
+        self.edges_db.put(txn, &in_key, &())?;
+        Ok((out_key, in_key))
+    }
+
     fn get_neighbors<F>(
         &self,
         txn: &RoTxn,
@@ -162,7 +178,7 @@ impl VectorCore {
     where
         F: Fn(&HVector, &RoTxn) -> bool,
     {
-        let out_key = Self::out_edges_key(id, level, None);
+        let out_key = Self::edge_key(id, level, None);
         let mut neighbors = Vec::with_capacity(self.config.m_max_0.min(self.config.min_neighbors));
 
         let iter = self
@@ -208,7 +224,6 @@ impl VectorCore {
         Ok(neighbors)
     }
 
-    #[inline(always)]
     fn set_neighbours(
         &self,
         txn: &mut RwTxn,
@@ -216,30 +231,22 @@ impl VectorCore {
         neighbors: &BinaryHeap<HVector>,
         level: usize,
     ) -> Result<(), VectorError> {
-        let prefix = Self::out_edges_key(id, level, None);
-
-        let mut keys_to_delete: HashSet<Vec<u8>> = self
+        let prefix = Self::edge_key(id, level, None);
+        let mut keys_to_delete = self
             .edges_db
             .prefix_iter(txn, prefix.as_ref())?
             .filter_map(|result| result.ok().map(|(key, _)| key.to_vec()))
-            .collect();
+            .collect::<HashSet<Vec<u8>>>();
 
         neighbors
             .iter()
             .try_for_each(|neighbor| -> Result<(), VectorError> {
                 let neighbor_id = neighbor.get_id();
-                if neighbor_id == id {
-                    return Ok(());
+                if neighbor_id != id {
+                    let (out_key, in_key) = self.add_bidir_edge(txn, id, neighbor_id, level)?;
+                    keys_to_delete.remove(&out_key);
+                    keys_to_delete.remove(&in_key);
                 }
-
-                let out_key = Self::out_edges_key(id, level, Some(neighbor_id));
-                keys_to_delete.remove(&out_key);
-                self.edges_db.put(txn, &out_key, &())?;
-
-                let in_key = Self::out_edges_key(neighbor_id, level, Some(id));
-                keys_to_delete.remove(&in_key);
-                self.edges_db.put(txn, &in_key, &())?;
-
                 Ok(())
             })?;
 
@@ -373,7 +380,8 @@ impl VectorCore {
 }
 
 impl HNSW for VectorCore {
-    #[inline(always)]
+    // TODO: should not be inline?
+    #[inline]
     fn get_vector(
         &self,
         txn: &RoTxn,
@@ -382,26 +390,20 @@ impl HNSW for VectorCore {
         with_data: bool,
     ) -> Result<HVector, VectorError> {
         let key = Self::vector_key(id, level);
-        match self.vectors_db.get(txn, key.as_ref())? {
-            Some(bytes) => {
-                let mut vector = HVector::from_bytes(id, level, bytes)?;
-                match with_data {
-                    true => {
-                        let properties: Option<HashMap<String, Value>> =
-                            match self.vector_data_db.get(txn, &id.to_be_bytes())? {
-                                Some(bytes) => {
-                                    Some(bincode::deserialize(bytes).map_err(VectorError::from)?)
-                                }
-                                None => None,
-                            };
-                        vector.properties = properties;
-                        Ok(vector)
-                    }
-                    false => Ok(vector),
-                }
+        if let Some(bytes) = self.vectors_db.get(txn, key.as_ref())? {
+            let mut vector = HVector::from_bytes(id, level, bytes)?;
+            if with_data {
+                vector.properties = self
+                    .vector_data_db
+                    .get(txn, &id.to_be_bytes())?
+                    .map(|bytes| bincode::deserialize(bytes).map_err(VectorError::from))
+                    .transpose()?;
             }
-            None if level > 0 => self.get_vector(txn, id, 0, with_data),
-            None => Err(VectorError::VectorNotFound(id.to_string())),
+            Ok(vector)
+        } else if level > 0 {
+            self.get_vector(txn, id, 0, with_data)
+        } else {
+            Err(VectorError::VectorNotFound(id.to_string()))
         }
     }
 
