@@ -5,13 +5,14 @@ use crate::helixc::{
         methods::{
             migration_validation::validate_migration,
             query_validation::validate_query,
-            schema_methods::{build_field_lookups, check_schema, SchemaVersionMap},
+            schema_methods::{SchemaVersionMap, build_field_lookups, check_schema},
         },
         types::Type,
     },
-    generator::{Source as GeneratedSource},
+    generator::Source as GeneratedSource,
     parser::helix_parser::{EdgeSchema, ExpressionType, Field, Query, Source},
 };
+use itertools::Itertools;
 use serde::Serialize;
 use std::{
     borrow::Cow,
@@ -100,6 +101,7 @@ impl<'a> Ctx<'a> {
                             .filter(|f| f.is_indexed())
                             .map(|f| f.name.clone())
                     })
+                    .dedup()
                     .collect(),
             )
             .ok();
