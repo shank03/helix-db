@@ -1,6 +1,6 @@
 [package]
 name = "helix-cli"
-version = "1.0.133"
+version = "1.0.132"
 edition = "2024"
 
 [dependencies]
@@ -19,7 +19,7 @@ open = "5.0.1"
 spinners = "4"
 indicatif = "0.17.11"
 toml = "0.8"
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12" }
 serde_json = "1.0"
 webbrowser = "1.0"
 tokio-tungstenite = "0.27.0"

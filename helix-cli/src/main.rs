@@ -328,7 +328,7 @@ async fn run() -> ExitCode {
                 "local helix-cli version: {local_cli_version}, local helix-db version: {local_helix_version}, remote helix version: {remote_helix_version}",
             );
 
-            if local_helix_version < remote_helix_version {
+            if local_helix_version < remote_helix_version || local_cli_version < remote_helix_version {
                 let mut runner = Command::new("git");
                 runner.arg("reset");
                 runner.arg("--hard");
@@ -530,6 +530,15 @@ async fn run() -> ExitCode {
                     println!("{}", "Cargo is not installed".red().bold());
                     return ExitCode::FAILURE;
                 }
+            }
+
+            if !check_cargo_version() {
+                match Command::new("rustup").arg("update").output() {
+                    Ok(_) => println!("{}", "Updating cargo!".green().bold()),
+                    Err(e) => println!("Error updating cargo! {e}"),
+                }
+            } else {
+                println!("{}", "cargo up-to-date!".green().bold());
             }
 
             match Command::new("git").arg("version").output() {

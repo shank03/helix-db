@@ -213,7 +213,7 @@ pub async fn get_remote_helix_version() -> Result<Version, Box<dyn Error>> {
         .text()
         .await?;
 
-    let json: JsonValue = serde_json::from_str(&response)?;
+    let json: JsonValue = sonic_rs::from_str(&response)?;
     let tag_name = json
         .get("tag_name")
         .and_then(|v| v.as_str())

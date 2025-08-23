@@ -168,9 +168,9 @@ pub struct VisualizeCommand {
 #[derive(Debug, Args)]
 #[clap(name = "metrics", about = "Turn metrics on or off")]
 pub struct MetricsCommand {
-    #[clap(short, long, help = "Turn metrics off")]
+    #[clap(long, help = "Turn metrics off")]
     pub off: bool,
 
-    #[clap(short, long, help = "Turn metrics on")]
+    #[clap(long, help = "Turn metrics on")]
     pub on: bool,
 }
