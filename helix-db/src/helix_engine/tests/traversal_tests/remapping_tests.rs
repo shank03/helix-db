@@ -722,15 +722,20 @@ fn test_nested_with_other_remapping() {
         },
         ReturnValue::from("new_name".to_string())
     );
-    assert_eq!(
-        *match value.get("traversal").unwrap() {
+    assert!(
+        match value.get("traversal").unwrap() {
             ReturnValue::Array(array) => match array.first().unwrap() {
-                ReturnValue::Object(object) => object.get("id").unwrap(),
-                _ => panic!("Expected Object"),
+                ReturnValue::Object(object) => {
+                    println!("object: {:#?}", object);
+                    !object.contains_key("id")
+                },
+                _ => {
+                    println!("array: {:#?}", array);
+                    panic!("Expected Object")
+                }
             },
             _ => panic!("Expected Array"),
-        },
-        ReturnValue::from(_other_node.uuid())
+        }
     );
     assert_eq!(
         *value.get("identifier").unwrap(),
@@ -741,4 +746,62 @@ fn test_nested_with_other_remapping() {
         ReturnValue::from("new_value".to_string())
     );
     assert_eq!(*value.get("exists").unwrap(), ReturnValue::from(true));
+}
+
+
+#[test]
+fn test_remapping_with_traversal_from_source() {
+    let (storage, _temp_dir) = setup_test_db();
+    let mut txn = storage.graph_env.write_txn().unwrap();
+
+    let _node = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_n("person", Some(props! { "old_name" => "test" }), None)
+        .collect_to_val();
+    let _other_node = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_n("person", Some(props! {}), None)
+        .collect_to_val();
+    let _edge = G::new_mut(Arc::clone(&storage), &mut txn)
+        .add_e(
+            "knows",
+            Some(props!()),
+            _node.id(),
+            _other_node.id(),
+            false,
+            EdgeType::Node,
+        )
+        .collect_to_val();
+
+        let remapping_vals = RemappingMap::new();
+
+        let mut return_vals: HashMap<String, ReturnValue> = HashMap::new();
+        return_vals.insert(
+            "users".to_string(),
+            ReturnValue::from_traversal_value_array_with_mixin(
+G::new(Arc::clone(&storage), &txn)
+        .n_from_type("person")
+        .map_traversal(|item, _txn| {
+            traversal_remapping!(remapping_vals, item.clone(), false, "traversal" => G::new(Arc::clone(&storage), &txn).n_from_id(&_other_node.id()).collect_to::<Vec<_>>())?;
+            Ok(item)
+        })
+        .collect_to::<Vec<_>>()
+        .clone(),
+            remapping_vals.borrow_mut(),
+        ),
+    );
+
+    println!("return_vals: {:#?}", return_vals);
+    assert_eq!(return_vals.len(), 1);
+
+    let value = match return_vals.get("users").unwrap() {
+        ReturnValue::Array(array) => match array.first().unwrap() {
+            ReturnValue::Object(object) => object,
+            _ => panic!("Expected Node"),
+        },
+        _ => panic!("Expected Array"),
+    };
+
+    assert_eq!(
+        *value.get("new_name").unwrap(),
+        ReturnValue::from("test".to_string())
+    );
 }

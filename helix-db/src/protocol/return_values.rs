@@ -525,3 +525,32 @@ impl IfPresentThereInsertHere for HashMap<String, ReturnValue> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_return_value() {
+        let node = Node {
+            id: 1,
+            label: "test".to_string(),
+            version: 1,
+            properties: Some(HashMap::from([(
+                "test".to_string(),
+                Value::String("test".to_string()),
+            )])),
+        };
+
+        let remappings = HashMap::from([(
+            "test".to_string(),
+            Remapping::new(
+                false,
+                None,
+                Some(ReturnValue::from("hello".to_string())),
+            ),
+        )]);
+        let return_value = ReturnValue::from_traversal_value(node, &remappings).mixin_remapping(remappings);
+        assert_eq!(return_value, ReturnValue::Object(HashMap::from([("test".to_string(), ReturnValue::from("hello".to_string()))])));
+    }
+}
