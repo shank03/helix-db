@@ -8,6 +8,7 @@ use crate::utils::{
     filterable::{Filterable, FilterableType},
     items::{Edge, Node},
 };
+use axum::response::Response;
 use sonic_rs::{Deserialize, Serialize};
 use std::{cell::RefMut, collections::HashMap};
 
@@ -44,9 +45,9 @@ impl ReturnValue {
     {
         if let Some(m) = mixin.remove(item.id()) {
             if m.should_spread {
-                ReturnValue::from_traversal_value(item, &m.remappings).mixin_remapping(m.remappings)
+                ReturnValue::from(item).mixin_remapping(m.remappings)
             } else {
-                ReturnValue::default().mixin_remapping(m.remappings)
+                ReturnValue::from_traversal_value(item, &m).mixin_remapping(m.remappings)
             }
         } else {
             ReturnValue::from(item)
@@ -221,7 +222,7 @@ impl ReturnValue {
     #[inline]
     pub fn from_traversal_value<T: Filterable + Clone>(
         item: T,
-        remappings: &HashMap<String, Remapping>,
+        remapping: &ResponseRemapping,
     ) -> Self {
         let length = match item.properties_ref() {
             Some(properties) => properties.len(),
@@ -232,12 +233,12 @@ impl ReturnValue {
             FilterableType::Edge => {
                 let mut properties = HashMap::with_capacity(Edge::NUM_PROPERTIES + length);
                 properties.check_and_insert(
-                    remappings,
+                    remapping,
                     "from_node".to_string(),
                     ReturnValue::from(item.from_node_uuid()),
                 );
                 properties.check_and_insert(
-                    remappings,
+                    remapping,
                     "to_node".to_string(),
                     ReturnValue::from(item.to_node_uuid()),
                 );
@@ -248,22 +249,18 @@ impl ReturnValue {
                 let score = item.score();
 
                 let mut properties = HashMap::with_capacity(2 + length);
+                properties.check_and_insert(remapping, "data".to_string(), ReturnValue::from(data));
                 properties.check_and_insert(
-                    remappings,
-                    "data".to_string(),
-                    ReturnValue::from(data),
-                );
-                properties.check_and_insert(
-                    remappings,
+                    remapping,
                     "score".to_string(),
                     ReturnValue::from(score),
                 );
                 properties
             }
         };
-        properties.check_and_insert(remappings, "id".to_string(), ReturnValue::from(item.uuid()));
+        properties.check_and_insert(remapping, "id".to_string(), ReturnValue::from(item.uuid()));
         properties.check_and_insert(
-            remappings,
+            remapping,
             "label".to_string(),
             ReturnValue::from(item.label().to_string()),
         );
@@ -502,23 +499,17 @@ impl Default for ReturnValue {
 }
 
 trait IfPresentThereInsertHere {
-    fn check_and_insert(
-        &mut self,
-        there: &HashMap<String, Remapping>,
-        key: String,
-        value: ReturnValue,
-    );
+    fn check_and_insert(&mut self, there: &ResponseRemapping, key: String, value: ReturnValue);
 }
 
 impl IfPresentThereInsertHere for HashMap<String, ReturnValue> {
-    fn check_and_insert(
-        &mut self,
-        there: &HashMap<String, Remapping>,
-        key: String,
-        value: ReturnValue,
-    ) {
+    fn check_and_insert(&mut self, there: &ResponseRemapping, key: String, value: ReturnValue) {
         // value in mixin
-        if let Some(existing_value) = there.get(&key)
+        // if there.should_spread {
+        //     self.insert(key, value);
+        // } else 
+        
+        if let Some(existing_value) = there.remappings.get(&key)
             && !existing_value.exclude
         {
             self.insert(key, value);
@@ -542,15 +533,21 @@ mod tests {
             )])),
         };
 
-        let remappings = HashMap::from([(
-            "test".to_string(),
-            Remapping::new(
-                false,
-                None,
-                Some(ReturnValue::from("hello".to_string())),
-            ),
-        )]);
-        let return_value = ReturnValue::from_traversal_value(node, &remappings).mixin_remapping(remappings);
-        assert_eq!(return_value, ReturnValue::Object(HashMap::from([("test".to_string(), ReturnValue::from("hello".to_string()))])));
+        let remapping = ResponseRemapping {
+            should_spread: false,
+            remappings: HashMap::from([(
+                "test".to_string(),
+                Remapping::new(false, None, Some(ReturnValue::from("hello".to_string()))),
+            )]),
+        };
+        let return_value = ReturnValue::from_traversal_value(node, &remapping)
+            .mixin_remapping(remapping.remappings);
+        assert_eq!(
+            return_value,
+            ReturnValue::Object(HashMap::from([(
+                "test".to_string(),
+                ReturnValue::from("hello".to_string())
+            )]))
+        );
     }
 }

@@ -758,7 +758,7 @@ fn test_remapping_with_traversal_from_source() {
         .add_n("person", Some(props! { "old_name" => "test" }), None)
         .collect_to_val();
     let _other_node = G::new_mut(Arc::clone(&storage), &mut txn)
-        .add_n("person", Some(props! {}), None)
+        .add_n("person", Some(props! { "other_name" => "other" }), None)
         .collect_to_val();
     let _edge = G::new_mut(Arc::clone(&storage), &mut txn)
         .add_e(
