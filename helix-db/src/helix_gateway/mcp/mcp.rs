@@ -1,6 +1,6 @@
 use crate::{
     helix_engine::{
-        traversal_core::traversal_value::TraversalValue, storage_core::HelixGraphStorage,
+        storage_core::HelixGraphStorage, traversal_core::traversal_value::TraversalValue,
         types::GraphError,
     },
     helix_gateway::mcp::tools::ToolArgs,
@@ -201,22 +201,24 @@ pub fn collect(input: &mut MCPToolInput) -> Result<Response, GraphError> {
     let values = match data.range {
         Some(range) => connection
             .iter
+            .clone()
             .skip(range.start)
             .take(range.end - range.start)
             .collect::<Vec<TraversalValue>>(),
-        None => connection.iter.collect::<Vec<TraversalValue>>(),
+        None => connection.iter.clone().collect::<Vec<TraversalValue>>(),
     };
 
     let mut connections = input.mcp_connections.lock().unwrap();
-    let mut new_iter = values.clone().into_iter();
+
     if data.drop.unwrap_or(true) {
-        new_iter = vec![].into_iter();
+        connections.add_connection(MCPConnection::new(
+            connection.connection_id.clone(),
+            vec![].into_iter(),
+        ));
+    } else {
+        connections.add_connection(connection);
     }
 
-    connections.add_connection(MCPConnection::new(
-        connection.connection_id.clone(),
-        new_iter,
-    ));
     drop(connections);
 
     Ok(Format::Json.create_response(&ReturnValue::from(values)))
