@@ -66,19 +66,18 @@ async fn run() -> ExitCode {
                 }
             };
 
-            if command.path.is_none()
-                && !Path::new(&format!("./{DB_DIR}")).is_dir()
-                && command.cluster.is_none()
-            {
-                println!("{}", "No path or instance specified!".red().bold());
-                return ExitCode::FAILURE;
-            }
+            let path = match get_path_or_cwd(command.path.as_ref()) {
+                Ok(path) => path,
+                Err(e) => {
+                    println!("{}", "Error: failed to get path".red().bold());
+                    println!("└── {e}");
+                    return ExitCode::FAILURE;
+                }
+            };
+            let files = check_and_read_files(&path).unwrap_or_default();
 
             // -- helix start --
-            if command.cluster.is_some()
-                && command.path.is_none()
-                && !Path::new(&format!("./{DB_DIR}")).is_dir()
-            {
+            if command.cluster.is_some() && files.is_empty() {
                 let instance_manager = InstanceManager::new().unwrap();
                 let mut sp = Spinner::new(Spinners::Dots9, "Starting Helix instance".into());
                 let openai_key = get_openai_key();
@@ -117,23 +116,15 @@ async fn run() -> ExitCode {
                 return ExitCode::SUCCESS;
             }
 
+            if command.cluster.is_none() && files.is_empty() {
+                println!("{}", "No query files, path, or instance provided!".red().bold());
+                return ExitCode::FAILURE;
+            }
+
             let output = dirs::home_dir()
                 .unwrap_or_else(|| PathBuf::from("./"))
                 .join(".helix/repo/helix-db/helix-container");
             let start_port = command.port.unwrap_or(6969);
-
-            let path = get_cfg_deploy_path(command.path.clone());
-            let files = match check_and_read_files(&path) {
-                Ok(files) if !files.is_empty() => files,
-                Ok(_) => {
-                    println!("{}", "No queries found, nothing to compile".red().bold());
-                    return ExitCode::FAILURE;
-                }
-                Err(e) => {
-                    println!("{} {}", "Error:".red().bold(), e);
-                    return ExitCode::FAILURE;
-                }
-            };
 
             if !command.remote {
                 let code = match compile_and_build_helix(
@@ -204,37 +195,16 @@ async fn run() -> ExitCode {
                 }
 
                 // -- helix deploy --
-                if command.cluster.is_none()
-                    && (command.path.is_some() || Path::new(&format!("./{DB_DIR}")).is_dir())
-                {
-                    let port = match find_available_port(start_port) {
-                        Some(port) => {
-                            if port != start_port {
-                                println!(
-                                    "{} {} {} {} {}",
-                                    "Port".yellow(),
-                                    start_port,
-                                    "is in use, using port".yellow(),
-                                    port,
-                                    "instead".yellow(),
-                                );
-                            }
-                            port
-                        }
-                        None => {
+                let port = match find_available_port(start_port) {
+                    Some(port) => {
+                        if port != start_port {
                             println!(
-                                "{} {}",
-                                "No available ports found starting from".red().bold(),
-                                start_port
-                            );
-                            return ExitCode::FAILURE;
-                        }
-                    };
-                    match deploy_helix(port, code, None, BuildMode::from_release(command.release)) {
-                        Ok(cluster_id) => {
-                            HELIX_METRICS_CLIENT.send_event(
-                                EventType::DeployLocal,
-                                event(cluster_id, start_time.elapsed().as_secs() as u32),
+                                "{} {} {} {} {}",
+                                "Port".yellow(),
+                                start_port,
+                                "is in use, using port".yellow(),
+                                port,
+                                "instead".yellow(),
                             );
                         }
                         Err(_) => {
@@ -245,6 +215,7 @@ async fn run() -> ExitCode {
                     println!("{}", "Successfully deployed Helix queries".green().bold());
                     return ExitCode::SUCCESS;
                 }
+                return ExitCode::FAILURE;
             } else if let Some(cluster) = command.cluster {
                 match redeploy_helix_remote(cluster.clone(), path, files).await {
                     Ok(_) => {
