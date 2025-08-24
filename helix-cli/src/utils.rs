@@ -399,6 +399,19 @@ pub fn get_n_helix_cli() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+/// Returns the path or the current working directory if no path is provided
+pub fn get_path_or_cwd(path: Option<&String>) -> Result<String, Box<dyn Error>> {
+    match path {
+        Some(p) => Ok(p.to_string()),
+        None => {
+            let cwd = env::current_dir()?;
+            cwd.to_str()
+                .map(|s| s.to_string())
+                .ok_or_else(|| format!("Path contains invalid UTF-8 characters: {cwd:?}").into())
+        }
+    }
+}
+
 /// Checks if the path contains a schema.hx and config.hx.json file
 /// Returns a vector of DirEntry objects for all .hx files in the path
 pub fn check_and_read_files(path: &str) -> Result<Vec<DirEntry>, String> {
