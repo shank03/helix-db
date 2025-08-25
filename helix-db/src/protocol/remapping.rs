@@ -22,6 +22,8 @@ impl Serialize for Remapping {
 }
 
 impl Remapping {
+    /// To replace existing field with new value, new_name must be set to None, and exclude must be false.
+    /// To rename a field, new_name must be set to the new name, return_value must be set to existing value, and exclude must be false.
     pub fn new(exclude: bool, new_name: Option<String>, return_value: Option<ReturnValue>) -> Self {
         assert!(
             !exclude || (new_name.is_none() || return_value.is_none()),
@@ -56,10 +58,6 @@ impl ResponseRemapping {
             remappings,
             should_spread,
         }
-    }
-
-    pub fn insert(&mut self, key: String, remapping: Remapping) {
-        self.remappings.insert(key, remapping);
     }
 }
 

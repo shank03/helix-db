@@ -152,6 +152,7 @@ pub(super) fn gen_property_access(name: &str) -> Step {
     }
 }
 
+#[allow(unused)]
 #[derive(Clone)]
 pub(super) struct Variable {
     pub name: String,
@@ -164,6 +165,7 @@ impl Variable {
     }
 }
 
+#[allow(unused)]
 pub(super) trait VariableAccess {
     fn get_variable_name(&self) -> String;
     fn get_variable_ty(&self) -> &Type;
@@ -187,6 +189,7 @@ impl VariableAccess for Option<Variable> {
 
 pub(super) trait FieldLookup {
     fn item_fields_contains_key(&self, ctx: &Ctx, key: &str) -> bool;
+    fn item_fields_contains_key_with_type(&self, ctx: &Ctx, key: &str) -> (bool, String);
 }
 
 impl FieldLookup for Type {
@@ -218,5 +221,43 @@ impl FieldLookup for Type {
                 .unwrap_or(true),
             _ => unreachable!("shouldve been caught eariler"),
         }
+    }
+
+    fn item_fields_contains_key_with_type(&self, ctx: &Ctx, key: &str) -> (bool, String) {
+        let (is_valid_field, item_type) = match self {
+            Type::Node(Some(node_type)) | Type::Nodes(Some(node_type)) => (
+                ctx.node_fields
+                    .get(node_type.as_str())
+                    .map(|fields| match key {
+                        "id" | "ID" | "label" => true,
+                        _ => fields.contains_key(key),
+                    })
+                    .unwrap_or(true),
+                node_type.as_str(),
+            ),
+            Type::Edge(Some(edge_type)) | Type::Edges(Some(edge_type)) => (
+                ctx.edge_fields
+                    .get(edge_type.as_str())
+                    .map(|fields| match key {
+                        "id" | "ID" | "label" | "from_node" | "to_node" => true,
+                        _ => fields.contains_key(key),
+                    })
+                    .unwrap_or(true),
+                edge_type.as_str(),
+            ),
+            Type::Vector(Some(vector_type)) | Type::Vectors(Some(vector_type)) => (
+                ctx.vector_fields
+                    .get(vector_type.as_str())
+                    .map(|fields| match key {
+                        "id" | "ID" | "label" | "data" | "score" => true,
+                        _ => fields.contains_key(key),
+                    })
+                    .unwrap_or(true),
+                vector_type.as_str(),
+            ),
+            _ => unreachable!("shouldve been caught eariler"),
+        };
+
+        (is_valid_field, item_type.to_string())
     }
 }

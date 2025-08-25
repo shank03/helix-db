@@ -38,6 +38,7 @@ mod tests {
         }
     }
 
+    #[allow(dead_code)]
     fn fetch_parquet_vectors() -> Result<(), Box<dyn std::error::Error>> {
         let urls = [
             "https://huggingface.co/datasets/KShivendu/dbpedia-entities-openai-1M/resolve/main/data/train-00002-of-00026-b05ce48965853dad.parquet",
@@ -164,6 +165,7 @@ mod tests {
     }
 
     /// Higher values of similarity make the vectors more similar
+    #[allow(dead_code)]
     fn gen_sim_vecs(n: usize, dim: usize, similarity: f64) -> Vec<Vec<f64>> {
         let mut rng = rand::rng();
         let mut vectors = Vec::with_capacity(n);

@@ -73,7 +73,7 @@ optional_param = { "?" }
 // Assignments and traversals
 // ---------------------------------------------------------------------
 get_stmt            = { identifier ~ "<-" ~ evaluates_to_anything }
-traversal           = { (start_node | start_edge | search_vector) ~ step* ~ last_step? }
+traversal           = { (start_node | start_edge | search_vector | start_vector) ~ step* ~ last_step? }
 id_traversal        = { identifier ~ ((step+ ~ last_step?) | last_step) }
 anonymous_traversal = { "_"  ~ ((step+ ~ last_step?) | last_step)? }
 step                = { "::" ~ ((variable_declaration~graph_step) | order_by | where_step | closure_step | object_step | exclude_field | count | ID | range_step | AddE) }

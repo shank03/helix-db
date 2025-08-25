@@ -36,6 +36,9 @@ pub enum CommandType {
     /// Initialise a new Helix project
     Init(InitCommand),
 
+    /// Turn metrics on or off
+    Metrics(MetricsCommand),
+
     /// List all Helix instances
     Status,
 
@@ -50,9 +53,6 @@ pub enum CommandType {
 
     /// Get the current version of the cli and core database
     Version,
-
-    /// Open graph visualizer in default browser
-    Visualize(VisualizeCommand),
 
     /// Check login credentials or login with github
     Login,
@@ -82,6 +82,9 @@ pub struct DeployCommand {
 
     #[clap(long, help = "Port to run the instance on")]
     pub port: Option<u16>,
+
+    #[clap(long, help = "Enable dev-instance feature flags, allows you to use visualizer endpoints")]
+    pub dev: bool,
 }
 
 #[derive(Debug, Args)]
@@ -153,8 +156,11 @@ pub struct DeleteCommand {
 }
 
 #[derive(Debug, Args)]
-#[clap(name = "visualize", about = "Visualize the Helix graph")]
-pub struct VisualizeCommand {
-    #[clap(help = "Cluster ID to visualize")]
-    pub cluster: String,
+#[clap(name = "metrics", about = "Turn metrics on or off")]
+pub struct MetricsCommand {
+    #[clap(long, help = "Turn metrics off")]
+    pub off: bool,
+
+    #[clap(long, help = "Turn metrics on")]
+    pub on: bool,
 }

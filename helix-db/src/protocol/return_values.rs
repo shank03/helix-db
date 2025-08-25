@@ -2,7 +2,7 @@ use super::{
     remapping::{Remapping, ResponseRemapping},
     value::Value,
 };
-use crate::helix_engine::graph_core::ops::tr_val::TraversalVal;
+use crate::helix_engine::traversal_core::traversal_value::TraversalValue;
 use crate::utils::{
     count::Count,
     filterable::{Filterable, FilterableType},
@@ -46,7 +46,7 @@ impl ReturnValue {
             if m.should_spread {
                 ReturnValue::from(item).mixin_remapping(m.remappings)
             } else {
-                ReturnValue::default().mixin_remapping(m.remappings)
+                ReturnValue::from_traversal_value(item, &m).mixin_remapping(m.remappings)
             }
         } else {
             ReturnValue::from(item)
@@ -55,26 +55,26 @@ impl ReturnValue {
 
     #[inline]
     pub fn from_traversal_value_array_with_mixin(
-        traversal_value: Vec<TraversalVal>,
+        traversal_value: Vec<TraversalValue>,
         mut mixin: RefMut<HashMap<u128, ResponseRemapping>>,
     ) -> Self {
         ReturnValue::Array(
             traversal_value
                 .into_iter()
                 .map(|val| match val {
-                    TraversalVal::Node(node) => {
+                    TraversalValue::Node(node) => {
                         ReturnValue::process_items_with_mixin(node, &mut mixin)
                     }
-                    TraversalVal::Edge(edge) => {
+                    TraversalValue::Edge(edge) => {
                         ReturnValue::process_items_with_mixin(edge, &mut mixin)
                     }
-                    TraversalVal::Vector(vector) => {
+                    TraversalValue::Vector(vector) => {
                         ReturnValue::process_items_with_mixin(vector, &mut mixin)
                     }
-                    TraversalVal::Count(count) => ReturnValue::from(count),
-                    TraversalVal::Empty => ReturnValue::Empty,
-                    TraversalVal::Value(value) => ReturnValue::from(value),
-                    TraversalVal::Path((nodes, edges)) => {
+                    TraversalValue::Count(count) => ReturnValue::from(count),
+                    TraversalValue::Empty => ReturnValue::Empty,
+                    TraversalValue::Value(value) => ReturnValue::from(value),
+                    TraversalValue::Path((nodes, edges)) => {
                         let mut properties = HashMap::with_capacity(2);
                         properties.insert(
                             "nodes".to_string(),
@@ -93,22 +93,22 @@ impl ReturnValue {
 
     #[inline]
     pub fn from_traversal_value_with_mixin(
-        traversal_value: TraversalVal,
+        traversal_value: TraversalValue,
         mut mixin: RefMut<HashMap<u128, ResponseRemapping>>,
     ) -> Self {
         match traversal_value {
-            TraversalVal::Node(node) => {
+            TraversalValue::Node(node) => {
                 println!("node processing");
                 ReturnValue::process_items_with_mixin(node, &mut mixin)
             }
-            TraversalVal::Edge(edge) => ReturnValue::process_items_with_mixin(edge, &mut mixin),
-            TraversalVal::Vector(vector) => {
+            TraversalValue::Edge(edge) => ReturnValue::process_items_with_mixin(edge, &mut mixin),
+            TraversalValue::Vector(vector) => {
                 ReturnValue::process_items_with_mixin(vector, &mut mixin)
             }
-            TraversalVal::Count(count) => ReturnValue::from(count),
-            TraversalVal::Empty => ReturnValue::Empty,
-            TraversalVal::Value(value) => ReturnValue::from(value),
-            TraversalVal::Path((nodes, edges)) => {
+            TraversalValue::Count(count) => ReturnValue::from(count),
+            TraversalValue::Empty => ReturnValue::Empty,
+            TraversalValue::Value(value) => ReturnValue::from(value),
+            TraversalValue::Path((nodes, edges)) => {
                 let mut properties = HashMap::with_capacity(2);
                 properties.insert(
                     "nodes".to_string(),
@@ -172,30 +172,29 @@ impl ReturnValue {
     /// ```
     #[inline(always)]
     pub fn mixin_remapping(self, remappings: HashMap<String, Remapping>) -> Self {
-        match self {
+        println!("Remapping: {:#?}", self);
+        let return_value = match self {
             ReturnValue::Object(mut a) => {
-                println!("a1: {a:?}");
                 remappings.into_iter().for_each(|(k, v)| {
+                    println!("k: {:?}, v: {:?}", k, v);
                     if v.exclude {
-                        println!("removing key: {k:?}");
                         let _ = a.remove(&k);
                     } else if let Some(new_name) = v.new_name {
                         if let Some(value) = a.remove(&k) {
                             a.insert(new_name, value);
                         } else {
-                            println!("no value found for key: {k:?}");
                             a.insert(k, v.return_value);
                         }
                     } else {
-                        println!("inserting value: {k:?}");
                         a.insert(k, v.return_value);
                     }
                 });
-                println!("a2: {a:?}");
                 ReturnValue::Object(a)
             }
             _ => unreachable!(),
-        }
+        };
+        println!("Return value: {:?}", return_value);
+        return_value
     }
 
     #[inline(always)]
@@ -222,12 +221,66 @@ impl ReturnValue {
         return_val = return_val.mixin_remapping(secondary_properties.remappings);
         return_val
     }
+
+    #[inline]
+    pub fn from_traversal_value<T: Filterable + Clone>(
+        item: T,
+        remapping: &ResponseRemapping,
+    ) -> Self {
+        let length = match item.properties_ref() {
+            Some(properties) => properties.len(),
+            None => 0,
+        };
+        let mut properties = match item.type_name() {
+            FilterableType::Node => HashMap::with_capacity(Node::NUM_PROPERTIES + length),
+            FilterableType::Edge => {
+                let mut properties = HashMap::with_capacity(Edge::NUM_PROPERTIES + length);
+                properties.check_and_insert(
+                    remapping,
+                    "from_node".to_string(),
+                    ReturnValue::from(item.from_node_uuid()),
+                );
+                properties.check_and_insert(
+                    remapping,
+                    "to_node".to_string(),
+                    ReturnValue::from(item.to_node_uuid()),
+                );
+                properties
+            }
+            FilterableType::Vector => {
+                let data = item.vector_data();
+                let score = item.score();
+
+                let mut properties = HashMap::with_capacity(2 + length);
+                properties.check_and_insert(remapping, "data".to_string(), ReturnValue::from(data));
+                properties.check_and_insert(
+                    remapping,
+                    "score".to_string(),
+                    ReturnValue::from(score),
+                );
+                properties
+            }
+        };
+        properties.check_and_insert(remapping, "id".to_string(), ReturnValue::from(item.uuid()));
+        properties.check_and_insert(
+            remapping,
+            "label".to_string(),
+            ReturnValue::from(item.label().to_string()),
+        );
+        if item.properties_ref().is_some() {
+            properties.extend(
+                item.properties()
+                    .unwrap()
+                    .into_iter()
+                    .map(|(k, v)| (k, ReturnValue::from(v))),
+            );
+        }
+
+        ReturnValue::Object(properties)
+    }
 }
 
-impl<I> From<I> for ReturnValue
-where
-    I: Filterable + Clone,
-{
+impl<I: Filterable + Clone> From<I> for ReturnValue {
     #[inline]
     fn from(item: I) -> Self {
         let length = match item.properties_ref() {
@@ -312,6 +365,78 @@ impl From<&str> for ReturnValue {
     }
 }
 
+impl From<HashMap<String, ReturnValue>> for ReturnValue {
+    fn from(object: HashMap<String, ReturnValue>) -> Self {
+        ReturnValue::Object(object)
+    }
+}
+
+impl From<&HashMap<String, ReturnValue>> for ReturnValue {
+    fn from(object: &HashMap<String, ReturnValue>) -> Self {
+        ReturnValue::Object(object.clone())
+    }
+}
+
+impl From<Vec<(String, ReturnValue)>> for ReturnValue {
+    fn from(object: Vec<(String, ReturnValue)>) -> Self {
+        ReturnValue::Object(object.into_iter().collect())
+    }
+}
+
+impl From<&Vec<(String, ReturnValue)>> for ReturnValue {
+    fn from(object: &Vec<(String, ReturnValue)>) -> Self {
+        ReturnValue::Object(object.clone().into_iter().collect())
+    }
+}
+
+impl From<i8> for ReturnValue {
+    fn from(integer: i8) -> Self {
+        ReturnValue::Value(Value::I8(integer))
+    }
+}
+
+impl From<i16> for ReturnValue {
+    fn from(integer: i16) -> Self {
+        ReturnValue::Value(Value::I16(integer))
+    }
+}
+
+impl From<i64> for ReturnValue {
+    fn from(integer: i64) -> Self {
+        ReturnValue::Value(Value::I64(integer))
+    }
+}
+
+impl From<u8> for ReturnValue {
+    fn from(integer: u8) -> Self {
+        ReturnValue::Value(Value::U8(integer))
+    }
+}
+
+impl From<u16> for ReturnValue {
+    fn from(integer: u16) -> Self {
+        ReturnValue::Value(Value::U16(integer))
+    }
+}
+
+impl From<u32> for ReturnValue {
+    fn from(integer: u32) -> Self {
+        ReturnValue::Value(Value::U32(integer))
+    }
+}
+
+impl From<u64> for ReturnValue {
+    fn from(integer: u64) -> Self {
+        ReturnValue::Value(Value::U64(integer))
+    }
+}
+
+impl From<u128> for ReturnValue {
+    fn from(integer: u128) -> Self {
+        ReturnValue::Value(Value::U128(integer))
+    }
+}
+
 impl From<i32> for ReturnValue {
     fn from(integer: i32) -> Self {
         ReturnValue::Value(Value::I32(integer))
@@ -324,27 +449,27 @@ impl From<f64> for ReturnValue {
     }
 }
 
-impl From<u128> for ReturnValue {
-    fn from(integer: u128) -> Self {
-        ReturnValue::Value(Value::U128(integer))
+impl From<f32> for ReturnValue {
+    fn from(float: f32) -> Self {
+        ReturnValue::Value(Value::F32(float))
     }
 }
 
-impl From<Vec<TraversalVal>> for ReturnValue {
-    fn from(array: Vec<TraversalVal>) -> Self {
+impl From<Vec<TraversalValue>> for ReturnValue {
+    fn from(array: Vec<TraversalValue>) -> Self {
         ReturnValue::Array(array.into_iter().map(|val| val.into()).collect())
     }
 }
 
-impl From<TraversalVal> for ReturnValue {
-    fn from(val: TraversalVal) -> Self {
+impl From<TraversalValue> for ReturnValue {
+    fn from(val: TraversalValue) -> Self {
         match val {
-            TraversalVal::Node(node) => ReturnValue::from(node),
-            TraversalVal::Edge(edge) => ReturnValue::from(edge),
-            TraversalVal::Vector(vector) => ReturnValue::from(vector),
-            TraversalVal::Count(count) => ReturnValue::from(count),
-            TraversalVal::Value(value) => ReturnValue::from(value),
-            TraversalVal::Empty => ReturnValue::Empty,
+            TraversalValue::Node(node) => ReturnValue::from(node),
+            TraversalValue::Edge(edge) => ReturnValue::from(edge),
+            TraversalValue::Vector(vector) => ReturnValue::from(vector),
+            TraversalValue::Count(count) => ReturnValue::from(count),
+            TraversalValue::Value(value) => ReturnValue::from(value),
+            TraversalValue::Empty => ReturnValue::Empty,
             _ => unreachable!(),
         }
     }
@@ -373,5 +498,59 @@ impl Serialize for ReturnValue {
 impl Default for ReturnValue {
     fn default() -> Self {
         ReturnValue::Object(HashMap::new())
+    }
+}
+
+trait IfPresentThereInsertHere {
+    fn check_and_insert(&mut self, there: &ResponseRemapping, key: String, value: ReturnValue);
+}
+
+impl IfPresentThereInsertHere for HashMap<String, ReturnValue> {
+    fn check_and_insert(&mut self, there: &ResponseRemapping, key: String, value: ReturnValue) {
+        // value in mixin
+        // if there.should_spread {
+        //     self.insert(key, value);
+        // } else 
+        
+        if let Some(existing_value) = there.remappings.get(&key)
+            && !existing_value.exclude
+        {
+            self.insert(key, value);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_return_value() {
+        let node = Node {
+            id: 1,
+            label: "test".to_string(),
+            version: 1,
+            properties: Some(HashMap::from([(
+                "test".to_string(),
+                Value::String("test".to_string()),
+            )])),
+        };
+
+        let remapping = ResponseRemapping {
+            should_spread: false,
+            remappings: HashMap::from([(
+                "test".to_string(),
+                Remapping::new(false, None, Some(ReturnValue::from("hello".to_string()))),
+            )]),
+        };
+        let return_value = ReturnValue::from_traversal_value(node, &remapping)
+            .mixin_remapping(remapping.remappings);
+        assert_eq!(
+            return_value,
+            ReturnValue::Object(HashMap::from([(
+                "test".to_string(),
+                ReturnValue::from("hello".to_string())
+            )]))
+        );
     }
 }

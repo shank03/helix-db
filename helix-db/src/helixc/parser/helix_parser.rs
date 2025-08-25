@@ -24,8 +24,11 @@ pub struct HelixParser {
 }
 
 pub struct Content {
+    /// Source code of the content
     pub content: String,
+    /// Parsed source code
     pub source: Source,
+    /// Files in the content
     pub files: Vec<HxFile>,
 }
 
@@ -1607,9 +1610,7 @@ impl HelixParser {
                 };
 
                 // gets optional param
-                let is_optional = inner
-                    .peek()
-                    .is_some_and(|p| p.as_rule() == Rule::optional_param);
+                let is_optional = inner.peek().is_some_and(|p| p.as_rule() == Rule::optional_param);
                 if is_optional {
                     inner.next();
                 }

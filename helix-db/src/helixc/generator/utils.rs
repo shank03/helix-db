@@ -111,10 +111,11 @@ impl From<IdType> for GenRef<String> {
 #[derive(Clone)]
 pub enum VecData {
     Standard(GeneratedValue),
-    Embed {
-        data: GeneratedValue,
-        model_name: Option<String>,
-    },
+    // Embed {
+    //     data: GeneratedValue,
+    //     model_name: Option<String>,
+    // },
+    Hoisted(String),
     Unknown,
 }
 
@@ -122,11 +123,33 @@ impl Display for VecData {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             VecData::Standard(v) => write!(f, "{v}"),
-            VecData::Embed { data, model_name } => match model_name {
-                Some(model) => write!(f, "&embed!(db, {data}, {model})"),
-                None => write!(f, "&embed!(db, {data})"),
-            },
+            // VecData::Embed { data, model_name } => match model_name {
+            //     Some(model) => write!(f, "&embed!(db, {data}, {model})"),
+            //     None => write!(f, "&embed!(db, {data})"),
+            // },
+            VecData::Hoisted(ident) => write!(f, "&{ident}"),
             VecData::Unknown => panic!("Cannot convert to string, VecData is unknown"),
+        }
+    }
+}
+
+pub struct EmbedData {
+    pub data: GeneratedValue,
+    pub model_name: Option<String>,
+}
+
+impl EmbedData {
+    pub fn name_from_index(idx: usize) -> String {
+        format!("__internal_embed_data_{idx}")
+    }
+}
+
+impl Display for EmbedData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let EmbedData { data, model_name } = self;
+        match model_name {
+            Some(model) => write!(f, "embed_async!(db, {data}, {model})"),
+            None => write!(f, "embed_async!(db, {data})"),
         }
     }
 }
@@ -332,7 +355,7 @@ impl<T: Display> Separator<T> {
 pub fn write_headers() -> String {
     r#"
 // DEFAULT CODE
-// use helix_db::helix_engine::graph_core::config::Config;
+// use helix_db::helix_engine::traversal_core::config::Config;
 
 // pub fn config() -> Option<Config> {
 //     None
@@ -344,7 +367,7 @@ use heed3::RoTxn;
 use helix_macros::{handler, tool_call, mcp_handler, migration};
 use helix_db::{
     helix_engine::{
-        graph_core::{
+        traversal_core::{
             config::{Config, GraphConfig, VectorConfig},
             ops::{
                 bm25::search_bm25::SearchBM25Adapter,
@@ -362,27 +385,27 @@ use helix_db::{
                     n_from_index::NFromIndexAdapter,
                     n_from_type::NFromTypeAdapter,
                 },
-                tr_val::{Traversable, TraversalVal},
                 util::{
                     dedup::DedupAdapter, drop::Drop, exist::Exist, filter_mut::FilterMut,
                     filter_ref::FilterRefAdapter, map::MapAdapter, paths::ShortestPathAdapter,
                     props::PropsAdapter, range::RangeAdapter, update::UpdateAdapter, order::OrderByAdapter,
+                    },
+                    vectors::{
+                        brute_force_search::BruteForceSearchVAdapter, insert::InsertVAdapter,
+                        search::SearchVAdapter,
+                    },
                 },
-                vectors::{
-                    brute_force_search::BruteForceSearchVAdapter, insert::InsertVAdapter,
-                    search::SearchVAdapter,
-                },
-            }
-        },
+                traversal_value::{Traversable, TraversalValue},
+            },
         types::GraphError,
         vector_core::vector::HVector,
     },
     helix_gateway::{
         embedding_providers::embedding_providers::{EmbeddingModel, get_embedding_model},
-        router::router::HandlerInput,
+        router::router::{HandlerInput, IoContFn},
         mcp::mcp::{MCPHandlerSubmission, MCPToolInput, MCPHandler}
     },
-    node_matches, props, embed,
+    node_matches, props, embed, embed_async,
     field_remapping, identifier_remapping, 
     traversal_remapping, exclude_field, value_remapping, 
     field_addition_from_old_field, field_type_cast, field_addition_from_value,

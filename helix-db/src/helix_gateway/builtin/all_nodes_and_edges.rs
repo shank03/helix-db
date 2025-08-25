@@ -65,7 +65,7 @@ pub async fn nodes_edges_handler(
     }
 }
 
-pub fn nodes_edges_inner(input: &HandlerInput) -> Result<protocol::Response, GraphError> {
+pub fn nodes_edges_inner(input: HandlerInput) -> Result<protocol::Response, GraphError> {
     let db = Arc::clone(&input.graph.storage);
     let txn = db.graph_env.read_txn().map_err(GraphError::from)?;
 
@@ -116,7 +116,7 @@ pub fn nodes_edges_inner(input: &HandlerInput) -> Result<protocol::Response, Gra
         .unwrap_or_else(|_| "[]".to_string());
 
     let combined =
-        format!(r#"{{"data": {json_result}, "vectors": {vectors_result}, "stats": {db_stats }}}"#);
+        format!(r#"{{"data": {json_result}, "vectors": {vectors_result}, "stats": {db_stats}}}"#);
 
     Ok(protocol::Response {
         body: combined.into_bytes(),
@@ -125,10 +125,11 @@ pub fn nodes_edges_inner(input: &HandlerInput) -> Result<protocol::Response, Gra
 }
 
 fn get_all_nodes_edges_json(
-    db: &Arc<crate::helix_engine::storage_core::storage_core::HelixGraphStorage>,
+    db: &Arc<crate::helix_engine::storage_core::HelixGraphStorage>,
     txn: &RoTxn,
     node_label: Option<String>,
 ) -> Result<String, GraphError> {
+    use crate::utils::filterable::Filterable;
     use sonic_rs::json;
 
     let nodes_length = db.nodes_db.len(txn)?;
@@ -144,7 +145,8 @@ fn get_all_nodes_edges_json(
         });
 
         if let Some(prop) = &node_label {
-            let node = Node::decode_node(value, id)?;
+            let node = Node::decode_node(&value, id)?;
+            json_node["label"] = json!(node.label());
             if let Some(props) = node.properties {
                 if let Some(prop_value) = props.get(prop) {
                     json_node["label"] = sonic_rs::to_value(&prop_value.to_string())
@@ -160,13 +162,14 @@ fn get_all_nodes_edges_json(
     let edge_iter = db.edges_db.iter(txn)?;
     for result in edge_iter {
         let (id, value) = result?;
-        let edge = Edge::decode_edge(value, id)?;
+        let edge = Edge::decode_edge(&value, id)?;
+        let id_str = ID::from(id).stringify();
 
         edges.push(json!({
-            "from": edge.from_node.to_string(),
-            "to": edge.to_node.to_string(),
-            "title": id.to_string(),
-            "id": id.to_string()
+            "from": ID::from(edge.from_node).stringify(),
+            "to": ID::from(edge.to_node).stringify(),
+            "title": id_str.clone(),
+            "id": id_str
         }));
     }
 

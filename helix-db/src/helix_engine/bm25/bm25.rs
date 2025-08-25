@@ -1,10 +1,11 @@
 use crate::{
     helix_engine::{
-        storage_core::storage_core::HelixGraphStorage,
+        storage_core::HelixGraphStorage,
         types::GraphError,
         vector_core::{hnsw::HNSW, vector::HVector},
     },
     protocol::value::Value,
+    debug_println,
 };
 
 use heed3::{types::*, Database, Env, RoTxn, RwTxn};
@@ -335,6 +336,8 @@ impl BM25 for HBM25Config {
         results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         results.truncate(limit);
 
+        debug_println!("found {} results in bm25 search", results.len());
+
         Ok(results)
     }
 }
@@ -429,6 +432,7 @@ impl BM25Flatten for HashMap<String, Value> {
                 s.push_str(k);
                 s.push(' ');
                 s.push_str(&v.to_string());
+                s.push(' ');
                 s
             })
     }

@@ -29,37 +29,17 @@ pub(crate) fn validate_query<'a>(ctx: &mut Ctx<'a>, original_query: &'a Query) {
         ..Default::default()
     };
 
-    match &original_query.built_in_macro {
-        Some(BuiltInMacro::MCP) => {
-            if query.return_values.len() != 1 {
-                generate_error!(
-                    ctx,
-                    original_query,
-                    original_query.loc.clone(),
-                    E401,
-                    &query.return_values.len().to_string()
-                );
-            } else {
-                // match query.return_values.first().unwrap().return_type {
-
-                // }
-            }
-            let return_name = query.return_values.first().unwrap().get_name();
-            query.mcp_handler = Some(return_name);
-        }
-        Some(BuiltInMacro::Model(model_name)) => {
-            // handle model macro
-            query.embedding_model_to_use = Some(model_name.clone());
-        }
-        None => {}
+    if let Some(BuiltInMacro::Model(model_name)) = &original_query.built_in_macro {
+        // handle model macro
+        query.embedding_model_to_use = Some(model_name.clone());
     }
 
     // -------------------------------------------------
     // Parameter validation
     // -------------------------------------------------
     for param in &original_query.parameters {
-        if let FieldType::Identifier(ref id) = param.param_type.1 {
-            if is_valid_identifier(ctx, original_query, param.param_type.0.clone(), id.as_str()) {
+        if let FieldType::Identifier(ref id) = param.param_type.1
+            && is_valid_identifier(ctx, original_query, param.param_type.0.clone(), id.as_str()) {
                 // TODO: add support for edges
                 if !ctx.node_set.contains(id.as_str()) {
                     generate_error!(
@@ -71,7 +51,6 @@ pub(crate) fn validate_query<'a>(ctx: &mut Ctx<'a>, original_query: &'a Query) {
                         &param.name.1
                     );
                 }
-            }
         }
         // constructs parameters and sub‑parameters for generator
         GeneratedParameter::unwrap_param(
@@ -92,12 +71,9 @@ pub(crate) fn validate_query<'a>(ctx: &mut Ctx<'a>, original_query: &'a Query) {
         );
     }
     for stmt in &original_query.statements {
-        let statement = validate_statements(ctx, &mut scope, original_query, &mut query, stmt);
-        if let Some(s) = statement {
-            query.statements.push(s);
-        } else {
-            // given all erroneous statements are caught by the analyzer, this should never happen
-            unreachable!()
+        match validate_statements(ctx, &mut scope, original_query, &mut query, stmt) {
+            Some(s) => query.statements.push(s),
+            None => return,
         }
     }
 
@@ -214,6 +190,20 @@ pub(crate) fn validate_query<'a>(ctx: &mut Ctx<'a>, original_query: &'a Query) {
             // all malformed statements (not gramatically correct) should be caught by the parser
             _ => unreachable!(),
         }
+    }
+
+    if let Some(BuiltInMacro::MCP) = &original_query.built_in_macro {
+        if query.return_values.len() != 1 {
+            generate_error!(
+                ctx,
+                original_query,
+                original_query.loc.clone(),
+                E401,
+                &query.return_values.len().to_string()
+            );
+        }
+        let return_name = query.return_values.first().unwrap().get_name();
+        query.mcp_handler = Some(return_name);
     }
 
     ctx.output.queries.push(query);

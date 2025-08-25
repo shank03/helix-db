@@ -17,8 +17,6 @@ Closes #
 - [ ] All tests pass
 - [ ] Performance has not regressed (assuming change was not to fix a bug)
 - [ ] Version number has been updated in `helix-cli/Cargo.toml` and `helixdb/Cargo.toml`
-- [ ] Lines are kept under 100 characters where possible
-- [ ] Code is good
 
 ## Additional Notes
 <!-- Add any additional information that would be helpful for reviewers --> 

@@ -1,10 +1,11 @@
 use crate::{
+    HELIX_METRICS_CLIENT,
     instance_manager::{InstanceInfo, InstanceManager},
     types::*,
 };
 use futures_util::StreamExt;
 use helix_db::{
-    helix_engine::graph_core::config::Config,
+    helix_engine::traversal_core::config::Config,
     helixc::{
         analyzer::analyzer::analyze,
         generator::{Source as GeneratedSource, tsdisplay::ToTypeScript},
@@ -12,9 +13,10 @@ use helix_db::{
     },
     utils::styled_string::StyledString,
 };
+use helix_metrics::events::{DeployCloudEvent, EventType};
 use reqwest::Client;
 use serde::Deserialize;
-use serde_json::{Value as JsonValue, json};
+use sonic_rs::{JsonValueTrait, Value as JsonValue, json};
 use spinners::{Spinner, Spinners};
 use std::{
     env,
@@ -25,6 +27,7 @@ use std::{
     net::{SocketAddr, TcpListener},
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    sync::LazyLock,
 };
 use tokio_tungstenite::{
     connect_async,
@@ -35,7 +38,11 @@ use tokio_tungstenite::{
 };
 use toml::Value;
 
-pub const DB_DIR: &str = "helixdb-cfg/";
+const DEFAULT_CLOUD_AUTHORITY: &str = "ec2-184-72-27-116.us-west-1.compute.amazonaws.com:3000";
+
+pub static CLOUD_AUTHORITY: LazyLock<String> = LazyLock::new(|| {
+    env::var("HELIX_CLOUD_AUTHORITY").unwrap_or(DEFAULT_CLOUD_AUTHORITY.to_string())
+});
 
 pub const DEFAULT_SCHEMA: &str = r#"// Start building your schema here.
 //
@@ -111,7 +118,7 @@ pub fn check_helix_installation() -> Option<PathBuf> {
     Some(container_path)
 }
 
-pub fn print_instance(instance: &InstanceInfo) {
+pub fn print_instance(mut instance: InstanceInfo) {
     let rg: bool = instance.running;
     println!(
         "{} {} {}{}",
@@ -154,6 +161,7 @@ pub fn print_instance(instance: &InstanceInfo) {
     println!("└── Port: {}", instance.port);
     println!("└── Available endpoints:");
 
+    instance.available_endpoints.sort();
     instance
         .available_endpoints
         .iter()
@@ -192,6 +200,8 @@ pub async fn get_remote_helix_version() -> Result<Version, Box<dyn Error>> {
 
     let url = "https://api.github.com/repos/HelixDB/helix-db/releases/latest";
 
+    // if response is not returned within timeout just return.
+    // At the moment this is stopping cli be used offline
     let response = client
         .get(url)
         .header("User-Agent", "rust")
@@ -201,7 +211,7 @@ pub async fn get_remote_helix_version() -> Result<Version, Box<dyn Error>> {
         .text()
         .await?;
 
-    let json: JsonValue = serde_json::from_str(&response)?;
+    let json: JsonValue = sonic_rs::from_str(&response)?;
     let tag_name = json
         .get("tag_name")
         .and_then(|v| v.as_str())
@@ -212,7 +222,7 @@ pub async fn get_remote_helix_version() -> Result<Version, Box<dyn Error>> {
 }
 
 pub async fn github_login() -> Result<(String, String), Box<dyn Error>> {
-    let url = "ws://ec2-184-72-27-116.us-west-1.compute.amazonaws.com:3000/login";
+    let url = format!("ws://{}/login", *CLOUD_AUTHORITY);
     let (mut ws_stream, _) = connect_async(url).await?;
 
     let init_msg: UserCodeMsg = match ws_stream.next().await {
@@ -255,8 +265,35 @@ struct ApiKeyMsg {
     key: String,
 }
 
+pub struct Credentials {
+    pub key: Option<String>,
+    pub user_id: Option<String>,
+    pub metrics: Option<bool>,
+}
+
+pub fn parse_credentials(creds: &str) -> Credentials {
+    let mut credentials = Credentials {
+        key: None,
+        user_id: None,
+        metrics: None,
+    };
+
+    for line in creds.lines() {
+        if let Some((key, value)) = line.split_once("=") {
+            match key.to_lowercase().as_str() {
+                "helix_user_key" => credentials.key = Some(value.to_string()),
+                "helix_user_id" => credentials.user_id = Some(value.to_string()),
+                "metrics" => credentials.metrics = Some(value.to_string().parse().unwrap()),
+                _ => {}
+            }
+        }
+    }
+
+    credentials
+}
+
 /// tries to parse a credential file, returning the key, if any
-pub fn parse_credentials(creds: &str) -> Option<&str> {
+pub fn parse_key_from_creds(creds: &str) -> Option<&str> {
     for line in creds.lines() {
         if let Some((key, value)) = line.split_once("=")
             && key.to_lowercase() == "helix_user_key"
@@ -358,6 +395,19 @@ pub fn get_n_helix_cli() -> Result<(), Box<dyn Error>> {
     }
 
     Ok(())
+}
+
+/// Returns the path or the current working directory if no path is provided
+pub fn get_path_or_cwd(path: Option<&String>) -> Result<String, Box<dyn Error>> {
+    match path {
+        Some(p) => Ok(p.to_string()),
+        None => {
+            let cwd = env::current_dir()?;
+            cwd.to_str()
+                .map(|s| s.to_string())
+                .ok_or_else(|| format!("Path contains invalid UTF-8 characters: {cwd:?}").into())
+        }
+    }
 }
 
 /// Checks if the path contains a schema.hx and config.hx.json file
@@ -525,31 +575,12 @@ pub fn find_available_port(start_port: u16) -> Option<u16> {
     None
 }
 
-pub fn get_cfg_deploy_path(cmd_path: Option<String>) -> String {
-    if let Some(path) = cmd_path {
-        return path;
-    }
-
-    let cwd = ".";
-    let files = match check_and_read_files(cwd) {
-        Ok(files) => files,
-        Err(_) => {
-            return DB_DIR.to_string();
-        }
-    };
-
-    if !files.is_empty() {
-        return cwd.to_string();
-    }
-
-    DB_DIR.to_string()
-}
-
 pub fn compile_and_build_helix(
     path: String,
     output: &PathBuf,
     files: Vec<DirEntry>,
     release_mode: BuildMode,
+    enable_dev_instance: bool,
 ) -> Result<Content, String> {
     let mut sp = Spinner::new(Spinners::Dots9, "Compiling Helix queries".into());
 
@@ -624,12 +655,19 @@ pub fn compile_and_build_helix(
 
     println!("building helix at: {}", output.display());
     let mut runner = Command::new("cargo");
+    let mut args = vec!["build"];
+
+    match release_mode {
+        BuildMode::Dev => args.extend_from_slice(&["--profile", "dev"]),
+        BuildMode::Release => args.push("--release"),
+    }
+
+    if enable_dev_instance {
+        args.extend_from_slice(&["--features", "dev-instance"]);
+    }
+
     runner
-        .arg("build")
-        .args(match release_mode {
-            BuildMode::Dev => vec!["--profile", "dev"],
-            BuildMode::Release => vec!["--release"],
-        })
+        .args(args)
         .current_dir(PathBuf::from(&output))
         .env("RUSTFLAGS", "-Awarnings");
 
@@ -660,13 +698,18 @@ pub fn deploy_helix(
     code: Content,
     instance_id: Option<String>,
     release_mode: BuildMode,
-) -> Result<(), String> {
+) -> Result<String, String> {
     let mut sp = Spinner::new(Spinners::Dots9, "Starting Helix instance".into());
 
     let instance_manager = InstanceManager::new().unwrap();
 
     let binary_path = dirs::home_dir()
-        .map(|path| path.join(format!(".helix/repo/helix-db/target/{}/helix-container", release_mode.to_path())))
+        .map(|path| {
+            path.join(format!(
+                ".helix/repo/helix-db/target/{}/helix-container",
+                release_mode.to_path()
+            ))
+        })
         .unwrap();
 
     let endpoints: Vec<String> = code.source.queries.iter().map(|q| q.name.clone()).collect();
@@ -689,8 +732,9 @@ pub fn deploy_helix(
                         .bold()
                         .to_string(),
                 );
-                print_instance(&instance);
-                Ok(())
+                let instance_id = instance.id.clone();
+                print_instance(instance);
+                Ok(instance_id)
             }
             Err(e) => {
                 sp.stop_with_message("Failed to start Helix instance".red().bold().to_string());
@@ -708,8 +752,9 @@ pub fn deploy_helix(
                         .bold()
                         .to_string(),
                 );
-                print_instance(&instance);
-                Ok(())
+                let instance_id = instance.id.clone();
+                print_instance(instance);
+                Ok(instance_id)
             }
             Err(e) => {
                 sp.stop_with_message("Failed to start Helix instance".red().bold().to_string());
@@ -729,7 +774,10 @@ pub fn redeploy_helix(
     let iid = instance;
 
     match instance_manager.get_instance(&iid) {
-        Ok(Some(_)) => println!("{}", "Helix instance found!".green().bold()),
+        Ok(Some(instance)) => {
+            println!("{}", "Helix instance found!".green().bold());
+            instance
+        }
         Ok(None) => {
             println!(
                 "{} {}",
@@ -821,6 +869,21 @@ pub async fn redeploy_helix_remote(
         }
     };
 
+    let deployment = DeployCloudEvent {
+        cluster_id: cluster.clone(),
+        queries_string: content
+            .source
+            .queries
+            .iter()
+            .map(|q| q.name.clone())
+            .collect::<Vec<String>>()
+            .join("\n"),
+        num_of_queries: content.source.queries.len() as u32,
+        time_taken_sec: 0,
+        success: true,
+        error_messages: None,
+    };
+
     // upload queries to central server
     let payload = json!({
         "user_id": user_id,
@@ -831,10 +894,10 @@ pub async fn redeploy_helix_remote(
     });
     let client = reqwest::Client::new();
 
+    let cloud_url = format!("http://{}/clusters/deploy-queries", *CLOUD_AUTHORITY);
+
     match client
-        .post(
-            "http://ec2-184-72-27-116.us-west-1.compute.amazonaws.com:3000/clusters/deploy-queries",
-        )
+        .post(cloud_url)
         .header("x-api-key", user_key) // used to verify user
         .header("x-cluster-id", &cluster) // used to verify instance with user
         .header("Content-Type", "application/json")
@@ -845,6 +908,7 @@ pub async fn redeploy_helix_remote(
         Ok(response) => {
             if response.status().is_success() {
                 sp.stop_with_message("Queries uploaded to remote db".green().bold().to_string());
+                HELIX_METRICS_CLIENT.send_event(EventType::DeployCloud, deployment);
             } else {
                 sp.stop_with_message(
                     "Error uploading queries to remote db"

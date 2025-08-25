@@ -3,10 +3,10 @@ mod tests {
     use crate::{
         helix_engine::{
             bm25::bm25::{
-                BM25Flatten, BM25Metadata, HBM25Config, HybridSearch, BM25, METADATA_KEY,
+                BM25, BM25Flatten, BM25Metadata, HBM25Config, HybridSearch, METADATA_KEY,
             },
-            graph_core::{config::Config, ops::version_info::VersionInfo},
-            storage_core::storage_core::HelixGraphStorage,
+            storage_core::{HelixGraphStorage, version_info::VersionInfo},
+            traversal_core::config::Config,
             vector_core::{hnsw::HNSW, vector::HVector},
         },
         protocol::value::Value,
@@ -1581,4 +1581,3 @@ mod tests {
         wtxn.commit().unwrap();
     }
 }
-

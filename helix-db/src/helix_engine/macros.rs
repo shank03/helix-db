@@ -130,38 +130,66 @@ pub mod macros {
     }
 
     #[macro_export]
+    /// Maps an existing field to a new field, removing the old field from .
+    ///
+    /// Requires `field_remapping!(remapping_vals, item, should_spread, old_name => new_name)`
+    ///
+    /// - `remapping_vals`: RemappingMap - the remapping map to insert the remapping into
+    /// - `item`: TraversalValue - the item from the `.map_traversal`
+    /// - `should_spread`: bool - whether to spread the remapping to the next item
+    /// - `old_name`: String - the name of the field to remap
+    /// - `new_name`: String - the new name of the field
     macro_rules! field_remapping {
-        ($remapping_vals:expr, $var_name:expr, $should_spread:expr, $old_name:expr => $new_name:expr) => {{
-            let old_value = match $var_name.check_property($old_name) {
-                Ok(val) => val,
+        ($remapping_vals:expr, $item:expr, $should_spread:expr, $old_name:expr => $new_name:expr) => {{
+            let old_value = match $item.check_property($old_name) {
+                Ok(val) => val.into_owned(),
                 Err(e) => {
                     return Err(GraphError::ConversionError(format!(
                         "Error Decoding: {:?}",
-                        "Invalid node".to_string()
-                    )))
+                        e.to_string()
+                    )));
                 }
             };
-            let old_value_remapping =
-                Remapping::new(false, Some($new_name), Some(ReturnValue::from(old_value)));
+            let old_value_remapping = Remapping::new(
+                false,
+                Some($new_name.to_string()),
+                Some(ReturnValue::from(old_value)),
+            );
             $remapping_vals.insert(
-                $var_name.id(),
+                $item.id(),
                 ResponseRemapping::new(
-                    HashMap::from([($old_name.to_string(), old_value_remapping)]),
+                    HashMap::from([($new_name.to_string(), old_value_remapping)]),
                     $should_spread,
                 ),
             );
-            Ok::<TraversalVal, GraphError>($var_name) // Return the Ok value
+            Ok::<TraversalValue, GraphError>($item) // Return the Ok value
         }};
     }
 
+    /// This is used to map a traversal to a field
+    ///
+    /// Requires `traversal_remapping!(remapping_vals, item, should_spread, new_name => traversal)`
+    ///
+    /// - `remapping_vals`: RemappingMap - the remapping map to insert the remapping into
+    /// - `item`: TraversalValue - the item from the `.map_traversal`
+    /// - `should_spread`: bool - whether to spread the remapping to the next item
+    /// - `new_name`: String - the name of the field to remap
+    /// - `traversal`: Traversal - the traversal to remap the field to
     #[macro_export]
     macro_rules! traversal_remapping {
         ($remapping_vals:expr, $var_name:expr, $should_spread:expr, $new_name:expr => $traversal:expr) => {{
             // TODO: ref?
+            // Apply remappings to the nested traversal result
+
+            let nested_return_value = ReturnValue::from_traversal_value_array_with_mixin(
+                $traversal,
+                $remapping_vals.borrow_mut(),
+            );
+
             let new_remapping = Remapping::new(
                 false,
                 Some($new_name.to_string()),
-                Some(ReturnValue::from($traversal)),
+                Some(nested_return_value),
             );
             $remapping_vals.insert(
                 $var_name.id(),
@@ -170,10 +198,17 @@ pub mod macros {
                     $should_spread,
                 ),
             );
-            Ok::<TraversalVal, GraphError>($var_name)
+            Ok::<TraversalValue, GraphError>($var_name)
         }};
     }
 
+    /// This is used to exclude a field from the remapping
+    ///
+    /// Requires `exclude_field!(remapping_vals, item, fields_to_exclude)`
+    ///
+    /// - `remapping_vals`: RemappingMap - the remapping map to insert the remapping into
+    /// - `item`: TraversalValue - the item from the `.map_traversal`
+    /// - `field_to_excludes`: Vec<&str> - the names of the fields to exclude
     #[macro_export]
     macro_rules! exclude_field {
         ($remapping_vals:expr, $var_name:expr, $($field_to_exclude:expr),* $(,)?) => {{
@@ -193,54 +228,26 @@ pub mod macros {
                 );
                 println!("inserting remapping: {:?}", $remapping_vals.borrow_mut());
             )*
-                Ok::<TraversalVal, GraphError>($var_name)
+                Ok::<TraversalValue, GraphError>($var_name)
         }};
     }
 
+    /// This is used to map a variable to a field
+    ///
+    /// Requires `identifier_remapping!(remapping_vals, item, should_spread, field_name => identifier_value)`
+    ///
+    /// - `remapping_vals`: RemappingMap - the remapping map to insert the remapping into
+    /// - `item`: TraversalValue - the item from the `.map_traversal`
+    /// - `should_spread`: bool - whether to spread the remapping to the next item
+    /// - `field_name`: String - the name of the field to remap
+    /// - `identifier_value`: String - the value to remap the field to
     #[macro_export]
     macro_rules! identifier_remapping {
         ($remapping_vals:expr, $var_name:expr, $should_spread:expr, $field_name:expr =>  $identifier_value:expr) => {{
-            let value = match $var_name.check_property($field_name) {
-                Ok(val) => val.clone(), // TODO: try and remove clone
-                Err(e) => {
-                    return Err(GraphError::ConversionError(format!(
-                        "Error Decoding: {:?}",
-                        "Invalid node".to_string()
-                    )))
-                }
-            };
-            let value_remapping = Remapping::new(
-                false,
-                Some($identifier_value.to_string()),
-                Some(ReturnValue::from(value)),
-            );-
-            $remapping_vals.insert(
-                $var_name.id(),
-                ResponseRemapping::new(
-                    HashMap::from([($field_name.to_string(), value_remapping)]),
-                    $should_spread,
-                ),
-            );
-            Ok::<TraversalVal, GraphError>($var_name)
-        }};
-    }
-
-    #[macro_export]
-    macro_rules! value_remapping {
-        ($remapping_vals:expr, $var_name:expr, $should_spread:expr, $field_name:expr =>  $value:expr) => {{
-            let value = match $var_name.check_property($field_name) {
-                Ok(val) => val.clone(),
-                Err(e) => {
-                    return Err(GraphError::ConversionError(format!(
-                        "Error Decoding: {:?}",
-                        "Invalid node".to_string()
-                    )))
-                }
-            };
             let old_value_remapping = Remapping::new(
                 false,
-                Some($field_name.to_string()),
-                Some(ReturnValue::from(value)),
+                None,
+                Some(ReturnValue::from($identifier_value)),
             );
             $remapping_vals.insert(
                 $var_name.id(),
@@ -249,7 +256,68 @@ pub mod macros {
                     $should_spread,
                 ),
             );
-            Ok::<TraversalVal, GraphError>($var_name) // Return the Ok value
+            Ok::<TraversalValue, GraphError>($var_name)
+        }};
+    }
+
+    /// This is used to map a literal value to a field
+    ///
+    /// Requires `value_remapping!(remapping_vals, item, should_spread, field_name => value)`
+    ///
+    /// - `remapping_vals`: RemappingMap - the remapping map to insert the remapping into
+    /// - `item`: TraversalValue - the item from the `.map_traversal`
+    /// - `should_spread`: bool - whether to spread the remapping to the next item
+    /// - `field_name`: String - the name of the field to remap
+    /// - `value`: Value - the value to remap the field to
+    #[macro_export]
+    macro_rules! value_remapping {
+        ($remapping_vals:expr, $var_name:expr, $should_spread:expr, $field_name:expr => $value:expr) => {{
+            let old_value_remapping = Remapping::new(
+                false,
+                None,
+                Some(ReturnValue::from($value)),
+            );
+            $remapping_vals.insert(
+                $var_name.id(),
+                ResponseRemapping::new(
+                    HashMap::from([($field_name.to_string(), old_value_remapping)]),
+                    $should_spread,
+                ),
+            );
+            Ok::<TraversalValue, GraphError>($var_name) // Return the Ok value
+        }};
+    }
+
+    /// This is used to map a exists traversal to a field
+    ///
+    /// Requires `exists_remapping!(remapping_vals, item, should_spread, field_name => traversal)`
+    ///
+    /// - `remapping_vals`: RemappingMap - the remapping map to insert the remapping into
+    /// - `item`: TraversalValue - the item from the `.map_traversal`
+    /// - `should_spread`: bool - whether to spread the remapping to the next item
+    /// - `field_name`: String - the name of the field to remap
+    /// - `traversal`: Traversal - the traversal to check if it exists
+    #[macro_export]
+    macro_rules! exists_remapping {
+        ($remapping_vals:expr, $var_name:expr, $should_spread:expr, $field_name:expr => $inner_traversal:expr) => {{
+            let exists = if $inner_traversal.len() > 0 {
+                true
+            } else {
+                false
+            };
+            let value_remapping = Remapping::new(
+                false,
+                Some($field_name.to_string()),
+                Some(ReturnValue::from(exists)),
+            );
+            $remapping_vals.insert(
+                $var_name.id(),
+                ResponseRemapping::new(
+                    HashMap::from([($field_name.to_string(), value_remapping)]),
+                    $should_spread,
+                ),
+            );
+            Ok::<TraversalValue, GraphError>($var_name)
         }};
     }
 
@@ -301,4 +369,3 @@ pub mod macros {
         }};
     }
 }
-

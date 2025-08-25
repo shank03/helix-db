@@ -5,66 +5,23 @@ extern crate syn;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
-    Expr, FnArg, Ident, ItemFn, ItemTrait, LitInt, Pat, Stmt, Token, TraitItem,
-    parse::{Parse, ParseStream},
-    parse_macro_input,
+    parse::{Parse, ParseStream}, parse_macro_input, Expr, FnArg, Ident, ItemFn, ItemStruct, ItemTrait, LitInt, Pat, Stmt, Token, TraitItem
 };
 
-struct HandlerArgs {
-    txn_type: Ident,
-}
-impl Parse for HandlerArgs {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        Ok(HandlerArgs {
-            txn_type: input.parse()?,
-        })
-    }
-}
-
 #[proc_macro_attribute]
-pub fn handler(args: TokenStream, item: TokenStream) -> TokenStream {
+pub fn handler(_args: TokenStream, item: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(item as ItemFn);
-    let args = parse_macro_input!(args as HandlerArgs);
-    let input_fn_block_contents = &input_fn.block.stmts;
     let fn_name = &input_fn.sig.ident;
     let fn_name_str = fn_name.to_string();
-    let vis = &input_fn.vis;
-    let sig = &input_fn.sig;
     println!("fn_name_str: {fn_name_str}");
     // Create a unique static name for each handler
     let static_name = quote::format_ident!(
         "_MAIN_HANDLER_REGISTRATION_{}",
         fn_name.to_string().to_uppercase()
     );
-    let input_data_name = quote::format_ident!("{}Input", fn_name);
-
-    let query_stmts = match input_fn_block_contents.first() {
-        Some(Stmt::Expr(Expr::Block(block), _)) => block.block.stmts.clone(),
-        _ => panic!("Query block not found"),
-    };
-
-    let txn_type = match args.txn_type.to_string().as_str() {
-        "with_read" => quote! { let txn = db.graph_env.read_txn().unwrap(); },
-        "with_write" => quote! { let mut txn = db.graph_env.write_txn().unwrap(); },
-        _ => panic!("Invalid transaction type: expected 'with_read' or 'with_write'"),
-    };
 
     let expanded = quote! {
-        #[allow(non_camel_case_types)]
-        #vis #sig {
-            let data = input.request.in_fmt.deserialize::<#input_data_name>(&input.request.body)?;
-
-            let mut remapping_vals = RemappingMap::new();
-            let db = Arc::clone(&input.graph.storage);
-            #txn_type
-
-
-            #(#query_stmts)*
-
-            txn.commit().unwrap();
-
-            Ok(input.request.out_fmt.create_response(&return_vals))
-        }
+        #input_fn
 
         #[doc(hidden)]
         #[used]
@@ -249,7 +206,7 @@ pub fn tool_calls(_attr: TokenStream, input: TokenStream) -> TokenStream {
 
                     let result = input.mcp_backend.#fn_name(&txn, &connection, #(data.data.#field_names),*)?;
 
-                    let first = result.first().unwrap_or(&TraversalVal::Empty).clone();
+                    let first = result.first().unwrap_or(&TraversalValue::Empty).clone();
 
                     connection.iter = result.into_iter();
                     let mut connections = input.mcp_connections.lock().unwrap();
@@ -349,7 +306,7 @@ pub fn tool_call(args: TokenStream, input: TokenStream) -> TokenStream {
 
             let mut result = #mcp_query_block;
 
-            let first = result.next().unwrap_or(TraversalVal::Empty);
+            let first = result.next().unwrap_or(TraversalValue::Empty);
 
             connection.iter = result.into_iter();
             let mut connections = input.mcp_connections.lock().unwrap();
@@ -386,7 +343,6 @@ impl Parse for MigrationArgs {
     }
 }
 
-
 struct MigrationArgs {
     item: Ident,
     _comma: Token![,],
@@ -409,12 +365,11 @@ pub fn migration(args: TokenStream, item: TokenStream) -> TokenStream {
         "_MAIN_HANDLER_REGISTRATION_{}",
         fn_name.to_string().to_uppercase()
     );
-    
-    
+
     let item = &args.item;
     let from_version = &args.from_version;
     let to_version = &args.to_version;
-    
+
     let expanded = quote! {
         #input_fn
 
@@ -435,4 +390,20 @@ pub fn migration(args: TokenStream, item: TokenStream) -> TokenStream {
         };
     };
     expanded.into()
+}
+
+#[proc_macro_attribute]
+pub fn helix_node(_attr: TokenStream, input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as ItemStruct);
+    let name = &input.ident;
+    let fields = input.fields.iter();
+
+    let expanded = quote! {
+        pub struct #name {
+            id: String,
+            #(#fields),*
+        }
+    };
+
+    TokenStream::from(expanded)
 }

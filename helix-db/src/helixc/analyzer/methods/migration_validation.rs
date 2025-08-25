@@ -100,7 +100,6 @@ pub(crate) fn validate_migration(ctx: &mut Ctx, migration: &Migration) {
             loc: _,
         } in &item.remappings
         {
-
             // check the new property exists in to version schema
             let to_property_field = match to_fields.get(property_name.1.as_str()) {
                 Some(field) => field,
@@ -131,19 +130,17 @@ pub(crate) fn validate_migration(ctx: &mut Ctx, migration: &Migration) {
             }
 
             // check default value is valid for the new field type
-            if let Some(default) = &default {
-                if to_property_field.field_type != *default {
+            if let Some(default) = &default
+                && to_property_field.field_type != *default {
                     // schema error - default value is not valid for the new field type
                     panic!("default value is not valid for the new field type");
-                }
             }
 
             // check the cast is valid for the new field type
-            if let Some(cast) = &cast {
-                if to_property_field.field_type != cast.cast_to {
+            if let Some(cast) = &cast
+                && to_property_field.field_type != cast.cast_to {
                     // schema error - cast is not valid for the new field type
                     panic!("cast is not valid for the new field type");
-                }
             }
 
             // // warnings if name is same
@@ -176,9 +173,10 @@ pub(crate) fn validate_migration(ctx: &mut Ctx, migration: &Migration) {
                                 .remappings
                                 .push(Separator::Semicolon(
                                     GeneratedMigrationPropertyMapping::FieldAdditionFromValue {
-                                        new_field: GeneratedValue::Literal(GenRef::Literal(
+                                        new_field_name: GeneratedValue::Literal(GenRef::Literal(
                                             property_name.1.to_string(),
                                         )),
+                                        new_field_type: to_property_field.field_type.clone(),
                                         value: GeneratedValue::Literal(match literal {
                                             Value::String(s) => GenRef::Literal(s.to_string()),
                                             other => GenRef::Std(other.to_string()),

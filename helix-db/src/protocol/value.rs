@@ -114,6 +114,41 @@ impl Display for Value {
 }
 impl Ord for Value {
     fn cmp(&self, other: &Self) -> Ordering {
+        let to_i128 = |value: &Value| -> Option<i128> {
+            match value {
+                Value::I8(v) => Some(*v as i128),
+                Value::I16(v) => Some(*v as i128),
+                Value::I32(v) => Some(*v as i128),
+                Value::I64(v) => Some(*v as i128),
+                Value::U8(v) => Some(*v as i128),
+                Value::U16(v) => Some(*v as i128),
+                Value::U32(v) => Some(*v as i128),
+                Value::U64(v) => Some(*v as i128),
+                Value::U128(v) => {
+                    if *v <= i128::MAX as u128 {
+                        Some(*v as i128)
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            }
+        };
+        let is_integer = |value: &Value| -> bool {
+            matches!(
+                value,
+                Value::I8(_)
+                    | Value::I16(_)
+                    | Value::I32(_)
+                    | Value::I64(_)
+                    | Value::U8(_)
+                    | Value::U16(_)
+                    | Value::U32(_)
+                    | Value::U64(_)
+                    | Value::U128(_)
+            )
+        };
+
         match (self, other) {
             (Value::String(s), Value::String(o)) => s.cmp(o),
             (Value::F32(s), Value::F32(o)) => match s.partial_cmp(o) {
@@ -124,26 +159,25 @@ impl Ord for Value {
                 Some(o) => o,
                 None => Ordering::Equal,
             },
-            (Value::I8(s), Value::I8(o)) => s.cmp(o),
-            (Value::I16(s), Value::I16(o)) => s.cmp(o),
-            (Value::I32(s), Value::I32(o)) => s.cmp(o),
-            (Value::I64(s), Value::I64(o)) => s.cmp(o),
-            (Value::U8(s), Value::U8(o)) => s.cmp(o),
-            (Value::U16(s), Value::U16(o)) => s.cmp(o),
-            (Value::U32(s), Value::U32(o)) => s.cmp(o),
-            (Value::U64(s), Value::U64(o)) => s.cmp(o),
-            (Value::U128(s), Value::U128(o)) => s.cmp(o),
             (Value::Date(s), Value::Date(o)) => s.cmp(o),
             (Value::Boolean(s), Value::Boolean(o)) => s.cmp(o),
             (Value::Array(s), Value::Array(o)) => s.cmp(o),
             (Value::Empty, Value::Empty) => Ordering::Equal,
             (Value::Empty, _) => Ordering::Less,
             (_, Value::Empty) => Ordering::Greater,
+            (s, o) if is_integer(s) && is_integer(o) => match (to_i128(s), to_i128(o)) {
+                (Some(s), Some(o)) => s.cmp(&o),
+                (None, Some(_)) => Ordering::Greater,
+                (Some(_), None) => Ordering::Less,
+                (None, None) => match (self, other) {
+                    (Value::U128(s), Value::U128(o)) => s.cmp(o),
+                    _ => unreachable!(),
+                },
+            },
             (_, _) => Ordering::Equal,
         }
     }
 }
-
 impl PartialOrd for Value {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
@@ -182,6 +216,8 @@ impl PartialEq<ID> for Value {
     fn eq(&self, other: &ID) -> bool {
         match self {
             Value::Id(id) => id == other,
+            Value::String(s) => &ID::from(s) == other,
+            Value::U128(u) => &ID::from(*u) == other,
             _ => false,
         }
     }
@@ -459,15 +495,15 @@ impl Serialize for Value {
                 Value::U64(i) => serializer.serialize_newtype_variant("Value", 10, "U64", i),
                 Value::U128(i) => serializer.serialize_newtype_variant("Value", 11, "U128", i),
                 Value::Date(d) => serializer.serialize_newtype_variant("Value", 12, "Date", d),
-                Value::Id(id) => serializer.serialize_newtype_variant("Value", 13, "Id", id),
                 Value::Boolean(b) => {
-                    serializer.serialize_newtype_variant("Value", 12, "Boolean", b)
+                    serializer.serialize_newtype_variant("Value", 13, "Boolean", b)
                 }
-                Value::Array(a) => serializer.serialize_newtype_variant("Value", 13, "Array", a),
+                Value::Id(id) => serializer.serialize_newtype_variant("Value", 14, "Id", id),
+                Value::Array(a) => serializer.serialize_newtype_variant("Value", 15, "Array", a),
                 Value::Object(obj) => {
-                    serializer.serialize_newtype_variant("Value", 14, "Object", obj)
+                    serializer.serialize_newtype_variant("Value", 16, "Object", obj)
                 }
-                Value::Empty => serializer.serialize_unit_variant("Value", 15, "Empty"),
+                Value::Empty => serializer.serialize_unit_variant("Value", 17, "Empty"),
             }
         }
     }
@@ -625,6 +661,18 @@ impl<'de> Deserialize<'de> for Value {
                 Ok(Value::Array(values))
             }
 
+            /// Handles object values by recursively deserialising each key-value pair
+            fn visit_map<A>(self, mut map: A) -> Result<Value, A::Error>
+            where
+                A: serde::de::MapAccess<'de>,
+            {
+                let mut object = HashMap::new();
+                while let Some((key, value)) = map.next_entry()? {
+                    object.insert(key, value);
+                }
+                Ok(Value::Object(object))
+            }
+
             /// Handles binary format deserialisation using numeric indices to identify variants
             /// Maps indices 0-5 to corresponding Value enum variants
             fn visit_enum<A>(self, data: A) -> Result<Self::Value, A::Error>
@@ -645,16 +693,18 @@ impl<'de> Deserialize<'de> for Value {
                     9 => Ok(Value::U32(variant_data.newtype_variant()?)),
                     10 => Ok(Value::U64(variant_data.newtype_variant()?)),
                     11 => Ok(Value::U128(variant_data.newtype_variant()?)),
-                    12 => Ok(Value::Boolean(variant_data.newtype_variant()?)),
-                    13 => Ok(Value::Array(variant_data.newtype_variant()?)),
-                    14 => Ok(Value::Object(variant_data.newtype_variant()?)),
-                    15 => {
+                    12 => Ok(Value::Date(variant_data.newtype_variant()?)),
+                    13 => Ok(Value::Boolean(variant_data.newtype_variant()?)),
+                    14 => Ok(Value::Id(variant_data.newtype_variant()?)),
+                    15 => Ok(Value::Array(variant_data.newtype_variant()?)),
+                    16 => Ok(Value::Object(variant_data.newtype_variant()?)),
+                    17 => {
                         variant_data.unit_variant()?;
                         Ok(Value::Empty)
                     }
                     _ => Err(serde::de::Error::invalid_value(
                         serde::de::Unexpected::Unsigned(variant_idx as u64),
-                        &"variant index 0 through 5",
+                        &"variant index 0 through 17",
                     )),
                 }
             }
@@ -700,7 +750,7 @@ impl<'de> Deserialize<'de> for Value {
                 "Value",
                 &[
                     "String", "F32", "F64", "I8", "I16", "I32", "I64", "U8", "U16", "U32", "U64",
-                    "U128", "Boolean", "Array", "Object", "Empty",
+                    "U128", "Date", "Boolean", "Id", "Array", "Object", "Empty",
                 ],
                 ValueVisitor,
             )

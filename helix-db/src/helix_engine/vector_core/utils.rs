@@ -124,14 +124,11 @@ impl VectorFilter for BinaryHeap<HVector> {
                         None => None, // TODO: maybe should be an error?
                     };
 
-                if SHOULD_CHECK_DELETED {
-                    if let Ok(is_deleted) = item.check_property("is_deleted") {
-                        if let Value::Boolean(is_deleted) = is_deleted.as_ref() {
-                            if *is_deleted {
+                if SHOULD_CHECK_DELETED
+                    && let Ok(is_deleted) = item.check_property("is_deleted")
+                        && let Value::Boolean(is_deleted) = is_deleted.as_ref()
+                            && *is_deleted {
                                 continue;
-                            }
-                        }
-                    }
                 }
 
                 if item.label() == label
