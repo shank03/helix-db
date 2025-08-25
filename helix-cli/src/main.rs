@@ -1119,7 +1119,7 @@ async fn run() -> ExitCode {
                 Err(e) => {
                     println!(
                         "{}",
-                        format!("Error initializing Docker dev manager: {}", e)
+                        format!("Error initializing Docker dev manager: {e}")
                             .red()
                             .bold()
                     );
@@ -1130,13 +1130,13 @@ async fn run() -> ExitCode {
             match command.subcommand {
                 DockerDevSubcommand::Run(run_cmd) => {
                     if let Err(e) = manager.run(run_cmd.background, run_cmd.port) {
-                        println!("{}", format!("Error: {}", e).red().bold());
+                        println!("{}", format!("Error: {e}").red().bold());
                         return ExitCode::FAILURE;
                     }
                 }
                 DockerDevSubcommand::Stop => {
                     if let Err(e) = manager.stop() {
-                        println!("{}", format!("Error: {}", e).red().bold());
+                        println!("{}", format!("Error: {e}").red().bold());
                         return ExitCode::FAILURE;
                     }
                 }
@@ -1148,7 +1148,7 @@ async fn run() -> ExitCode {
 
                     // Stop first (don't fail if it's not running)
                     if let Err(e) = manager.stop() {
-                        println!("{}", format!("Warning: {}", e).yellow());
+                        println!("{}", format!("Warning: {e}").yellow());
                     }
 
                     // Wait a moment for cleanup
@@ -1156,25 +1156,25 @@ async fn run() -> ExitCode {
 
                     // Start again
                     if let Err(e) = manager.run(run_cmd.background, run_cmd.port) {
-                        println!("{}", format!("Error: {}", e).red().bold());
+                        println!("{}", format!("Error: {e}").red().bold());
                         return ExitCode::FAILURE;
                     }
                 }
                 DockerDevSubcommand::Delete => {
                     if let Err(e) = manager.delete() {
-                        println!("{}", format!("Error: {}", e).red().bold());
+                        println!("{}", format!("Error: {e}").red().bold());
                         return ExitCode::FAILURE;
                     }
                 }
                 DockerDevSubcommand::Status => {
                     if let Err(e) = manager.status() {
-                        println!("{}", format!("Error: {}", e).red().bold());
+                        println!("{}", format!("Error: {e}").red().bold());
                         return ExitCode::FAILURE;
                     }
                 }
                 DockerDevSubcommand::Logs(logs_cmd) => {
                     if let Err(e) = manager.logs(logs_cmd.follow, logs_cmd.lines) {
-                        println!("{}", format!("Error: {}", e).red().bold());
+                        println!("{}", format!("Error: {e}").red().bold());
                         return ExitCode::FAILURE;
                     }
                 }
@@ -1186,7 +1186,7 @@ async fn run() -> ExitCode {
                     let command_args: Vec<&str> =
                         exec_cmd.command.iter().map(|s| s.as_str()).collect();
                     if let Err(e) = manager.exec_command(&command_args) {
-                        println!("{}", format!("Error: {}", e).red().bold());
+                        println!("{}", format!("Error: {e}").red().bold());
                         return ExitCode::FAILURE;
                     }
                 }
@@ -1195,7 +1195,7 @@ async fn run() -> ExitCode {
                         println!("{}", url.blue().bold());
                     }
                     Err(e) => {
-                        println!("{}", format!("Error: {}", e).red().bold());
+                        println!("{}", format!("Error: {e}").red().bold());
                         return ExitCode::FAILURE;
                     }
                 },

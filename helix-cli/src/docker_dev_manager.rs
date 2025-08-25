@@ -58,21 +58,21 @@ impl DockerDevManager {
 
     fn get_compose_command(&self) -> Result<ComposeCommand, String> {
         // Try docker-compose first
-        let compose_check = Command::new("docker-compose").args(&["--version"]).output();
-        if let Ok(output) = compose_check {
-            if output.status.success() {
-                return Ok(ComposeCommand::DockerCompose);
-            }
+        let compose_check = Command::new("docker-compose").args(["--version"]).output();
+        if let Ok(output) = compose_check
+            && output.status.success()
+        {
+            return Ok(ComposeCommand::DockerCompose);
         }
 
         // Try newer docker compose syntax
         let compose_check = Command::new("docker")
-            .args(&["compose", "--version"])
+            .args(["compose", "--version"])
             .output();
-        if let Ok(output) = compose_check {
-            if output.status.success() {
-                return Ok(ComposeCommand::DockerCompose2);
-            }
+        if let Ok(output) = compose_check
+            && output.status.success()
+        {
+            return Ok(ComposeCommand::DockerCompose2);
         }
 
         Err("Neither 'docker-compose' nor 'docker compose' command is available".to_string())
@@ -126,8 +126,7 @@ impl DockerDevManager {
         // Check if port is available
         if self.is_port_in_use(port)? {
             return Err(format!(
-                "Port {} is already in use. Please choose a different port.",
-                port
+                "Port {port} is already in use. Please choose a different port with --port"
             ));
         }
 
@@ -138,11 +137,11 @@ impl DockerDevManager {
 
         // Create log file with timestamp in the mounted directory
         let timestamp = Local::now().format("%Y%m%d_%H%M%S").to_string();
-        let log_file = self.logs_dir.join(format!("dockerdev-{}.log", timestamp));
+        let log_file = self.logs_dir.join(format!("dockerdev-{timestamp}.log"));
 
         println!(
             "{}",
-            format!("Starting Helix development container on port {}...", port)
+            format!("Starting Helix development container on port {port}...")
                 .blue()
                 .bold()
         );
@@ -154,11 +153,11 @@ impl DockerDevManager {
 
             let output = command
                 .output()
-                .map_err(|e| format!("Failed to start container: {}", e))?;
+                .map_err(|e| format!("Failed to start container: {e}"))?;
 
             if !output.status.success() {
                 let error = String::from_utf8_lossy(&output.stderr);
-                return Err(format!("Failed to start container: {}", error));
+                return Err(format!("Failed to start container: {error}"));
             }
 
             println!("{}", "Container started in background mode".green().bold());
@@ -173,9 +172,7 @@ impl DockerDevManager {
             println!("{}", "View logs with: helix dockerdev logs".normal());
             println!(
                 "{}",
-                format!("Access at: http://localhost:{}", port)
-                    .blue()
-                    .bold()
+                format!("Access at: http://localhost:{port}").blue().bold()
             );
 
             // Wait a moment for container to start and create initial logs
@@ -198,9 +195,7 @@ impl DockerDevManager {
             );
             println!(
                 "{}",
-                format!("Access at: http://localhost:{}", port)
-                    .blue()
-                    .bold()
+                format!("Access at: http://localhost:{port}").blue().bold()
             );
 
             let mut command = self.create_compose_command(&["up", "--build"])?;
@@ -208,7 +203,7 @@ impl DockerDevManager {
 
             let mut child = command
                 .spawn()
-                .map_err(|e| format!("Failed to start container: {}", e))?;
+                .map_err(|e| format!("Failed to start container: {e}"))?;
 
             let _ = child.wait();
         }
@@ -246,11 +241,11 @@ impl DockerDevManager {
         let output = self
             .create_compose_command(&["stop"])?
             .output()
-            .map_err(|e| format!("Failed to stop container: {}", e))?;
+            .map_err(|e| format!("Failed to stop container: {e}"))?;
 
         if !output.status.success() {
             let error = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("Failed to stop container: {}", error));
+            return Err(format!("Failed to stop container: {error}"));
         }
 
         // Update instance status
@@ -282,17 +277,17 @@ impl DockerDevManager {
         let output = self
             .create_compose_command(&["down", "-v", "--remove-orphans"])?
             .output()
-            .map_err(|e| format!("Failed to remove container: {}", e))?;
+            .map_err(|e| format!("Failed to remove container: {e}"))?;
 
         if !output.status.success() {
             let error = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("Failed to remove container: {}", error));
+            return Err(format!("Failed to remove container: {error}"));
         }
 
         // Remove instance file
         if self.instance_file.exists() {
-            fs::remove_file(&self.instance_file)
-                .map_err(|e| format!("Failed to remove instance file: {}", e))?;
+            std::fs::remove_file(&self.instance_file)
+                .map_err(|e| format!("Failed to remove instance file: {e}"))?;
         }
 
         // Optionally clean up the dockerdev directory (but preserve logs)
@@ -361,7 +356,7 @@ impl DockerDevManager {
         }
 
         let mut command = Command::new("docker");
-        command.args(&["logs"]);
+        command.args(["logs"]);
 
         if follow {
             command.arg("-f");
@@ -369,7 +364,7 @@ impl DockerDevManager {
 
         if let Some(n) = lines {
             command.arg("--tail");
-            command.arg(&n.to_string());
+            command.arg(n.to_string());
         } else if !follow {
             // Default to last 100 lines if not following and no lines specified
             command.arg("--tail");
@@ -384,7 +379,7 @@ impl DockerDevManager {
 
         let mut child = command
             .spawn()
-            .map_err(|e| format!("Failed to get logs: {}", e))?;
+            .map_err(|e| format!("Failed to get logs: {e}"))?;
 
         let _ = child.wait();
         Ok(())
@@ -406,12 +401,12 @@ impl DockerDevManager {
         }
 
         let mut docker_command = Command::new("docker");
-        docker_command.args(&["exec", "-it", CONTAINER_NAME]);
+        docker_command.args(["exec", "-it", CONTAINER_NAME]);
         docker_command.args(command);
 
         let mut child = docker_command
             .spawn()
-            .map_err(|e| format!("Failed to execute command: {}", e))?;
+            .map_err(|e| format!("Failed to execute command: {e}"))?;
 
         let _ = child.wait();
         Ok(())
@@ -427,9 +422,9 @@ impl DockerDevManager {
 
     fn is_running(&self) -> Result<bool, String> {
         let output = Command::new("docker")
-            .args(&["ps", "-q", "-f", &format!("name={}", CONTAINER_NAME)])
+            .args(["ps", "-q", "-f", &format!("name={CONTAINER_NAME}")])
             .output()
-            .map_err(|e| format!("Failed to check container status: {}", e))?;
+            .map_err(|e| format!("Failed to check container status: {e}"))?;
 
         Ok(!output.stdout.is_empty())
     }
@@ -442,9 +437,9 @@ impl DockerDevManager {
 
         // Check if stopped (exists but not running)
         let output = Command::new("docker")
-            .args(&["ps", "-aq", "-f", &format!("name={}", CONTAINER_NAME)])
+            .args(["ps", "-aq", "-f", &format!("name={CONTAINER_NAME}")])
             .output()
-            .map_err(|e| format!("Failed to check container status: {}", e))?;
+            .map_err(|e| format!("Failed to check container status: {e}"))?;
 
         if !output.stdout.is_empty() {
             Ok(DockerDevStatus::Stopped)
@@ -454,11 +449,10 @@ impl DockerDevManager {
     }
 
     fn save_instance(&self, instance: &DockerDevInstance) -> Result<(), String> {
-        let json = serde_json::to_string_pretty(instance)
-            .map_err(|e| format!("Failed to serialize instance: {}", e))?;
-
-        fs::write(&self.instance_file, json)
-            .map_err(|e| format!("Failed to save instance: {}", e))?;
+        let json = serde_json::to_string(&instance)
+            .map_err(|e| format!("Failed to serialize instance: {e}"))?;
+        std::fs::write(&self.instance_file, json)
+            .map_err(|e| format!("Failed to save instance: {e}"))?;
 
         Ok(())
     }
@@ -468,21 +462,21 @@ impl DockerDevManager {
             return Err("No instance file found".to_string());
         }
 
-        let contents = fs::read_to_string(&self.instance_file)
-            .map_err(|e| format!("Failed to read instance file: {}", e))?;
+        let contents = std::fs::read_to_string(&self.instance_file)
+            .map_err(|e| format!("Failed to read instance file: {e}"))?;
 
-        serde_json::from_str(&contents).map_err(|e| format!("Failed to parse instance file: {}", e))
+        serde_json::from_str(&contents).map_err(|e| format!("Failed to parse instance file: {e}"))
     }
 
     fn check_docker_available(&self) -> Result<(), String> {
         // Check if docker command is available
-        let docker_check = Command::new("docker").args(&["--version"]).output();
+        let docker_check = Command::new("docker").args(["--version"]).output();
 
         match docker_check {
             Ok(output) if output.status.success() => {
                 // Docker is available, now check if daemon is running
                 let daemon_check = Command::new("docker")
-                    .args(&["info"])
+                    .args(["info"])
                     .output();
 
                 match daemon_check {
