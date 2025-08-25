@@ -1,5 +1,6 @@
 //! Semantic analyzer for Helix‑QL.
 use crate::helixc::analyzer::error_codes::ErrorCode;
+use crate::helixc::analyzer::utils::FieldLookup;
 use crate::helixc::generator::object_remapping_generation::SingleFieldTraversalRemapping;
 use crate::{
     generate_error,
@@ -522,30 +523,9 @@ fn parse_identifier_as_remapping_value<'a>(
             should_spread,
         })
     } else {
-        let (is_valid_field, item_type) = match &parent_ty {
-            Type::Nodes(Some(ty)) | Type::Node(Some(ty)) => (
-                ctx.node_fields
-                    .get(ty.as_str())
-                    .unwrap()
-                    .contains_key(identifier.as_str()),
-                ty.as_str(),
-            ),
-            Type::Edges(Some(ty)) | Type::Edge(Some(ty)) => (
-                ctx.edge_fields
-                    .get(ty.as_str())
-                    .unwrap()
-                    .contains_key(identifier.as_str()),
-                ty.as_str(),
-            ),
-            Type::Vectors(Some(ty)) | Type::Vector(Some(ty)) => (
-                ctx.vector_fields
-                    .get(ty.as_str())
-                    .unwrap()
-                    .contains_key(identifier.as_str()),
-                ty.as_str(),
-            ),
-            _ => unreachable!(),
-        };
+        let (is_valid_field, item_type) =
+            parent_ty.item_fields_contains_key_with_type(ctx, identifier.as_str());
+
         match is_valid_field {
             true => RemappingType::SingleFieldTraversalRemapping(SingleFieldTraversalRemapping {
                 variable_name: closure_variable.get_variable_name(),
