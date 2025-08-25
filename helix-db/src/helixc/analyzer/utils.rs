@@ -152,6 +152,7 @@ pub(super) fn gen_property_access(name: &str) -> Step {
     }
 }
 
+#[allow(unused)]
 #[derive(Clone)]
 pub(super) struct Variable {
     pub name: String,
@@ -164,6 +165,7 @@ impl Variable {
     }
 }
 
+#[allow(unused)]
 pub(super) trait VariableAccess {
     fn get_variable_name(&self) -> String;
     fn get_variable_ty(&self) -> &Type;

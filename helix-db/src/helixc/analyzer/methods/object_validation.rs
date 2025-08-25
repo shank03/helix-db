@@ -519,7 +519,7 @@ fn parse_identifier_as_remapping_value<'a>(
         RemappingType::IdentifierRemapping(IdentifierRemapping {
             variable_name: closure_variable.get_variable_name(),
             field_name: key.clone(),
-            identifier_value: identifier.into(), // TODO: Implement
+            identifier_value: identifier,
             should_spread,
         })
     } else {

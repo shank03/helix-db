@@ -390,8 +390,5 @@ fn kill_and_check_pid(pid: Pid) -> bool {
 }
 
 fn port_is_available(port: u16) -> bool {
-    match TcpListener::bind(format!("127.0.0.1:{}", port)) {
-        Ok(_) => false,
-        Err(_) => true,
-    }
+    TcpListener::bind(format!("127.0.0.1:{port}")).is_err()
 }
