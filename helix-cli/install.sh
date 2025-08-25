@@ -3,43 +3,59 @@
 # Set your repository
 REPO="HelixDB/helix-db"
 
-# Function to run command with timeout
-run_with_timeout() {
-    local timeout_duration=$1
-    shift
-    timeout "$timeout_duration" "$@"
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Function to print colored output
+print_error() {
+    echo -e "${RED}Error: $1${NC}" >&2
+}
+
+print_success() {
+    echo -e "${GREEN}$1${NC}"
+}
+
+print_info() {
+    echo -e "${YELLOW}$1${NC}"
 }
 
 # Function to get version from binary safely
 get_binary_version() {
     local binary_path=$1
     if [[ -f "$binary_path" && -x "$binary_path" ]]; then
-        local version_output
-        version_output=$(run_with_timeout 10s "$binary_path" --version 2>/dev/null)
-        if [[ $? -eq 0 && -n "$version_output" ]]; then
-            echo "$version_output" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1
+        # Try to run with timeout, but don't fail if it doesn't work
+        if command -v timeout >/dev/null 2>&1; then
+            timeout 5s "$binary_path" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1
+        else
+            "$binary_path" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1
         fi
     fi
 }
 
 # Fetch the latest release version from GitHub API
+print_info "Fetching latest release information..."
 VERSION=$(curl --silent "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | sed -E 's/.*"tag_name": "([^"]+)".*/\1/')
 
 if [[ -z "$VERSION" ]]; then
-    echo "Failed to fetch the latest version. Please check your internet connection or the repository."
+    print_error "Failed to fetch the latest version. Please check your internet connection."
     exit 1
 fi
 
 # Remove 'v' prefix if present for comparison
 LATEST_VERSION=${VERSION#v}
 
-echo "Latest available version: $VERSION"
-echo "User home directory: $HOME"
+print_info "Latest available version: $VERSION"
 
-# Detect the operating system
+# Detect the operating system and architecture
 OS=$(uname -s)
 ARCH=$(uname -m)
 
+print_info "Detected system: $OS $ARCH"
+
+# Set installation directory
 INSTALL_DIR="$HOME/.local/bin"
 mkdir -p "$INSTALL_DIR"
 
@@ -48,77 +64,83 @@ export PATH="$INSTALL_DIR:$PATH"
 
 # Check if binary already exists and get its version
 EXISTING_BINARY="$INSTALL_DIR/helix"
-CURRENT_VERSION=""
 if [[ -f "$EXISTING_BINARY" ]]; then
-    echo "Existing binary found at $EXISTING_BINARY"
+    print_info "Existing binary found at $EXISTING_BINARY"
     CURRENT_VERSION=$(get_binary_version "$EXISTING_BINARY")
     if [[ -n "$CURRENT_VERSION" ]]; then
-        echo "Current installed version: $CURRENT_VERSION"
+        print_info "Current installed version: $CURRENT_VERSION"
         
-        # Compare versions (simple string comparison should work for semver)
         if [[ "$CURRENT_VERSION" == "$LATEST_VERSION" ]]; then
-            echo "You already have the latest version ($CURRENT_VERSION) installed."
-            echo "To force reinstall, delete $EXISTING_BINARY and run this script again."
-            
-            # Still verify it works
-            echo "Verifying current installation..."
-            if run_with_timeout 10s helix --version >/dev/null 2>&1; then
-                echo "Helix CLI is working correctly!"
-                exit 0
-            else
-                echo "Current installation appears to be broken. Proceeding with reinstall..."
-            fi
+            print_success "You already have the latest version ($CURRENT_VERSION) installed!"
+            print_info "To force reinstall, delete $EXISTING_BINARY and run this script again."
+            exit 0
         else
-            echo "Updating from version $CURRENT_VERSION to $LATEST_VERSION"
-        fi
-    else
-        echo "Existing binary found but version check failed. Proceeding with reinstall..."
-    fi
-fi
-
-# Ensure that $HOME/.local/bin is in the PATH permanently
-if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
-    echo "Adding $HOME/.local/bin to PATH permanently"
-
-    # Determine shell config file
-    if [[ "$SHELL" == *"bash"* ]]; then
-        SHELL_CONFIG="$HOME/.bashrc"
-    elif [[ "$SHELL" == *"zsh"* ]]; then
-        SHELL_CONFIG="$HOME/.zshrc"
-    fi
-
-    # Add to shell config if not already present
-    if [[ -f "$SHELL_CONFIG" ]]; then
-        if ! grep -q 'export PATH="$HOME/.local/bin:$PATH"' "$SHELL_CONFIG"; then
-            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$SHELL_CONFIG"
+            print_info "Updating from version $CURRENT_VERSION to $LATEST_VERSION"
         fi
     fi
 fi
 
-# Determine the appropriate binary to download
-if [[ "$OS" == "Linux" && "$ARCH" == "x86_64" ]]; then
-    FILE="helix-cli-linux-amd64"
-elif [[ "$OS" == "Linux" && "$ARCH" == "aarch64" ]]; then
-    FILE="helix-cli-linux-arm64"
-elif [[ "$OS" == "Darwin" && "$ARCH" == "arm64" ]]; then
-    FILE="helix-cli-macos-arm64"
-elif [[ "$OS" == "Darwin" && "$ARCH" == "x86_64" ]]; then
-    FILE="helix-cli-macos-amd64"
-else
-    echo "Unsupported system: This installer only works on Linux AMD64 and macOS ARM64"
-    echo "Your system is: $OS $ARCH"
-    exit 1
-fi
+# Determine the appropriate binary to download based on OS and architecture
+case "$OS" in
+    Linux)
+        case "$ARCH" in
+            x86_64)
+                FILE="helix-cli-linux-amd64"
+                ;;
+            aarch64|arm64)
+                FILE="helix-cli-linux-arm64"
+                ;;
+            *)
+                print_error "Unsupported Linux architecture: $ARCH"
+                print_info "Supported architectures: x86_64, aarch64/arm64"
+                exit 1
+                ;;
+        esac
+        ;;
+    Darwin)
+        case "$ARCH" in
+            arm64)
+                FILE="helix-cli-macos-arm64"
+                ;;
+            x86_64)
+                FILE="helix-cli-macos-amd64"
+                ;;
+            *)
+                print_error "Unsupported macOS architecture: $ARCH"
+                print_info "Supported architectures: arm64, x86_64"
+                exit 1
+                ;;
+        esac
+        ;;
+    MINGW*|MSYS*|CYGWIN*|Windows_NT)
+        # Windows support
+        case "$ARCH" in
+            x86_64|AMD64)
+                FILE="helix-cli-windows-amd64.exe"
+                ;;
+            *)
+                print_error "Unsupported Windows architecture: $ARCH"
+                print_info "Supported architectures: x86_64/AMD64"
+                exit 1
+                ;;
+        esac
+        ;;
+    *)
+        print_error "Unsupported operating system: $OS"
+        print_info "Supported systems: Linux, macOS, Windows"
+        exit 1
+        ;;
+esac
 
 # Download the binary
 URL="https://github.com/$REPO/releases/download/$VERSION/$FILE"
-echo "Downloading from $URL"
+print_info "Downloading from: $URL"
 
 # Create a temporary file for download
 TEMP_BINARY=$(mktemp)
-curl -L "$URL" -o "$TEMP_BINARY"
-if [[ $? -ne 0 ]]; then
-    echo "Failed to download the binary"
+if ! curl -L "$URL" -o "$TEMP_BINARY" --fail --silent --show-error; then
+    print_error "Failed to download the binary from $URL"
+    print_info "Please check if the release exists and try again."
     rm -f "$TEMP_BINARY"
     exit 1
 fi
@@ -126,107 +148,60 @@ fi
 # Make it executable
 chmod +x "$TEMP_BINARY"
 
-# Test the downloaded binary with timeout
-echo "Testing downloaded binary..."
-if run_with_timeout 10s "$TEMP_BINARY" --version &> /dev/null; then
-    echo "Downloaded binary is working. Installing..."
-    mv "$TEMP_BINARY" "$INSTALL_DIR/helix"
-else
-    echo "Downloaded binary is incompatible with system or has issues. Falling back to building from source..."
-    rm -f "$TEMP_BINARY"
+# Move to installation directory
+print_info "Installing to $INSTALL_DIR/helix"
+mv "$TEMP_BINARY" "$INSTALL_DIR/helix"
 
-    # Ensure Rust is installed
-    if ! command -v cargo &> /dev/null; then
-        echo "Installing Rust first..."
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-        source "$HOME/.cargo/env"
-    fi
+# Ensure PATH is set up correctly
+print_info "Setting up PATH..."
 
-    # Clone and build from source
-    TMP_DIR=$(mktemp -d)
-    echo "Building from source in $TMP_DIR..."
-    git clone "https://github.com/$REPO.git" "$TMP_DIR"
-    if [[ $? -ne 0 ]]; then
-        echo "Failed to clone repository"
-        rm -rf "$TMP_DIR"
-        exit 1
-    fi
-    
-    cd "$TMP_DIR"
-    git checkout "$VERSION"
-    if [[ $? -ne 0 ]]; then
-        echo "Failed to checkout version $VERSION"
-        cd - > /dev/null
-        rm -rf "$TMP_DIR"
-        exit 1
-    fi
-    
-    echo "Building helix-cli (this may take a while)..."
-    cargo build --release --bin helix
-    if [[ $? -ne 0 ]]; then
-        echo "Failed to build from source"
-        cd - > /dev/null
-        rm -rf "$TMP_DIR"
-        exit 1
-    fi
-    
-    # Test the built binary
-    if run_with_timeout 10s "./target/release/helix" --version &> /dev/null; then
-        mv "target/release/helix" "$INSTALL_DIR/helix"
-        echo "Successfully built and installed from source"
+# Determine shell config file
+SHELL_CONFIG=""
+if [[ "$SHELL" == *"bash"* ]]; then
+    SHELL_CONFIG="$HOME/.bashrc"
+elif [[ "$SHELL" == *"zsh"* ]]; then
+    SHELL_CONFIG="$HOME/.zshrc"
+elif [[ "$SHELL" == *"fish"* ]]; then
+    SHELL_CONFIG="$HOME/.config/fish/config.fish"
+fi
+
+# Add to shell config if not already present
+if [[ -n "$SHELL_CONFIG" ]] && [[ -f "$SHELL_CONFIG" ]]; then
+    if [[ "$SHELL" == *"fish"* ]]; then
+        if ! grep -q 'set -gx PATH $HOME/.local/bin $PATH' "$SHELL_CONFIG"; then
+            echo 'set -gx PATH $HOME/.local/bin $PATH' >> "$SHELL_CONFIG"
+            print_info "Added $HOME/.local/bin to PATH in $SHELL_CONFIG"
+        fi
     else
-        echo "Built binary failed version check"
-        cd - > /dev/null
-        rm -rf "$TMP_DIR"
-        exit 1
+        if ! grep -q 'export PATH="$HOME/.local/bin:$PATH"' "$SHELL_CONFIG"; then
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$SHELL_CONFIG"
+            print_info "Added $HOME/.local/bin to PATH in $SHELL_CONFIG"
+        fi
     fi
-    
-    cd - > /dev/null
-    rm -rf "$TMP_DIR"
 fi
 
-# Verify installation and ensure command is available
-echo "Verifying installation..."
-if run_with_timeout 10s helix --version >/dev/null 2>&1; then
-    INSTALLED_VERSION=$(get_binary_version "$INSTALL_DIR/helix")
-    echo "Installation successful!"
-    echo "Helix CLI version $INSTALLED_VERSION has been installed to $INSTALL_DIR/helix"
-    echo "The 'helix' command is now available in your current shell"
-    if [[ -n "$SHELL_CONFIG" ]]; then
-        echo "For permanent installation, please restart your shell or run:"
-        echo "    source $SHELL_CONFIG"
-    fi
-else
-    echo "Installation failed - binary is not responding to version check."
-    exit 1
+# Final success message
+print_success "Installation completed successfully!"
+print_info "Helix CLI has been installed to: $INSTALL_DIR/helix"
+
+# Try to verify version (but don't fail if it doesn't work)
+INSTALLED_VERSION=$(get_binary_version "$INSTALL_DIR/helix")
+if [[ -n "$INSTALLED_VERSION" ]]; then
+    print_success "Installed version: $INSTALLED_VERSION"
 fi
 
-# Install Rust if needed
-echo "Checking dependencies..."
-if ! command -v cargo &> /dev/null; then
-    echo "Rust/Cargo is not installed. Installing Rust..."
-    if [[ "$OS" == "Linux" ]] || [[ "$OS" == "Darwin" ]]; then
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-        source "$HOME/.cargo/env"
-    elif [[ "$OS" == "Windows_NT" ]]; then
-        curl --proto '=https' --tlsv1.2 -sSf https://win.rustup.rs -o rustup-init.exe
-        ./rustup-init.exe -y
-        rm rustup-init.exe
-    fi
-else
-    echo "Rust/Cargo is already installed."
-fi
+print_info ""
+print_info "Next steps:"
+print_info "1. Restart your terminal or run: source $SHELL_CONFIG"
+print_info "2. Run 'helix --version' to verify the installation"
+print_info ""
+print_info "If you encounter issues:"
+print_info "- On Linux: You may need a newer glibc version. Try updating your system."
+print_info "- On macOS: You may need to allow the binary in System Preferences > Security & Privacy"
+print_info "- On Windows: Run this script in Git Bash or WSL"
+print_info ""
+print_info "Metrics are enabled by default. To disable them, run 'helix metrics --off'"
 
-# Final verification that helix is working
-echo "Final verification..."
-if run_with_timeout 10s helix --version; then
-    echo "Helix CLI is working correctly!"
-else
-    echo "Warning: Helix CLI may not be working correctly."
-    echo "Please try running 'source $SHELL_CONFIG' or restart your terminal."
-    exit 1
-fi
-
-
-echo "Metrics are enabled by default. To disable them, run 'helix metrics --off'"
-echo "Note that metrics are completely anonymous and do not contain any personal information."
+# Exit successfully even if we can't verify the binary runs
+# This prevents the script from trying to build from source
+exit 0

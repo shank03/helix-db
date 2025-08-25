@@ -1,6 +1,7 @@
 use crate::{
     debug_println,
     helix_engine::{
+        storage_core::HelixGraphStorage,
         traversal_core::{
             ops::{
                 bm25::search_bm25::SearchBM25Adapter,
@@ -18,7 +19,6 @@ use crate::{
             },
             traversal_value::{Traversable, TraversalValue},
         },
-        storage_core::HelixGraphStorage,
         types::GraphError,
         vector_core::vector::HVector,
     },
@@ -621,4 +621,59 @@ pub(super) fn _filter_items(
 
     debug_println!("result: {:?}", result);
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use tempfile::TempDir;
+
+    use crate::{
+        helix_engine::{storage_core::version_info::VersionInfo, traversal_core::config},
+        protocol::value::Value,
+        utils::items::Node,
+    };
+
+    use super::*;
+
+    #[test]
+    fn test_filter_items() {
+        let (storage, _temp_dir) = {
+            let temp_dir = TempDir::new().unwrap();
+            let storage = Arc::new(
+                HelixGraphStorage::new(
+                    temp_dir.path().to_str().unwrap(),
+                    config::Config::default(),
+                    VersionInfo::default(),
+                )
+                .unwrap(),
+            );
+            (storage, temp_dir)
+        };
+        let items = (1..101)
+            .map(|i| {
+                TraversalValue::Node(Node {
+                    id: i,
+                    version: 1,
+                    label: "test".to_string(),
+                    properties: Some(HashMap::from([("age".to_string(), Value::I64(i as i64))])),
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let filter = FilterTraversal {
+            properties: Some(vec![vec![FilterProperties {
+                key: "age".to_string(),
+                value: Value::I64(50),
+                operator: Some(Operator::Gt),
+            }]]),
+            filter_traversals: None,
+        };
+
+        let txn = storage.graph_env.read_txn().unwrap();
+
+        let result = _filter_items(Arc::clone(&storage), &txn, items.into_iter(), &filter);
+        assert_eq!(result.len(), 50);
+    }
 }

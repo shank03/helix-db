@@ -14,7 +14,6 @@ use serde::Deserialize;
 use sonic_rs::json;
 use spinners::{Spinner, Spinners};
 use std::{
-    env,
     fmt::Write,
     fs::{self, File, OpenOptions, read_to_string},
     io::{Read, Write as iWrite},
@@ -176,6 +175,11 @@ async fn run() -> ExitCode {
                 if command.cluster.is_some()
                     && (command.path.is_some() || Path::new(&format!("./{DB_DIR}")).is_dir())
                 {
+                    println!(
+                        "{} {}",
+                        "Redeploying cluster".green().bold(),
+                        command.cluster.clone().unwrap()
+                    );
                     match redeploy_helix(
                         command.cluster.clone().unwrap(),
                         code,
@@ -190,9 +194,13 @@ async fn run() -> ExitCode {
                                 ),
                             );
                         }
-                        Err(_) => return ExitCode::FAILURE,
+                        Err(_) => {
+                            println!("{}", "Failed to deploy Helix queries".red().bold());
+                            return ExitCode::FAILURE;
+                        }
                     }
-                    return ExitCode::FAILURE;
+                    println!("{}", "Successfully deployed Helix queries".green().bold());
+                    return ExitCode::SUCCESS;
                 }
 
                 // -- helix deploy --
@@ -229,16 +237,23 @@ async fn run() -> ExitCode {
                                 event(cluster_id, start_time.elapsed().as_secs() as u32),
                             );
                         }
-                        Err(_) => return ExitCode::FAILURE,
+                        Err(_) => {
+                            println!("{}", "Failed to deploy Helix queries".red().bold());
+                            return ExitCode::FAILURE;
+                        }
                     }
-                    return ExitCode::FAILURE;
+                    println!("{}", "Successfully deployed Helix queries".green().bold());
+                    return ExitCode::SUCCESS;
                 }
             } else if let Some(cluster) = command.cluster {
                 match redeploy_helix_remote(cluster.clone(), path, files).await {
                     Ok(_) => {
                         return ExitCode::SUCCESS;
                     }
-                    Err(_) => return ExitCode::FAILURE,
+                    Err(_) => {
+                        println!("{}", "Failed to deploy Helix queries".red().bold());
+                        return ExitCode::FAILURE;
+                    }
                 }
             } else {
                 println!(
@@ -312,7 +327,7 @@ async fn run() -> ExitCode {
                 "local helix-cli version: {local_cli_version}, local helix-db version: {local_helix_version}, remote helix version: {remote_helix_version}",
             );
 
-            if local_helix_version < remote_helix_version {
+            if local_helix_version < remote_helix_version || local_cli_version < remote_helix_version {
                 let mut runner = Command::new("git");
                 runner.arg("reset");
                 runner.arg("--hard");
@@ -372,15 +387,13 @@ async fn run() -> ExitCode {
         }
 
         CommandType::Compile(command) => {
-            let path = if let Some(p) = &command.path {
-                p
-            } else {
-                println!(
-                    "{} '{}'",
-                    "No path provided, defaulting to".yellow().bold(),
-                    DB_DIR.yellow().bold()
-                );
-                DB_DIR
+            let path = match get_path_or_cwd(command.path.as_ref()) {
+                Ok(path) => path,
+                Err(e) => {
+                    println!("{}", "Error: failed to get path".red().bold());
+                    println!("└── {e}");
+                    return ExitCode::FAILURE;
+                }
             };
 
             let output = match &command.output {
@@ -389,7 +402,7 @@ async fn run() -> ExitCode {
             };
 
             let mut sp = Spinner::new(Spinners::Dots9, "Compiling Helix queries".into());
-            let files = match check_and_read_files(path) {
+            let files = match check_and_read_files(&path) {
                 Ok(files) => files,
                 Err(e) => {
                     sp.stop_with_message("Failed to read files".red().bold().to_string());
@@ -408,7 +421,7 @@ async fn run() -> ExitCode {
                 return ExitCode::FAILURE;
             }
 
-            let analyzed_source = match generate(&files, path) {
+            let analyzed_source = match generate(&files, &path) {
                 Ok((_, analyzed_source)) => analyzed_source,
                 Err(e) => {
                     sp.stop_with_message(e.to_string().red().bold().to_string());
@@ -455,23 +468,18 @@ async fn run() -> ExitCode {
         }
 
         CommandType::Check(command) => {
-            let path = match &command.path {
-                Some(path) => PathBuf::from(path),
-                None => env::current_dir().expect("Failed to get current working directory"),
-            };
-
-            let mut sp = Spinner::new(Spinners::Dots9, "Checking Helix queries".into());
-
-            let path_str = match path.to_str() {
-                Some(s) => s,
-                None => {
-                    sp.stop_with_message("Invalid path encoding".red().bold().to_string());
-                    println!("└── Path contains invalid UTF-8 characters: {path:?}");
+            let path = match get_path_or_cwd(command.path.as_ref()) {
+                Ok(path) => path,
+                Err(e) => {
+                    println!("{}", "Error: failed to get path".red().bold());
+                    println!("└── {e}");
                     return ExitCode::FAILURE;
                 }
             };
 
-            let files = match check_and_read_files(path_str) {
+            let mut sp = Spinner::new(Spinners::Dots9, "Checking Helix queries".into());
+
+            let files = match check_and_read_files(&path) {
                 Ok(files) => files,
                 Err(e) => {
                     sp.stop_with_message("Error checking files".red().bold().to_string());
@@ -490,7 +498,7 @@ async fn run() -> ExitCode {
                 return ExitCode::FAILURE;
             }
 
-            match generate(&files, path_str) {
+            match generate(&files, &path) {
                 Ok(_) => {}
                 Err(e) => {
                     sp.stop_with_message("Failed to generate queries".red().bold().to_string());
@@ -514,6 +522,15 @@ async fn run() -> ExitCode {
                     println!("{}", "Cargo is not installed".red().bold());
                     return ExitCode::FAILURE;
                 }
+            }
+
+            if !check_cargo_version() {
+                match Command::new("rustup").arg("update").output() {
+                    Ok(_) => println!("{}", "Updating cargo!".green().bold()),
+                    Err(e) => println!("Error updating cargo! {e}"),
+                }
+            } else {
+                println!("{}", "cargo up-to-date!".green().bold());
             }
 
             match Command::new("git").arg("version").output() {
@@ -604,13 +621,19 @@ async fn run() -> ExitCode {
 
         CommandType::Init(command) => {
             println!("{}", "Initialising Helix project...".bold());
-            let path = match command.path {
-                Some(path) => PathBuf::from(path),
-                None => PathBuf::from(DB_DIR),
-            };
-            let path_str = path.to_str().unwrap();
 
-            match check_and_read_files(path_str) {
+            let path_str = match get_path_or_cwd(command.path.as_ref()) {
+                Ok(path) => path,
+                Err(e) => {
+                    println!("{}", "Error: failed to get path".red().bold());
+                    println!("└── {e}");
+                    return ExitCode::FAILURE;
+                }
+            };
+
+            let path = PathBuf::from(&path_str);
+
+            match check_and_read_files(&path_str) {
                 Ok(files) if !files.is_empty() => {
                     println!(
                         "{} {}",

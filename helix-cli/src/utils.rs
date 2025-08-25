@@ -213,7 +213,7 @@ pub async fn get_remote_helix_version() -> Result<Version, Box<dyn Error>> {
         .text()
         .await?;
 
-    let json: JsonValue = serde_json::from_str(&response)?;
+    let json: JsonValue = sonic_rs::from_str(&response)?;
     let tag_name = json
         .get("tag_name")
         .and_then(|v| v.as_str())
@@ -397,6 +397,19 @@ pub fn get_n_helix_cli() -> Result<(), Box<dyn Error>> {
     }
 
     Ok(())
+}
+
+/// Returns the path or the current working directory if no path is provided
+pub fn get_path_or_cwd(path: Option<&String>) -> Result<String, Box<dyn Error>> {
+    match path {
+        Some(p) => Ok(p.to_string()),
+        None => {
+            let cwd = env::current_dir()?;
+            cwd.to_str()
+                .map(|s| s.to_string())
+                .ok_or_else(|| format!("Path contains invalid UTF-8 characters: {cwd:?}").into())
+        }
+    }
 }
 
 /// Checks if the path contains a schema.hx and config.hx.json file
@@ -783,7 +796,10 @@ pub fn redeploy_helix(
     let iid = instance;
 
     match instance_manager.get_instance(&iid) {
-        Ok(Some(_)) => println!("{}", "Helix instance found!".green().bold()),
+        Ok(Some(instance)) => {
+            println!("{}", "Helix instance found!".green().bold());
+            instance
+        }
         Ok(None) => {
             println!(
                 "{} {}",

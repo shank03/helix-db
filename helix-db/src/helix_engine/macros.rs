@@ -158,7 +158,7 @@ pub mod macros {
             $remapping_vals.insert(
                 $item.id(),
                 ResponseRemapping::new(
-                    vec![($new_name.to_string(), old_value_remapping)],
+                    HashMap::from([($new_name.to_string(), old_value_remapping)]),
                     $should_spread,
                 ),
             );
@@ -180,10 +180,12 @@ pub mod macros {
         ($remapping_vals:expr, $var_name:expr, $should_spread:expr, $new_name:expr => $traversal:expr) => {{
             // TODO: ref?
             // Apply remappings to the nested traversal result
+
             let nested_return_value = ReturnValue::from_traversal_value_array_with_mixin(
                 $traversal,
                 $remapping_vals.borrow_mut(),
             );
+
             let new_remapping = Remapping::new(
                 false,
                 Some($new_name.to_string()),
@@ -192,7 +194,7 @@ pub mod macros {
             $remapping_vals.insert(
                 $var_name.id(),
                 ResponseRemapping::new(
-                    vec![($new_name.to_string(), new_remapping)],
+                    HashMap::from([($new_name.to_string(), new_remapping)]),
                     $should_spread,
                 ),
             );
@@ -220,7 +222,7 @@ pub mod macros {
                 $remapping_vals.insert(
                     $var_name.id(),
                     ResponseRemapping::new(
-                        vec![($field_to_exclude.to_string(), field_to_exclude_remapping)],
+                        HashMap::from([($field_to_exclude.to_string(), field_to_exclude_remapping)]),
                         true,
                     ),
                 );
@@ -244,13 +246,13 @@ pub mod macros {
         ($remapping_vals:expr, $var_name:expr, $should_spread:expr, $field_name:expr =>  $identifier_value:expr) => {{
             let old_value_remapping = Remapping::new(
                 false,
-                Some($field_name.to_string()),
+                None,
                 Some(ReturnValue::from($identifier_value)),
             );
             $remapping_vals.insert(
                 $var_name.id(),
                 ResponseRemapping::new(
-                    vec![($field_name.to_string(), old_value_remapping)],
+                    HashMap::from([($field_name.to_string(), old_value_remapping)]),
                     $should_spread,
                 ),
             );
@@ -272,13 +274,13 @@ pub mod macros {
         ($remapping_vals:expr, $var_name:expr, $should_spread:expr, $field_name:expr => $value:expr) => {{
             let old_value_remapping = Remapping::new(
                 false,
-                Some($field_name.to_string()),
+                None,
                 Some(ReturnValue::from($value)),
             );
             $remapping_vals.insert(
                 $var_name.id(),
                 ResponseRemapping::new(
-                    vec![($field_name.to_string(), old_value_remapping)],
+                    HashMap::from([($field_name.to_string(), old_value_remapping)]),
                     $should_spread,
                 ),
             );
@@ -311,7 +313,7 @@ pub mod macros {
             $remapping_vals.insert(
                 $var_name.id(),
                 ResponseRemapping::new(
-                    vec![($field_name.to_string(), value_remapping)],
+                    HashMap::from([($field_name.to_string(), value_remapping)]),
                     $should_spread,
                 ),
             );
