@@ -21,6 +21,24 @@ impl Display for TraversalRemapping {
     }
 }
 
+/// This is for creating a new field where the result is a single field traversal
+#[derive(Clone)]
+pub struct SingleFieldTraversalRemapping {
+    pub variable_name: String,
+    pub new_field: String,
+    pub new_value: Traversal,
+    pub should_spread: bool,
+}
+impl Display for SingleFieldTraversalRemapping {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "identifier_remapping!(remapping_vals, {}.clone(), {}, \"{}\" => {})",
+            self.variable_name, self.should_spread, self.new_field, self.new_value
+        )
+    }
+}
+
 /// This is used for renaming fields
 #[derive(Clone)]
 pub struct FieldRemapping {
@@ -202,6 +220,7 @@ pub enum RemappingType {
     ClosureFieldRemapping(ClosureFieldRemapping),
     ExcludeField(ExcludeField),
     TraversalRemapping(TraversalRemapping),
+    SingleFieldTraversalRemapping(SingleFieldTraversalRemapping),
     ValueRemapping(ValueRemapping),
     IdentifierRemapping(IdentifierRemapping),
     Exists(ExistsRemapping),
@@ -215,6 +234,7 @@ impl Display for RemappingType {
             RemappingType::ClosureFieldRemapping(r) => write!(f, "{r}"),
             RemappingType::ExcludeField(r) => write!(f, "{r}"),
             RemappingType::TraversalRemapping(r) => write!(f, "{r}"),
+            RemappingType::SingleFieldTraversalRemapping(r) => write!(f, "{r}"),
             RemappingType::ValueRemapping(r) => write!(f, "{r}"),
             RemappingType::IdentifierRemapping(r) => write!(f, "{r}"),
             RemappingType::Exists(r) => write!(f, "{r}"),

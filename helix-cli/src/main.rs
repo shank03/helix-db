@@ -175,6 +175,11 @@ async fn run() -> ExitCode {
                 if command.cluster.is_some()
                     && (command.path.is_some() || Path::new(&format!("./{DB_DIR}")).is_dir())
                 {
+                    println!(
+                        "{} {}",
+                        "Redeploying cluster".green().bold(),
+                        command.cluster.clone().unwrap()
+                    );
                     match redeploy_helix(
                         command.cluster.clone().unwrap(),
                         code,
@@ -189,9 +194,13 @@ async fn run() -> ExitCode {
                                 ),
                             );
                         }
-                        Err(_) => return ExitCode::FAILURE,
+                        Err(_) => {
+                            println!("{}", "Failed to deploy Helix queries".red().bold());
+                            return ExitCode::FAILURE;
+                        }
                     }
-                    return ExitCode::FAILURE;
+                    println!("{}", "Successfully deployed Helix queries".green().bold());
+                    return ExitCode::SUCCESS;
                 }
 
                 // -- helix deploy --
@@ -228,16 +237,23 @@ async fn run() -> ExitCode {
                                 event(cluster_id, start_time.elapsed().as_secs() as u32),
                             );
                         }
-                        Err(_) => return ExitCode::FAILURE,
+                        Err(_) => {
+                            println!("{}", "Failed to deploy Helix queries".red().bold());
+                            return ExitCode::FAILURE;
+                        }
                     }
-                    return ExitCode::FAILURE;
+                    println!("{}", "Successfully deployed Helix queries".green().bold());
+                    return ExitCode::SUCCESS;
                 }
             } else if let Some(cluster) = command.cluster {
                 match redeploy_helix_remote(cluster.clone(), path, files).await {
                     Ok(_) => {
                         return ExitCode::SUCCESS;
                     }
-                    Err(_) => return ExitCode::FAILURE,
+                    Err(_) => {
+                        println!("{}", "Failed to deploy Helix queries".red().bold());
+                        return ExitCode::FAILURE;
+                    }
                 }
             } else {
                 println!(
@@ -311,7 +327,7 @@ async fn run() -> ExitCode {
                 "local helix-cli version: {local_cli_version}, local helix-db version: {local_helix_version}, remote helix version: {remote_helix_version}",
             );
 
-            if local_helix_version < remote_helix_version {
+            if local_helix_version < remote_helix_version || local_cli_version < remote_helix_version {
                 let mut runner = Command::new("git");
                 runner.arg("reset");
                 runner.arg("--hard");
@@ -506,6 +522,15 @@ async fn run() -> ExitCode {
                     println!("{}", "Cargo is not installed".red().bold());
                     return ExitCode::FAILURE;
                 }
+            }
+
+            if !check_cargo_version() {
+                match Command::new("rustup").arg("update").output() {
+                    Ok(_) => println!("{}", "Updating cargo!".green().bold()),
+                    Err(e) => println!("Error updating cargo! {e}"),
+                }
+            } else {
+                println!("{}", "cargo up-to-date!".green().bold());
             }
 
             match Command::new("git").arg("version").output() {

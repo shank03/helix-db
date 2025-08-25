@@ -22,6 +22,8 @@ impl Serialize for Remapping {
 }
 
 impl Remapping {
+    /// To replace existing field with new value, new_name must be set to None, and exclude must be false.
+    /// To rename a field, new_name must be set to the new name, return_value must be set to existing value, and exclude must be false.
     pub fn new(exclude: bool, new_name: Option<String>, return_value: Option<ReturnValue>) -> Self {
         assert!(
             !exclude || (new_name.is_none() || return_value.is_none()),
@@ -37,7 +39,7 @@ impl Remapping {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct ResponseRemapping {
-    pub remappings: Vec<(String, Remapping)>,
+    pub remappings: HashMap<String, Remapping>,
     pub should_spread: bool,
 }
 
@@ -51,7 +53,7 @@ impl Serialize for ResponseRemapping {
 }
 
 impl ResponseRemapping {
-    pub fn new(remappings: Vec<(String, Remapping)>, should_spread: bool) -> Self {
+    pub fn new(remappings: HashMap<String, Remapping>, should_spread: bool) -> Self {
         Self {
             remappings,
             should_spread,

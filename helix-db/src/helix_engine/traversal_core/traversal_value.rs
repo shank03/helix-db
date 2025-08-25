@@ -62,14 +62,20 @@ impl IntoIterator for TraversalValue {
     }
 }
 
+pub enum TraversableType {
+    Value,
+    Vec,
+}
+
 /// A trait for all traversable values in the graph
 ///
 /// This trait is used to define the common methods for all traversable values in the graph so we don't need to write match statements to access id's and properties every time.
 pub trait Traversable {
     fn id(&self) -> u128;
     fn label(&self) -> String;
-    fn check_property(&self, prop: &str) -> Result<Cow<'_,Value>, GraphError>;
+    fn check_property(&self, prop: &str) -> Result<Cow<'_, Value>, GraphError>;
     fn uuid(&self) -> String;
+    fn traversal_type(&self) -> TraversableType;
 }
 
 impl Traversable for TraversalValue {
@@ -86,6 +92,10 @@ impl Traversable for TraversalValue {
                 panic!("Invalid traversal value")
             }
         }
+    }
+
+    fn traversal_type(&self) -> TraversableType {
+        TraversableType::Value
     }
 
     fn uuid(&self) -> String {
@@ -105,12 +115,14 @@ impl Traversable for TraversalValue {
         }
     }
 
-    fn check_property(&self, prop: &str) -> Result<Cow<'_,Value>, GraphError> {
+    fn check_property(&self, prop: &str) -> Result<Cow<'_, Value>, GraphError> {
         match self {
             TraversalValue::Node(node) => node.check_property(prop),
             TraversalValue::Edge(edge) => edge.check_property(prop),
             TraversalValue::Vector(vector) => vector.check_property(prop),
-            _ => Err(GraphError::ConversionError("Invalid traversal value".to_string())),
+            _ => Err(GraphError::ConversionError(
+                "Invalid traversal value".to_string(),
+            )),
         }
     }
 }
@@ -130,9 +142,11 @@ impl Traversable for Vec<TraversalValue> {
         self[0].label()
     }
 
-    fn check_property(&self, prop: &str) -> Result<Cow<'_,Value>, GraphError> {
+    fn check_property(&self, prop: &str) -> Result<Cow<'_, Value>, GraphError> {
         if self.is_empty() {
-            return Err(GraphError::ConversionError("Invalid traversal value".to_string()));
+            return Err(GraphError::ConversionError(
+                "Invalid traversal value".to_string(),
+            ));
         }
         self[0].check_property(prop)
     }
@@ -142,6 +156,10 @@ impl Traversable for Vec<TraversalValue> {
             return "".to_string();
         }
         self[0].uuid()
+    }
+
+    fn traversal_type(&self) -> TraversableType {
+        TraversableType::Vec
     }
 }
 
