@@ -18,6 +18,10 @@ pub struct HelixCli {
 
 #[derive(Debug, Subcommand)]
 pub enum CommandType {
+    /// Docker development instance
+    #[command(name = "dockerdev")]
+    DockerDev(DockerDevCommand),
+
     /// Deploy a Helix project
     Deploy(DeployCommand),
 
@@ -63,10 +67,6 @@ pub enum CommandType {
     /// Create a new key for a cloud cluster
     #[command(name = "create-key")]
     CreateKey { cluster: String },
-
-    /// Docker development instance
-    #[command(name = "dockerdev")]
-    DockerDev(DockerDevCommand),
 }
 
 #[derive(Debug, Args)]
