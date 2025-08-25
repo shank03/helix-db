@@ -43,11 +43,7 @@ impl ReturnValue {
         T: Filterable + Clone,
     {
         if let Some(m) = mixin.remove(item.id()) {
-            if m.should_spread {
-                ReturnValue::from(item).mixin_remapping(m.remappings)
-            } else {
-                ReturnValue::from_traversal_value(item, &m).mixin_remapping(m.remappings)
-            }
+            ReturnValue::from_traversal_value(item, &m).mixin_remapping(m.remappings)
         } else {
             ReturnValue::from(item)
         }
@@ -507,12 +503,9 @@ trait IfPresentThereInsertHere {
 
 impl IfPresentThereInsertHere for HashMap<String, ReturnValue> {
     fn check_and_insert(&mut self, there: &ResponseRemapping, key: String, value: ReturnValue) {
-        // value in mixin
-        // if there.should_spread {
-        //     self.insert(key, value);
-        // } else 
-        
-        if let Some(existing_value) = there.remappings.get(&key)
+        if there.should_spread {
+            self.insert(key, value);
+        } else if let Some(existing_value) = there.remappings.get(&key)
             && !existing_value.exclude
         {
             self.insert(key, value);
