@@ -117,7 +117,10 @@ async fn run() -> ExitCode {
             }
 
             if command.cluster.is_none() && files.is_empty() {
-                println!("{}", "No query files, path, or instance provided!".red().bold());
+                println!(
+                    "{}",
+                    "No query files, path, or instance provided!".red().bold()
+                );
                 return ExitCode::FAILURE;
             }
 
@@ -163,9 +166,7 @@ async fn run() -> ExitCode {
                         error_messages: None,
                     };
 
-                if command.cluster.is_some()
-                    && (command.path.is_some() || Path::new(&format!("./{DB_DIR}")).is_dir())
-                {
+                if command.cluster.is_some() {
                     println!(
                         "{} {}",
                         "Redeploying cluster".green().bold(),
@@ -207,15 +208,32 @@ async fn run() -> ExitCode {
                                 "instead".yellow(),
                             );
                         }
-                        Err(_) => {
-                            println!("{}", "Failed to deploy Helix queries".red().bold());
-                            return ExitCode::FAILURE;
-                        }
+                        port
                     }
-                    println!("{}", "Successfully deployed Helix queries".green().bold());
-                    return ExitCode::SUCCESS;
+                    None => {
+                        println!(
+                            "{} {}",
+                            "No available ports found starting from".red().bold(),
+                            start_port
+                        );
+                        return ExitCode::FAILURE;
+                    }
+                };
+                match deploy_helix(port, code, None, BuildMode::from_release(command.release)) {
+                    Ok(cluster_id) => {
+                        HELIX_METRICS_CLIENT.send_event(
+                            EventType::DeployLocal,
+                            event(cluster_id, start_time.elapsed().as_secs() as u32),
+                        );
+                    }
+                    Err(_) => {
+                        println!("{}", "Failed to deploy Helix queries".red().bold());
+                        return ExitCode::FAILURE;
+                    }
                 }
-                return ExitCode::FAILURE;
+                println!("{}", "Successfully deployed Helix queries".green().bold());
+                return ExitCode::SUCCESS;
+
             } else if let Some(cluster) = command.cluster {
                 match redeploy_helix_remote(cluster.clone(), path, files).await {
                     Ok(_) => {
@@ -298,7 +316,9 @@ async fn run() -> ExitCode {
                 "local helix-cli version: {local_cli_version}, local helix-db version: {local_helix_version}, remote helix version: {remote_helix_version}",
             );
 
-            if local_helix_version < remote_helix_version || local_cli_version < remote_helix_version {
+            if local_helix_version < remote_helix_version
+                || local_cli_version < remote_helix_version
+            {
                 let mut runner = Command::new("git");
                 runner.arg("reset");
                 runner.arg("--hard");
