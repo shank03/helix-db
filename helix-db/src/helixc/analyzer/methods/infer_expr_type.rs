@@ -136,170 +136,190 @@ pub(crate) fn infer_expr_type<'a>(
                     }
                 };
 
+                let default_properties = node_in_schema
+                    .properties
+                    .iter()
+                    .filter_map(|p| p.default_value.clone().map(|v| (p.name.clone(), v)))
+                    .collect::<Vec<(String, GeneratedValue)>>();
+
                 // Validate fields if both type and fields are present
-                if let Some(fields) = &add.fields {
-                    // Get the field set before validation
-                    // TODO: Check field types
-                    let field_set = ctx.node_fields.get(ty.as_str()).cloned();
-                    if let Some(field_set) = field_set {
-                        for (field_name, value) in fields {
-                            if !field_set.contains_key(field_name.as_str()) {
-                                generate_error!(
-                                    ctx,
-                                    original_query,
-                                    add.loc.clone(),
-                                    E202,
-                                    field_name.as_str(),
-                                    "node",
-                                    ty.as_str()
-                                );
-                            }
-                            match value {
-                                ValueType::Identifier { value, loc } => {
-                                    if is_valid_identifier(
+                let (properties, secondary_indices) = match &add.fields {
+                    Some(fields) => {
+                        // Get the field set before validation
+                        // TODO: Check field types
+                        let field_set = ctx.node_fields.get(ty.as_str()).cloned();
+                        if let Some(field_set) = field_set {
+                            for (field_name, value) in fields {
+                                if !field_set.contains_key(field_name.as_str()) {
+                                    generate_error!(
                                         ctx,
                                         original_query,
-                                        loc.clone(),
-                                        value.as_str(),
-                                    ) && !scope.contains_key(value.as_str())
-                                    {
-                                        generate_error!(
-                                            ctx,
-                                            original_query,
-                                            loc.clone(),
-                                            E301,
-                                            value.as_str()
-                                        );
-                                    };
+                                        add.loc.clone(),
+                                        E202,
+                                        field_name.as_str(),
+                                        "node",
+                                        ty.as_str()
+                                    );
                                 }
-                                ValueType::Literal { value, loc } => {
-                                    // check against type
-                                    let field_type = ctx
-                                        .node_fields
-                                        .get(ty.as_str())
-                                        .unwrap()
-                                        .get(field_name.as_str())
-                                        .unwrap()
-                                        .field_type
-                                        .clone();
-                                    if field_type != *value {
-                                        generate_error!(
-                                            ctx,
-                                            original_query,
-                                            loc.clone(),
-                                            E205,
-                                            value.as_str(),
-                                            &field_type.to_string(),
-                                            "node",
-                                            ty.as_str()
-                                        );
-                                    }
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-                    let mut properties: HashMap<String, GeneratedValue> = fields
-                        .iter()
-                        .map(|(field_name, value)| {
-                            (
-                                field_name.clone(),
                                 match value {
+                                    ValueType::Identifier { value, loc } => {
+                                        if is_valid_identifier(
+                                            ctx,
+                                            original_query,
+                                            loc.clone(),
+                                            value.as_str(),
+                                        ) && !scope.contains_key(value.as_str())
+                                        {
+                                            generate_error!(
+                                                ctx,
+                                                original_query,
+                                                loc.clone(),
+                                                E301,
+                                                value.as_str()
+                                            );
+                                        };
+                                    }
                                     ValueType::Literal { value, loc } => {
-                                        match ctx
+                                        // check against type
+                                        let field_type = ctx
                                             .node_fields
                                             .get(ty.as_str())
                                             .unwrap()
                                             .get(field_name.as_str())
                                             .unwrap()
                                             .field_type
-                                            == FieldType::Date
-                                        {
-                                            true => match Date::new(value) {
-                                                Ok(date) => GeneratedValue::Literal(
-                                                    GenRef::Literal(date.to_rfc3339()),
-                                                ),
-                                                Err(_) => {
-                                                    generate_error!(
-                                                        ctx,
-                                                        original_query,
-                                                        loc.clone(),
-                                                        E501,
-                                                        value.as_str()
-                                                    );
-                                                    GeneratedValue::Unknown
-                                                }
-                                            },
-                                            false => {
-                                                GeneratedValue::Literal(GenRef::from(value.clone()))
-                                            }
+                                            .clone();
+                                        if field_type != *value {
+                                            generate_error!(
+                                                ctx,
+                                                original_query,
+                                                loc.clone(),
+                                                E205,
+                                                value.as_str(),
+                                                &field_type.to_string(),
+                                                "node",
+                                                ty.as_str()
+                                            );
                                         }
                                     }
-                                    ValueType::Identifier { value, loc } => {
-                                        is_valid_identifier(
-                                            ctx,
-                                            original_query,
-                                            loc.clone(),
-                                            value.as_str(),
-                                        );
-                                        gen_identifier_or_param(original_query, value, true, false)
-                                    }
-                                    v => {
-                                        generate_error!(
-                                            ctx,
-                                            original_query,
-                                            add.loc.clone(),
-                                            E206,
-                                            &v.to_string()
-                                        );
-                                        GeneratedValue::Unknown
-                                    }
-                                },
-                            )
-                        })
-                        .collect();
-
-                    let default_properties = node_in_schema
-                        .properties
-                        .iter()
-                        .filter_map(|p| p.default_value.clone().map(|v| (p.name.clone(), v)))
-                        .collect::<Vec<(String, GeneratedValue)>>();
-
-                    for (field_name, default_value) in default_properties {
-                        if !properties.contains_key(field_name.as_str()) {
-                            properties.insert(field_name, default_value);
+                                    _ => {}
+                                }
+                            }
                         }
-                    }
-
-                    let secondary_indices = {
-                        let secondary_indices = node_in_schema
-                            .properties
+                        let mut properties = fields
                             .iter()
-                            .filter_map(|p| {
-                                matches!(p.is_index, FieldPrefix::Index).then_some(p.name.clone())
+                            .map(|(field_name, value)| {
+                                (
+                                    field_name.clone(),
+                                    match value {
+                                        ValueType::Literal { value, loc } => {
+                                            match ctx
+                                                .node_fields
+                                                .get(ty.as_str())
+                                                .unwrap()
+                                                .get(field_name.as_str())
+                                                .unwrap()
+                                                .field_type
+                                                == FieldType::Date
+                                            {
+                                                true => match Date::new(value) {
+                                                    Ok(date) => GeneratedValue::Literal(
+                                                        GenRef::Literal(date.to_rfc3339()),
+                                                    ),
+                                                    Err(_) => {
+                                                        generate_error!(
+                                                            ctx,
+                                                            original_query,
+                                                            loc.clone(),
+                                                            E501,
+                                                            value.as_str()
+                                                        );
+                                                        GeneratedValue::Unknown
+                                                    }
+                                                },
+                                                false => GeneratedValue::Literal(GenRef::from(
+                                                    value.clone(),
+                                                )),
+                                            }
+                                        }
+                                        ValueType::Identifier { value, loc } => {
+                                            is_valid_identifier(
+                                                ctx,
+                                                original_query,
+                                                loc.clone(),
+                                                value.as_str(),
+                                            );
+                                            gen_identifier_or_param(
+                                                original_query,
+                                                value,
+                                                true,
+                                                false,
+                                            )
+                                        }
+                                        v => {
+                                            generate_error!(
+                                                ctx,
+                                                original_query,
+                                                add.loc.clone(),
+                                                E206,
+                                                &v.to_string()
+                                            );
+                                            GeneratedValue::Unknown
+                                        }
+                                    },
+                                )
                             })
-                            .collect::<Vec<_>>();
-                        match secondary_indices.is_empty() {
-                            true => None,
-                            false => Some(secondary_indices),
+                            .collect::<HashMap<String, GeneratedValue>>();
+
+                        for (field_name, default_value) in default_properties {
+                            if !properties.contains_key(field_name.as_str()) {
+                                properties.insert(field_name, default_value);
+                            }
                         }
-                    };
 
-                    let add_n = AddN {
-                        label,
-                        properties: Some(properties.into_iter().collect()),
-                        secondary_indices,
-                    };
+                        let secondary_indices = {
+                            let secondary_indices = node_in_schema
+                                .properties
+                                .iter()
+                                .filter_map(|p| {
+                                    matches!(p.is_index, FieldPrefix::Index)
+                                        .then_some(p.name.clone())
+                                })
+                                .collect::<Vec<_>>();
+                            match secondary_indices.is_empty() {
+                                true => None,
+                                false => Some(secondary_indices),
+                            }
+                        };
 
-                    let stmt = GeneratedStatement::Traversal(GeneratedTraversal {
-                        source_step: Separator::Period(SourceStep::AddN(add_n)),
-                        steps: vec![],
-                        traversal_type: TraversalType::Mut,
-                        should_collect: ShouldCollect::ToVal,
-                    });
-                    gen_query.is_mut = true;
-                    return (Type::Node(Some(ty.to_string())), Some(stmt));
-                }
+                        (properties, secondary_indices)
+                    }
+                    None => (
+                        default_properties.into_iter().fold(
+                            HashMap::new(),
+                            |mut acc, (field_name, default_value)| {
+                                acc.insert(field_name, default_value);
+                                acc
+                            },
+                        ),
+                        None,
+                    ),
+                };
+
+                let add_n = AddN {
+                    label,
+                    properties: Some(properties.into_iter().collect()),
+                    secondary_indices,
+                };
+
+                let stmt = GeneratedStatement::Traversal(GeneratedTraversal {
+                    source_step: Separator::Period(SourceStep::AddN(add_n)),
+                    steps: vec![],
+                    traversal_type: TraversalType::Mut,
+                    should_collect: ShouldCollect::ToVal,
+                });
+                gen_query.is_mut = true;
+                return (Type::Node(Some(ty.to_string())), Some(stmt));
             }
             generate_error!(
                 ctx,
