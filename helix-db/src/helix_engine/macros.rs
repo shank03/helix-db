@@ -246,7 +246,7 @@ pub mod macros {
         ($remapping_vals:expr, $var_name:expr, $should_spread:expr, $field_name:expr =>  $identifier_value:expr) => {{
             let old_value_remapping = Remapping::new(
                 false,
-                Some($field_name.to_string()),
+                None,
                 Some(ReturnValue::from($identifier_value)),
             );
             $remapping_vals.insert(
@@ -274,7 +274,7 @@ pub mod macros {
         ($remapping_vals:expr, $var_name:expr, $should_spread:expr, $field_name:expr => $value:expr) => {{
             let old_value_remapping = Remapping::new(
                 false,
-                Some($field_name.to_string()),
+                None,
                 Some(ReturnValue::from($value)),
             );
             $remapping_vals.insert(
