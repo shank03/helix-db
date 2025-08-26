@@ -15,7 +15,6 @@ pub struct DockerDevInstance {
     pub port: u16,
     pub started_at: String,
     pub status: DockerDevStatus,
-    pub log_file: PathBuf,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -27,7 +26,6 @@ pub enum DockerDevStatus {
 
 pub struct DockerDevManager {
     dockerdev_dir: PathBuf,
-    logs_dir: PathBuf,
     instance_file: PathBuf,
     helix_container_dir: PathBuf,
 }
@@ -46,7 +44,6 @@ impl DockerDevManager {
         let home_dir = dirs::home_dir().expect("Could not find home directory");
         let helix_dir = home_dir.join(".helix");
         let dockerdev_dir = helix_dir.join("dockerdev");
-        let logs_dir = dockerdev_dir.join("logs");
 
         // Check if helix is installed and get the container directory
         let helix_container_dir = match check_helix_installation() {
@@ -62,11 +59,9 @@ impl DockerDevManager {
         // Create necessary directories
         fs::create_dir_all(&helix_dir)?;
         fs::create_dir_all(&dockerdev_dir)?;
-        fs::create_dir_all(&logs_dir)?;
 
         Ok(Self {
             dockerdev_dir: dockerdev_dir.clone(),
-            logs_dir,
             instance_file: dockerdev_dir.join("dockerdev_instance.json"),
             helix_container_dir,
         })
@@ -155,10 +150,6 @@ impl DockerDevManager {
         // Compile queries from current directory and emplace them in container directory
         self.compile_and_emplace_queries()?;
 
-        // Create log file with timestamp in the mounted directory
-        let timestamp = Local::now().format("%Y%m%d_%H%M%S").to_string();
-        let log_file = self.logs_dir.join(format!("dockerdev-{timestamp}.log"));
-
         println!(
             "{}",
             format!("Starting Helix development container on port {port}...")
@@ -234,7 +225,6 @@ impl DockerDevManager {
             port,
             started_at: Local::now().to_rfc3339(),
             status: DockerDevStatus::Running,
-            log_file,
         };
 
         self.save_instance(&instance)?;
@@ -340,7 +330,6 @@ impl DockerDevManager {
                     );
                     println!("Started: {}", instance.started_at);
                     println!("Host mount: {}", self.dockerdev_dir.display());
-                    println!("Container logs: {}", self.logs_dir.display());
                 } else {
                     println!(
                         "{}",
