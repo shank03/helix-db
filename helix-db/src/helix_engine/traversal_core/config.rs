@@ -90,22 +90,23 @@ impl Config {
 
     pub fn init_config() -> String {
         r#"
-    {
-        "vector_config": {
-            "m": 16,
-            "ef_construction": 128,
-            "ef_search": 768
-        },
-        "graph_config": {
-            "secondary_indices": []
-        },
-        "db_max_size_gb": 10,
-        "mcp": true,
-        "bm25": true,
-        "embedding_model": "text-embedding-ada-002",
-        "graphvis_node_label": ""
-    }
-    "#
+{
+	"vector_config": {
+		"m": 16,
+		"ef_construction": 128,
+		"ef_search": 768
+	},
+	"graph_config": {
+		"secondary_indices": []
+	},
+	"db_max_size_gb": 10,
+	"mcp": true,
+	"bm25": true,
+	"embedding_model": "text-embedding-ada-002",
+	"graphvis_node_label": ""
+}
+        "#
+        .trim()
         .to_string()
     }
 
@@ -198,7 +199,14 @@ impl fmt::Display for Config {
             "secondary_indices: {},",
             match SECONDARY_INDICES.get() {
                 Some(indices) => {
-                    format!("Some(vec![{}])", indices.iter().map(|i| format!("\"{i}\".to_string()")).collect::<Vec<_>>().join(", "))
+                    format!(
+                        "Some(vec![{}])",
+                        indices
+                            .iter()
+                            .map(|i| format!("\"{i}\".to_string()"))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
                 }
                 None => "None".to_string(),
             }
