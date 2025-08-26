@@ -879,10 +879,16 @@ pub(crate) fn infer_expr_type<'a>(
                             gen_traversal
                                 .steps
                                 .push(Separator::Period(GeneratedStep::Where(match expr {
-                                    BoExp::Exists(mut tr) => {
-                                        tr.should_collect = ShouldCollect::No;
+                                    BoExp::Exists {
+                                        mut traversal,
+                                        negated,
+                                    } => {
+                                        traversal.should_collect = ShouldCollect::No;
                                         Where::Ref(WhereRef {
-                                            expr: BoExp::Exists(tr),
+                                            expr: BoExp::Exists {
+                                                traversal,
+                                                negated,
+                                            },
                                         })
                                     }
                                     _ => Where::Ref(WhereRef { expr }),
@@ -933,10 +939,16 @@ pub(crate) fn infer_expr_type<'a>(
                     match stmt.unwrap() {
                         GeneratedStatement::BoExp(expr) => {
                             match expr {
-                                BoExp::Exists(mut tr) => {
+                                BoExp::Exists {
+                                    mut traversal,
+                                    negated,
+                                } => {
                                     // keep as iterator
-                                    tr.should_collect = ShouldCollect::No;
-                                    BoExp::Exists(tr)
+                                    traversal.should_collect = ShouldCollect::No;
+                                    BoExp::Exists {
+                                        traversal,
+                                        negated,
+                                    }
                                 }
                                 _ => expr,
                             }
@@ -969,9 +981,15 @@ pub(crate) fn infer_expr_type<'a>(
                     );
                     match stmt.unwrap() {
                         GeneratedStatement::BoExp(expr) => match expr {
-                            BoExp::Exists(mut tr) => {
-                                tr.should_collect = ShouldCollect::No;
-                                BoExp::Exists(tr)
+                            BoExp::Exists {
+                                mut traversal,
+                                negated,
+                            } => {
+                                traversal.should_collect = ShouldCollect::No;
+                                BoExp::Exists {
+                                    traversal,
+                                    negated,
+                                }
                             }
                             _ => expr,
                         },
@@ -986,10 +1004,17 @@ pub(crate) fn infer_expr_type<'a>(
             )
         }
         Exists(expr) => {
-            let (_, stmt) = infer_expr_type(ctx, expr, scope, original_query, parent_ty, gen_query);
+            let (_, stmt) = infer_expr_type(
+                ctx,
+                &expr.expr,
+                scope,
+                original_query,
+                parent_ty,
+                gen_query,
+            );
             assert!(stmt.is_some());
             assert!(matches!(stmt, Some(GeneratedStatement::Traversal(_))));
-            let expr = match stmt.unwrap() {
+            let traversal = match stmt.unwrap() {
                 GeneratedStatement::Traversal(mut tr) => {
                     // TODO: FIX VALUE HERE
                     let source_variable = match tr.source_step.inner() {
@@ -1004,7 +1029,10 @@ pub(crate) fn infer_expr_type<'a>(
             };
             (
                 Type::Boolean,
-                Some(GeneratedStatement::BoExp(BoExp::Exists(expr))),
+                Some(GeneratedStatement::BoExp(BoExp::Exists {
+                    traversal,
+                    negated: expr.negated,
+                })),
             )
         }
         Empty => (Type::Unknown, Some(GeneratedStatement::Empty)),

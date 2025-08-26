@@ -100,13 +100,18 @@ impl Display for Contains {
 }
 
 
+
+
 /// Boolean expression is used for a traversal or set of traversals wrapped in AND/OR
 /// that resolve to a boolean value
 #[derive(Clone)]
 pub enum BoExp {
     And(Vec<BoExp>),
     Or(Vec<BoExp>),
-    Exists(Traversal),
+    Exists {
+        traversal: Traversal,
+        negated: bool,
+    },
     Expr(Traversal),
 }
 impl Display for BoExp {
@@ -126,7 +131,13 @@ impl Display for BoExp {
                     .collect::<Vec<_>>();
                 write!(f, "{}", tr.join(" || "))
             }
-            BoExp::Exists(traversal) => write!(f, "Exist::exists(&mut {traversal})"),
+            BoExp::Exists { traversal, negated } => {
+                if *negated {
+                    write!(f, "!Exist::exists(&mut {traversal})")
+                } else {
+                    write!(f, "Exist::exists(&mut {traversal})")
+                }
+            }
             BoExp::Expr(traversal) => write!(f, "{traversal}"),
         }
     }

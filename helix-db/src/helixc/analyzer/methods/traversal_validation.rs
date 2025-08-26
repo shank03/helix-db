@@ -428,10 +428,13 @@ pub(crate) fn validate_traversal<'a>(
                             gen_traversal
                                 .steps
                                 .push(Separator::Period(GeneratedStep::Where(match expr {
-                                    BoExp::Exists(mut tr) => {
-                                        tr.should_collect = ShouldCollect::No;
+                                    BoExp::Exists {
+                                        mut traversal,
+                                        negated,
+                                    } => {
+                                        traversal.should_collect = ShouldCollect::No;
                                         Where::Ref(WhereRef {
-                                            expr: BoExp::Exists(tr),
+                                            expr: BoExp::Exists { traversal, negated },
                                         })
                                     }
                                     _ => Where::Ref(WhereRef { expr }),
@@ -579,10 +582,13 @@ pub(crate) fn validate_traversal<'a>(
                         gen_traversal
                             .steps
                             .push(Separator::Period(GeneratedStep::Where(match expr {
-                                BoExp::Exists(mut tr) => {
-                                    tr.should_collect = ShouldCollect::No;
+                                BoExp::Exists {
+                                    mut traversal,
+                                    negated,
+                                } => {
+                                    traversal.should_collect = ShouldCollect::No;
                                     Where::Ref(WhereRef {
-                                        expr: BoExp::Exists(tr),
+                                        expr: BoExp::Exists { traversal, negated },
                                     })
                                 }
                                 _ => Where::Ref(WhereRef { expr }),
