@@ -1,10 +1,13 @@
 use chrono::Local;
 use helix_db::utils::styled_string::StyledString;
 use serde::{Deserialize, Serialize};
+use std::fmt::Write;
 use std::fs;
 use std::io;
 use std::path::PathBuf;
 use std::process::Command;
+
+use crate::utils::{check_and_read_files, check_helix_installation, generate, get_path_or_cwd};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DockerDevInstance {
@@ -26,6 +29,7 @@ pub struct DockerDevManager {
     dockerdev_dir: PathBuf,
     logs_dir: PathBuf,
     instance_file: PathBuf,
+    helix_container_dir: PathBuf,
 }
 
 const CONTAINER_NAME: &str = "helix-dockerdev";
@@ -44,6 +48,17 @@ impl DockerDevManager {
         let dockerdev_dir = helix_dir.join("dockerdev");
         let logs_dir = dockerdev_dir.join("logs");
 
+        // Check if helix is installed and get the container directory
+        let helix_container_dir = match check_helix_installation() {
+            Some(container_path) => container_path,
+            None => {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    "Helix is not installed. Please run 'helix install' first.",
+                ));
+            }
+        };
+
         // Create necessary directories
         fs::create_dir_all(&helix_dir)?;
         fs::create_dir_all(&dockerdev_dir)?;
@@ -53,6 +68,7 @@ impl DockerDevManager {
             dockerdev_dir: dockerdev_dir.clone(),
             logs_dir,
             instance_file: dockerdev_dir.join("dockerdev_instance.json"),
+            helix_container_dir,
         })
     }
 
@@ -95,11 +111,11 @@ impl DockerDevManager {
             }
         };
 
-        // Set environment variables and working directory
+        // Set environment variables and working directory to the installed helix-container
         if let Some(home) = dirs::home_dir() {
             command.env("HOME", home);
         }
-        command.current_dir("helix-container");
+        command.current_dir(&self.helix_container_dir);
 
         Ok(command)
     }
@@ -130,10 +146,14 @@ impl DockerDevManager {
             ));
         }
 
-        // Verify docker-compose.yml exists
-        if !PathBuf::from("helix-container/docker-compose.yml").exists() {
-            return Err("docker-compose.yml not found in helix-container directory. Please ensure you're running from the project root.".to_string());
+        // Verify docker-compose.yml exists in the installed helix-container directory
+        let compose_file = self.helix_container_dir.join("docker-compose.yml");
+        if !compose_file.exists() {
+            return Err("docker-compose.yml not found in installed helix-container directory. Please run 'helix update' to ensure helix is properly installed.".to_string());
         }
+
+        // Compile queries from current directory and emplace them in container directory
+        self.compile_and_emplace_queries()?;
 
         // Create log file with timestamp in the mounted directory
         let timestamp = Local::now().format("%Y%m%d_%H%M%S").to_string();
@@ -503,5 +523,91 @@ impl DockerDevManager {
             Ok(ComposeCommand::DockerCompose) => Ok(()),
             Err(e) => Err(e),
         }
+    }
+
+    fn compile_and_emplace_queries(&self) -> Result<(), String> {
+        // Get current directory path
+        let current_path =
+            get_path_or_cwd(None).map_err(|e| format!("Failed to get current directory: {}", e))?;
+
+        // Check if current directory has queries
+        let files = match check_and_read_files(&current_path) {
+            Ok(files) if !files.is_empty() => {
+                println!(
+                    "{}",
+                    "Found queries in current directory, compiling..."
+                        .blue()
+                        .bold()
+                );
+                files
+            }
+            Ok(_) => {
+                println!(
+                    "{}",
+                    "No queries found in current directory, using existing container queries"
+                        .yellow()
+                        .bold()
+                );
+                return Ok(());
+            }
+            Err(e) => {
+                return Err(format!("Error checking files in current directory: {}", e));
+            }
+        };
+
+        // Compile queries
+        let (_code, analyzed_source) = match generate(&files, &current_path) {
+            Ok((code, analyzer_source)) => (code, analyzer_source),
+            Err(e) => {
+                return Err(format!("Error compiling queries: {}", e));
+            }
+        };
+
+        println!("{}", "Successfully compiled queries".green().bold());
+
+        // Write compiled queries to container directory
+        let queries_file_path = self.helix_container_dir.join("src/queries.rs");
+        let mut generated_rust_code = String::new();
+
+        match write!(&mut generated_rust_code, "{}", analyzed_source) {
+            Ok(_) => println!("{}", "Successfully transpiled queries".green().bold()),
+            Err(e) => {
+                return Err(format!("Failed to transpile queries: {}", e));
+            }
+        }
+
+        match fs::write(&queries_file_path, generated_rust_code) {
+            Ok(_) => println!("{}", "Successfully wrote queries file".green().bold()),
+            Err(e) => {
+                return Err(format!("Failed to write queries file: {}", e));
+            }
+        }
+
+        // Copy config and schema files
+        let config_source = PathBuf::from(&current_path).join("config.hx.json");
+        let config_dest = self.helix_container_dir.join("src/config.hx.json");
+
+        if config_source.exists() {
+            match fs::copy(&config_source, &config_dest) {
+                Ok(_) => println!("{}", "Successfully copied config file".green().bold()),
+                Err(e) => {
+                    return Err(format!("Failed to copy config file: {}", e));
+                }
+            }
+        }
+
+        let schema_source = PathBuf::from(&current_path).join("schema.hx");
+        let schema_dest = self.helix_container_dir.join("src/schema.hx");
+
+        if schema_source.exists() {
+            match fs::copy(&schema_source, &schema_dest) {
+                Ok(_) => println!("{}", "Successfully copied schema file".green().bold()),
+                Err(e) => {
+                    return Err(format!("Failed to copy schema file: {}", e));
+                }
+            }
+        }
+
+        Ok(())
     }
 }

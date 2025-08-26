@@ -14,12 +14,6 @@ services:
       - HELIX_DATA_DIR=/usr/src/app/data
       - HELIX_DAEMON=1
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:6969/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 
 volumes:
   helix-dev-data:
