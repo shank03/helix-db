@@ -2273,6 +2273,9 @@ impl HelixParser {
                 if negated {
                     inner.next();
                 }
+                let traversal = inner
+                    .next()
+                    .ok_or_else(|| ParserError::from("Missing traversal"))?;
                 Ok(Expression {
                     loc: loc.clone(),
                     expr: ExpressionType::Exists(ExistsExpression {
@@ -2281,7 +2284,7 @@ impl HelixParser {
                         expr: Box::new(Expression {
                             loc: loc.clone(),
                             expr: ExpressionType::Traversal(Box::new(
-                                self.parse_anon_traversal(inner.next().unwrap())?,
+                                self.parse_anon_traversal(traversal)?,
                             )),
                         }),
                     }),
@@ -2329,6 +2332,9 @@ impl HelixParser {
                 if negated {
                     inner.next();
                 }
+                let traversal = inner
+                    .next()
+                    .ok_or_else(|| ParserError::from("Missing traversal"))?;
                 Ok(Expression {
                     loc: loc.clone(),
                     expr: ExpressionType::Exists(ExistsExpression {
@@ -2336,9 +2342,14 @@ impl HelixParser {
                         negated,
                         expr: Box::new(Expression {
                             loc: loc.clone(),
-                            expr: ExpressionType::Traversal(Box::new(
-                                self.parse_anon_traversal(inner.next().unwrap())?,
-                            )),
+                            expr: ExpressionType::Traversal(Box::new(match traversal.as_rule() {
+                                Rule::anonymous_traversal => {
+                                    self.parse_anon_traversal(traversal)?
+                                }
+                                Rule::id_traversal => self.parse_traversal(traversal)?,
+                                Rule::traversal => self.parse_traversal(traversal)?,
+                                _ => unreachable!(),
+                            })),
                         }),
                     }),
                 })
