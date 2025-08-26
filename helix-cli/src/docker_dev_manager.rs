@@ -67,6 +67,72 @@ impl DockerDevManager {
         })
     }
 
+    fn setup_persistent_volume(&self) -> Result<(), String> {
+        // Get the root helix-db project directory (parent of helix-container)
+        let project_root = self
+            .helix_container_dir
+            .parent()
+            .ok_or("Could not find helix-db project root")?;
+
+        // Check if persistent volume already has the project structure
+        let project_marker = self
+            .dockerdev_dir
+            .join("helix-container")
+            .join("Cargo.toml");
+
+        if !project_marker.exists() {
+            println!(
+                "{}",
+                "Setting up persistent volume with project structure..."
+                    .blue()
+                    .bold()
+            );
+
+            // Copy the entire project structure to dockerdev directory
+            self.copy_dir_recursive(project_root, &self.dockerdev_dir)
+                .map_err(|e| format!("Failed to copy project structure: {}", e))?;
+
+            println!(
+                "{}",
+                "Project structure copied to persistent volume"
+                    .green()
+                    .bold()
+            );
+        }
+
+        // Ensure data directory exists
+        let data_dir = self.dockerdev_dir.join("data");
+        fs::create_dir_all(&data_dir)
+            .map_err(|e| format!("Failed to create data directory: {}", e))?;
+
+        Ok(())
+    }
+
+    fn copy_dir_recursive(&self, src: &std::path::Path, dst: &std::path::Path) -> io::Result<()> {
+        fs::create_dir_all(dst)?;
+
+        for entry in fs::read_dir(src)? {
+            let entry = entry?;
+            let src_path = entry.path();
+            let dst_path = dst.join(entry.file_name());
+
+            // Skip target directory and .git directory to avoid copying large unnecessary files
+            if let Some(file_name) = entry.file_name().to_str() {
+                if file_name == "target" || file_name == ".git" {
+                    continue;
+                }
+            }
+
+            if src_path.is_dir() {
+                self.copy_dir_recursive(&src_path, &dst_path)?;
+            } else {
+                fs::copy(&src_path, &dst_path)?;
+            }
+        }
+
+        Ok(())
+    }
+
     fn get_compose_command(&self) -> Result<ComposeCommand, String> {
         // Try docker-compose first
         let compose_check = Command::new("docker-compose").args(["--version"]).output();
@@ -106,11 +172,11 @@ impl DockerDevManager {
             }
         };
 
-        // Set environment variables and working directory to the installed helix-container
+        // Set environment variables and working directory to the helix-container subdirectory
         if let Some(home) = dirs::home_dir() {
             command.env("HOME", home);
         }
-        command.current_dir(&self.helix_container_dir);
+        command.current_dir(&self.dockerdev_dir.join("helix-container"));
 
         Ok(command)
     }
@@ -141,13 +207,18 @@ impl DockerDevManager {
             ));
         }
 
-        // Verify docker-compose.yml exists in the installed helix-container directory
-        let compose_file = self.helix_container_dir.join("docker-compose.yml");
+        // Setup persistent volume with project structure
+        self.setup_persistent_volume()?;
+
+        // Verify docker-compose.yml exists in the persistent volume
+        let compose_file = self
+            .dockerdev_dir
+            .join("helix-container/docker-compose.yml");
         if !compose_file.exists() {
-            return Err("docker-compose.yml not found in installed helix-container directory. Please run 'helix update' to ensure helix is properly installed.".to_string());
+            return Err("docker-compose.yml not found in persistent volume. Please run 'helix dockerdev delete' and try again.".to_string());
         }
 
-        // Compile queries from current directory and emplace them in container directory
+        // Compile queries from current directory and emplace them in persistent volume
         self.compile_and_emplace_queries()?;
 
         println!(
@@ -172,14 +243,6 @@ impl DockerDevManager {
             }
 
             println!("{}", "Container started in background mode".green().bold());
-            println!(
-                "{}",
-                format!(
-                    "Container logs accessible in: {}",
-                    self.dockerdev_dir.display()
-                )
-                .normal()
-            );
             println!("{}", "View logs with: helix dockerdev logs".normal());
             println!(
                 "{}",
@@ -195,14 +258,6 @@ impl DockerDevManager {
                 "Container started in foreground mode. Press Ctrl+C to stop."
                     .green()
                     .bold()
-            );
-            println!(
-                "{}",
-                format!(
-                    "Container logs accessible in: {}",
-                    self.dockerdev_dir.display()
-                )
-                .normal()
             );
             println!(
                 "{}",
@@ -300,10 +355,15 @@ impl DockerDevManager {
                 .map_err(|e| format!("Failed to remove instance file: {e}"))?;
         }
 
-        // Optionally clean up the dockerdev directory
+        // Clean up the persistent volume directory
+        if self.dockerdev_dir.exists() {
+            std::fs::remove_dir_all(&self.dockerdev_dir)
+                .map_err(|e| format!("Failed to remove persistent volume directory: {e}"))?;
+        }
+
         println!(
             "{}",
-            "Docker development instance and Docker volumes removed"
+            "Docker development instance, volumes, and persistent data removed"
                 .green()
                 .bold()
         );
@@ -551,8 +611,8 @@ impl DockerDevManager {
 
         println!("{}", "Successfully compiled queries".green().bold());
 
-        // Write compiled queries to container directory
-        let queries_file_path = self.helix_container_dir.join("src/queries.rs");
+        // Write compiled queries to persistent volume container directory
+        let queries_file_path = self.dockerdev_dir.join("helix-container/src/queries.rs");
         let mut generated_rust_code = String::new();
 
         match write!(&mut generated_rust_code, "{}", analyzed_source) {
@@ -571,7 +631,9 @@ impl DockerDevManager {
 
         // Copy config and schema files
         let config_source = PathBuf::from(&current_path).join("config.hx.json");
-        let config_dest = self.helix_container_dir.join("src/config.hx.json");
+        let config_dest = self
+            .dockerdev_dir
+            .join("helix-container/src/config.hx.json");
 
         if config_source.exists() {
             match fs::copy(&config_source, &config_dest) {
@@ -583,7 +645,7 @@ impl DockerDevManager {
         }
 
         let schema_source = PathBuf::from(&current_path).join("schema.hx");
-        let schema_dest = self.helix_container_dir.join("src/schema.hx");
+        let schema_dest = self.dockerdev_dir.join("helix-container/src/schema.hx");
 
         if schema_source.exists() {
             match fs::copy(&schema_source, &schema_dest) {

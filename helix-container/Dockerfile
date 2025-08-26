@@ -6,11 +6,8 @@ RUN apt-get update && apt-get install -y \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Set up working directory
+# Set up working directory first
 WORKDIR /usr/src/app
-
-# Copy source code
-COPY . .
 
 # Create non-root user with proper permissions
 RUN useradd -m -u 1000 user && \
@@ -19,6 +16,9 @@ RUN useradd -m -u 1000 user && \
     chown -R user:user /home/user/.helix
 
 USER user
+
+# Copy source code
+COPY . .
 
 # Create data directory with proper permissions
 RUN mkdir -p /usr/src/app/data
