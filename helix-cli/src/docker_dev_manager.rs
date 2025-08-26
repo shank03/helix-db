@@ -300,17 +300,14 @@ impl DockerDevManager {
                 .map_err(|e| format!("Failed to remove instance file: {e}"))?;
         }
 
-        // Optionally clean up the dockerdev directory (but preserve logs)
+        // Optionally clean up the dockerdev directory
         println!(
             "{}",
             "Docker development instance and Docker volumes removed"
                 .green()
                 .bold()
         );
-        println!(
-            "{}",
-            format!("Host data in {} is preserved", self.dockerdev_dir.display()).normal()
-        );
+
         Ok(())
     }
 
