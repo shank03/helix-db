@@ -185,7 +185,7 @@ pub(crate) fn parse_object_remapping<'a>(
                 ExpressionType::Exists(expr) => {
                     let (_, stmt) = infer_expr_type(
                         ctx,
-                        expr,
+                        &expr.expr,
                         scope,
                         original_query,
                         Some(parent_ty.clone()),
