@@ -118,25 +118,25 @@ impl Display for BoExp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             BoExp::And{ exprs, negated } => {
-                let tr = exprs
+                let displayed_exprs = exprs
                     .iter()
                     .map(|s| format!("{s}"))
                     .collect::<Vec<_>>();
                 if *negated {
-                    write!(f, "!({})", tr.join(" && "))
+                    write!(f, "!({})", displayed_exprs.join(" && "))
                 } else {
-                    write!(f, "{}", tr.join(" && "))
+                    write!(f, "{}", displayed_exprs.join(" && "))
                 }
             }
             BoExp::Or{ exprs, negated } => {
-                let tr = exprs
+                let displayed_exprs = exprs
                     .iter()
                     .map(|s| format!("{s}"))
                     .collect::<Vec<_>>();
                 if *negated {
-                    write!(f, "!({})", tr.join(" || "))
+                    write!(f, "!({})", displayed_exprs.join(" || "))
                 } else {
-                    write!(f, "{}", tr.join(" || "))
+                    write!(f, "{}", displayed_exprs.join(" || "))
                 }
             }
             BoExp::Exists { traversal, negated } => {
