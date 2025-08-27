@@ -879,13 +879,10 @@ pub(crate) fn infer_expr_type<'a>(
                             gen_traversal
                                 .steps
                                 .push(Separator::Period(GeneratedStep::Where(match expr {
-                                    BoExp::Exists {
-                                        mut traversal,
-                                        negated,
-                                    } => {
+                                    BoExp::Exists(mut traversal) => {
                                         traversal.should_collect = ShouldCollect::No;
                                         Where::Ref(WhereRef {
-                                            expr: BoExp::Exists { traversal, negated },
+                                            expr: BoExp::Exists(traversal),
                                         })
                                     }
                                     _ => Where::Ref(WhereRef { expr }),
@@ -916,89 +913,116 @@ pub(crate) fn infer_expr_type<'a>(
                 })),
             )
         }
-        And { exprs, negated } => {
+        And(exprs) => {
             let exprs = exprs
                 .iter()
                 .map(|expr| {
-                    let (_, stmt) = infer_expr_type(
+                    let (ty, stmt) = infer_expr_type(
                         ctx,
                         expr,
                         scope,
                         original_query,
                         parent_ty.clone(),
                         gen_query,
-                    );
-                    assert!(
-                        stmt.is_some(),
-                        "incorrect stmt should've been caught by `infer_expr_type`"
                     );
 
                     match stmt.unwrap() {
-                        GeneratedStatement::BoExp(expr) => {
-                            match expr {
-                                BoExp::Exists {
-                                    mut traversal,
-                                    negated,
-                                } => {
-                                    // keep as iterator
-                                    traversal.should_collect = ShouldCollect::No;
-                                    BoExp::Exists { traversal, negated }
-                                }
-                                _ => expr,
-                            }
-                        }
-                        GeneratedStatement::Traversal(tr) => BoExp::Expr(tr),
-                        _ => unreachable!(),
-                    }
-                })
-                .collect::<Vec<_>>();
-            (
-                Type::Boolean,
-                Some(GeneratedStatement::BoExp(BoExp::And {
-                    exprs,
-                    negated: *negated,
-                })),
-            )
-        }
-        Or { exprs, negated } => {
-            let exprs = exprs
-                .iter()
-                .map(|expr| {
-                    let (_, stmt) = infer_expr_type(
-                        ctx,
-                        expr,
-                        scope,
-                        original_query,
-                        parent_ty.clone(),
-                        gen_query,
-                    );
-                    assert!(
-                        stmt.is_some(),
-                        "incorrect stmt should've been caught by `infer_expr_type`"
-                    );
-                    match stmt.unwrap() {
                         GeneratedStatement::BoExp(expr) => match expr {
-                            BoExp::Exists {
-                                mut traversal,
-                                negated,
-                            } => {
+                            BoExp::Exists(mut traversal) => {
                                 traversal.should_collect = ShouldCollect::No;
-                                BoExp::Exists { traversal, negated }
+                                BoExp::Exists(traversal)
+                            }
+                            BoExp::Not(inner_expr) => {
+                                if let BoExp::Exists(mut traversal) = *inner_expr {
+                                    traversal.should_collect = ShouldCollect::No;
+                                    BoExp::Exists(traversal)
+                                } else {
+                                    BoExp::Not(inner_expr)
+                                }
                             }
                             _ => expr,
                         },
                         GeneratedStatement::Traversal(tr) => BoExp::Expr(tr),
-                        _ => unreachable!(),
+                        _ => {
+                            generate_error!(
+                                ctx,
+                                original_query,
+                                expr.loc.clone(),
+                                E306,
+                                ty.kind_str()
+                            );
+                            BoExp::Empty
+                        }
                     }
                 })
                 .collect::<Vec<_>>();
             (
                 Type::Boolean,
-                Some(GeneratedStatement::BoExp(BoExp::Or {
-                    exprs,
-                    negated: *negated,
-                })),
+                Some(GeneratedStatement::BoExp(BoExp::And(exprs))),
             )
+        }
+        Or(exprs) => {
+            let exprs = exprs
+                .iter()
+                .map(|expr| {
+                    let (ty, stmt) = infer_expr_type(
+                        ctx,
+                        expr,
+                        scope,
+                        original_query,
+                        parent_ty.clone(),
+                        gen_query,
+                    );
+
+                    match stmt.unwrap() {
+                        GeneratedStatement::BoExp(expr) => match expr {
+                            BoExp::Exists(mut traversal) => {
+                                traversal.should_collect = ShouldCollect::No;
+                                BoExp::Exists(traversal)
+                            }
+                            BoExp::Not(inner_expr) => {
+                                if let BoExp::Exists(mut traversal) = *inner_expr {
+                                    traversal.should_collect = ShouldCollect::No;
+                                    BoExp::Exists(traversal)
+                                } else {
+                                    BoExp::Not(inner_expr)
+                                }
+                            }
+                            _ => expr,
+                        },
+                        GeneratedStatement::Traversal(tr) => BoExp::Expr(tr),
+                        _ => {
+                            generate_error!(
+                                ctx,
+                                original_query,
+                                expr.loc.clone(),
+                                E306,
+                                ty.kind_str()
+                            );
+                            BoExp::Empty
+                        }
+                    }
+                })
+                .collect::<Vec<_>>();
+            (
+                Type::Boolean,
+                Some(GeneratedStatement::BoExp(BoExp::Or(exprs))),
+            )
+        }
+        Not(expr) => {
+            let (ty, stmt) =
+                infer_expr_type(ctx, expr, scope, original_query, parent_ty, gen_query);
+
+            match stmt.unwrap() {
+                GeneratedStatement::BoExp(expr) => (
+                    Type::Boolean,
+                    Some(GeneratedStatement::BoExp(BoExp::Not(Box::new(expr)))),
+                ),
+                _ => {
+                    generate_error!(ctx, original_query, expr.loc.clone(), E306, ty.kind_str());
+                    (Type::Unknown, None)
+                }
+            }
         }
         Exists(expr) => {
             let (_, stmt) =
@@ -1020,10 +1044,7 @@ pub(crate) fn infer_expr_type<'a>(
             };
             (
                 Type::Boolean,
-                Some(GeneratedStatement::BoExp(BoExp::Exists {
-                    traversal,
-                    negated: expr.negated,
-                })),
+                Some(GeneratedStatement::BoExp(BoExp::Exists(traversal))),
             )
         }
         Empty => (Type::Unknown, Some(GeneratedStatement::Empty)),

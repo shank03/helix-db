@@ -478,7 +478,6 @@ pub struct Expression {
 #[derive(Debug, Clone)]
 pub struct ExistsExpression {
     pub loc: Loc,
-    pub negated: bool,
     pub expr: Box<Expression>,
 }
 
@@ -495,14 +494,9 @@ pub enum ExpressionType {
     AddVector(AddVector),
     AddNode(AddNode),
     AddEdge(AddEdge),
-    And {
-        exprs: Vec<Expression>,
-        negated: bool,
-    },
-    Or {
-        exprs: Vec<Expression>,
-        negated: bool,
-    },
+    Not(Box<Expression>),
+    And(Vec<Expression>),
+    Or(Vec<Expression>),
     SearchVector(SearchVector),
     BM25Search(BM25Search),
     Empty,
@@ -521,8 +515,9 @@ impl Debug for ExpressionType {
             ExpressionType::AddVector(av) => write!(f, "AddVector({av:?})"),
             ExpressionType::AddNode(an) => write!(f, "AddNode({an:?})"),
             ExpressionType::AddEdge(ae) => write!(f, "AddEdge({ae:?})"),
-            ExpressionType::And { exprs, negated } => write!(f, "And({exprs:?}, {negated})"),
-            ExpressionType::Or { exprs, negated } => write!(f, "Or({exprs:?}, {negated})"),
+            ExpressionType::Not(expr) => write!(f, "Not({expr:?})"),
+            ExpressionType::And(exprs) => write!(f, "And({exprs:?})"),
+            ExpressionType::Or(exprs) => write!(f, "Or({exprs:?})"),
             ExpressionType::SearchVector(sv) => write!(f, "SearchVector({sv:?})"),
             ExpressionType::BM25Search(bm25) => write!(f, "BM25Search({bm25:?})"),
             ExpressionType::Empty => write!(f, "Empty"),
@@ -543,8 +538,9 @@ impl Display for ExpressionType {
             ExpressionType::AddVector(av) => write!(f, "AddVector({av:?})"),
             ExpressionType::AddNode(an) => write!(f, "AddNode({an:?})"),
             ExpressionType::AddEdge(ae) => write!(f, "AddEdge({ae:?})"),
-            ExpressionType::And { exprs, negated } => write!(f, "And({exprs:?}, {negated})"),
-            ExpressionType::Or { exprs, negated } => write!(f, "Or({exprs:?}, {negated})"),
+            ExpressionType::Not(expr) => write!(f, "Not({expr:?})"),
+            ExpressionType::And(exprs) => write!(f, "And({exprs:?})"),
+            ExpressionType::Or(exprs) => write!(f, "Or({exprs:?})"),
             ExpressionType::SearchVector(sv) => write!(f, "SearchVector({sv:?})"),
             ExpressionType::BM25Search(bm25) => write!(f, "BM25Search({bm25:?})"),
             ExpressionType::Empty => write!(f, "Empty"),
@@ -2267,11 +2263,15 @@ impl HelixParser {
                 if negated {
                     inner.next();
                 }
+                let exprs = self.parse_expression_vec(inner)?;
                 Ok(Expression {
-                    loc,
-                    expr: ExpressionType::And {
-                        exprs: self.parse_expression_vec(inner)?,
-                        negated,
+                    loc: loc.clone(),
+                    expr: match negated {
+                        true => ExpressionType::Not(Box::new(Expression {
+                            loc,
+                            expr: ExpressionType::And(exprs),
+                        })),
+                        false => ExpressionType::And(exprs),
                     },
                 })
             }
@@ -2285,11 +2285,15 @@ impl HelixParser {
                 if negated {
                     inner.next();
                 }
+                let exprs = self.parse_expression_vec(inner)?;
                 Ok(Expression {
-                    loc,
-                    expr: ExpressionType::Or {
-                        exprs: self.parse_expression_vec(inner)?,
-                        negated,
+                    loc: loc.clone(),
+                    expr: match negated {
+                        true => ExpressionType::Not(Box::new(Expression {
+                            loc,
+                            expr: ExpressionType::Or(exprs),
+                        })),
+                        false => ExpressionType::Or(exprs),
                     },
                 })
             }
@@ -2310,18 +2314,24 @@ impl HelixParser {
                 let traversal = inner
                     .next()
                     .ok_or_else(|| ParserError::from("Missing traversal"))?;
+                let expr = ExpressionType::Exists(ExistsExpression {
+                    loc: loc.clone(),
+                    expr: Box::new(Expression {
+                        loc: loc.clone(),
+                        expr: ExpressionType::Traversal(Box::new(
+                            self.parse_anon_traversal(traversal)?,
+                        )),
+                    }),
+                });
                 Ok(Expression {
                     loc: loc.clone(),
-                    expr: ExpressionType::Exists(ExistsExpression {
-                        loc: loc.clone(),
-                        negated,
-                        expr: Box::new(Expression {
+                    expr: match negated {
+                        true => ExpressionType::Not(Box::new(Expression {
                             loc: loc.clone(),
-                            expr: ExpressionType::Traversal(Box::new(
-                                self.parse_anon_traversal(traversal)?,
-                            )),
-                        }),
-                    }),
+                            expr: expr,
+                        })),
+                        false => expr,
+                    },
                 })
             }
 
@@ -2369,23 +2379,27 @@ impl HelixParser {
                 let traversal = inner
                     .next()
                     .ok_or_else(|| ParserError::from("Missing traversal"))?;
+                let expr = ExpressionType::Exists(ExistsExpression {
+                    loc: loc.clone(),
+                    expr: Box::new(Expression {
+                        loc: loc.clone(),
+                        expr: ExpressionType::Traversal(Box::new(match traversal.as_rule() {
+                            Rule::anonymous_traversal => self.parse_anon_traversal(traversal)?,
+                            Rule::id_traversal => self.parse_traversal(traversal)?,
+                            Rule::traversal => self.parse_traversal(traversal)?,
+                            _ => unreachable!(),
+                        })),
+                    }),
+                });
                 Ok(Expression {
                     loc: loc.clone(),
-                    expr: ExpressionType::Exists(ExistsExpression {
-                        loc: loc.clone(),
-                        negated,
-                        expr: Box::new(Expression {
+                    expr: match negated {
+                        true => ExpressionType::Not(Box::new(Expression {
                             loc: loc.clone(),
-                            expr: ExpressionType::Traversal(Box::new(match traversal.as_rule() {
-                                Rule::anonymous_traversal => {
-                                    self.parse_anon_traversal(traversal)?
-                                }
-                                Rule::id_traversal => self.parse_traversal(traversal)?,
-                                Rule::traversal => self.parse_traversal(traversal)?,
-                                _ => unreachable!(),
-                            })),
-                        }),
-                    }),
+                            expr: expr,
+                        })),
+                        false => expr,
+                    },
                 })
             }
             Rule::integer => pair

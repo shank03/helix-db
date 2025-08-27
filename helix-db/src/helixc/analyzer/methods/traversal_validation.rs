@@ -394,58 +394,56 @@ pub(crate) fn validate_traversal<'a>(
                 }
             };
 
-            let pre_filter: Option<Vec<BoExp>> = match &sv.pre_filter {
-                Some(expr) => {
-                    let (_, stmt) = infer_expr_type(
-                        ctx,
-                        expr,
-                        scope,
-                        original_query,
-                        Some(Type::Vector(sv.vector_type.clone())),
-                        gen_query,
-                    );
-                    // Where/boolean ops don't change the element type,
-                    // so `cur_ty` stays the same.
-                    assert!(stmt.is_some());
-                    let stmt = stmt.unwrap();
-                    let mut gen_traversal = GeneratedTraversal {
-                        traversal_type: TraversalType::NestedFrom(GenRef::Std("v".to_string())),
-                        steps: vec![],
-                        should_collect: ShouldCollect::ToVec,
-                        source_step: Separator::Empty(SourceStep::Anonymous),
-                    };
-                    match stmt {
-                        GeneratedStatement::Traversal(tr) => {
-                            gen_traversal
-                                .steps
-                                .push(Separator::Period(GeneratedStep::Where(Where::Ref(
-                                    WhereRef {
-                                        expr: BoExp::Expr(tr),
-                                    },
-                                ))));
-                        }
-                        GeneratedStatement::BoExp(expr) => {
-                            gen_traversal
-                                .steps
-                                .push(Separator::Period(GeneratedStep::Where(match expr {
-                                    BoExp::Exists {
-                                        mut traversal,
-                                        negated,
-                                    } => {
-                                        traversal.should_collect = ShouldCollect::No;
-                                        Where::Ref(WhereRef {
-                                            expr: BoExp::Exists { traversal, negated },
-                                        })
-                                    }
-                                    _ => Where::Ref(WhereRef { expr }),
-                                })));
-                        }
-                        _ => unreachable!(),
-                    }
-                    Some(vec![BoExp::Expr(gen_traversal)])
-                }
-                None => None,
-            };
+            // let pre_filter: Option<Vec<BoExp>> = match &sv.pre_filter {
+            //     Some(expr) => {
+            //         let (_, stmt) = infer_expr_type(
+            //             ctx,
+            //             expr,
+            //             scope,
+            //             original_query,
+            //             Some(Type::Vector(sv.vector_type.clone())),
+            //             gen_query,
+            //         );
+            //         // Where/boolean ops don't change the element type,
+            //         // so `cur_ty` stays the same.
+            //         assert!(stmt.is_some());
+            //         let stmt = stmt.unwrap();
+            //         let mut gen_traversal = GeneratedTraversal {
+            //             traversal_type: TraversalType::NestedFrom(GenRef::Std("v".to_string())),
+            //             steps: vec![],
+            //             should_collect: ShouldCollect::ToVec,
+            //             source_step: Separator::Empty(SourceStep::Anonymous),
+            //         };
+            //         match stmt {
+            //             GeneratedStatement::Traversal(tr) => {
+            //                 gen_traversal
+            //                     .steps
+            //                     .push(Separator::Period(GeneratedStep::Where(Where::Ref(
+            //                         WhereRef {
+            //                             expr: BoExp::Expr(tr),
+            //                         },
+            //                     ))));
+            //             }
+            //             GeneratedStatement::BoExp(expr) => {
+            //                 gen_traversal
+            //                     .steps
+            //                     .push(Separator::Period(GeneratedStep::Where(match expr {
+            //                         BoExp::Exists(mut traversal) => {
+            //                             traversal.should_collect = ShouldCollect::No;
+            //                             Where::Ref(WhereRef {
+            //                                 expr: BoExp::Exists(traversal),
+            //                             })
+            //                         }
+            //                         _ => Where::Ref(WhereRef { expr }),
+            //                     })));
+            //             }
+            //             _ => unreachable!(),
+            //         }
+            //         Some(vec![BoExp::Expr(gen_traversal)])
+            //     }
+            //     None => None,
+            // };
+            let pre_filter = None;
 
             gen_traversal.traversal_type = TraversalType::Ref;
             gen_traversal.should_collect = ShouldCollect::ToVec;
@@ -579,20 +577,34 @@ pub(crate) fn validate_traversal<'a>(
                             ))));
                     }
                     GeneratedStatement::BoExp(expr) => {
-                        gen_traversal
-                            .steps
-                            .push(Separator::Period(GeneratedStep::Where(match expr {
-                                BoExp::Exists {
-                                    mut traversal,
-                                    negated,
-                                } => {
+                        // if Not(Exists()) or Exits() need to modify the traversal to not collect 
+                        // else return where as normal
+                        let where_expr = match expr {
+                            BoExp::Not(inner_expr) => {
+                                if let BoExp::Exists(mut traversal) = *inner_expr {
                                     traversal.should_collect = ShouldCollect::No;
                                     Where::Ref(WhereRef {
-                                        expr: BoExp::Exists { traversal, negated },
+                                        expr: BoExp::Exists(traversal),
+                                    })
+                                } else {
+                                    Where::Ref(WhereRef {
+                                        // expr gets moved at start of match to allow for box dereference so need to move back
+                                        expr: BoExp::Not(inner_expr),
                                     })
                                 }
-                                _ => Where::Ref(WhereRef { expr }),
-                            })));
+                            }
+                            BoExp::Exists(mut traversal) => {
+                                traversal.should_collect = ShouldCollect::No;
+                                Where::Ref(WhereRef {
+                                    expr: BoExp::Exists(traversal),
+                                })
+                            }
+                            _ => Where::Ref(WhereRef { expr }),
+                        };
+
+                        gen_traversal
+                            .steps
+                            .push(Separator::Period(GeneratedStep::Where(where_expr)));
                     }
                     _ => unreachable!(),
                 }

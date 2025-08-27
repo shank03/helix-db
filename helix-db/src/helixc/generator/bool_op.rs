@@ -99,54 +99,48 @@ impl Display for Contains {
     }
 }
 
-
-
-
 /// Boolean expression is used for a traversal or set of traversals wrapped in AND/OR
 /// that resolve to a boolean value
 #[derive(Clone)]
 pub enum BoExp {
-    And{ exprs: Vec<BoExp>, negated: bool },
-    Or{ exprs: Vec<BoExp>, negated: bool },
-    Exists {
-        traversal: Traversal,
-        negated: bool,
-    },
+    Not(Box<BoExp>),
+    And(Vec<BoExp>),
+    Or(Vec<BoExp>),
+    Exists(Traversal),
     Expr(Traversal),
+    Empty,
+}
+
+impl BoExp {
+    pub fn negate(&self) -> Self {
+        match self {
+            BoExp::Not(expr) => *expr.clone(),
+            _ => BoExp::Not(Box::new(self.clone())),
+        }
+    }
+
+    pub fn is_not(&self) -> bool {
+        match self {
+            BoExp::Not(_) => true,
+            _ => false,
+        }
+    }
 }
 impl Display for BoExp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BoExp::And{ exprs, negated } => {
-                let displayed_exprs = exprs
-                    .iter()
-                    .map(|s| format!("{s}"))
-                    .collect::<Vec<_>>();
-                if *negated {
-                    write!(f, "!({})", displayed_exprs.join(" && "))
-                } else {
-                    write!(f, "{}", displayed_exprs.join(" && "))
-                }
+            BoExp::Not(expr) => write!(f, "!({})", expr),
+            BoExp::And(exprs) => {
+                let displayed_exprs = exprs.iter().map(|s| format!("{s}")).collect::<Vec<_>>();
+                write!(f, "{}", displayed_exprs.join(" && "))
             }
-            BoExp::Or{ exprs, negated } => {
-                let displayed_exprs = exprs
-                    .iter()
-                    .map(|s| format!("{s}"))
-                    .collect::<Vec<_>>();
-                if *negated {
-                    write!(f, "!({})", displayed_exprs.join(" || "))
-                } else {
-                    write!(f, "{}", displayed_exprs.join(" || "))
-                }
+            BoExp::Or(exprs) => {
+                let displayed_exprs = exprs.iter().map(|s| format!("{s}")).collect::<Vec<_>>();
+                write!(f, "{}", displayed_exprs.join(" || "))
             }
-            BoExp::Exists { traversal, negated } => {
-                if *negated {
-                    write!(f, "!Exist::exists(&mut {traversal})")
-                } else {
-                    write!(f, "Exist::exists(&mut {traversal})")
-                }
-            }
+            BoExp::Exists(traversal) => write!(f, "Exist::exists(&mut {traversal})"),
             BoExp::Expr(traversal) => write!(f, "{traversal}"),
+            BoExp::Empty => write!(f, ""),
         }
     }
 }
