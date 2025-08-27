@@ -89,7 +89,7 @@ impl DockerDevManager {
             );
 
             // Copy the entire project structure to dockerdev directory
-            self.copy_dir_recursive(project_root, &self.dockerdev_dir)
+            self.copy_repo_dir_for_build(project_root, &self.dockerdev_dir)
                 .map_err(|e| format!("Failed to copy project structure: {e}"))?;
 
             println!(
@@ -108,7 +108,7 @@ impl DockerDevManager {
         Ok(())
     }
 
-    fn copy_dir_recursive(&self, src: &std::path::Path, dst: &std::path::Path) -> io::Result<()> {
+    fn copy_repo_dir_for_build(&self, src: &std::path::Path, dst: &std::path::Path) -> io::Result<()> {
         fs::create_dir_all(dst)?;
 
         for entry in fs::read_dir(src)? {
@@ -134,7 +134,7 @@ impl DockerDevManager {
             }
 
             if src_path.is_dir() {
-                self.copy_dir_recursive(&src_path, &dst_path)?;
+                self.copy_repo_dir_for_build(&src_path, &dst_path)?;
             } else {
                 fs::copy(&src_path, &dst_path)?;
             }
@@ -186,7 +186,7 @@ impl DockerDevManager {
         if let Some(home) = dirs::home_dir() {
             command.env("HOME", home);
         }
-        command.current_dir(&self.dockerdev_dir.join("helix-container"));
+        command.current_dir(self.dockerdev_dir.join("helix-container"));
 
         Ok(command)
     }
