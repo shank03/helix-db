@@ -90,7 +90,7 @@ impl DockerDevManager {
 
             // Copy the entire project structure to dockerdev directory
             self.copy_dir_recursive(project_root, &self.dockerdev_dir)
-                .map_err(|e| format!("Failed to copy project structure: {}", e))?;
+                .map_err(|e| format!("Failed to copy project structure: {e}"))?;
 
             println!(
                 "{}",
@@ -103,7 +103,7 @@ impl DockerDevManager {
         // Ensure data directory exists
         let data_dir = self.dockerdev_dir.join("data");
         fs::create_dir_all(&data_dir)
-            .map_err(|e| format!("Failed to create data directory: {}", e))?;
+            .map_err(|e| format!("Failed to create data directory: {e}"))?;
 
         Ok(())
     }
@@ -584,7 +584,7 @@ impl DockerDevManager {
     fn compile_and_emplace_queries(&self) -> Result<(), String> {
         // Get current directory path
         let current_path =
-            get_path_or_cwd(None).map_err(|e| format!("Failed to get current directory: {}", e))?;
+            get_path_or_cwd(None).map_err(|e| format!("Failed to get current directory: {e}"))?;
 
         // Check if current directory has queries
         let files = match check_and_read_files(&current_path) {
@@ -607,7 +607,7 @@ impl DockerDevManager {
                 return Ok(());
             }
             Err(e) => {
-                return Err(format!("Error checking files in current directory: {}", e));
+                return Err(format!("Error checking files in current directory: {e}"));
             }
         };
 
@@ -615,7 +615,7 @@ impl DockerDevManager {
         let (_code, analyzed_source) = match generate(&files, &current_path) {
             Ok((code, analyzer_source)) => (code, analyzer_source),
             Err(e) => {
-                return Err(format!("Error compiling queries: {}", e));
+                return Err(format!("Error compiling queries: {e}"));
             }
         };
 
@@ -625,17 +625,17 @@ impl DockerDevManager {
         let queries_file_path = self.dockerdev_dir.join("helix-container/src/queries.rs");
         let mut generated_rust_code = String::new();
 
-        match write!(&mut generated_rust_code, "{}", analyzed_source) {
+        match write!(&mut generated_rust_code, "{analyzed_source}") {
             Ok(_) => println!("{}", "Successfully transpiled queries".green().bold()),
             Err(e) => {
-                return Err(format!("Failed to transpile queries: {}", e));
+                return Err(format!("Failed to transpile queries: {e}"));
             }
         }
 
         match fs::write(&queries_file_path, generated_rust_code) {
             Ok(_) => println!("{}", "Successfully wrote queries file".green().bold()),
             Err(e) => {
-                return Err(format!("Failed to write queries file: {}", e));
+                return Err(format!("Failed to write queries file: {e}"));
             }
         }
 
@@ -649,7 +649,7 @@ impl DockerDevManager {
             match fs::copy(&config_source, &config_dest) {
                 Ok(_) => println!("{}", "Successfully copied config file".green().bold()),
                 Err(e) => {
-                    return Err(format!("Failed to copy config file: {}", e));
+                    return Err(format!("Failed to copy config file: {e}"));
                 }
             }
         }
@@ -661,7 +661,7 @@ impl DockerDevManager {
             match fs::copy(&schema_source, &schema_dest) {
                 Ok(_) => println!("{}", "Successfully copied schema file".green().bold()),
                 Err(e) => {
-                    return Err(format!("Failed to copy schema file: {}", e));
+                    return Err(format!("Failed to copy schema file: {e}"));
                 }
             }
         }
