@@ -435,7 +435,8 @@ impl<'a> McpTools<'a> for McpBackend {
                 Ok(None) => {
                     // BM25 metadata not found - index not initialized yet
                     debug_println!("BM25 index not initialized yet - returning empty results");
-                    Ok(vec![])
+                    println!("BM25 index not initialized yet - returning empty results");
+                    Err(GraphError::from("BM25 index not initialized yet - returning empty results"))
                 }
                 Err(_e) => {
                     // Error accessing metadata database
@@ -443,13 +444,15 @@ impl<'a> McpTools<'a> for McpBackend {
                         "Error checking BM25 metadata: {:?} - returning empty results",
                         e
                     );
-                    Ok(vec![])
+                    println!("Error checking BM25 metadata: {:?} - returning empty results", _e);
+                    Err(GraphError::from("Error checking BM25 metadata - returning empty results"))
                 }
             }
         } else {
             // BM25 is not enabled
             debug_println!("BM25 is not enabled - returning empty results");
-            Ok(vec![])
+            println!("BM25 is not enabled - returning empty results");
+            Err(GraphError::from("BM25 is not enabled - returning empty results"))
         }
     }
 
