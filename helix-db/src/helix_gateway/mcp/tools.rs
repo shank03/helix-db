@@ -114,7 +114,7 @@ pub struct FilterTraversal {
 }
 
 #[tool_calls]
-trait McpTools<'a> {
+pub(super) trait McpTools<'a> {
     fn out_step(
         &'a self,
         txn: &'a RoTxn,
@@ -185,6 +185,7 @@ trait McpTools<'a> {
         connection: &'a MCPConnection,
         query: String,
         label: String,
+        k: Option<usize>,
     ) -> Result<Vec<TraversalValue>, GraphError>;
 
     fn search_vector(
@@ -234,7 +235,7 @@ impl<'a> McpTools<'a> for McpBackend {
             })
             .flatten();
 
-        let result = iter.take(100).collect();
+        let result = iter.collect();
         debug_println!("result: {:?}", result);
         result
     }
@@ -273,7 +274,7 @@ impl<'a> McpTools<'a> for McpBackend {
             })
             .flatten();
 
-        let result = iter.take(100).collect();
+        let result = iter.collect();
         debug_println!("result: {:?}", result);
         result
     }
@@ -314,7 +315,7 @@ impl<'a> McpTools<'a> for McpBackend {
             })
             .flatten();
 
-        let result = iter.take(100).collect();
+        let result = iter.collect();
         debug_println!("result: {:?}", result);
         result
     }
@@ -353,7 +354,7 @@ impl<'a> McpTools<'a> for McpBackend {
             })
             .flatten();
 
-        let result = iter.take(100).collect();
+        let result = iter.collect();
         debug_println!("result: {:?}", result);
         result
     }
@@ -371,7 +372,7 @@ impl<'a> McpTools<'a> for McpBackend {
             label: &node_type,
         };
 
-        let result = iter.take(100).collect::<Result<Vec<_>, _>>();
+        let result = iter.collect::<Result<Vec<_>, _>>();
         debug_println!("result: {:?}", result);
         result
     }
@@ -389,7 +390,7 @@ impl<'a> McpTools<'a> for McpBackend {
             label: &edge_type,
         };
 
-        let result = iter.take(100).collect::<Result<Vec<_>, _>>();
+        let result = iter.collect::<Result<Vec<_>, _>>();
         debug_println!("result: {:?}", result);
         result
     }
@@ -458,6 +459,7 @@ impl<'a> McpTools<'a> for McpBackend {
         _connection: &'a MCPConnection,
         query: String,
         label: String,
+        k: Option<usize>,
     ) -> Result<Vec<TraversalValue>, GraphError> {
         let db = Arc::clone(&self.db);
 
@@ -466,7 +468,7 @@ impl<'a> McpTools<'a> for McpBackend {
         let embedding = result?;
 
         let res = G::new(db, txn)
-            .search_v::<fn(&HVector, &RoTxn) -> bool, _>(&embedding, 5, &label, None)
+            .search_v::<fn(&HVector, &RoTxn) -> bool, _>(&embedding, k.unwrap_or(5), &label, None)
             .collect_to::<Vec<_>>();
 
         debug_println!("result: {res:?}");
@@ -499,7 +501,7 @@ impl<'a> McpTools<'a> for McpBackend {
             });
         }
 
-        println!("result: {res:?}");
+        debug_println!("result: {res:?}");
         Ok(res)
     }
 }
