@@ -26,6 +26,8 @@ tokio-tungstenite = "0.27.0"
 futures-util = "0.3.31"
 anyhow = "1.0.98"
 dotenvy = "0.15.7"
+
+[target.'cfg(unix)'.dependencies]
 nix = { version = "0.30.1", features = ["process", "signal"] }
 
 [target.'cfg(windows)'.dependencies]

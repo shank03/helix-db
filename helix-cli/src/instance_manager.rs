@@ -1,11 +1,17 @@
 use crate::types::BuildMode;
-
+#[cfg(unix)]
 use super::utils::find_available_port;
 use helix_db::utils::styled_string::StyledString;
+
+#[cfg(unix)]
 use nix::errno::Errno;
+#[cfg(unix)]
 use nix::sys::signal::{Signal, kill};
+#[cfg(unix)]
 use nix::sys::wait::{WaitStatus, waitpid};
+#[cfg(unix)]
 use nix::unistd::Pid;
+
 use serde::{Deserialize, Serialize};
 use std::net::TcpListener;
 use std::thread::sleep;

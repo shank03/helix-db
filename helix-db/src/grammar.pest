@@ -180,7 +180,8 @@ shortest_path ={ "ShortestPath" ~ ("<" ~ type_args ~ ">")? ~ to_from}
 // Util steps
 // ---------------------------------------------------------------------
 where_step = { "WHERE" ~ "(" ~ (evaluates_to_bool | anonymous_traversal) ~ ")" }
-exists     = { "EXISTS" ~ "(" ~ (traversal | id_traversal | anonymous_traversal) ~ ")" }
+exists     = { negate? ~ "EXISTS" ~ "(" ~ (traversal | id_traversal | anonymous_traversal) ~ ")" }
+negate     = { "!" }
 range_step = { "RANGE" ~ "(" ~ (evaluates_to_number) ~ "," ~ (evaluates_to_number) ~ ")" }
 order_by   = { "ORDER" ~ "<" ~ order_by_type ~ ">" ~"(" ~ (to_order) ~ ")" }
 to_order = { anonymous_traversal | id_traversal }

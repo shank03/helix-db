@@ -475,6 +475,13 @@ pub struct Expression {
     pub expr: ExpressionType,
 }
 
+#[derive(Debug, Clone)]
+pub struct ExistsExpression {
+    pub loc: Loc,
+    pub negated: bool,
+    pub expr: Box<Expression>,
+}
+
 #[derive(Clone)]
 pub enum ExpressionType {
     Traversal(Box<Traversal>),
@@ -483,7 +490,7 @@ pub enum ExpressionType {
     IntegerLiteral(i32),
     FloatLiteral(f64),
     BooleanLiteral(bool),
-    Exists(Box<Expression>),
+    Exists(ExistsExpression),
     BatchAddVector(BatchAddVector),
     AddVector(AddVector),
     AddNode(AddNode),
@@ -1610,7 +1617,9 @@ impl HelixParser {
                 };
 
                 // gets optional param
-                let is_optional = inner.peek().is_some_and(|p| p.as_rule() == Rule::optional_param);
+                let is_optional = inner
+                    .peek()
+                    .is_some_and(|p| p.as_rule() == Rule::optional_param);
                 if is_optional {
                     inner.next();
                 }
@@ -2254,15 +2263,33 @@ impl HelixParser {
                 loc: expression.loc(),
                 expr: ExpressionType::BooleanLiteral(expression.as_str() == "true"),
             }),
-            Rule::exists => Ok(Expression {
-                loc: expression.loc(),
-                expr: ExpressionType::Exists(Box::new(Expression {
-                    loc: expression.loc(),
-                    expr: ExpressionType::Traversal(Box::new(
-                        self.parse_anon_traversal(expression.into_inner().next().unwrap())?,
-                    )),
-                })),
-            }),
+            Rule::exists => {
+                let loc = expression.loc();
+                let mut inner = expression.into_inner();
+                let negated = match inner.peek() {
+                    Some(p) => p.as_rule() == Rule::negate,
+                    None => false,
+                };
+                if negated {
+                    inner.next();
+                }
+                let traversal = inner
+                    .next()
+                    .ok_or_else(|| ParserError::from("Missing traversal"))?;
+                Ok(Expression {
+                    loc: loc.clone(),
+                    expr: ExpressionType::Exists(ExistsExpression {
+                        loc: loc.clone(),
+                        negated,
+                        expr: Box::new(Expression {
+                            loc: loc.clone(),
+                            expr: ExpressionType::Traversal(Box::new(
+                                self.parse_anon_traversal(traversal)?,
+                            )),
+                        }),
+                    }),
+                })
+            }
 
             _ => unreachable!(),
         }
@@ -2296,21 +2323,35 @@ impl HelixParser {
                 expr: ExpressionType::StringLiteral(self.parse_string_literal(pair)?),
             }),
             Rule::exists => {
-                let traversal = pair
-                    .clone()
-                    .into_inner()
+                let loc = pair.loc();
+                let mut inner = pair.into_inner();
+                let negated = match inner.peek() {
+                    Some(p) => p.as_rule() == Rule::negate,
+                    None => false,
+                };
+                if negated {
+                    inner.next();
+                }
+                let traversal = inner
                     .next()
-                    .ok_or_else(|| ParserError::from("Missing exists traversal"))?;
+                    .ok_or_else(|| ParserError::from("Missing traversal"))?;
                 Ok(Expression {
-                    loc: pair.loc(),
-                    expr: ExpressionType::Exists(Box::new(Expression {
-                        loc: pair.loc(),
-                        expr: ExpressionType::Traversal(Box::new(match traversal.as_rule() {
-                            Rule::traversal => self.parse_traversal(traversal)?,
-                            Rule::id_traversal => self.parse_traversal(traversal)?,
-                            _ => unreachable!(),
-                        })),
-                    })),
+                    loc: loc.clone(),
+                    expr: ExpressionType::Exists(ExistsExpression {
+                        loc: loc.clone(),
+                        negated,
+                        expr: Box::new(Expression {
+                            loc: loc.clone(),
+                            expr: ExpressionType::Traversal(Box::new(match traversal.as_rule() {
+                                Rule::anonymous_traversal => {
+                                    self.parse_anon_traversal(traversal)?
+                                }
+                                Rule::id_traversal => self.parse_traversal(traversal)?,
+                                Rule::traversal => self.parse_traversal(traversal)?,
+                                _ => unreachable!(),
+                            })),
+                        }),
+                    }),
                 })
             }
             Rule::integer => pair

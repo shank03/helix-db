@@ -38,8 +38,6 @@ use tokio_tungstenite::{
 };
 use toml::Value;
 
-pub const DB_DIR: &str = "helixdb-cfg/";
-
 const DEFAULT_CLOUD_AUTHORITY: &str = "ec2-184-72-27-116.us-west-1.compute.amazonaws.com:3000";
 
 pub static CLOUD_AUTHORITY: LazyLock<String> = LazyLock::new(|| {
@@ -575,26 +573,6 @@ pub fn find_available_port(start_port: u16) -> Option<u16> {
         }
     }
     None
-}
-
-pub fn get_cfg_deploy_path(cmd_path: Option<String>) -> String {
-    if let Some(path) = cmd_path {
-        return path;
-    }
-
-    let cwd = ".";
-    let files = match check_and_read_files(cwd) {
-        Ok(files) => files,
-        Err(_) => {
-            return DB_DIR.to_string();
-        }
-    };
-
-    if !files.is_empty() {
-        return cwd.to_string();
-    }
-
-    DB_DIR.to_string()
 }
 
 pub fn compile_and_build_helix(
