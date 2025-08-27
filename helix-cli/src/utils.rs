@@ -971,8 +971,8 @@ pub fn copy_repo_dir_for_build(src: &std::path::Path, dst: &std::path::Path) -> 
         let dst_path = dst.join(entry.file_name());
 
         // Skip copying unnecessary files and directories
-        if let Some(file_name) = entry.file_name().to_str() {
-            if matches!(
+        if let Some(file_name) = entry.file_name().to_str()
+            && matches!(
                 file_name,
                 ".git"
                     | ".gitignore"
@@ -982,9 +982,9 @@ pub fn copy_repo_dir_for_build(src: &std::path::Path, dst: &std::path::Path) -> 
                     | "helix-cli"
                     | "hql-tests"
                     | "docs"
-            ) {
-                continue;
-            }
+            )
+        {
+            continue;
         }
 
         if src_path.is_dir() {
