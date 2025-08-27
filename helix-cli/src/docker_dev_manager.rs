@@ -116,9 +116,19 @@ impl DockerDevManager {
             let src_path = entry.path();
             let dst_path = dst.join(entry.file_name());
 
-            // Skip target directory and .git directory to avoid copying large unnecessary files
+            // Skip copying unnecessary files and directories
             if let Some(file_name) = entry.file_name().to_str() {
-                if file_name == "target" || file_name == ".git" {
+                if matches!(
+                    file_name,
+                    ".git"
+                        | ".gitignore"
+                        | ".github"
+                        | ".DS_Store"
+                        | "target"
+                        | "helix-cli"
+                        | "hql-tests"
+                        | "docs"
+                ) {
                     continue;
                 }
             }
