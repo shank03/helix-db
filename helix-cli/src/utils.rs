@@ -23,7 +23,7 @@ use std::{
     error::Error,
     fmt::Write,
     fs::{self, DirEntry, File},
-    io::{ErrorKind, Write as iWrite},
+    io::{self, ErrorKind, Write as iWrite},
     net::{SocketAddr, TcpListener},
     path::{Path, PathBuf},
     process::{Command, Stdio},
@@ -960,4 +960,39 @@ pub fn get_openai_key() -> Option<String> {
     use dotenvy::dotenv;
     dotenv().ok();
     env::var("OPENAI_API_KEY").ok()
+}
+
+pub fn copy_repo_dir_for_build(src: &std::path::Path, dst: &std::path::Path) -> io::Result<()> {
+    fs::create_dir_all(dst)?;
+
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+
+        // Skip copying unnecessary files and directories
+        if let Some(file_name) = entry.file_name().to_str() {
+            if matches!(
+                file_name,
+                ".git"
+                    | ".gitignore"
+                    | ".github"
+                    | ".DS_Store"
+                    | "target"
+                    | "helix-cli"
+                    | "hql-tests"
+                    | "docs"
+            ) {
+                continue;
+            }
+        }
+
+        if src_path.is_dir() {
+            copy_repo_dir_for_build(&src_path, &dst_path)?;
+        } else {
+            fs::copy(&src_path, &dst_path)?;
+        }
+    }
+
+    Ok(())
 }

@@ -7,7 +7,10 @@ use std::io;
 use std::path::PathBuf;
 use std::process::Command;
 
-use crate::utils::{check_and_read_files, check_helix_installation, generate, get_path_or_cwd};
+use crate::utils::{
+    check_and_read_files, check_helix_installation, copy_repo_dir_for_build, generate,
+    get_path_or_cwd,
+};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DockerDevInstance {
@@ -89,7 +92,7 @@ impl DockerDevManager {
             );
 
             // Copy the entire project structure to dockerdev directory
-            self.copy_repo_dir_for_build(project_root, &self.dockerdev_dir)
+            copy_repo_dir_for_build(project_root, &self.dockerdev_dir)
                 .map_err(|e| format!("Failed to copy project structure: {e}"))?;
 
             println!(
@@ -104,41 +107,6 @@ impl DockerDevManager {
         let data_dir = self.dockerdev_dir.join("data");
         fs::create_dir_all(&data_dir)
             .map_err(|e| format!("Failed to create data directory: {e}"))?;
-
-        Ok(())
-    }
-
-    fn copy_repo_dir_for_build(&self, src: &std::path::Path, dst: &std::path::Path) -> io::Result<()> {
-        fs::create_dir_all(dst)?;
-
-        for entry in fs::read_dir(src)? {
-            let entry = entry?;
-            let src_path = entry.path();
-            let dst_path = dst.join(entry.file_name());
-
-            // Skip copying unnecessary files and directories
-            if let Some(file_name) = entry.file_name().to_str() {
-                if matches!(
-                    file_name,
-                    ".git"
-                        | ".gitignore"
-                        | ".github"
-                        | ".DS_Store"
-                        | "target"
-                        | "helix-cli"
-                        | "hql-tests"
-                        | "docs"
-                ) {
-                    continue;
-                }
-            }
-
-            if src_path.is_dir() {
-                self.copy_repo_dir_for_build(&src_path, &dst_path)?;
-            } else {
-                fs::copy(&src_path, &dst_path)?;
-            }
-        }
 
         Ok(())
     }
