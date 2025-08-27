@@ -486,6 +486,10 @@ fn parse_content(content: &Content) -> Result<Source, String> {
 /// Runs the static analyzer on the parsed source to catch errors and generate diagnostics if any.
 /// Otherwise returns the generated source object which is an IR used to transpile the queries to rust.
 fn analyze_source(source: Source) -> Result<GeneratedSource, String> {
+    if source.schema.is_empty() {
+        return Err("No schema definitions provided".to_string());
+    }
+
     let (diagnostics, source) = analyze(&source);
     if !diagnostics.is_empty() {
         for diag in diagnostics {
