@@ -2268,7 +2268,7 @@ impl HelixParser {
                     inner.next();
                 }
                 Ok(Expression {
-                    loc: loc,
+                    loc,
                     expr: ExpressionType::And {
                         exprs: self.parse_expression_vec(inner)?,
                         negated: false,
@@ -2286,7 +2286,7 @@ impl HelixParser {
                     inner.next();
                 }
                 Ok(Expression {
-                    loc: loc,
+                    loc,
                     expr: ExpressionType::Or {
                         exprs: self.parse_expression_vec(inner)?,
                         negated: false,
