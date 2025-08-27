@@ -495,8 +495,14 @@ pub enum ExpressionType {
     AddVector(AddVector),
     AddNode(AddNode),
     AddEdge(AddEdge),
-    And(Vec<Expression>),
-    Or(Vec<Expression>),
+    And {
+        exprs: Vec<Expression>,
+        negated: bool,
+    },
+    Or {
+        exprs: Vec<Expression>,
+        negated: bool,
+    },
     SearchVector(SearchVector),
     BM25Search(BM25Search),
     Empty,
@@ -515,8 +521,8 @@ impl Debug for ExpressionType {
             ExpressionType::AddVector(av) => write!(f, "AddVector({av:?})"),
             ExpressionType::AddNode(an) => write!(f, "AddNode({an:?})"),
             ExpressionType::AddEdge(ae) => write!(f, "AddEdge({ae:?})"),
-            ExpressionType::And(and) => write!(f, "And({and:?})"),
-            ExpressionType::Or(or) => write!(f, "Or({or:?})"),
+            ExpressionType::And { exprs, negated } => write!(f, "And({exprs:?}, {negated})"),
+            ExpressionType::Or { exprs, negated } => write!(f, "Or({exprs:?}, {negated})"),
             ExpressionType::SearchVector(sv) => write!(f, "SearchVector({sv:?})"),
             ExpressionType::BM25Search(bm25) => write!(f, "BM25Search({bm25:?})"),
             ExpressionType::Empty => write!(f, "Empty"),
@@ -537,8 +543,8 @@ impl Display for ExpressionType {
             ExpressionType::AddVector(av) => write!(f, "AddVector({av:?})"),
             ExpressionType::AddNode(an) => write!(f, "AddNode({an:?})"),
             ExpressionType::AddEdge(ae) => write!(f, "AddEdge({ae:?})"),
-            ExpressionType::And(and) => write!(f, "And({and:?})"),
-            ExpressionType::Or(or) => write!(f, "Or({or:?})"),
+            ExpressionType::And { exprs, negated } => write!(f, "And({exprs:?}, {negated})"),
+            ExpressionType::Or { exprs, negated } => write!(f, "Or({exprs:?}, {negated})"),
             ExpressionType::SearchVector(sv) => write!(f, "SearchVector({sv:?})"),
             ExpressionType::BM25Search(bm25) => write!(f, "BM25Search({bm25:?})"),
             ExpressionType::Empty => write!(f, "Empty"),
@@ -2251,14 +2257,42 @@ impl HelixParser {
     fn parse_boolean_expression(&self, pair: Pair<Rule>) -> Result<Expression, ParserError> {
         let expression = pair.into_inner().next().unwrap();
         match expression.as_rule() {
-            Rule::and => Ok(Expression {
-                loc: expression.loc(),
-                expr: ExpressionType::And(self.parse_expression_vec(expression.into_inner())?),
-            }),
-            Rule::or => Ok(Expression {
-                loc: expression.loc(),
-                expr: ExpressionType::Or(self.parse_expression_vec(expression.into_inner())?),
-            }),
+            Rule::and => {
+                let loc: Loc = expression.loc();
+                let mut inner = expression.into_inner();
+                let negated = match inner.peek() {
+                    Some(p) => p.as_rule() == Rule::negate,
+                    None => false,
+                };
+                if negated {
+                    inner.next();
+                }
+                Ok(Expression {
+                    loc: loc,
+                    expr: ExpressionType::And {
+                        exprs: self.parse_expression_vec(inner)?,
+                        negated: false,
+                    },
+                })
+            }
+            Rule::or => {
+                let loc: Loc = expression.loc();
+                let mut inner = expression.into_inner();
+                let negated = match inner.peek() {
+                    Some(p) => p.as_rule() == Rule::negate,
+                    None => false,
+                };
+                if negated {
+                    inner.next();
+                }
+                Ok(Expression {
+                    loc: loc,
+                    expr: ExpressionType::Or {
+                        exprs: self.parse_expression_vec(inner)?,
+                        negated: false,
+                    },
+                })
+            }
             Rule::boolean => Ok(Expression {
                 loc: expression.loc(),
                 expr: ExpressionType::BooleanLiteral(expression.as_str() == "true"),

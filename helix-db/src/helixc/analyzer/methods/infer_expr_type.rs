@@ -885,10 +885,7 @@ pub(crate) fn infer_expr_type<'a>(
                                     } => {
                                         traversal.should_collect = ShouldCollect::No;
                                         Where::Ref(WhereRef {
-                                            expr: BoExp::Exists {
-                                                traversal,
-                                                negated,
-                                            },
+                                            expr: BoExp::Exists { traversal, negated },
                                         })
                                     }
                                     _ => Where::Ref(WhereRef { expr }),
@@ -919,8 +916,8 @@ pub(crate) fn infer_expr_type<'a>(
                 })),
             )
         }
-        And(v) => {
-            let exprs = v
+        And { exprs, negated } => {
+            let exprs = exprs
                 .iter()
                 .map(|expr| {
                     let (_, stmt) = infer_expr_type(
@@ -945,10 +942,7 @@ pub(crate) fn infer_expr_type<'a>(
                                 } => {
                                     // keep as iterator
                                     traversal.should_collect = ShouldCollect::No;
-                                    BoExp::Exists {
-                                        traversal,
-                                        negated,
-                                    }
+                                    BoExp::Exists { traversal, negated }
                                 }
                                 _ => expr,
                             }
@@ -960,11 +954,14 @@ pub(crate) fn infer_expr_type<'a>(
                 .collect::<Vec<_>>();
             (
                 Type::Boolean,
-                Some(GeneratedStatement::BoExp(BoExp::And(exprs))),
+                Some(GeneratedStatement::BoExp(BoExp::And {
+                    exprs,
+                    negated: *negated,
+                })),
             )
         }
-        Or(v) => {
-            let exprs = v
+        Or { exprs, negated } => {
+            let exprs = exprs
                 .iter()
                 .map(|expr| {
                     let (_, stmt) = infer_expr_type(
@@ -986,10 +983,7 @@ pub(crate) fn infer_expr_type<'a>(
                                 negated,
                             } => {
                                 traversal.should_collect = ShouldCollect::No;
-                                BoExp::Exists {
-                                    traversal,
-                                    negated,
-                                }
+                                BoExp::Exists { traversal, negated }
                             }
                             _ => expr,
                         },
@@ -1000,18 +994,15 @@ pub(crate) fn infer_expr_type<'a>(
                 .collect::<Vec<_>>();
             (
                 Type::Boolean,
-                Some(GeneratedStatement::BoExp(BoExp::Or(exprs))),
+                Some(GeneratedStatement::BoExp(BoExp::Or {
+                    exprs,
+                    negated: *negated,
+                })),
             )
         }
         Exists(expr) => {
-            let (_, stmt) = infer_expr_type(
-                ctx,
-                &expr.expr,
-                scope,
-                original_query,
-                parent_ty,
-                gen_query,
-            );
+            let (_, stmt) =
+                infer_expr_type(ctx, &expr.expr, scope, original_query, parent_ty, gen_query);
             assert!(stmt.is_some());
             assert!(matches!(stmt, Some(GeneratedStatement::Traversal(_))));
             let traversal = match stmt.unwrap() {

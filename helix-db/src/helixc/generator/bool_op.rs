@@ -106,8 +106,8 @@ impl Display for Contains {
 /// that resolve to a boolean value
 #[derive(Clone)]
 pub enum BoExp {
-    And(Vec<BoExp>),
-    Or(Vec<BoExp>),
+    And{ exprs: Vec<BoExp>, negated: bool },
+    Or{ exprs: Vec<BoExp>, negated: bool },
     Exists {
         traversal: Traversal,
         negated: bool,
@@ -117,19 +117,27 @@ pub enum BoExp {
 impl Display for BoExp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BoExp::And(traversals) => {
-                let tr = traversals
+            BoExp::And{ exprs, negated } => {
+                let tr = exprs
                     .iter()
                     .map(|s| format!("{s}"))
                     .collect::<Vec<_>>();
-                write!(f, "{}", tr.join(" && "))
+                if *negated {
+                    write!(f, "!({})", tr.join(" && "))
+                } else {
+                    write!(f, "{}", tr.join(" && "))
+                }
             }
-            BoExp::Or(traversals) => {
-                let tr = traversals
+            BoExp::Or{ exprs, negated } => {
+                let tr = exprs
                     .iter()
                     .map(|s| format!("{s}"))
                     .collect::<Vec<_>>();
-                write!(f, "{}", tr.join(" || "))
+                if *negated {
+                    write!(f, "!({})", tr.join(" || "))
+                } else {
+                    write!(f, "{}", tr.join(" || "))
+                }
             }
             BoExp::Exists { traversal, negated } => {
                 if *negated {

@@ -5,7 +5,7 @@ use tempfile::TempDir;
 
 use crate::{
     helix_engine::{
-        storage_core::{HelixGraphStorage, version_info::VersionInfo},
+        storage_core::{version_info::VersionInfo},
         traversal_core::{
             HelixGraphEngine, HelixGraphEngineOpts,
             config::Config,
@@ -22,7 +22,6 @@ use crate::{
         vector_core::vector::HVector,
     },
     helix_gateway::mcp::{mcp::MCPConnection, tools::McpTools},
-    props,
 };
 
 fn setup_test_db() -> (HelixGraphEngine, TempDir) {
