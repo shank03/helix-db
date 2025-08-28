@@ -979,8 +979,6 @@ pub fn copy_repo_dir_for_build(src: &std::path::Path, dst: &std::path::Path) -> 
                     | ".github"
                     | ".DS_Store"
                     | "target"
-                    | "helix-cli"
-                    | "hql-tests"
                     | "docs"
             )
         {
