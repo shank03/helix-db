@@ -120,16 +120,13 @@ impl BoExp {
     }
 
     pub fn is_not(&self) -> bool {
-        match self {
-            BoExp::Not(_) => true,
-            _ => false,
-        }
+        matches!(self, BoExp::Not(_))
     }
 }
 impl Display for BoExp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BoExp::Not(expr) => write!(f, "!({})", expr),
+            BoExp::Not(expr) => write!(f, "!({expr})"),
             BoExp::And(exprs) => {
                 let displayed_exprs = exprs.iter().map(|s| format!("{s}")).collect::<Vec<_>>();
                 write!(f, "{}", displayed_exprs.join(" && "))

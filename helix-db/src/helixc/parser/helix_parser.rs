@@ -2328,7 +2328,7 @@ impl HelixParser {
                     expr: match negated {
                         true => ExpressionType::Not(Box::new(Expression {
                             loc: loc.clone(),
-                            expr: expr,
+                            expr,
                         })),
                         false => expr,
                     },
@@ -2396,7 +2396,7 @@ impl HelixParser {
                     expr: match negated {
                         true => ExpressionType::Not(Box::new(Expression {
                             loc: loc.clone(),
-                            expr: expr,
+                            expr,
                         })),
                         false => expr,
                     },
