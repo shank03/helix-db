@@ -510,8 +510,8 @@ impl IfPresentThereInsertHere for HashMap<String, ReturnValue> {
         // value in mixin
         // if there.should_spread {
         //     self.insert(key, value);
-        // } else 
-        
+        // } else
+
         if let Some(existing_value) = there.remappings.get(&key)
             && !existing_value.exclude
         {

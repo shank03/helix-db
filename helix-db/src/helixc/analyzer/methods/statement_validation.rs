@@ -57,10 +57,8 @@ pub(crate) fn validate_statements<'a>(
 
             let (rhs_ty, stmt) =
                 infer_expr_type(ctx, &assign.value, scope, original_query, None, query);
-
-            stmt.as_ref()?;
-
             scope.insert(assign.variable.as_str(), rhs_ty);
+            assert!(stmt.is_some(), "Assignment statement should be generated");
 
             let assignment = GeneratedStatement::Assignment(GeneratedAssignment {
                 variable: GenRef::Std(assign.variable.clone()),
