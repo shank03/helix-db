@@ -172,7 +172,7 @@ impl ReturnValue {
     /// ```
     #[inline(always)]
     pub fn mixin_remapping(self, remappings: HashMap<String, Remapping>) -> Self {
-        println!("Remapping: {self:#?}");
+        debug_println!("Remapping: {:#?}", self);
         let return_value = match self {
             ReturnValue::Object(mut a) => {
                 remappings.into_iter().for_each(|(k, v)| {
@@ -193,7 +193,7 @@ impl ReturnValue {
             }
             _ => unreachable!(),
         };
-        debug_println!("Return value: {return_value:?}");
+        debug_println!("Return value: {:return_value?}");
         return_value
     }
 
