@@ -176,7 +176,7 @@ impl ReturnValue {
         let return_value = match self {
             ReturnValue::Object(mut a) => {
                 remappings.into_iter().for_each(|(k, v)| {
-                    debug_println!("k: {k:?}, v: {v:?}");
+                    debug_println!("k: {:?}, v: {:?}", k, v);
                     if v.exclude {
                         let _ = a.remove(&k);
                     } else if let Some(new_name) = v.new_name {
