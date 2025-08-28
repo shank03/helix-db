@@ -249,11 +249,11 @@ impl Type {
     pub fn kind_str(&self) -> &'static str {
         match self {
             Type::Node(_) => "node",
-            Type::Nodes(_) => "node",
+            Type::Nodes(_) => "nodes",
             Type::Edge(_) => "edge",
-            Type::Edges(_) => "edge",
+            Type::Edges(_) => "edges",
             Type::Vector(_) => "vector",
-            Type::Vectors(_) => "vector",
+            Type::Vectors(_) => "vectors",
             Type::Scalar(_) => "scalar",
             Type::Object(_) => "object",
             Type::Boolean => "boolean",
