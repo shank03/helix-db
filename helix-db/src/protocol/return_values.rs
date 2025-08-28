@@ -2,7 +2,7 @@ use super::{
     remapping::{Remapping, ResponseRemapping},
     value::Value,
 };
-use crate::helix_engine::traversal_core::traversal_value::TraversalValue;
+use crate::{debug_println, helix_engine::traversal_core::traversal_value::TraversalValue};
 use crate::utils::{
     count::Count,
     filterable::{Filterable, FilterableType},
@@ -176,7 +176,7 @@ impl ReturnValue {
         let return_value = match self {
             ReturnValue::Object(mut a) => {
                 remappings.into_iter().for_each(|(k, v)| {
-                    println!("k: {k:?}, v: {v:?}");
+                    debug_println!("k: {k:?}, v: {v:?}");
                     if v.exclude {
                         let _ = a.remove(&k);
                     } else if let Some(new_name) = v.new_name {
@@ -193,7 +193,7 @@ impl ReturnValue {
             }
             _ => unreachable!(),
         };
-        println!("Return value: {return_value:?}");
+        debug_println!("Return value: {return_value:?}");
         return_value
     }
 
