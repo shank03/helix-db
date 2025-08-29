@@ -411,7 +411,7 @@ pub struct Query {
     pub name: String,
     pub parameters: Vec<Parameter>,
     pub statements: Vec<Statement>,
-    pub return_values: Vec<Expression>,
+    pub return_values: Vec<ReturnType>,
     pub loc: Loc,
 }
 
@@ -501,6 +501,15 @@ pub enum ExpressionType {
     BM25Search(BM25Search),
     Empty,
 }
+
+#[derive(Debug, Clone)]
+pub enum ReturnType {
+    Array(Vec<Object>),
+    Object(Object),
+    Expression(Expression),
+    Empty,
+}
+
 impl Debug for ExpressionType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -2212,11 +2221,82 @@ impl HelixParser {
         })
     }
 
-    fn parse_return_statement(&self, pair: Pair<Rule>) -> Result<Vec<Expression>, ParserError> {
+    fn parse_return_statement(&self, pair: Pair<Rule>) -> Result<Vec<ReturnType>, ParserError> {
         // println!("pair: {:?}", pair.clone().into_inner());
-        pair.into_inner()
-            .map(|p| self.parse_expression(p))
-            .collect()
+        let inner = pair.into_inner();
+        let mut return_types = Vec::new();
+        for pair in inner {
+            match pair.as_rule() {
+                Rule::array_creation => {
+                    return_types.push(ReturnType::Array(self.parse_array_creation(pair)?));
+                }
+                Rule::object_creation => {
+                    return_types.push(ReturnType::Object(self.parse_object_creation(pair)?));
+                }
+                Rule::evaluates_to_anything => {
+                    return_types.push(ReturnType::Expression(self.parse_expression(pair)?));
+                }
+                _ => {
+                    return Err(ParserError::from(format!(
+                        "Unexpected rule in return statement: {:?}",
+                        pair.as_rule()
+                    )));
+                }
+            }
+        }
+        Ok(return_types)
+    }
+
+    fn parse_array_creation(&self, pair: Pair<Rule>) -> Result<Vec<Object>, ParserError> {
+        let pairs = pair.into_inner();
+        let mut objects = Vec::new();
+        for p in pairs {
+            objects.push(self.parse_object_inner(p)?);
+        }
+        Ok(objects)
+    }
+
+    fn parse_object_creation(&self, pair: Pair<Rule>) -> Result<Object, ParserError> {
+        self.parse_object_inner(pair)
+    }
+
+    fn parse_object_inner(&self, pair: Pair<Rule>) -> Result<Object, ParserError> {
+        let mut fields = Vec::new();
+        let loc = pair.loc();
+        for p in pair.into_inner() {
+            let loc = p.loc();
+            let prop_key = p.as_str().to_string();
+            let field_addition = match p.as_rule() {
+                Rule::evaluates_to_anything => FieldValue {
+                    loc: loc.clone(),
+                    value: FieldValueType::Expression(self.parse_expression(p)?),
+                },
+                Rule::anonymous_traversal => FieldValue {
+                    loc: loc.clone(),
+                    value: FieldValueType::Traversal(Box::new(self.parse_anon_traversal(p)?)),
+                },
+                Rule::mapping_field => FieldValue {
+                    loc: loc.clone(),
+                    value: FieldValueType::Fields(self.parse_field_additions(p)?),
+                },
+                Rule::object_step => FieldValue {
+                    loc: loc.clone(),
+                    value: FieldValueType::Fields(self.parse_object_step(p.clone())?.fields),
+                },
+                _ => self.parse_new_field_value(p)?,
+            };
+
+            fields.push(FieldAddition {
+                loc,
+                key: prop_key,
+                value: field_addition,
+            });
+        }
+        Ok(Object {
+            loc,
+            fields,
+            should_spread: false,
+        })
     }
 
     fn parse_expression_vec(&self, pairs: Pairs<Rule>) -> Result<Vec<Expression>, ParserError> {

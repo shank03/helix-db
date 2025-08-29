@@ -127,7 +127,7 @@ evaluates_to_number = {
 // ---------------------------------------------------------------------
 // Return statement
 // ---------------------------------------------------------------------
-return_stmt = { "RETURN" ~ evaluates_to_anything ~ ("," ~ evaluates_to_anything)* }
+return_stmt = { "RETURN" ~ (evaluates_to_anything ~ ("," ~ evaluates_to_anything)* | array_creation | object_creation) }
 
 // ---------------------------------------------------------------------
 // Creation steps
@@ -226,6 +226,9 @@ exclude_field = { "!" ~ "{" ~ identifier ~ ("," ~ identifier)* ~ "}" }
 closure_step  = { "|" ~ identifier ~ "|" ~ object_step }
 spread_object = { ".." ~ ","?}
 mapping_field = { (identifier ~ (":" ~ (anonymous_traversal | evaluates_to_anything | object_step))) | identifier }
+array_creation = { "[" ~ (object_inner ~ ("," ~ object_inner)* ~ ","?) ~ "]" }
+object_creation = {  object_inner ~ ("," ~ object_inner)* ~ ","? }
+object_inner = {  "{" ~ identifier ~ ":" ~ (anonymous_traversal | evaluates_to_anything) ~ "}"}
 
 // ---------------------------------------------------------------------
 // Macros

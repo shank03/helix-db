@@ -1,8 +1,7 @@
 use core::fmt;
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 
 use crate::helixc::generator::{traversal_steps::Traversal, utils::GeneratedValue};
-
 
 pub struct ReturnValue {
     pub value: ReturnValueExpr,
@@ -40,8 +39,11 @@ impl Display for ReturnValue {
                 )
             }
             ReturnType::UnnamedExpr => {
-                write!(f, "// need to implement unnamed return value\n todo!()")?;
-                panic!("Unnamed return value is not supported");
+                writeln!(
+                    f,
+                    "    return_vals.insert(\"data\".to_string(), ReturnValue::from_traversal_value_array_with_mixin({}.clone(), remapping_vals.borrow_mut()));",
+                    self.value
+                )
             }
         }
     }
@@ -88,6 +90,18 @@ impl ReturnValue {
             return_type: ReturnType::UnnamedExpr,
         }
     }
+    pub fn new_array(values: Vec<ReturnValueExpr>) -> Self {
+        Self {
+            value: ReturnValueExpr::Array(values),
+            return_type: ReturnType::UnnamedExpr,
+        }
+    }
+    pub fn new_object(values: HashMap<String, ReturnValueExpr>) -> Self {
+        Self {
+            value: ReturnValueExpr::Object(values),
+            return_type: ReturnType::UnnamedExpr,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -103,6 +117,8 @@ pub enum ReturnValueExpr {
     Traversal(Traversal),
     Identifier(GeneratedValue),
     Value(GeneratedValue),
+    Array(Vec<ReturnValueExpr>),
+    Object(HashMap<String, ReturnValueExpr>),
 }
 impl Display for ReturnValueExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -110,6 +126,20 @@ impl Display for ReturnValueExpr {
             ReturnValueExpr::Traversal(traversal) => write!(f, "{traversal}"),
             ReturnValueExpr::Identifier(identifier) => write!(f, "{identifier}"),
             ReturnValueExpr::Value(value) => write!(f, "{value}"),
+            ReturnValueExpr::Array(values) => {
+                write!(f, "vec![")?;
+                for value in values {
+                    write!(f, "{value};")?;
+                }
+                write!(f, "]")
+            }
+            ReturnValueExpr::Object(values) => {
+                write!(f, "HashMap::from([")?;
+                for (key, value) in values {
+                    write!(f, "({}, {}),", key, value)?;
+                }
+                write!(f, "])")
+            }
         }
     }
 }
