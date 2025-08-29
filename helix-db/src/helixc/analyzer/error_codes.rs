@@ -48,6 +48,8 @@ pub enum ErrorCode {
     E304,
     /// `E305` – `missing parameter`
     E305,
+    /// `E306` – `expression is not a boolean`
+    E306,
 
     // MCP ERRORS
     /// `E401` – `MCP query must return a single value`
@@ -139,6 +141,7 @@ impl std::fmt::Display for ErrorCode {
             ErrorCode::E303 => write!(f, "E303"),
             ErrorCode::E304 => write!(f, "E304"),
             ErrorCode::E305 => write!(f, "E305"),
+            ErrorCode::E306 => write!(f, "E306"),
             ErrorCode::E401 => write!(f, "E401"),
             ErrorCode::E501 => write!(f, "E501"),
             ErrorCode::E601 => write!(f, "E601"),
@@ -218,6 +221,7 @@ implement_error_code!(E301, "variable `{}` not in scope" => { variable }, "check
 implement_error_code!(E302, "variable `{}` previously declared" => { variable }, "check the variable" => {});
 implement_error_code!(E304, "missing {} type" => { item_type }, "add an {} type" => { item_type });
 implement_error_code!(E305, "missing parameter `{}` for method `{}`" => { parameter_name, method_name }, "add the parameter `{}`" => { parameter_name });
+implement_error_code!(E306, "expression should result in a boolean, instead got `{}`" => { expression_type }, "ensure the expression is a boolean" => {});
 
 // MCP errors
 implement_error_code!(E401, "MCP query must return a single value, but got `{}`" => { number_of_values }, "return a single value" => {});

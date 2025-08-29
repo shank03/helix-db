@@ -1,7 +1,6 @@
 use crate::helix_engine::traversal_core::HelixGraphEngine;
 use crate::helix_engine::types::GraphError;
 use crate::helix_gateway::gateway::CoreSetter;
-use crate::helix_gateway::graphvis;
 use crate::helix_gateway::mcp::mcp::MCPToolInput;
 use crate::protocol::{self, HelixError, Request};
 use flume::{Receiver, Selector, Sender};
@@ -169,13 +168,6 @@ fn request_mapper(
             } else {
                 None
             }
-        }
-        RequestType::GraphVis => {
-            let input = HandlerInput {
-                request,
-                graph: graph_access.clone(),
-            };
-            Some(graphvis::graphvis_inner(&input))
         }
     };
 

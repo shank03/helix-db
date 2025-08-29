@@ -26,7 +26,6 @@ pub struct Request {
 pub enum RequestType {
     Query,
     MCP,
-    GraphVis,
 }
 
 impl<S> FromRequest<S> for Request

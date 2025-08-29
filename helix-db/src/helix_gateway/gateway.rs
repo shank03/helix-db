@@ -22,7 +22,6 @@ use crate::helix_gateway::builtin::node_by_id::node_details_handler;
 use crate::helix_gateway::builtin::node_connections::node_connections_handler;
 #[cfg(feature = "dev-instance")]
 use crate::helix_gateway::builtin::nodes_by_label::nodes_by_label_handler;
-use crate::helix_gateway::graphvis;
 use crate::helix_gateway::introspect_schema::introspect_schema_handler;
 use crate::helix_gateway::worker_pool::WorkerPool;
 use crate::protocol;
@@ -126,7 +125,6 @@ impl HelixGateway {
 
         axum_app = axum_app
             .route("/{*path}", post(post_handler))
-            .route("/graphvis", get(graphvis::graphvis_handler))
             .route("/introspect", get(introspect_schema_handler));
 
         #[cfg(feature = "dev-instance")]

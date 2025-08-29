@@ -114,7 +114,7 @@ pub struct FilterTraversal {
 }
 
 #[tool_calls]
-trait McpTools<'a> {
+pub(super) trait McpTools<'a> {
     fn out_step(
         &'a self,
         txn: &'a RoTxn,
@@ -185,6 +185,7 @@ trait McpTools<'a> {
         connection: &'a MCPConnection,
         query: String,
         label: String,
+        k: Option<usize>,
     ) -> Result<Vec<TraversalValue>, GraphError>;
 
     fn search_vector(
@@ -234,7 +235,7 @@ impl<'a> McpTools<'a> for McpBackend {
             })
             .flatten();
 
-        let result = iter.take(100).collect();
+        let result = iter.collect();
         debug_println!("result: {:?}", result);
         result
     }
@@ -273,7 +274,7 @@ impl<'a> McpTools<'a> for McpBackend {
             })
             .flatten();
 
-        let result = iter.take(100).collect();
+        let result = iter.collect();
         debug_println!("result: {:?}", result);
         result
     }
@@ -314,7 +315,7 @@ impl<'a> McpTools<'a> for McpBackend {
             })
             .flatten();
 
-        let result = iter.take(100).collect();
+        let result = iter.collect();
         debug_println!("result: {:?}", result);
         result
     }
@@ -353,7 +354,7 @@ impl<'a> McpTools<'a> for McpBackend {
             })
             .flatten();
 
-        let result = iter.take(100).collect();
+        let result = iter.collect();
         debug_println!("result: {:?}", result);
         result
     }
@@ -371,7 +372,7 @@ impl<'a> McpTools<'a> for McpBackend {
             label: &node_type,
         };
 
-        let result = iter.take(100).collect::<Result<Vec<_>, _>>();
+        let result = iter.collect::<Result<Vec<_>, _>>();
         debug_println!("result: {:?}", result);
         result
     }
@@ -389,7 +390,7 @@ impl<'a> McpTools<'a> for McpBackend {
             label: &edge_type,
         };
 
-        let result = iter.take(100).collect::<Result<Vec<_>, _>>();
+        let result = iter.collect::<Result<Vec<_>, _>>();
         debug_println!("result: {:?}", result);
         result
     }
@@ -434,7 +435,8 @@ impl<'a> McpTools<'a> for McpBackend {
                 Ok(None) => {
                     // BM25 metadata not found - index not initialized yet
                     debug_println!("BM25 index not initialized yet - returning empty results");
-                    Ok(vec![])
+                    println!("BM25 index not initialized yet - returning empty results");
+                    Err(GraphError::from("BM25 index not initialized yet - returning empty results"))
                 }
                 Err(_e) => {
                     // Error accessing metadata database
@@ -442,13 +444,15 @@ impl<'a> McpTools<'a> for McpBackend {
                         "Error checking BM25 metadata: {:?} - returning empty results",
                         e
                     );
-                    Ok(vec![])
+                    println!("Error checking BM25 metadata: {:?} - returning empty results", _e);
+                    Err(GraphError::from("Error checking BM25 metadata - returning empty results"))
                 }
             }
         } else {
             // BM25 is not enabled
             debug_println!("BM25 is not enabled - returning empty results");
-            Ok(vec![])
+            println!("BM25 is not enabled - returning empty results");
+            Err(GraphError::from("BM25 is not enabled - returning empty results"))
         }
     }
 
@@ -458,6 +462,7 @@ impl<'a> McpTools<'a> for McpBackend {
         _connection: &'a MCPConnection,
         query: String,
         label: String,
+        k: Option<usize>,
     ) -> Result<Vec<TraversalValue>, GraphError> {
         let db = Arc::clone(&self.db);
 
@@ -466,7 +471,7 @@ impl<'a> McpTools<'a> for McpBackend {
         let embedding = result?;
 
         let res = G::new(db, txn)
-            .search_v::<fn(&HVector, &RoTxn) -> bool, _>(&embedding, 5, &label, None)
+            .search_v::<fn(&HVector, &RoTxn) -> bool, _>(&embedding, k.unwrap_or(5), &label, None)
             .collect_to::<Vec<_>>();
 
         debug_println!("result: {res:?}");
@@ -499,7 +504,7 @@ impl<'a> McpTools<'a> for McpBackend {
             });
         }
 
-        println!("result: {res:?}");
+        debug_println!("result: {res:?}");
         Ok(res)
     }
 }

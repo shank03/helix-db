@@ -23,7 +23,7 @@ use std::{
     error::Error,
     fmt::Write,
     fs::{self, DirEntry, File},
-    io::{ErrorKind, Write as iWrite},
+    io::{self, ErrorKind, Write as iWrite},
     net::{SocketAddr, TcpListener},
     path::{Path, PathBuf},
     process::{Command, Stdio},
@@ -486,6 +486,10 @@ fn parse_content(content: &Content) -> Result<Source, String> {
 /// Runs the static analyzer on the parsed source to catch errors and generate diagnostics if any.
 /// Otherwise returns the generated source object which is an IR used to transpile the queries to rust.
 fn analyze_source(source: Source) -> Result<GeneratedSource, String> {
+    if source.schema.is_empty() {
+        return Err("No schema definitions provided".to_string());
+    }
+
     let (diagnostics, source) = analyze(&source);
     if !diagnostics.is_empty() {
         for diag in diagnostics {
@@ -938,4 +942,37 @@ pub fn get_openai_key() -> Option<String> {
     use dotenvy::dotenv;
     dotenv().ok();
     env::var("OPENAI_API_KEY").ok()
+}
+
+pub fn copy_repo_dir_for_build(src: &std::path::Path, dst: &std::path::Path) -> io::Result<()> {
+    fs::create_dir_all(dst)?;
+
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+
+        // Skip copying unnecessary files and directories
+        if let Some(file_name) = entry.file_name().to_str()
+            && matches!(
+                file_name,
+                ".git"
+                    | ".gitignore"
+                    | ".github"
+                    | ".DS_Store"
+                    | "target"
+                    | "docs"
+            )
+        {
+            continue;
+        }
+
+        if src_path.is_dir() {
+            copy_repo_dir_for_build(&src_path, &dst_path)?;
+        } else {
+            fs::copy(&src_path, &dst_path)?;
+        }
+    }
+
+    Ok(())
 }

@@ -31,6 +31,7 @@ impl Display for Statement {
     }
 }
 
+
 #[derive(Clone)]
 pub enum IdentifierType {
     Primitive,

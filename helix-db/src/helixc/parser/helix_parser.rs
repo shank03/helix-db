@@ -478,7 +478,6 @@ pub struct Expression {
 #[derive(Debug, Clone)]
 pub struct ExistsExpression {
     pub loc: Loc,
-    pub negated: bool,
     pub expr: Box<Expression>,
 }
 
@@ -495,6 +494,7 @@ pub enum ExpressionType {
     AddVector(AddVector),
     AddNode(AddNode),
     AddEdge(AddEdge),
+    Not(Box<Expression>),
     And(Vec<Expression>),
     Or(Vec<Expression>),
     SearchVector(SearchVector),
@@ -515,8 +515,9 @@ impl Debug for ExpressionType {
             ExpressionType::AddVector(av) => write!(f, "AddVector({av:?})"),
             ExpressionType::AddNode(an) => write!(f, "AddNode({an:?})"),
             ExpressionType::AddEdge(ae) => write!(f, "AddEdge({ae:?})"),
-            ExpressionType::And(and) => write!(f, "And({and:?})"),
-            ExpressionType::Or(or) => write!(f, "Or({or:?})"),
+            ExpressionType::Not(expr) => write!(f, "Not({expr:?})"),
+            ExpressionType::And(exprs) => write!(f, "And({exprs:?})"),
+            ExpressionType::Or(exprs) => write!(f, "Or({exprs:?})"),
             ExpressionType::SearchVector(sv) => write!(f, "SearchVector({sv:?})"),
             ExpressionType::BM25Search(bm25) => write!(f, "BM25Search({bm25:?})"),
             ExpressionType::Empty => write!(f, "Empty"),
@@ -537,8 +538,9 @@ impl Display for ExpressionType {
             ExpressionType::AddVector(av) => write!(f, "AddVector({av:?})"),
             ExpressionType::AddNode(an) => write!(f, "AddNode({an:?})"),
             ExpressionType::AddEdge(ae) => write!(f, "AddEdge({ae:?})"),
-            ExpressionType::And(and) => write!(f, "And({and:?})"),
-            ExpressionType::Or(or) => write!(f, "Or({or:?})"),
+            ExpressionType::Not(expr) => write!(f, "Not({expr:?})"),
+            ExpressionType::And(exprs) => write!(f, "And({exprs:?})"),
+            ExpressionType::Or(exprs) => write!(f, "Or({exprs:?})"),
             ExpressionType::SearchVector(sv) => write!(f, "SearchVector({sv:?})"),
             ExpressionType::BM25Search(bm25) => write!(f, "BM25Search({bm25:?})"),
             ExpressionType::Empty => write!(f, "Empty"),
@@ -2251,14 +2253,50 @@ impl HelixParser {
     fn parse_boolean_expression(&self, pair: Pair<Rule>) -> Result<Expression, ParserError> {
         let expression = pair.into_inner().next().unwrap();
         match expression.as_rule() {
-            Rule::and => Ok(Expression {
-                loc: expression.loc(),
-                expr: ExpressionType::And(self.parse_expression_vec(expression.into_inner())?),
-            }),
-            Rule::or => Ok(Expression {
-                loc: expression.loc(),
-                expr: ExpressionType::Or(self.parse_expression_vec(expression.into_inner())?),
-            }),
+            Rule::and => {
+                let loc: Loc = expression.loc();
+                let mut inner = expression.into_inner();
+                let negated = match inner.peek() {
+                    Some(p) => p.as_rule() == Rule::negate,
+                    None => false,
+                };
+                if negated {
+                    inner.next();
+                }
+                let exprs = self.parse_expression_vec(inner)?;
+                Ok(Expression {
+                    loc: loc.clone(),
+                    expr: match negated {
+                        true => ExpressionType::Not(Box::new(Expression {
+                            loc,
+                            expr: ExpressionType::And(exprs),
+                        })),
+                        false => ExpressionType::And(exprs),
+                    },
+                })
+            }
+            Rule::or => {
+                let loc: Loc = expression.loc();
+                let mut inner = expression.into_inner();
+                let negated = match inner.peek() {
+                    Some(p) => p.as_rule() == Rule::negate,
+                    None => false,
+                };
+                if negated {
+                    inner.next();
+                }
+                let exprs = self.parse_expression_vec(inner)?;
+                Ok(Expression {
+                    loc: loc.clone(),
+                    expr: match negated {
+                        true => ExpressionType::Not(Box::new(Expression {
+                            loc,
+                            expr: ExpressionType::Or(exprs),
+                        })),
+                        false => ExpressionType::Or(exprs),
+                    },
+                })
+            }
             Rule::boolean => Ok(Expression {
                 loc: expression.loc(),
                 expr: ExpressionType::BooleanLiteral(expression.as_str() == "true"),
@@ -2276,18 +2314,24 @@ impl HelixParser {
                 let traversal = inner
                     .next()
                     .ok_or_else(|| ParserError::from("Missing traversal"))?;
+                let expr = ExpressionType::Exists(ExistsExpression {
+                    loc: loc.clone(),
+                    expr: Box::new(Expression {
+                        loc: loc.clone(),
+                        expr: ExpressionType::Traversal(Box::new(
+                            self.parse_anon_traversal(traversal)?,
+                        )),
+                    }),
+                });
                 Ok(Expression {
                     loc: loc.clone(),
-                    expr: ExpressionType::Exists(ExistsExpression {
-                        loc: loc.clone(),
-                        negated,
-                        expr: Box::new(Expression {
+                    expr: match negated {
+                        true => ExpressionType::Not(Box::new(Expression {
                             loc: loc.clone(),
-                            expr: ExpressionType::Traversal(Box::new(
-                                self.parse_anon_traversal(traversal)?,
-                            )),
-                        }),
-                    }),
+                            expr,
+                        })),
+                        false => expr,
+                    },
                 })
             }
 
@@ -2335,23 +2379,27 @@ impl HelixParser {
                 let traversal = inner
                     .next()
                     .ok_or_else(|| ParserError::from("Missing traversal"))?;
+                let expr = ExpressionType::Exists(ExistsExpression {
+                    loc: loc.clone(),
+                    expr: Box::new(Expression {
+                        loc: loc.clone(),
+                        expr: ExpressionType::Traversal(Box::new(match traversal.as_rule() {
+                            Rule::anonymous_traversal => self.parse_anon_traversal(traversal)?,
+                            Rule::id_traversal => self.parse_traversal(traversal)?,
+                            Rule::traversal => self.parse_traversal(traversal)?,
+                            _ => unreachable!(),
+                        })),
+                    }),
+                });
                 Ok(Expression {
                     loc: loc.clone(),
-                    expr: ExpressionType::Exists(ExistsExpression {
-                        loc: loc.clone(),
-                        negated,
-                        expr: Box::new(Expression {
+                    expr: match negated {
+                        true => ExpressionType::Not(Box::new(Expression {
                             loc: loc.clone(),
-                            expr: ExpressionType::Traversal(Box::new(match traversal.as_rule() {
-                                Rule::anonymous_traversal => {
-                                    self.parse_anon_traversal(traversal)?
-                                }
-                                Rule::id_traversal => self.parse_traversal(traversal)?,
-                                Rule::traversal => self.parse_traversal(traversal)?,
-                                _ => unreachable!(),
-                            })),
-                        }),
-                    }),
+                            expr,
+                        })),
+                        false => expr,
+                    },
                 })
             }
             Rule::integer => pair

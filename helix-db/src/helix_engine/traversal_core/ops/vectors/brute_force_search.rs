@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
+    debug_println,
     helix_engine::{
         traversal_core::{traversal_iter::RoTraversalIterator, traversal_value::TraversalValue},
         types::GraphError,
@@ -62,7 +63,6 @@ impl<'a, I: Iterator<Item = Result<TraversalValue, GraphError>> + 'a> BruteForce
                     v.set_distance(d);
                     Some(v)
                 }
-                // TODO: handle other types of traversal values
                 _ => None,
             })
             .sorted_by(|v1, v2| v1.partial_cmp(v2).unwrap())
@@ -84,10 +84,10 @@ impl<'a, I: Iterator<Item = Result<TraversalValue, GraphError>> + 'a> BruteForce
                         return None;
                     }
                 };
-                println!("item: {item:?}");
+                debug_println!("item: {item:?}");
 
                 if let Ok(is_deleted) = item.check_property("is_deleted") {
-                    println!("is_deleted: {is_deleted:?}");
+                    debug_println!("is_deleted: {is_deleted:?}");
                     if let Value::Boolean(is_deleted) = is_deleted.as_ref() {
                         if *is_deleted { None } else { Some(item) }
                     } else {
@@ -96,8 +96,6 @@ impl<'a, I: Iterator<Item = Result<TraversalValue, GraphError>> + 'a> BruteForce
                 } else {
                     None
                 }
-
-                // get properties
             })
             .map(|v| Ok(TraversalValue::Vector(v)));
 

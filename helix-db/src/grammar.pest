@@ -207,8 +207,8 @@ embed_method = { "Embed" ~ "(" ~ (identifier | string_literal) ~ ")" }
 // ---------------------------------------------------------------------
 // Boolean operations
 // ---------------------------------------------------------------------
-and             = { "AND" ~ "(" ~ (evaluates_to_bool | anonymous_traversal) ~ ("," ~ (evaluates_to_bool | anonymous_traversal))* ~ ")" }
-or              = { "OR" ~ "(" ~ (evaluates_to_bool | anonymous_traversal) ~ ("," ~ (evaluates_to_bool | anonymous_traversal))* ~ ")" }
+and             = { negate? ~ "AND" ~ "(" ~ (evaluates_to_bool | anonymous_traversal) ~ ("," ~ (evaluates_to_bool | anonymous_traversal))* ~ ")" }
+or              = { negate? ~ "OR" ~ "(" ~ (evaluates_to_bool | anonymous_traversal) ~ ("," ~ (evaluates_to_bool | anonymous_traversal))* ~ ")" }
 bool_operations = { GT | GTE | LT | LTE | EQ | NEQ }
 GT              = { "GT" ~ "(" ~ (evaluates_to_number | anonymous_traversal) ~ ")" }
 GTE             = { "GTE" ~ "(" ~ (evaluates_to_number | anonymous_traversal) ~ ")" }
