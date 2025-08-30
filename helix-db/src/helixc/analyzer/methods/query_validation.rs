@@ -226,114 +226,114 @@ fn analyze_return_expr<'a>(
         ReturnType::Array(values) => {
             let values = values
                 .iter()
-                .map(|object| {
-                    object
-                        .fields
-                        .iter()
-                        .map(|FieldAddition { key, value, .. }| match &value.value {
-                            FieldValueType::Expression(expr) => {
-                                let (_, stmt) =
-                                    infer_expr_type(ctx, expr, scope, original_query, None, query);
-                                (
-                                    key.clone(),
-                                    process_return_object(
-                                        ctx,
-                                        original_query,
-                                        scope,
-                                        &expr,
-                                        &stmt.unwrap(),
-                                    ),
-                                )
-                            }
-                            _ => unreachable!(),
-                        })
-                        .collect::<HashMap<String, ReturnValueExpr>>()
-                })
-                .map(|object| ReturnValueExpr::Object(object))
+                .map(|object| process_return_object(ctx, original_query, scope, &object, query))
                 .collect::<Vec<ReturnValueExpr>>();
             query.return_values.push(ReturnValue::new_array(values));
         }
         ReturnType::Object(values) => {
             let values = values
-                .fields
                 .iter()
-                .map(|FieldAddition { key, value, .. }| match &value.value {
-                    FieldValueType::Expression(expr) => {
-                        let (_, stmt) =
-                            infer_expr_type(ctx, expr, scope, original_query, None, query);
-                        (
-                            key.clone(),
-                            process_return_object(
-                                ctx,
-                                original_query,
-                                scope,
-                                &expr,
-                                &stmt.unwrap(),
-                            ),
-                        )
-                    }
-                    _ => unreachable!(),
+                .map(|(key, value)| {
+                    (
+                        key.clone(),
+                        process_return_object(ctx, original_query, scope, &value, query),
+                    )
                 })
-                .collect();
+                .collect::<HashMap<String, ReturnValueExpr>>();
             query.return_values.push(ReturnValue::new_object(values));
         }
         ReturnType::Empty => {}
     }
 }
 
-fn process_return_object(
-    ctx: &mut Ctx,
-    original_query: &Query,
-    scope: &mut HashMap<&str, Type>,
-    expr: &Expression,
-    stmt: &GeneratedStatement,
+fn process_return_object<'a>(
+    ctx: &mut Ctx<'a>,
+    original_query: &'a Query,
+    scope: &mut HashMap<&'a str, Type>,
+    return_type: &'a ReturnType,
+    query: &mut GeneratedQuery,
 ) -> ReturnValueExpr {
-    match stmt {
-        GeneratedStatement::Traversal(traversal) => {
-            match &traversal.source_step.inner() {
-                SourceStep::Identifier(v) => {
-                    is_valid_identifier(ctx, original_query, expr.loc.clone(), v.inner().as_str());
+    match return_type {
+        ReturnType::Expression(expr) => {
+            let (_, stmt) = infer_expr_type(ctx, expr, scope, original_query, None, query);
+            match stmt.unwrap() {
+                GeneratedStatement::Traversal(traversal) => {
+                    match &traversal.source_step.inner() {
+                        SourceStep::Identifier(v) => {
+                            is_valid_identifier(
+                                ctx,
+                                original_query,
+                                expr.loc.clone(),
+                                v.inner().as_str(),
+                            );
 
-                    // if is single object, need to handle it as a single object
-                    // if is array, need to handle it as an array
-                    match traversal.should_collect {
-                        ShouldCollect::ToVec => ReturnValueExpr::Traversal(traversal.clone()),
-                        ShouldCollect::ToVal => ReturnValueExpr::Traversal(traversal.clone()),
-                        _ => {
-                            unreachable!()
+                            // if is single object, need to handle it as a single object
+                            // if is array, need to handle it as an array
+                            match traversal.should_collect {
+                                ShouldCollect::ToVec => {
+                                    ReturnValueExpr::Traversal(traversal.clone())
+                                }
+                                ShouldCollect::ToVal => {
+                                    ReturnValueExpr::Traversal(traversal.clone())
+                                }
+                                _ => {
+                                    unreachable!()
+                                }
+                            }
                         }
+                        _ => ReturnValueExpr::Traversal(traversal.clone()),
                     }
                 }
-                _ => ReturnValueExpr::Traversal(traversal.clone()),
-            }
-        }
-        GeneratedStatement::Identifier(id) => {
-            is_valid_identifier(ctx, original_query, expr.loc.clone(), id.inner().as_str());
-            let identifier_end_type = match scope.get(id.inner().as_str()) {
-                Some(t) => t.clone(),
-                None => {
-                    generate_error!(
-                        ctx,
-                        original_query,
-                        expr.loc.clone(),
-                        E301,
-                        id.inner().as_str()
-                    );
-                    Type::Unknown
-                }
-            };
-            let value = gen_identifier_or_param(original_query, id.inner().as_str(), false, true);
+                GeneratedStatement::Identifier(id) => {
+                    is_valid_identifier(ctx, original_query, expr.loc.clone(), id.inner().as_str());
+                    let identifier_end_type = match scope.get(id.inner().as_str()) {
+                        Some(t) => t.clone(),
+                        None => {
+                            generate_error!(
+                                ctx,
+                                original_query,
+                                expr.loc.clone(),
+                                E301,
+                                id.inner().as_str()
+                            );
+                            Type::Unknown
+                        }
+                    };
+                    let value =
+                        gen_identifier_or_param(original_query, id.inner().as_str(), false, true);
 
-            match identifier_end_type {
-                Type::Scalar(_) | Type::Boolean => ReturnValueExpr::Identifier(value),
-                Type::Node(_) | Type::Vector(_) | Type::Edge(_) => {
-                    ReturnValueExpr::Identifier(value)
+                    match identifier_end_type {
+                        Type::Scalar(_) | Type::Boolean => ReturnValueExpr::Identifier(value),
+                        Type::Node(_) | Type::Vector(_) | Type::Edge(_) => {
+                            ReturnValueExpr::Identifier(value)
+                        }
+                        _ => ReturnValueExpr::Identifier(value),
+                    }
                 }
-                _ => ReturnValueExpr::Identifier(value),
+                GeneratedStatement::Literal(l) => {
+                    ReturnValueExpr::Value(GeneratedValue::Literal(l.clone()))
+                }
+                _ => unreachable!(),
             }
         }
-        GeneratedStatement::Literal(l) => {
-            ReturnValueExpr::Value(GeneratedValue::Literal(l.clone()))
+        ReturnType::Array(values) => {
+            let values = values
+                .iter()
+                .map(|value| process_return_object(ctx, original_query, scope, &value, query))
+                .collect::<Vec<ReturnValueExpr>>();
+            ReturnValueExpr::Array(values)
+        }
+        ReturnType::Object(values) => {
+            let values = values
+                .iter()
+                .map(|(key, value)| {
+                    (
+                        key.clone(),
+                        process_return_object(ctx, original_query, scope, &value, query),
+                    )
+                })
+                .collect::<HashMap<String, ReturnValueExpr>>();
+            ReturnValueExpr::Object(values)
         }
         _ => unreachable!(),
     }

@@ -504,8 +504,8 @@ pub enum ExpressionType {
 
 #[derive(Debug, Clone)]
 pub enum ReturnType {
-    Array(Vec<Object>),
-    Object(Object),
+    Array(Vec<ReturnType>),
+    Object(HashMap<String, ReturnType>),
     Expression(Expression),
     Empty,
 }
@@ -2247,56 +2247,57 @@ impl HelixParser {
         Ok(return_types)
     }
 
-    fn parse_array_creation(&self, pair: Pair<Rule>) -> Result<Vec<Object>, ParserError> {
+    fn parse_array_creation(&self, pair: Pair<Rule>) -> Result<Vec<ReturnType>, ParserError> {
         let pairs = pair.into_inner();
         let mut objects = Vec::new();
         for p in pairs {
-            objects.push(self.parse_object_inner(p)?);
+            match p.as_rule() {
+                Rule::identifier => {
+                    objects.push(ReturnType::Expression(Expression {
+                        loc: p.loc(),
+                        expr: ExpressionType::Identifier(p.as_str().to_string()),
+                    }));
+                }
+                _ => {
+                    objects.push(ReturnType::Object(self.parse_object_creation(p)?));
+                }
+            }
         }
         Ok(objects)
     }
 
-    fn parse_object_creation(&self, pair: Pair<Rule>) -> Result<Object, ParserError> {
-        self.parse_object_inner(pair)
+    fn parse_object_creation(&self, pair: Pair<Rule>) -> Result<HashMap<String, ReturnType>, ParserError> {
+        pair.into_inner()
+            .map(|p| {
+                let mut object_inner = p.into_inner();
+                let key = object_inner.next().ok_or_else(|| ParserError::from("Missing object inner"))?;
+                let value = object_inner.next().ok_or_else(|| ParserError::from("Missing object inner"))?;
+                let value = self.parse_object_inner(value)?;
+                Ok((key.as_str().to_string(), value))
+            })
+            .collect::<Result<HashMap<String, ReturnType>, _>>()
     }
 
-    fn parse_object_inner(&self, pair: Pair<Rule>) -> Result<Object, ParserError> {
-        let mut fields = Vec::new();
-        let loc = pair.loc();
-        for p in pair.into_inner() {
-            let loc = p.loc();
-            let prop_key = p.as_str().to_string();
-            let field_addition = match p.as_rule() {
-                Rule::evaluates_to_anything => FieldValue {
-                    loc: loc.clone(),
-                    value: FieldValueType::Expression(self.parse_expression(p)?),
-                },
-                Rule::anonymous_traversal => FieldValue {
-                    loc: loc.clone(),
-                    value: FieldValueType::Traversal(Box::new(self.parse_anon_traversal(p)?)),
-                },
-                Rule::mapping_field => FieldValue {
-                    loc: loc.clone(),
-                    value: FieldValueType::Fields(self.parse_field_additions(p)?),
-                },
-                Rule::object_step => FieldValue {
-                    loc: loc.clone(),
-                    value: FieldValueType::Fields(self.parse_object_step(p.clone())?.fields),
-                },
-                _ => self.parse_new_field_value(p)?,
-            };
+    fn parse_object_inner(&self, object_field: Pair<Rule>) -> Result<ReturnType, ParserError> {
+        let object_field_inner = object_field.into_inner().next().ok_or_else(|| ParserError::from("Missing object inner"))?;
 
-            fields.push(FieldAddition {
-                loc,
-                key: prop_key,
-                value: field_addition,
-            });
+        match object_field_inner.as_rule() {
+            Rule::evaluates_to_anything => {
+                Ok(ReturnType::Expression(self.parse_expression(object_field_inner)?))
+            }
+            Rule::object_creation => {
+                Ok(ReturnType::Object(self.parse_object_creation(object_field_inner)?))
+            }
+            Rule::array_creation => {
+                Ok(ReturnType::Array(self.parse_array_creation(object_field_inner)?))
+            }
+            _ => {
+                return Err(ParserError::from(format!(
+                    "Unexpected rule in parse_object_inner: {:?}",
+                    object_field_inner.as_rule()
+                )));
+            }
         }
-        Ok(Object {
-            loc,
-            fields,
-            should_spread: false,
-        })
     }
 
     fn parse_expression_vec(&self, pairs: Pairs<Rule>) -> Result<Vec<Expression>, ParserError> {
