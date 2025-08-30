@@ -45,6 +45,20 @@ impl Display for ReturnValue {
                     self.value
                 )
             }
+            ReturnType::HashMap => {
+                writeln!(
+                    f,
+                    "    return_vals.insert(\"data\".to_string(), ReturnValue::from({}));",
+                    self.value
+                )
+            }
+            ReturnType::Array => {
+                writeln!(
+                    f,
+                    "    return_vals.insert(\"data\".to_string(), ReturnValue::from({}));",
+                    self.value
+                )
+            }
         }
     }
 }
@@ -57,6 +71,8 @@ impl ReturnValue {
             ReturnType::NamedExpr(name) => name.inner().inner().to_string(),
             ReturnType::SingleExpr(name) => name.inner().inner().to_string(),
             ReturnType::UnnamedExpr => todo!(),
+            ReturnType::HashMap => todo!(),
+            ReturnType::Array => todo!(),
         }
     }
 
@@ -93,13 +109,13 @@ impl ReturnValue {
     pub fn new_array(values: Vec<ReturnValueExpr>) -> Self {
         Self {
             value: ReturnValueExpr::Array(values),
-            return_type: ReturnType::UnnamedExpr,
+            return_type: ReturnType::Array,
         }
     }
     pub fn new_object(values: HashMap<String, ReturnValueExpr>) -> Self {
         Self {
             value: ReturnValueExpr::Object(values),
-            return_type: ReturnType::UnnamedExpr,
+            return_type: ReturnType::HashMap,
         }
     }
 }
@@ -111,6 +127,8 @@ pub enum ReturnType {
     NamedExpr(GeneratedValue),
     SingleExpr(GeneratedValue),
     UnnamedExpr,
+    HashMap,
+    Array,
 }
 #[derive(Clone)]
 pub enum ReturnValueExpr {
@@ -128,15 +146,17 @@ impl Display for ReturnValueExpr {
             ReturnValueExpr::Value(value) => write!(f, "{value}"),
             ReturnValueExpr::Array(values) => {
                 write!(f, "vec![")?;
+                // if traversal then use the other from functions
                 for value in values {
-                    write!(f, "{value};")?;
+                    write!(f, "ReturnValue::from({value}),")?;
                 }
                 write!(f, "]")
             }
             ReturnValueExpr::Object(values) => {
                 write!(f, "HashMap::from([")?;
+                // if traversal then use the other from functions
                 for (key, value) in values {
-                    write!(f, "({}, {}),", key, value)?;
+                    write!(f, "(String::from(\"{key}\"), ReturnValue::from({value})),")?;
                 }
                 write!(f, "])")
             }
