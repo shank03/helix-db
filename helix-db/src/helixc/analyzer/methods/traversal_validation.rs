@@ -577,14 +577,14 @@ pub(crate) fn validate_traversal<'a>(
                             ))));
                     }
                     GeneratedStatement::BoExp(expr) => {
-                        // if Not(Exists()) or Exits() need to modify the traversal to not collect 
+                        // if Not(Exists()) or Exits() need to modify the traversal to not collect
                         // else return where as normal
                         let where_expr = match expr {
                             BoExp::Not(inner_expr) => {
                                 if let BoExp::Exists(mut traversal) = *inner_expr {
                                     traversal.should_collect = ShouldCollect::No;
                                     Where::Ref(WhereRef {
-                                        expr: BoExp::Exists(traversal),
+                                        expr: BoExp::Not(Box::new(BoExp::Exists(traversal))),
                                     })
                                 } else {
                                     Where::Ref(WhereRef {
