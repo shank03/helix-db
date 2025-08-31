@@ -98,7 +98,33 @@ pub(crate) fn infer_expr_type<'a>(
             Type::Boolean,
             Some(GeneratedStatement::Literal(GenRef::Literal(b.to_string()))),
         ),
-
+        ArrayLiteral(a) => {
+            let mut inner_array_ty = None;
+            let stmts = a
+                .iter()
+                .map(|e| {
+                    let (ty, stmt) = infer_expr_type(
+                        ctx,
+                        e,
+                        scope,
+                        original_query,
+                        parent_ty.clone(),
+                        gen_query,
+                    );
+                    if inner_array_ty.is_none() {
+                        inner_array_ty = Some(ty);
+                    } else {
+                        // TODO handle type is same for all elements
+                    }
+                    // TODO handle none for stmt
+                    stmt.unwrap()
+                })
+                .collect::<Vec<_>>();
+            (
+                inner_array_ty.unwrap(),
+                Some(GeneratedStatement::Array(stmts)),
+            )
+        }
         Traversal(tr) => {
             let mut gen_traversal = GeneratedTraversal::default();
             let final_ty = validate_traversal(
