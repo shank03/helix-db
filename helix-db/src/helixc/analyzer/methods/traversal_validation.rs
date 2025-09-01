@@ -1001,7 +1001,7 @@ pub(crate) fn validate_traversal<'a>(
                         };
                         BoolOp::IsIn(IsIn { value: v })
                     }
-                    _ => unreachable!("shouldve been caught eariler"),
+                    _ => unreachable!("shouldve been caught earlier"),
                 };
                 gen_traversal
                     .steps
