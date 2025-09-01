@@ -2468,7 +2468,7 @@ impl HelixParser {
     }
 
     fn parse_array_literal(&self, pair: Pair<Rule>) -> Result<Vec<Expression>, ParserError> {
-        println!("pair: {:?}", pair);
+        println!("pair: {pair:?}");
         pair.into_inner()
             .map(|p| self.parse_expression(p))
             .collect()
@@ -2940,9 +2940,7 @@ impl HelixParser {
             },
             Rule::IS_IN => BooleanOp {
                 loc: pair.loc(),
-                op: BooleanOpType::IsIn(Box::new(
-                    self.parse_expression(inner)?,
-                )),
+                op: BooleanOpType::IsIn(Box::new(self.parse_expression(inner)?)),
             },
             _ => return Err(ParserError::from("Invalid boolean operation")),
         };
