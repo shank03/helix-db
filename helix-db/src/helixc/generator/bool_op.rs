@@ -1,5 +1,5 @@
 use core::fmt;
-use std::fmt::{format, Display};
+use std::fmt::Display;
 
 use crate::helixc::generator::traversal_steps::Traversal;
 
