@@ -1118,9 +1118,9 @@ impl FilterValues for Value {
     }
 }
 
-impl Into<i8> for Value {
-    fn into(self) -> i8 {
-        match self {
+impl From<Value> for i8 {
+    fn from(val: Value) -> Self {
+        match val {
             Value::I8(i) => i,
             Value::I16(i) => i as i8,
             Value::I32(i) => i as i8,
@@ -1139,9 +1139,9 @@ impl Into<i8> for Value {
     }
 }
 
-impl Into<i16> for Value {
-    fn into(self) -> i16 {
-        match self {
+impl From<Value> for i16 {
+    fn from(val: Value) -> Self {
+        match val {
             Value::I16(i) => i,
             Value::I8(i) => i as i16,
             Value::I32(i) => i as i16,
@@ -1160,9 +1160,9 @@ impl Into<i16> for Value {
     }
 }
 
-impl Into<i32> for Value {
-    fn into(self) -> i32 {
-        match self {
+impl From<Value> for i32 {
+    fn from(val: Value) -> Self {
+        match val {
             Value::I32(i) => i,
             Value::I8(i) => i as i32,
             Value::I16(i) => i as i32,
@@ -1181,9 +1181,9 @@ impl Into<i32> for Value {
     }
 }
 
-impl Into<i64> for Value {
-    fn into(self) -> i64 {
-        match self {
+impl From<Value> for i64 {
+    fn from(val: Value) -> Self {
+        match val {
             Value::I64(i) => i,
             Value::I8(i) => i as i64,
             Value::I16(i) => i as i64,
@@ -1202,9 +1202,9 @@ impl Into<i64> for Value {
     }
 }
 
-impl Into<u8> for Value {
-    fn into(self) -> u8 {
-        match self {
+impl From<Value> for u8 {
+    fn from(val: Value) -> Self {
+        match val {
             Value::U8(i) => i,
             Value::I8(i) => i as u8,
             Value::I16(i) => i as u8,
@@ -1223,9 +1223,9 @@ impl Into<u8> for Value {
     }
 }
 
-impl Into<u16> for Value {
-    fn into(self) -> u16 {
-        match self {
+impl From<Value> for u16 {
+    fn from(val: Value) -> Self {
+        match val {
             Value::U16(i) => i,
             Value::I8(i) => i as u16,
             Value::I16(i) => i as u16,
@@ -1244,9 +1244,9 @@ impl Into<u16> for Value {
     }
 }
 
-impl Into<u32> for Value {
-    fn into(self) -> u32 {
-        match self {
+impl From<Value> for u32 {
+    fn from(val: Value) -> Self {
+        match val {
             Value::U32(i) => i,
             Value::I8(i) => i as u32,
             Value::I16(i) => i as u32,
@@ -1265,9 +1265,9 @@ impl Into<u32> for Value {
     }
 }
 
-impl Into<u64> for Value {
-    fn into(self) -> u64 {
-        match self {
+impl From<Value> for u64 {
+    fn from(val: Value) -> Self {
+        match val {
             Value::U64(i) => i,
             Value::I8(i) => i as u64,
             Value::I16(i) => i as u64,
@@ -1285,9 +1285,9 @@ impl Into<u64> for Value {
     }
 }
 
-impl Into<u128> for Value {
-    fn into(self) -> u128 {
-        match self {
+impl From<Value> for u128 {
+    fn from(val: Value) -> Self {
+        match val {
             Value::U128(i) => i,
             Value::I8(i) => i as u128,
             Value::I16(i) => i as u128,
@@ -1306,9 +1306,9 @@ impl Into<u128> for Value {
     }
 }
 
-impl Into<Date> for Value {
-    fn into(self) -> Date {
-        match self {
+impl From<Value> for Date {
+    fn from(val: Value) -> Self {
+        match val {
             Value::String(s) => Date::new(&Value::String(s)).unwrap(),
             Value::I64(i) => Date::new(&Value::I64(i)).unwrap(),
             Value::U64(i) => Date::new(&Value::U64(i)).unwrap(),
@@ -1316,18 +1316,18 @@ impl Into<Date> for Value {
         }
     }
 }
-impl Into<bool> for Value {
-    fn into(self) -> bool {
-        match self {
+impl From<Value> for bool {
+    fn from(val: Value) -> Self {
+        match val {
             Value::Boolean(b) => b,
             _ => panic!("Value cannot be cast to boolean"),
         }
     }
 }
 
-impl Into<ID> for Value {
-    fn into(self) -> ID {
-        match self {
+impl From<Value> for ID {
+    fn from(val: Value) -> Self {
+        match val {
             Value::Id(id) => id,
             Value::String(s) => ID::from(s),
             Value::U128(i) => ID::from(i),
@@ -1336,27 +1336,27 @@ impl Into<ID> for Value {
     }
 }
 
-impl Into<Vec<Value>> for Value {
-    fn into(self) -> Vec<Value> {
-        match self {
+impl From<Value> for Vec<Value> {
+    fn from(val: Value) -> Self {
+        match val {
             Value::Array(a) => a,
             _ => panic!("Value cannot be cast to array"),
         }
     }
 }
 
-impl Into<HashMap<String, Value>> for Value {
-    fn into(self) -> HashMap<String, Value> {
-        match self {
+impl From<Value> for HashMap<String, Value> {
+    fn from(val: Value) -> Self {
+        match val {
             Value::Object(o) => o,
             _ => panic!("Value cannot be cast to object"),
         }
     }
 }
 
-impl Into<f32> for Value {
-    fn into(self) -> f32 {
-        match self {
+impl From<Value> for f32 {
+    fn from(val: Value) -> Self {
+        match val {
             Value::F32(f) => f,
             Value::F64(f) => f as f32,
             Value::I8(i) => i as f32,
@@ -1374,9 +1374,9 @@ impl Into<f32> for Value {
     }
 }
 
-impl Into<f64> for Value {
-    fn into(self) -> f64 {
-        match self {
+impl From<Value> for f64 {
+    fn from(val: Value) -> Self {
+        match val {
             Value::F64(f) => f,
             Value::F32(f) => f as f64,
             Value::I8(i) => i as f64,
