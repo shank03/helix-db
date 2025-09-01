@@ -209,13 +209,16 @@ embed_method = { "Embed" ~ "(" ~ (identifier | string_literal) ~ ")" }
 // ---------------------------------------------------------------------
 and             = { negate? ~ "AND" ~ "(" ~ (evaluates_to_bool | anonymous_traversal) ~ ("," ~ (evaluates_to_bool | anonymous_traversal))* ~ ")" }
 or              = { negate? ~ "OR" ~ "(" ~ (evaluates_to_bool | anonymous_traversal) ~ ("," ~ (evaluates_to_bool | anonymous_traversal))* ~ ")" }
-bool_operations = { GT | GTE | LT | LTE | EQ | NEQ }
+bool_operations = { GT | GTE | LT | LTE | EQ | NEQ | CONTAINS | IS_IN }
 GT              = { "GT" ~ "(" ~ (evaluates_to_number | anonymous_traversal) ~ ")" }
 GTE             = { "GTE" ~ "(" ~ (evaluates_to_number | anonymous_traversal) ~ ")" }
 LT              = { "LT" ~ "(" ~ (evaluates_to_number | anonymous_traversal) ~ ")" }
 LTE             = { "LTE" ~ "(" ~ (evaluates_to_number | anonymous_traversal) ~ ")" }
 EQ              = { "EQ" ~ "(" ~ (evaluates_to_anything | anonymous_traversal) ~ ")" }
 NEQ             = { "NEQ" ~ "(" ~ (evaluates_to_anything | anonymous_traversal) ~ ")" }
+CONTAINS        = { "CONTAINS" ~ "(" ~ (evaluates_to_anything | anonymous_traversal) ~ ")" }
+IS_IN           = { "IS_IN" ~ "(" ~ (array_literal | identifier) ~ ")" }
+array_literal     = { "[" ~ (evaluates_to_anything) ~ ("," ~ (evaluates_to_anything))* ~ "]" }
 
 
 // ---------------------------------------------------------------------

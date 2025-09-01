@@ -489,6 +489,7 @@ pub enum ExpressionType {
     IntegerLiteral(i32),
     FloatLiteral(f64),
     BooleanLiteral(bool),
+    ArrayLiteral(Vec<Expression>),
     Exists(ExistsExpression),
     BatchAddVector(BatchAddVector),
     AddVector(AddVector),
@@ -510,6 +511,7 @@ impl Debug for ExpressionType {
             ExpressionType::IntegerLiteral(i) => write!(f, "{i}"),
             ExpressionType::FloatLiteral(fl) => write!(f, "{fl}"),
             ExpressionType::BooleanLiteral(b) => write!(f, "{b}"),
+            ExpressionType::ArrayLiteral(a) => write!(f, "Array({a:?})"),
             ExpressionType::Exists(e) => write!(f, "Exists({e:?})"),
             ExpressionType::BatchAddVector(bav) => write!(f, "BatchAddVector({bav:?})"),
             ExpressionType::AddVector(av) => write!(f, "AddVector({av:?})"),
@@ -533,6 +535,7 @@ impl Display for ExpressionType {
             ExpressionType::IntegerLiteral(i) => write!(f, "{i}"),
             ExpressionType::FloatLiteral(fl) => write!(f, "{fl}"),
             ExpressionType::BooleanLiteral(b) => write!(f, "{b}"),
+            ExpressionType::ArrayLiteral(a) => write!(f, "Array({a:?})"),
             ExpressionType::Exists(e) => write!(f, "Exists({e:?})"),
             ExpressionType::BatchAddVector(bav) => write!(f, "BatchAddVector({bav:?})"),
             ExpressionType::AddVector(av) => write!(f, "AddVector({av:?})"),
@@ -716,6 +719,8 @@ pub enum BooleanOpType {
     LessThanOrEqual(Box<Expression>),
     Equal(Box<Expression>),
     NotEqual(Box<Expression>),
+    Contains(Box<Expression>),
+    IsIn(Box<Expression>),
 }
 
 #[derive(Debug, Clone)]
@@ -2422,6 +2427,10 @@ impl HelixParser {
                 loc: pair.loc(),
                 expr: ExpressionType::BooleanLiteral(pair.as_str() == "true"),
             }),
+            Rule::array_literal => Ok(Expression {
+                loc: pair.loc(),
+                expr: ExpressionType::ArrayLiteral(self.parse_array_literal(pair)?),
+            }),
             Rule::evaluates_to_bool => Ok(self.parse_boolean_expression(pair)?),
             Rule::AddN => Ok(Expression {
                 loc: pair.loc(),
@@ -2456,6 +2465,13 @@ impl HelixParser {
                 pair.as_rule()
             ))),
         }
+    }
+
+    fn parse_array_literal(&self, pair: Pair<Rule>) -> Result<Vec<Expression>, ParserError> {
+        println!("pair: {pair:?}");
+        pair.into_inner()
+            .map(|p| self.parse_expression(p))
+            .collect()
     }
 
     fn parse_string_literal(&self, pair: Pair<Rule>) -> Result<String, ParserError> {
@@ -2915,6 +2931,16 @@ impl HelixParser {
                 op: BooleanOpType::NotEqual(Box::new(
                     self.parse_expression(inner.into_inner().next().unwrap())?,
                 )),
+            },
+            Rule::CONTAINS => BooleanOp {
+                loc: pair.loc(),
+                op: BooleanOpType::Contains(Box::new(
+                    self.parse_expression(inner.into_inner().next().unwrap())?,
+                )),
+            },
+            Rule::IS_IN => BooleanOp {
+                loc: pair.loc(),
+                op: BooleanOpType::IsIn(Box::new(self.parse_expression(inner)?)),
             },
             _ => return Err(ParserError::from("Invalid boolean operation")),
         };
