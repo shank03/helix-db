@@ -4,7 +4,6 @@ use super::{
 };
 use crate::{debug_println, helix_engine::traversal_core::traversal_value::TraversalValue};
 use crate::{
-    helix_engine::vector_core::vector::HVector,
     utils::{
         count::Count,
         filterable::{Filterable, FilterableType},
