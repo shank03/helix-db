@@ -226,7 +226,7 @@ fn analyze_return_expr<'a>(
         ReturnType::Array(values) => {
             let values = values
                 .iter()
-                .map(|object| process_return_object(ctx, original_query, scope, &object, query))
+                .map(|object| process_return_object(ctx, original_query, scope, object, query))
                 .collect::<Vec<ReturnValueExpr>>();
             query.return_values.push(ReturnValue::new_array(values));
         }
@@ -236,7 +236,7 @@ fn analyze_return_expr<'a>(
                 .map(|(key, value)| {
                     (
                         key.clone(),
-                        process_return_object(ctx, original_query, scope, &value, query),
+                        process_return_object(ctx, original_query, scope, value, query),
                     )
                 })
                 .collect::<HashMap<String, ReturnValueExpr>>();
@@ -319,7 +319,7 @@ fn process_return_object<'a>(
         ReturnType::Array(values) => {
             let values = values
                 .iter()
-                .map(|value| process_return_object(ctx, original_query, scope, &value, query))
+                .map(|value| process_return_object(ctx, original_query, scope, value, query))
                 .collect::<Vec<ReturnValueExpr>>();
             ReturnValueExpr::Array(values)
         }
@@ -329,7 +329,7 @@ fn process_return_object<'a>(
                 .map(|(key, value)| {
                     (
                         key.clone(),
-                        process_return_object(ctx, original_query, scope, &value, query),
+                        process_return_object(ctx, original_query, scope, value, query),
                     )
                 })
                 .collect::<HashMap<String, ReturnValueExpr>>();
