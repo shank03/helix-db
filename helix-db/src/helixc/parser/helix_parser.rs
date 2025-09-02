@@ -411,7 +411,7 @@ pub struct Query {
     pub name: String,
     pub parameters: Vec<Parameter>,
     pub statements: Vec<Statement>,
-    pub return_values: Vec<Expression>,
+    pub return_values: Vec<ReturnType>,
     pub loc: Loc,
 }
 
@@ -502,6 +502,15 @@ pub enum ExpressionType {
     BM25Search(BM25Search),
     Empty,
 }
+
+#[derive(Debug, Clone)]
+pub enum ReturnType {
+    Array(Vec<ReturnType>),
+    Object(HashMap<String, ReturnType>),
+    Expression(Expression),
+    Empty,
+}
+
 impl Debug for ExpressionType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -2217,11 +2226,91 @@ impl HelixParser {
         })
     }
 
-    fn parse_return_statement(&self, pair: Pair<Rule>) -> Result<Vec<Expression>, ParserError> {
+    fn parse_return_statement(&self, pair: Pair<Rule>) -> Result<Vec<ReturnType>, ParserError> {
         // println!("pair: {:?}", pair.clone().into_inner());
+        let inner = pair.into_inner();
+        let mut return_types = Vec::new();
+        for pair in inner {
+            match pair.as_rule() {
+                Rule::array_creation => {
+                    return_types.push(ReturnType::Array(self.parse_array_creation(pair)?));
+                }
+                Rule::object_creation => {
+                    return_types.push(ReturnType::Object(self.parse_object_creation(pair)?));
+                }
+                Rule::evaluates_to_anything => {
+                    return_types.push(ReturnType::Expression(self.parse_expression(pair)?));
+                }
+                _ => {
+                    return Err(ParserError::from(format!(
+                        "Unexpected rule in return statement: {:?}",
+                        pair.as_rule()
+                    )));
+                }
+            }
+        }
+        Ok(return_types)
+    }
+
+    fn parse_array_creation(&self, pair: Pair<Rule>) -> Result<Vec<ReturnType>, ParserError> {
+        let pairs = pair.into_inner();
+        let mut objects = Vec::new();
+        for p in pairs {
+            match p.as_rule() {
+                Rule::identifier => {
+                    objects.push(ReturnType::Expression(Expression {
+                        loc: p.loc(),
+                        expr: ExpressionType::Identifier(p.as_str().to_string()),
+                    }));
+                }
+                _ => {
+                    objects.push(ReturnType::Object(self.parse_object_creation(p)?));
+                }
+            }
+        }
+        Ok(objects)
+    }
+
+    fn parse_object_creation(
+        &self,
+        pair: Pair<Rule>,
+    ) -> Result<HashMap<String, ReturnType>, ParserError> {
         pair.into_inner()
-            .map(|p| self.parse_expression(p))
-            .collect()
+            .map(|p| {
+                let mut object_inner = p.into_inner();
+                let key = object_inner
+                    .next()
+                    .ok_or_else(|| ParserError::from("Missing object inner"))?;
+                let value = object_inner
+                    .next()
+                    .ok_or_else(|| ParserError::from("Missing object inner"))?;
+                let value = self.parse_object_inner(value)?;
+                Ok((key.as_str().to_string(), value))
+            })
+            .collect::<Result<HashMap<String, ReturnType>, _>>()
+    }
+
+    fn parse_object_inner(&self, object_field: Pair<Rule>) -> Result<ReturnType, ParserError> {
+        let object_field_inner = object_field
+            .into_inner()
+            .next()
+            .ok_or_else(|| ParserError::from("Missing object inner"))?;
+
+        match object_field_inner.as_rule() {
+            Rule::evaluates_to_anything => Ok(ReturnType::Expression(
+                self.parse_expression(object_field_inner)?,
+            )),
+            Rule::object_creation => Ok(ReturnType::Object(
+                self.parse_object_creation(object_field_inner)?,
+            )),
+            Rule::array_creation => Ok(ReturnType::Array(
+                self.parse_array_creation(object_field_inner)?,
+            )),
+            _ => Err(ParserError::from(format!(
+                "Unexpected rule in parse_object_inner: {:?}",
+                object_field_inner.as_rule()
+            ))),
+        }
     }
 
     fn parse_expression_vec(&self, pairs: Pairs<Rule>) -> Result<Vec<Expression>, ParserError> {
